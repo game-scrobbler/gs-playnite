@@ -307,6 +307,11 @@
             Gets collection of import exclusions.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.IGameDatabase.FilterPresets">
+            <summary>
+            Gets collection of filter presets.
+            </summary>
+        </member>
         <member name="P:Playnite.SDK.IGameDatabase.IsOpen">
             <summary>
             Gets value indicating whether database is opened.
@@ -331,6 +336,38 @@
             <param name="game">Game data to import.</param>
             <param name="sourcePlugin">Source library plugin.</param>
             <returns>Imported game.</returns>
+        </member>
+        <member name="M:Playnite.SDK.IGameDatabase.GetGameMatchesFilter(Playnite.SDK.Models.Game,Playnite.SDK.Models.FilterPresetSettings)">
+            <summary>
+            Checks if the game matches specified filter settings.
+            </summary>
+            <param name="game"></param>
+            <param name="filterSettings"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.IGameDatabase.GetFilteredGames(Playnite.SDK.Models.FilterPresetSettings)">
+            <summary>
+            Returns enumeration of all games matching specified filter settings.
+            </summary>
+            <param name="filterSettings"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.IGameDatabase.GetGameMatchesFilter(Playnite.SDK.Models.Game,Playnite.SDK.Models.FilterPresetSettings,System.Boolean)">
+            <summary>
+            Checks if the game matches specified filter settings.
+            </summary>
+            <param name="game"></param>
+            <param name="filterSettings"></param>
+            <param name="useFuzzyNameMatch"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.IGameDatabase.GetFilteredGames(Playnite.SDK.Models.FilterPresetSettings,System.Boolean)">
+            <summary>
+            Returns enumeration of all games matching specified filter settings.
+            </summary>
+            <param name="filterSettings"></param>
+            <param name="useFuzzyNameMatch"></param>
+            <returns></returns>
         </member>
         <member name="T:Playnite.SDK.ItemUpdateEvent`1">
             <summary>
@@ -492,7 +529,7 @@
         </member>
         <member name="M:Playnite.SDK.IItemCollection`1.Add(System.Collections.Generic.IEnumerable{`0})">
             <summary>
-            Adds itemss to into collection.
+            Adds items to collection.
             </summary>
             <param name="items">Item to be added.</param>
         </member>
@@ -522,6 +559,12 @@
             </summary>
             <param name="items">New states of items.</param>
         </member>
+        <member name="M:Playnite.SDK.IItemCollection`1.BufferedUpdate">
+            <summary>
+            Switches collection to buffered mode. Suppresses all notification events until buffering is stopped.
+            </summary>
+            <returns>Buffer object.</returns>
+        </member>
         <member name="M:Playnite.SDK.IItemCollection`1.BeginBufferUpdate">
             <summary>
             Sets collection into buffered update state.
@@ -534,7 +577,7 @@
         </member>
         <member name="M:Playnite.SDK.IItemCollection`1.GetClone">
             <summary>
-            Gets clone of an collection.
+            Gets clone of a collection.
             </summary>
             <returns></returns>
         </member>
@@ -600,7 +643,7 @@
         </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.ToYaml(System.Object)">
             <summary>
-            Serailize an object to YAML string.
+            Serialize an object to YAML string.
             </summary>
             <param name="obj"></param>
             <returns></returns>
@@ -615,11 +658,21 @@
         </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.TryFromYaml``1(System.String,``0@)">
             <summary>
-            Tries to deserialize an object form YAML string.
+            Tries to deserialize an object from YAML string.
             </summary>
             <typeparam name="T"></typeparam>
             <param name="yaml"></param>
             <param name="content"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.Data.IDataSerializer.TryFromYaml``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from YAML string.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="yaml"></param>
+            <param name="content"></param>
+            <param name="error"></param>
             <returns></returns>
         </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.FromYamlFile``1(System.String)">
@@ -639,9 +692,19 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.IDataSerializer.TryFromYamlFile``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to serialize an object to YAML file.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="filePath"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.ToJson(System.Object,System.Boolean)">
             <summary>
-            Serailize an object to JSON string.
+            Serialize an object to JSON string.
             </summary>
             <param name="obj"></param>
             <param name="formatted"></param>
@@ -672,6 +735,16 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.IDataSerializer.TryFromJson``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from JSON string.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="json"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.FromJsonStream``1(System.IO.Stream)">
             <summary>
             Deserialize an object from JSON data stream.
@@ -687,6 +760,16 @@
             <typeparam name="T"></typeparam>
             <param name="stream"></param>
             <param name="content"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.Data.IDataSerializer.TryFromJsonStream``1(System.IO.Stream,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from JSON data stream.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="stream"></param>
+            <param name="content"></param>
+            <param name="error"></param>
             <returns></returns>
         </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.FromJsonFile``1(System.String)">
@@ -706,6 +789,16 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.IDataSerializer.TryFromJsonFile``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from JSON file.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="filePath"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.FromToml``1(System.String)">
             <summary>
             Deserialize an object from TOML string.
@@ -723,6 +816,16 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.IDataSerializer.TryFromToml``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from TOML string.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="toml"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.FromTomlFile``1(System.String)">
             <summary>
             Deserialize an object from a file containing TOML string.
@@ -738,6 +841,16 @@
             <typeparam name="T"></typeparam>
             <param name="filePath"></param>
             <param name="content"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.Data.IDataSerializer.TryFromTomlFile``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from TOML file.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="filePath"></param>
+            <param name="content"></param>
+            <param name="error"></param>
             <returns></returns>
         </member>
         <member name="M:Playnite.SDK.Data.IDataSerializer.GetClone``1(``0)">
@@ -772,7 +885,7 @@
         </member>
         <member name="M:Playnite.SDK.Data.Serialization.ToYaml(System.Object)">
             <summary>
-            Serailize an object to YAML string.
+            Serialize an object to YAML string.
             </summary>
             <param name="obj"></param>
             <returns></returns>
@@ -794,6 +907,16 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.Serialization.TryFromYaml``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from YAML string.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="yaml"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.Serialization.FromYamlFile``1(System.String)">
             <summary>
             Deserialize an object from a file containing YAML string.
@@ -811,9 +934,19 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.Serialization.TryFromYamlFile``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from YAML file.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="filePath"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.Serialization.ToJson(System.Object,System.Boolean)">
             <summary>
-            Serailize an object to JSON string.
+            Serialize an object to JSON string.
             </summary>
             <param name="obj"></param>
             <param name="formatted"></param>
@@ -844,6 +977,16 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.Serialization.TryFromJson``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from JSON string.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="json"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.Serialization.FromJsonStream``1(System.IO.Stream)">
             <summary>
             Deserialize an object from JSON data stream.
@@ -859,6 +1002,16 @@
             <typeparam name="T"></typeparam>
             <param name="stream"></param>
             <param name="content"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.Data.Serialization.TryFromJsonStream``1(System.IO.Stream,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from JSON data stream.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="stream"></param>
+            <param name="content"></param>
+            <param name="error"></param>
             <returns></returns>
         </member>
         <member name="M:Playnite.SDK.Data.Serialization.FromJsonFile``1(System.String)">
@@ -878,6 +1031,16 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.Serialization.TryFromJsonFile``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from JSON file.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="filePath"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.Serialization.FromToml``1(System.String)">
             <summary>
             Deserialize an object from TOML string.
@@ -895,6 +1058,16 @@
             <param name="content"></param>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Data.Serialization.TryFromToml``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from TOML string.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="toml"></param>
+            <param name="content"></param>
+            <param name="error"></param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Data.Serialization.FromTomlFile``1(System.String)">
             <summary>
             Deserialize an object from a file containing TOML string.
@@ -910,6 +1083,16 @@
             <typeparam name="T"></typeparam>
             <param name="filePath"></param>
             <param name="content"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.Data.Serialization.TryFromTomlFile``1(System.String,``0@,System.Exception@)">
+            <summary>
+            Tries to deserialize an object from TOML file.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="filePath"></param>
+            <param name="content"></param>
+            <param name="error"></param>
             <returns></returns>
         </member>
         <member name="M:Playnite.SDK.Data.Serialization.GetClone``1(``0)">
@@ -1036,7 +1219,12 @@
         </member>
         <member name="P:Playnite.SDK.IEmulationAPI.Regions">
             <summary>
-            Gets built-in region defitions.
+            Gets built-in region definitions.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.IEmulationAPI.Emulators">
+            <summary>
+            Gets list of built-in emulator definitions.
             </summary>
         </member>
         <member name="M:Playnite.SDK.IEmulationAPI.GetPlatform(System.String)">
@@ -1051,6 +1239,13 @@
             Gets specific region by id.
             </summary>
             <param name="regionId"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.IEmulationAPI.GetEmulator(System.String)">
+            <summary>
+            Gets specific built-in emulator definition.
+            </summary>
+            <param name="emulatorDefinitionId"></param>
             <returns></returns>
         </member>
         <member name="T:Playnite.SDK.Events.ApplicationEvent">
@@ -1103,6 +1298,11 @@
             
              </summary>
         </member>
+        <member name="F:Playnite.SDK.Events.ApplicationEvent.OnGameStartupCancelled">
+             <summary>
+            
+             </summary>
+        </member>
         <member name="T:Playnite.SDK.Events.OnGameSelectedEventArgs">
             <summary>
             Represents game selection change event.
@@ -1145,9 +1345,14 @@
             Gets ROM file selected when running a game with multiple ROMs assigned.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Events.OnGameStartingEventArgs.CancelStartup">
+            <summary>
+            Gets or sets value indicating whether game startup should be interrupted.
+            </summary>
+        </member>
         <member name="T:Playnite.SDK.Events.OnGameStartedEventArgs">
             <summary>
-            Represents arguments for the event a game starts running.
+            Represents arguments for the event when a game starts running.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Events.OnGameStartedEventArgs.Game">
@@ -1165,9 +1370,24 @@
             Gets ROM file selected when running a game with multiple ROMs assigned.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Events.OnGameStartedEventArgs.StartedProcessId">
+            <summary>
+            Gets started process ID. Might not be valid for all started games depending on how the game was started.
+            </summary>
+        </member>
+        <member name="T:Playnite.SDK.Events.OnGameStartupCancelledEventArgs">
+            <summary>
+            Represents arguments for the event when a game is installed.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Events.OnGameStartupCancelledEventArgs.Game">
+            <summary>
+            Gets or sets game object initiating the event.
+            </summary>
+        </member>
         <member name="T:Playnite.SDK.Events.OnGameStoppedEventArgs">
             <summary>
-            Reperesents arguments for the event when a game stops running.
+            Represents arguments for the event when a game stops running.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Events.OnGameStoppedEventArgs.Game">
@@ -1178,6 +1398,11 @@
         <member name="P:Playnite.SDK.Events.OnGameStoppedEventArgs.ElapsedSeconds">
             <summary>
             Gets or sets length of the game session in seconds.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Events.OnGameStoppedEventArgs.ManuallyStopped">
+            <summary>
+            Gets value indicated whether game tracking was manually stopped by a user.
             </summary>
         </member>
         <member name="T:Playnite.SDK.Events.OnGameInstalledEventArgs">
@@ -1217,7 +1442,7 @@
         </member>
         <member name="T:Playnite.SDK.Events.PlayniteUriEventArgs">
             <summary>
-            Respresents arguments for Playnite URI execution event.
+            Represents arguments for Playnite URI execution event.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Events.PlayniteUriEventArgs.Arguments">
@@ -1334,6 +1559,26 @@
             Gets list of currently loaded plugins.
             </summary>
         </member>
+        <member name="T:Playnite.SDK.PlaytimeImportMode">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.PlaytimeImportMode.Always">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.PlaytimeImportMode.NewImportsOnly">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.PlaytimeImportMode.Never">
+             <summary>
+            
+             </summary>
+        </member>
         <member name="T:Playnite.SDK.IFullscreenSettingsAPI">
             <summary>
             Describes interface for Fullscreen mode settings.
@@ -1346,7 +1591,7 @@
         </member>
         <member name="T:Playnite.SDK.ICompletionStatusSettignsApi">
             <summary>
-            Describes interafce for completion status related settings.
+            Describes interface for completion status related settings.
             </summary>
         </member>
         <member name="P:Playnite.SDK.ICompletionStatusSettignsApi.DefaultStatus">
@@ -1459,6 +1704,11 @@
             
              </summary>
         </member>
+        <member name="P:Playnite.SDK.IPlayniteSettingsAPI.PlaytimeImportMode">
+             <summary>
+            
+             </summary>
+        </member>
         <member name="P:Playnite.SDK.IPlayniteSettingsAPI.FontFamilyName">
              <summary>
             
@@ -1505,7 +1755,7 @@
         </member>
         <member name="T:Playnite.SDK.IUriHandlerAPI">
             <summary>
-            Describest API for handling playnite:// URI.
+            Describes API for handling playnite:// URI.
             </summary>
         </member>
         <member name="M:Playnite.SDK.IUriHandlerAPI.RegisterSource(System.String,System.Action{Playnite.SDK.Events.PlayniteUriEventArgs})">
@@ -1535,6 +1785,21 @@
             <summary>
             ESRB - Entertainment Software Rating Board
             </summary>
+        </member>
+        <member name="T:Playnite.SDK.Models.AppSoftwareType">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.AppSoftwareType.Standard">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.AppSoftwareType.Script">
+             <summary>
+            
+             </summary>
         </member>
         <member name="T:Playnite.SDK.Models.AppSoftware">
             <summary>
@@ -1566,6 +1831,16 @@
             
              </summary>
         </member>
+        <member name="P:Playnite.SDK.Models.AppSoftware.AppType">
+            <summary>
+            Gets or sets type.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.AppSoftware.Script">
+            <summary>
+            Gets or sets script to execute if type is set to script type.
+            </summary>
+        </member>
         <member name="M:Playnite.SDK.Models.AppSoftware.#ctor">
             <summary>
             Creates new instance of <see cref="T:Playnite.SDK.Models.AppSoftware"/>.
@@ -1580,6 +1855,131 @@
         <member name="M:Playnite.SDK.Models.AppSoftware.CopyDiffTo(System.Object)">
             <inheritdoc/>
         </member>
+        <member name="T:Playnite.SDK.Models.IdItemFilterItemProperties">
+            <summary>
+            Represents filter for ID based fields.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.IdItemFilterItemProperties.Ids">
+            <summary>
+            Gets or sets list of item IDs to filter.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.IdItemFilterItemProperties.Text">
+            <summary>
+            Gets or sets full text search to filter.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.IdItemFilterItemProperties.#ctor">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.IdItemFilterItemProperties"/>.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.IdItemFilterItemProperties.#ctor(System.Collections.Generic.List{System.Guid})">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.IdItemFilterItemProperties"/>.
+            </summary>
+            <param name="ids"></param>
+        </member>
+        <member name="M:Playnite.SDK.Models.IdItemFilterItemProperties.#ctor(System.Guid)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.IdItemFilterItemProperties"/>.
+            </summary>
+            <param name="id"></param>
+        </member>
+        <member name="M:Playnite.SDK.Models.IdItemFilterItemProperties.#ctor(System.String)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.IdItemFilterItemProperties"/>.
+            </summary>
+            <param name="text"></param>
+        </member>
+        <member name="T:Playnite.SDK.Models.StringFilterItemProperties">
+            <summary>
+            Represents filter for string based fields.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.StringFilterItemProperties.Values">
+            <summary>
+            Gets or sets values to filter.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.StringFilterItemProperties.#ctor">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.StringFilterItemProperties"/>.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.StringFilterItemProperties.#ctor(System.Collections.Generic.List{System.String})">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.StringFilterItemProperties"/>.
+            </summary>
+            <param name="values"></param>
+        </member>
+        <member name="M:Playnite.SDK.Models.StringFilterItemProperties.#ctor(System.String)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.StringFilterItemProperties"/>.
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="T:Playnite.SDK.Models.EnumFilterItemProperties">
+            <summary>
+            Represents filter for enum based fields.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EnumFilterItemProperties.Values">
+            <summary>
+            Gets or sets values to filter.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.EnumFilterItemProperties.#ctor">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.EnumFilterItemProperties"/>.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.EnumFilterItemProperties.#ctor(System.Collections.Generic.List{System.Int32})">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.EnumFilterItemProperties"/>.
+            </summary>
+            <param name="values"></param>
+        </member>
+        <member name="M:Playnite.SDK.Models.EnumFilterItemProperties.#ctor(System.Int32)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Models.EnumFilterItemProperties"/>.
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="T:Playnite.SDK.Models.FilterPreset">
+            <summary>
+            Represents filter preset.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.FilterPreset.Settings">
+            <summary>
+            Gets or sets filter settings.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.FilterPreset.SortingOrder">
+            <summary>
+            Gets or sets view sorting order.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.FilterPreset.SortingOrderDirection">
+            <summary>
+            Gets or sets view sorting order direction.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.FilterPreset.GroupingOrder">
+            <summary>
+            Gets or sets view grouping.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.FilterPreset.ShowInFullscreeQuickSelection">
+            <summary>
+            Gets or sets value indicating whether a filter preset should be shown in FS mode quick filter list.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.FilterPreset.CopyDiffTo(System.Object)">
+            <inheritdoc/>
+        </member>
         <member name="T:Playnite.SDK.Models.GameRom">
             <summary>
             Represents game disk image.
@@ -1592,7 +1992,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.GameRom.Path">
             <summary>
-            Gets rom path.
+            Gets ROM path.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Models.GameRom.#ctor">
@@ -1609,6 +2009,32 @@
         </member>
         <member name="M:Playnite.SDK.Models.GameRom.Equals(Playnite.SDK.Models.GameRom)">
             <inheritdoc/>
+        </member>
+        <member name="M:Playnite.SDK.Models.GameRom.GetCopy">
+             <summary>
+            
+             </summary>
+             <returns></returns>
+        </member>
+        <member name="T:Playnite.SDK.Models.ScannerConfigPlayActionSettings">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.ScannerConfigPlayActionSettings.ScannerSettings">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.ScannerConfigPlayActionSettings.SelectProfiteOnStart">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.ScannerConfigPlayActionSettings.SelectEmulatorOnStart">
+             <summary>
+            
+             </summary>
         </member>
         <member name="T:Playnite.SDK.Models.GameScannerConfig">
             <summary>
@@ -1637,7 +2063,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.GameScannerConfig.InGlobalUpdate">
             <summary>
-            Gets or sets value indicating whether this configu should be included in global library update.
+            Gets or sets value indicating whether this config should be included in global library update.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.GameScannerConfig.ExcludeOnlineFiles">
@@ -1650,12 +2076,52 @@
             Gets or sets value indicating whether online only cloud files should still be scanned without reading a file.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Models.GameScannerConfig.ImportWithRelativePaths">
+            <summary>
+            Gets or sets value indicating whether game ROMs should be imported under relative paths if possible.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameScannerConfig.ScanSubfolders">
+            <summary>
+            Gets or sets value indicating whether subfolders should be scanned.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameScannerConfig.ScanInsideArchives">
+            <summary>
+            Gets or sets value indicating whether file archives should be scanned for content.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameScannerConfig.ExcludedFiles">
+            <summary>
+            Gets or sets list of files excluded from scan.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameScannerConfig.ExcludedDirectories">
+            <summary>
+            Gets or sets list of folders excluded from scan.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameScannerConfig.OverridePlatformId">
+            <summary>
+            Gets or sets id of default platform to be assigned if auto detection fails.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameScannerConfig.PlayActionSettings">
+            <summary>
+            Gets or sets play action settings for imported games.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameScannerConfig.MergeRelatedFiles">
+            <summary>
+            Gets or sets value indicating whether related files, like individual game discs, should be merged under one game entry.
+            </summary>
+        </member>
         <member name="M:Playnite.SDK.Models.GameScannerConfig.CopyDiffTo(System.Object)">
             <inheritdoc/>
         </member>
         <member name="T:Playnite.SDK.Models.IIdentifiable">
             <summary>
-            Desribest object identifiable by an id.
+            Desribes object identifiable by an id.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.IIdentifiable.Id">
@@ -1678,6 +2144,56 @@
             Game is not installed.
             </summary>
         </member>
+        <member name="T:Playnite.SDK.Models.InstallSizeGroup">
+            <summary>
+            Specifies Install Size categories.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.None">
+            <summary>
+            Not playtime.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.S0_0MB_100MB">
+            <summary>
+            0 to 100MB.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.S1_100MB_1GB">
+            <summary>
+            100MB to 1GB.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.S2_1GB_5GB">
+            <summary>
+            1GB to 5GB.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.S3_5GB_10GB">
+            <summary>
+            5GB to 10GB.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.S4_10GB_20GB">
+            <summary>
+            10GB to 20GB.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.S5_20GB_40GB">
+            <summary>
+            20GB to 40GB.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.S6_40GB_100GB">
+            <summary>
+            40GB to 100GB.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.InstallSizeGroup.S7_100GBPlus">
+            <summary>
+            100GB or more.
+            </summary>
+        </member>
         <member name="T:Playnite.SDK.Models.PastTimeSegment">
             <summary>
             Specifies past time segments.
@@ -1685,42 +2201,42 @@
         </member>
         <member name="F:Playnite.SDK.Models.PastTimeSegment.Today">
             <summary>
-            Idicates time occurig today.
+            Indicates time occuring today.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.PastTimeSegment.Yesterday">
             <summary>
-            Idicates time occurig yesterday.
+            Indicates time occuring yesterday.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.PastTimeSegment.PastWeek">
             <summary>
-            Idicates time occurig past week.
+            Indicates time occuring past week.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.PastTimeSegment.PastMonth">
             <summary>
-            Idicates time occurig past month.
+            Indicates time occuring past month.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.PastTimeSegment.PastYear">
             <summary>
-            Idicates time occurig past year.
+            Indicates time occuring past year.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.PastTimeSegment.MoreThenYear">
             <summary>
-            Idicates time occurig past year.
+            Indicates time occuring past year.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.PastTimeSegment.Never">
             <summary>
-            Idicates time that never happened.
+            Indicates time that never happened.
             </summary>
         </member>
         <member name="T:Playnite.SDK.Models.PlaytimeCategory">
             <summary>
-            Specifies plat time categories.
+            Specifies play time categories.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.PlaytimeCategory.NotPlayed">
@@ -1730,7 +2246,7 @@
         </member>
         <member name="F:Playnite.SDK.Models.PlaytimeCategory.LessThenHour">
             <summary>
-            Less then an hour played.
+            Less than an hour played.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.PlaytimeCategory.O1_10">
@@ -1761,6 +2277,11 @@
         <member name="T:Playnite.SDK.Models.ReleaseDate">
             <summary>
             Represents game release date.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.ReleaseDate.Date">
+            <summary>
+            Gets DateTime representation of release date.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ReleaseDate.Empty">
@@ -1840,7 +2361,7 @@
         </member>
         <member name="M:Playnite.SDK.Models.ReleaseDate.Serialize">
             <summary>
-            Get release date serialized to a string.
+            Gets release date serialized to a string.
             </summary>
             <returns></returns>
         </member>
@@ -1867,7 +2388,7 @@
         </member>
         <member name="T:Playnite.SDK.Models.ScoreRating">
             <summary>
-            Scpecifies game score rating.
+            Specifies game score rating.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreRating.None">
@@ -1892,57 +2413,57 @@
         </member>
         <member name="T:Playnite.SDK.Models.ScoreGroup">
             <summary>
-            Scpecifies rating score groups.
+            Specifies rating score groups.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O0x">
             <summary>
-            Score rage from 0 to 10.
+            Score range from 0 to 10.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O1x">
             <summary>
-            Score rage from 10 to 20.
+            Score range from 10 to 20.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O2x">
             <summary>
-            Score rage from 20 to 30.
+            Score range from 20 to 30.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O3x">
             <summary>
-            Score rage from 30 to 40.
+            Score range from 30 to 40.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O4x">
             <summary>
-            Score rage from 40 to 50.
+            Score range from 40 to 50.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O5x">
             <summary>
-            Score rage from 50 to 60.
+            Score range from 50 to 60.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O6x">
             <summary>
-            Score rage from 60 to 70.
+            Score range from 60 to 70.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O7x">
             <summary>
-            Score rage from 70 to 80.
+            Score range from 70 to 80.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O8x">
             <summary>
-            Score rage from 80 to 90.
+            Score range from 80 to 90.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.O9x">
             <summary>
-            Score rage from 90 to 100.
+            Score range from 90 to 100.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Models.ScoreGroup.None">
@@ -1952,7 +2473,7 @@
         </member>
         <member name="T:Playnite.SDK.Models.GameFeature">
             <summary>
-            Describes fame feature object.
+            Describes game feature object.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Models.GameFeature.#ctor">
@@ -2126,9 +2647,9 @@
             <param name="name"></param>
         </member>
         <member name="F:Playnite.SDK.Models.Company.Empty">
-            <summary>
+             <summary>
             
-            </summary>
+             </summary>
         </member>
         <member name="T:Playnite.SDK.Models.Developer">
             <summary>
@@ -2313,7 +2834,7 @@
         </member>
         <member name="T:Playnite.SDK.Models.MetadataProperty">
             <summary>
-            Represents based metdata property.
+            Represents base metadata property.
             </summary>
         </member>
         <member name="T:Playnite.SDK.Models.GameMetadata">
@@ -2323,7 +2844,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.GameMetadata.Name">
             <summary>
-            Gets or sets name.
+            Gets or sets Name.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.GameMetadata.GameId">
@@ -2339,6 +2860,11 @@
         <member name="P:Playnite.SDK.Models.GameMetadata.InstallDirectory">
             <summary>
             Gets or sets installation directory.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameMetadata.InstallSize">
+            <summary>
+            Gets or sets install size in bytes of the game.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.GameMetadata.SortingName">
@@ -2520,9 +3046,90 @@
             Gets empty CompletionStatus.
             </summary>
         </member>
+        <member name="T:Playnite.SDK.Models.EmulatorDefinitionProfile">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.Name">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.Platforms">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.ImageExtensions">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.ProfileFiles">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.InstallationFile">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.StartupArguments">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.StartupExecutable">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.ScriptStartup">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinitionProfile.ScriptGameImport">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.EmulatorDefinitionProfile.ToString">
+            <inheritdoc/>
+        </member>
+        <member name="T:Playnite.SDK.Models.EmulatorDefinition">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinition.Id">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinition.Name">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinition.Website">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.EmulatorDefinition.Profiles">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.EmulatorDefinition.ToString">
+            <inheritdoc/>
+        </member>
         <member name="T:Playnite.SDK.Models.EmulatedRegion">
             <summary>
-            Represents built-in region defition.
+            Represents built-in region definition.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.EmulatedRegion.Id">
@@ -2589,7 +3196,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.EmulatedPlatform.Emulators">
             <summary>
-            Gets liust of emulator IDs supporting this platform.
+            Gets list of emulator IDs supporting this platform.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Models.EmulatedPlatform.GetHashCode">
@@ -2670,6 +3277,12 @@
         <member name="M:Playnite.SDK.Models.BuiltInEmulatorProfile.Equals(Playnite.SDK.Models.BuiltInEmulatorProfile)">
             <inheritdoc/>
         </member>
+        <member name="M:Playnite.SDK.Models.BuiltInEmulatorProfile.GetCopy">
+             <summary>
+            
+             </summary>
+             <returns></returns>
+        </member>
         <member name="T:Playnite.SDK.Models.CustomEmulatorProfile">
             <summary>
             Represents emulator profile.
@@ -2705,6 +3318,16 @@
             Gets or sets working directory of emulator process.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Models.CustomEmulatorProfile.TrackingMode">
+            <summary>
+            Gets or sets executable arguments for File type tasks.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.CustomEmulatorProfile.TrackingPath">
+            <summary>
+            Gets or sets executable arguments for File type tasks.
+            </summary>
+        </member>
         <member name="M:Playnite.SDK.Models.CustomEmulatorProfile.ToString">
              <summary>
             
@@ -2718,6 +3341,12 @@
         </member>
         <member name="M:Playnite.SDK.Models.CustomEmulatorProfile.Equals(Playnite.SDK.Models.CustomEmulatorProfile)">
             <inheritdoc/>
+        </member>
+        <member name="M:Playnite.SDK.Models.CustomEmulatorProfile.GetCopy">
+             <summary>
+            
+             </summary>
+             <returns></returns>
         </member>
         <member name="T:Playnite.SDK.Models.Emulator">
             <summary>
@@ -2780,6 +3409,12 @@
         </member>
         <member name="M:Playnite.SDK.Models.Emulator.CopyDiffTo(System.Object)">
             <inheritdoc/>
+        </member>
+        <member name="M:Playnite.SDK.Models.Emulator.GetCopy">
+             <summary>
+            
+             </summary>
+             <returns></returns>
         </member>
         <member name="T:Playnite.SDK.Models.GameField">
             <summary>
@@ -3014,6 +3649,21 @@
         <member name="F:Playnite.SDK.Models.GameField.CompletionStatusId">
             
         </member>
+        <member name="F:Playnite.SDK.Models.GameField.OverrideInstallState">
+            
+        </member>
+        <member name="F:Playnite.SDK.Models.GameField.InstallSize">
+            
+        </member>
+        <member name="F:Playnite.SDK.Models.GameField.LastSizeScanDate">
+            
+        </member>
+        <member name="F:Playnite.SDK.Models.GameField.RecentActivity">
+            
+        </member>
+        <member name="F:Playnite.SDK.Models.GameField.EnableSystemHdr">
+            
+        </member>
         <member name="T:Playnite.SDK.Models.Game">
             <summary>
             Represents Playnite game object.
@@ -3039,6 +3689,11 @@
             Gets or sets list of genres.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Models.Game.EnableSystemHdr">
+            <summary>
+            Gets or sets value indicating if the game is should enable HDR on the primary monitor while playing.
+            </summary>
+        </member>
         <member name="P:Playnite.SDK.Models.Game.Hidden">
             <summary>
             Gets or sets value indicating if the game is hidden in library.
@@ -3046,7 +3701,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.Game.Favorite">
             <summary>
-            Gets or sets avlue indicating if the game is marked as favorite in library.
+            Gets or sets value indicating if the game is marked as favorite in library.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.Icon">
@@ -3141,27 +3796,32 @@
         </member>
         <member name="P:Playnite.SDK.Models.Game.IsInstalling">
             <summary>
-            Gets or sets value indicating wheter a game is being installed..
+            Gets or sets value indicating whether a game is being installed.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.IsUninstalling">
             <summary>
-            Gets or sets value indicating wheter a game is being uninstalled.
+            Gets or sets value indicating whether a game is being uninstalled.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.IsLaunching">
             <summary>
-            Gets or sets value indicating wheter a game is being launched.
+            Gets or sets value indicating whether a game is being launched.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.IsRunning">
             <summary>
-            Gets or sets value indicating wheter a game is currently running.
+            Gets or sets value indicating whether a game is currently running.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.IsInstalled">
             <summary>
-            Gets or sets value indicating wheter a game is installed.
+            Gets or sets value indicating whether a game is installed.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.Game.OverrideInstallState">
+            <summary>
+            Gets or sets value indicating whether installation state set by integration plugin should be ignored.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.Playtime">
@@ -3171,7 +3831,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.Game.Added">
             <summary>
-            Gets or sets date when game was added into library.
+            Gets or sets date when game was added to library.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.Modified">
@@ -3182,6 +3842,16 @@
         <member name="P:Playnite.SDK.Models.Game.PlayCount">
             <summary>
             Gets or sets a number indicating how many times the game has been played.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.Game.InstallSize">
+            <summary>
+            Gets or sets the install size in bytes of the game.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.Game.LastSizeScanDate">
+            <summary>
+            Gets or sets date of last date of install size scan made to a game.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.SeriesIds">
@@ -3306,7 +3976,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.Game.AgeRatings">
             <summary>
-            Get game's age rating.
+            Gets game's age rating.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.Regions">
@@ -3327,6 +3997,11 @@
         <member name="P:Playnite.SDK.Models.Game.ReleaseYear">
             <summary>
             Gets game's release year.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.Game.RecentActivity">
+            <summary>
+            Gets the most recent date between the last played and added dates.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.UserScoreRating">
@@ -3364,6 +4039,11 @@
             Gets time segment for games last activity.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Models.Game.RecentActivitySegment">
+            <summary>
+            Gets time segment for games recent activity.
+            </summary>
+        </member>
         <member name="P:Playnite.SDK.Models.Game.AddedSegment">
             <summary>
             Gets time segment for games added date.
@@ -3379,15 +4059,26 @@
             Gets game's play time category.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Models.Game.InstallSizeGroup">
+            <summary>
+            Gets game's install size group.
+            </summary>
+        </member>
         <member name="P:Playnite.SDK.Models.Game.IsCustomGame">
             <summary>
-            Gets value indicating wheter the game is custom game.
+            Gets value indicating whether the game is custom game.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Game.InstallationStatus">
             <summary>
             Gets game installation state.
             </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.Game.GetGameRecentActivity">
+            <summary>
+            Gets the most recent date between the last played and added dates.
+            </summary>
+            <returns></returns>
         </member>
         <member name="M:Playnite.SDK.Models.Game.GetPlayTimeCategory(System.UInt64)">
             <summary>
@@ -3436,15 +4127,21 @@
         <member name="M:Playnite.SDK.Models.Game.ToString">
             <inheritdoc/>
         </member>
+        <member name="M:Playnite.SDK.Models.Game.GetCopy">
+             <summary>
+            
+             </summary>
+             <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.Models.Game.CopyDiffTo(System.Object)">
             <inheritdoc/>
         </member>
         <member name="M:Playnite.SDK.Models.Game.GetDifferences(Playnite.SDK.Models.Game)">
             <summary>
-            Get differecens in game objects.
+            Gets differences in game objects.
             </summary>
             <param name="otherGame">Game object to compare to.</param>
-            <returns>List of field that differ.</returns>
+            <returns>List of fields that differ.</returns>
         </member>
         <member name="M:Playnite.SDK.Models.Game.GetNameGroup">
              <summary>
@@ -3452,25 +4149,45 @@
              </summary>
              <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Models.Game.GetInstallSizeGroup">
+            <summary>
+            Gets game Install Size group.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.Game.GetInstallDriveGroup">
+            <summary>
+            Gets game Install Drive group.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Models.Game.GetInstallDrive">
+            <summary>
+            Gets game Install Drive.
+            </summary>
+        </member>
         <member name="T:Playnite.SDK.Models.TrackingMode">
              <summary>
             
              </summary>
         </member>
         <member name="F:Playnite.SDK.Models.TrackingMode.Default">
-             <summary>
-            
-             </summary>
+            <summary>
+            Default tracking mode. Playnite will try to use the best one automatically.
+            </summary>
         </member>
         <member name="F:Playnite.SDK.Models.TrackingMode.Process">
-             <summary>
-            
-             </summary>
+            <summary>
+            Origin process and all started child processes are tracked.
+            </summary>
         </member>
         <member name="F:Playnite.SDK.Models.TrackingMode.Directory">
-             <summary>
-            
-             </summary>
+            <summary>
+            Any process from specified directory is tracked.
+            </summary>
+        </member>
+        <member name="F:Playnite.SDK.Models.TrackingMode.OriginalProcess">
+            <summary>
+            Only originally started process is being tracked.
+            </summary>
         </member>
         <member name="T:Playnite.SDK.Models.GameActionType">
             <summary>
@@ -3519,7 +4236,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.GameAction.OverrideDefaultArgs">
             <summary>
-            Gets or sets value indicating wheter emulator arguments should be completely overwritten with action arguments.
+            Gets or sets value indicating whether emulator arguments should be completely overwritten with action arguments.
             Applies only to Emulator action type.
             </summary>
         </member>
@@ -3540,7 +4257,7 @@
         </member>
         <member name="P:Playnite.SDK.Models.GameAction.IsPlayAction">
             <summary>
-            Gets or sets value indicating wheter an action is play action.
+            Gets or sets value indicating whether an action is play action.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.GameAction.EmulatorId">
@@ -3568,6 +4285,16 @@
             Gets or sets startup script.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Models.GameAction.InitialTrackingDelay">
+            <summary>
+            Gets or sets delay in milliseconds before tracking actually starts.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Models.GameAction.TrackingFrequency">
+            <summary>
+            Gets or sets delay in milliseconds before tracking actually starts.
+            </summary>
+        </member>
         <member name="M:Playnite.SDK.Models.GameAction.ToString">
             <inheritdoc/>
         </member>
@@ -3581,6 +4308,12 @@
         </member>
         <member name="M:Playnite.SDK.Models.GameAction.Equals(Playnite.SDK.Models.GameAction)">
             <inheritdoc/>
+        </member>
+        <member name="M:Playnite.SDK.Models.GameAction.GetCopy">
+             <summary>
+            
+             </summary>
+             <returns></returns>
         </member>
         <member name="T:Playnite.SDK.Models.Link">
             <summary>
@@ -3612,9 +4345,15 @@
         <member name="M:Playnite.SDK.Models.Link.Equals(Playnite.SDK.Models.Link)">
             <inheritdoc/>
         </member>
+        <member name="M:Playnite.SDK.Models.Link.GetCopy">
+             <summary>
+            
+             </summary>
+             <returns></returns>
+        </member>
         <member name="T:Playnite.SDK.Models.Platform">
             <summary>
-            Represents game's platfom.
+            Represents game's platform.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Models.Platform.SpecificationId">
@@ -3739,7 +4478,7 @@
         </member>
         <member name="T:Playnite.SDK.Plugins.AutomaticPlayController">
             <summary>
-            Repsents controller for automatic handling of game startup.
+            Represents controller for automatic handling of game startup.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Plugins.AutomaticPlayController.Type">
@@ -3772,6 +4511,16 @@
             Gets or sets working directory for File action type executable.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Plugins.AutomaticPlayController.InitialTrackingDelay">
+            <summary>
+            Gets or sets delay in milliseconds before tracking actually starts.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.AutomaticPlayController.TrackingFrequency">
+            <summary>
+            Gets or sets tracking requency in milliseconds.
+            </summary>
+        </member>
         <member name="M:Playnite.SDK.Plugins.AutomaticPlayController.#ctor(Playnite.SDK.Models.Game)">
              <summary>
             
@@ -3796,7 +4545,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.ControllerBase.Game">
             <summary>
-            Gets or sets game attrached to a specific controller operation.
+            Gets or sets game attached to a specific controller operation.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Plugins.ControllerBase.#ctor(Playnite.SDK.Models.Game)">
@@ -3814,7 +4563,7 @@
         </member>
         <member name="M:Playnite.SDK.Plugins.InstallController.#ctor(Playnite.SDK.Models.Game)">
             <summary>
-            Creantes new instance of <see cref="T:Playnite.SDK.Plugins.InstallController"/>.
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.InstallController"/>.
             </summary>
             <param name="game"></param>
         </member>
@@ -3851,6 +4600,11 @@
             </summary>
             <param name="args"></param>
         </member>
+        <member name="M:Playnite.SDK.Plugins.UninstallController.InvokeOnUninstalled">
+            <summary>
+            Invoke to signal that uninstallation completed.
+            </summary>
+        </member>
         <member name="T:Playnite.SDK.Plugins.PlayController">
             <summary>
             Represents play controller.
@@ -3873,11 +4627,19 @@
             </summary>
             <param name="args"></param>
         </member>
+        <member name="M:Playnite.SDK.Plugins.PlayController.InvokeOnStarted">
+            <summary>
+            Invoke to signal that game started running.
+            </summary>
+        </member>
         <member name="M:Playnite.SDK.Plugins.PlayController.InvokeOnStopped(Playnite.SDK.Plugins.GameStoppedEventArgs)">
             <summary>
             Invoke to signal that game stopped running.
             </summary>
             <param name="args"></param>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.PlayController.ToString">
+            <inheritdoc/>
         </member>
         <member name="T:Playnite.SDK.Plugins.InstallActionArgs">
             <summary>
@@ -3901,7 +4663,7 @@
         </member>
         <member name="T:Playnite.SDK.Plugins.PlayActionArgs">
             <summary>
-             Represents arguments for play action.
+            Represents arguments for play action.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Plugins.PlayActionArgs.#ctor">
@@ -3912,6 +4674,11 @@
         <member name="T:Playnite.SDK.Plugins.GameStartedEventArgs">
             <summary>
             Represents arguments for game started event.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.GameStartedEventArgs.StartedProcessId">
+            <summary>
+            Gets or sets started process ID.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Plugins.GameStartedEventArgs.#ctor">
@@ -4003,7 +4770,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.PluginMenuItem.MenuSection">
             <summary>
-            Gets or sets meni item menu section.
+            Gets or sets menu item menu section.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Plugins.PluginMenuItem.ToString">
@@ -4076,6 +4843,11 @@
             Gets or sets source games for target menu items.
             </summary>
         </member>
+        <member name="P:Playnite.SDK.Plugins.GetGameMenuItemsArgs.IsGlobalSearchRequest">
+            <summary>
+            Gets or sets value indicating whether the request is for standard game menu or global search menu.
+            </summary>
+        </member>
         <member name="T:Playnite.SDK.Plugins.ScriptMainMenuItemActionArgs">
             <summary>
             Represents arguments object used when main menu item action is activated.
@@ -4115,7 +4887,7 @@
         </member>
         <member name="T:Playnite.SDK.Plugins.ScriptMainMenuItem">
             <summary>
-             Represents script main menu item.
+            Represents script main menu item.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Plugins.ScriptMainMenuItem.FunctionName">
@@ -4126,6 +4898,11 @@
         <member name="T:Playnite.SDK.Plugins.GetMainMenuItemsArgs">
             <summary>
             Represents arguments for getting main menu items.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.GetMainMenuItemsArgs.IsGlobalSearchRequest">
+            <summary>
+            Gets or sets value indicating whether the request is for standard main menu or global search menu.
             </summary>
         </member>
         <member name="T:Playnite.SDK.Plugins.MetadataField">
@@ -4145,7 +4922,7 @@
         </member>
         <member name="F:Playnite.SDK.Plugins.MetadataField.ReleaseDate">
             <summary>
-            Release Data can be provided.
+            Release Date can be provided.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Plugins.MetadataField.Developers">
@@ -4223,6 +5000,11 @@
             Platform can be provided.
             </summary>
         </member>
+        <member name="F:Playnite.SDK.Plugins.MetadataField.InstallSize">
+            <summary>
+            Install Size can be provided.
+            </summary>
+        </member>
         <member name="T:Playnite.SDK.Plugins.MetadataRequestOptions">
             <summary>
             Represents options for game metadata download.
@@ -4230,7 +5012,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.MetadataRequestOptions.GameData">
             <summary>
-            Gets or sets game data are being requested for.
+            Gets or sets game data being requested for.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Plugins.MetadataRequestOptions.IsBackgroundDownload">
@@ -4262,7 +5044,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.OnDemandMetadataProvider.AvailableFields">
             <summary>
-             Gets currently available fields.
+            Gets currently available fields.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Plugins.OnDemandMetadataProvider.Dispose">
@@ -4282,7 +5064,7 @@
         </member>
         <member name="M:Playnite.SDK.Plugins.OnDemandMetadataProvider.GetReleaseDate(Playnite.SDK.Plugins.GetMetadataFieldArgs)">
             <summary>
-            Gets relese date.
+            Gets release date.
             </summary>
             <returns></returns>
         </member>
@@ -4376,6 +5158,12 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="M:Playnite.SDK.Plugins.OnDemandMetadataProvider.GetInstallSize(Playnite.SDK.Plugins.GetMetadataFieldArgs)">
+            <summary>
+            Gets install size.
+            </summary>
+            <returns></returns>
+        </member>
         <member name="T:Playnite.SDK.Plugins.MetadataPluginProperties">
             <summary>
             Represents <see cref="T:Playnite.SDK.Plugins.MetadataPlugin"/> plugin properties.
@@ -4413,6 +5201,263 @@
             </summary>
             <param name="options"></param>
             <returns></returns>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.SearchSupport">
+            <summary>
+            Represents plugin search support.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchSupport.DefaultKeyword">
+            <summary>
+            Gets or sets default keyword.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchSupport.Name">
+            <summary>
+            Gets or sets search name.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchSupport.Context">
+            <summary>
+            Gets or sets search context.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.SearchSupport.#ctor(System.String,System.String,Playnite.SDK.Plugins.SearchContext)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.SearchSupport"/>.
+            </summary>
+            <param name="defaultKeyword"></param>
+            <param name="name"></param>
+            <param name="context"></param>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.SearchContext">
+            <summary>
+            Represents search context.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchContext.Description">
+            <summary>
+            Gets or sets search description.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchContext.Hint">
+            <summary>
+            Gets or sets search hint.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchContext.Label">
+            <summary>
+            Gets or sets search label.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchContext.Delay">
+            <summary>
+            Gets or sets search delay in milliseconds.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchContext.UseAutoSearch">
+            <summary>
+            Gets or sets value indicating whether auto search should be used in this context.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.SearchContext.GetSearchResults(Playnite.SDK.Plugins.GetSearchResultsArgs)">
+            <summary>
+            Gets search results.
+            </summary>
+            <param name="args"></param>
+            <returns></returns>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.GenericListSearchContext">
+            <summary>
+            Represents generic list with static items.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.GenericListSearchContext.#ctor(System.Collections.Generic.List{Playnite.SDK.Plugins.SearchItem},System.String)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.GenericListSearchContext"/>.
+            </summary>
+            <param name="items"></param>
+            <param name="label"></param>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.GenericListSearchContext.GetSearchResults(Playnite.SDK.Plugins.GetSearchResultsArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.GameSearchFilterSettings">
+            <summary>
+            Represents global search game filter.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.GameSearchFilterSettings.Uninstalled">
+            <summary>
+            Gets or set value indicating whether uninstalled games should be included.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.GameSearchFilterSettings.Hidden">
+            <summary>
+            Gets or set value indicating whether hidden games should be included.
+            </summary>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.GetSearchResultsArgs">
+            <summary>
+            Represents search request arguments.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.GetSearchResultsArgs.SearchTerm">
+            <summary>
+            Gets search term.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.GetSearchResultsArgs.CancelToken">
+            <summary>
+            Gets search cancellation token.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.GetSearchResultsArgs.GameFilterSettings">
+            <summary>
+            Gets game filter.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.GetSearchResultsArgs.SwitchContext(Playnite.SDK.Plugins.SearchContext)">
+            <summary>
+            Switch to new search context.
+            </summary>
+            <param name="newContext"></param>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.SearchItemAction">
+            <summary>
+            Represents search item action.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItemAction.Name">
+            <summary>
+            Gets or sets action name.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItemAction.Action">
+            <summary>
+            Gets or sets item's action.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItemAction.CloseSearch">
+            <summary>
+            Gets or sets value indicating whether this action should close search window when executed.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.SearchItemAction.#ctor(System.String,System.Action)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.SearchItemAction"/>.
+            </summary>
+            <param name="name"></param>
+            <param name="action"></param>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.ContextSwitchSearchItemAction">
+            <summary>
+            Represents search item action that switches to new context.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.ContextSwitchSearchItemAction.Context">
+            <summary>
+            Gets context to switch to when action is executed.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.ContextSwitchSearchItemAction.#ctor(System.String,Playnite.SDK.Plugins.SearchContext)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.ContextSwitchSearchItemAction"/>.
+            </summary>
+            <param name="name"></param>
+            <param name="newContext"></param>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.SearchItem">
+            <summary>
+            Represents search item for global search results.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItem.PrimaryAction">
+            <summary>
+            Gets or sets primary actions.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItem.SecondaryAction">
+            <summary>
+            Gets or sets secondary action.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItem.MenuAction">
+            <summary>
+            Gets or sets menu action context.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItem.Icon">
+            <summary>
+            Gets or sets item icon.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItem.Name">
+            <summary>
+            Gets or sets item name.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.SearchItem.Description">
+            <summary>
+            Gets or sets item description.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.SearchItem.#ctor(System.String,Playnite.SDK.Plugins.SearchItemAction)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.SearchItem"/>.
+            </summary>
+            <param name="name"></param>
+            <param name="primaryAction"></param>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.SearchItem.#ctor(System.String,Playnite.SDK.Plugins.SearchItemAction,System.Object)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.SearchItem"/>.
+            </summary>
+            <param name="name"></param>
+            <param name="primaryAction"></param>
+            <param name="icon"></param>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.SearchItem.#ctor(System.String,System.String,System.Action)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.SearchItem"/>.
+            </summary>
+            <param name="name"></param>
+            <param name="primaryActionName"></param>
+            <param name="primaryAction"></param>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.SearchItem.#ctor(System.String,System.String,System.Action,System.Object)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.SearchItem"/>.
+            </summary>
+            <param name="name"></param>
+            <param name="primaryActionName"></param>
+            <param name="primaryAction"></param>
+            <param name="icon"></param>
+        </member>
+        <member name="T:Playnite.SDK.Plugins.GameSearchItem">
+            <summary>
+            Represents game search item for global search results.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.GameSearchItem.Game">
+            <summary>
+            Gets associated game.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.GameSearchItem.#ctor(Playnite.SDK.Models.Game,Playnite.SDK.Plugins.SearchItemAction)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.GameSearchItem"/>.
+            </summary>
+            <param name="game"></param>
+            <param name="primaryAction"></param>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.GameSearchItem.#ctor(Playnite.SDK.Models.Game,System.String,System.Action)">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.GameSearchItem"/>.
+            </summary>
+            <param name="game"></param>
+            <param name="primaryActionName"></param>
+            <param name="primaryAction"></param>
         </member>
         <member name="T:Playnite.SDK.Plugins.SiderbarItemType">
             <summary>
@@ -4461,7 +5506,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.SidebarItem.ProgressMaximum">
             <summary>
-            Gets or sets maximum progress value;
+            Gets or sets maximum progress value.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Plugins.SidebarItem.IconPadding">
@@ -4483,6 +5528,11 @@
         <member name="P:Playnite.SDK.Plugins.SidebarItem.Closed">
             <summary>
             Called when view is closed.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.SidebarItem.#ctor">
+            <summary>
+            Creates new instance of <see cref="T:Playnite.SDK.Plugins.SidebarItem"/>.
             </summary>
         </member>
         <member name="T:Playnite.SDK.Plugins.TopPanelItem">
@@ -4517,7 +5567,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.LibraryGetGamesArgs.CancelToken">
             <summary>
-            Gets cancellataion token.
+            Gets cancellation token.
             </summary>
         </member>
         <member name="T:Playnite.SDK.Plugins.LibraryImportGamesArgs">
@@ -4527,7 +5577,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.LibraryImportGamesArgs.CancelToken">
             <summary>
-            Gets cancellataion token.
+            Gets cancellation token.
             </summary>
         </member>
         <member name="T:Playnite.SDK.Plugins.LibraryPluginProperties">
@@ -4563,7 +5613,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.LibraryPlugin.Name">
             <summary>
-            Gets library name;
+            Gets library name.
             </summary>
         </member>
         <member name="P:Playnite.SDK.Plugins.LibraryPlugin.LibraryIcon">
@@ -4580,7 +5630,7 @@
         </member>
         <member name="P:Playnite.SDK.Plugins.LibraryPlugin.Client">
             <summary>
-            Gets library client application or null of no client is associated with this library.
+            Gets library client application or null if no client is associated with this library.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Plugins.LibraryPlugin.GetGames(Playnite.SDK.Plugins.LibraryGetGamesArgs)">
@@ -4689,6 +5739,21 @@
             
              </summary>
         </member>
+        <member name="T:Playnite.SDK.Plugins.AddConvertersSupportArgs">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.AddConvertersSupportArgs.Converters">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.AddConvertersSupportArgs.SourceName">
+             <summary>
+            
+             </summary>
+        </member>
         <member name="T:Playnite.SDK.Plugins.PluginProperties">
             <summary>
             Represents plugin properties.
@@ -4723,6 +5788,11 @@
         <member name="T:Playnite.SDK.Plugins.Plugin">
             <summary>
             Represents base Playnite plugin.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.Plugins.Plugin.Searches">
+            <summary>
+            Gets or sets list of global searches.
             </summary>
         </member>
         <member name="F:Playnite.SDK.Plugins.Plugin.PlayniteApi">
@@ -4771,6 +5841,11 @@
             Called when game stopped running.
             </summary>
         </member>
+        <member name="M:Playnite.SDK.Plugins.Plugin.OnGameStartupCancelled(Playnite.SDK.Events.OnGameStartupCancelledEventArgs)">
+            <summary>
+            Called when game startup is cancelled.
+            </summary>
+        </member>
         <member name="M:Playnite.SDK.Plugins.Plugin.OnGameInstalled(Playnite.SDK.Events.OnGameInstalledEventArgs)">
             <summary>
             Called when game has been installed.
@@ -4793,12 +5868,12 @@
         </member>
         <member name="M:Playnite.SDK.Plugins.Plugin.OnApplicationStopped(Playnite.SDK.Events.OnApplicationStoppedEventArgs)">
             <summary>
-            Called when appliaction is stutting down.
+            Called when appliaction is shutting down.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Plugins.Plugin.OnLibraryUpdated(Playnite.SDK.Events.OnLibraryUpdatedEventArgs)">
             <summary>
-            Called library update has been finished.
+            Called when library update has been finished.
             </summary>
         </member>
         <member name="M:Playnite.SDK.Plugins.Plugin.GetGameMenuItems(Playnite.SDK.Plugins.GetGameMenuItemsArgs)">
@@ -4888,6 +5963,12 @@
              </summary>
              <param name="args"></param>
         </member>
+        <member name="M:Playnite.SDK.Plugins.Plugin.AddConvertersSupport(Playnite.SDK.Plugins.AddConvertersSupportArgs)">
+             <summary>
+            
+             </summary>
+             <param name="args"></param>
+        </member>
         <member name="M:Playnite.SDK.Plugins.Plugin.GetSidebarItems">
             <summary>
             Gets sidebar items provided by this plugin.
@@ -4895,10 +5976,16 @@
             <returns></returns>
         </member>
         <member name="M:Playnite.SDK.Plugins.Plugin.GetTopPanelItems">
-             <summary>
+            <summary>
             Gets top panel items provided by this plugin.
-             </summary>
-             <returns></returns>
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.Plugins.Plugin.GetSearchGlobalCommands">
+            <summary>
+            Gets items to be included in default global search.
+            </summary>
+            <returns></returns>
         </member>
         <member name="T:Playnite.SDK.RelayCommandBase">
              <summary>
@@ -5144,7 +6231,7 @@
         </member>
         <member name="F:Playnite.SDK.ExpandableVariables.EmulatorDirectory">
             <summary>
-            Gets durectory path of parent emulator object.
+            Gets directory path of parent emulator object.
             </summary>
         </member>
         <member name="T:Playnite.SDK.MessageBoxOption">
@@ -5228,6 +6315,11 @@
             </summary>
         </member>
         <member name="P:Playnite.SDK.GlobalProgressActionArgs.Text">
+            <summary>
+            Gets or sets progress text.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.GlobalProgressActionArgs.IsIndeterminate">
             <summary>
             Gets or sets progress text.
             </summary>
@@ -5351,7 +6443,7 @@
         </member>
         <member name="T:Playnite.SDK.StringSelectionDialogResult">
             <summary>
-            Refresents result of selection string dialog operation.
+            Represents result of selection string dialog operation.
             </summary>
         </member>
         <member name="P:Playnite.SDK.StringSelectionDialogResult.Result">
@@ -5396,9 +6488,16 @@
             Describes object providing methods for dialog based actions.
             </summary>
         </member>
+        <member name="M:Playnite.SDK.IDialogsFactory.ShowErrorMessage(System.String)">
+            <summary>
+            Displays error dialog window with text message.
+            </summary>
+            <param name="messageBoxText">Dialog message text.</param>
+            <returns></returns>
+        </member>
         <member name="M:Playnite.SDK.IDialogsFactory.ShowErrorMessage(System.String,System.String)">
             <summary>
-            Displays errod dialog window with text message.
+            Displays error dialog window with text message.
             </summary>
             <param name="messageBoxText">Dialog message text.</param>
             <param name="caption">Dialog window caption.</param>
@@ -5551,6 +6650,14 @@
             <param name="progressOptions">Options for progress dialog.</param>
             <returns>Status of the action execution.</returns>
         </member>
+        <member name="M:Playnite.SDK.IDialogsFactory.ActivateGlobalProgress(System.Func{Playnite.SDK.GlobalProgressActionArgs,System.Threading.Tasks.Task},Playnite.SDK.GlobalProgressOptions)">
+            <summary>
+            Activates progress dialog blocking app interaction until progress is finished or canceled.
+            </summary>
+            <param name="progresAction">Awaitable function to be executed.</param>
+            <param name="progressOptions">Options for progress dialog.</param>
+            <returns>Status of the action execution.</returns>
+        </member>
         <member name="M:Playnite.SDK.IDialogsFactory.CreateWindow(Playnite.SDK.WindowCreationOptions)">
             <summary>
             Creates new window with Playnite's default styling applied.
@@ -5560,7 +6667,7 @@
         </member>
         <member name="M:Playnite.SDK.IDialogsFactory.GetCurrentAppWindow">
             <summary>
-            Gets a window which currently in use an active.
+            Gets currently active window. If no window is active, main window is returned instead.
             </summary>
             <returns>Window object.</returns>
         </member>
@@ -5632,6 +6739,16 @@
             </summary>
             <returns>Buffer object.</returns>
         </member>
+        <member name="M:Playnite.SDK.IGameDatabaseAPI.BeginBufferUpdate">
+            <summary>
+            Begins buffered update. Suppresses all notification events until buffering is stopped.
+            </summary>
+        </member>
+        <member name="M:Playnite.SDK.IGameDatabaseAPI.EndBufferUpdate">
+            <summary>
+            Ends buffered update.
+            </summary>
+        </member>
         <member name="M:Playnite.SDK.IGameDatabaseAPI.GetFileStoragePath(System.Guid)">
             <summary>
             Returns full path to directory storing files for specified parent.
@@ -5641,7 +6758,7 @@
         </member>
         <member name="M:Playnite.SDK.IGameDatabaseAPI.GetFullFilePath(System.String)">
             <summary>
-            Return full path to a file based on database path.
+            Returns full path to a file based on database path.
             </summary>
             <param name="databasePath">Database path as set to game's field.</param>
             <returns>Full path to a file.</returns>
@@ -5653,7 +6770,7 @@
         </member>
         <member name="P:Playnite.SDK.LibraryClient.IsInstalled">
             <summary>
-            Gets value indicating wheter the client is installed.
+            Gets value indicating whether the client is installed.
             </summary>
         </member>
         <member name="P:Playnite.SDK.LibraryClient.Icon">
@@ -5678,65 +6795,65 @@
         </member>
         <member name="M:Playnite.SDK.ILogger.Info(System.String)">
             <summary>
-            Writes message to log with Info serverity.
+            Writes message to log with Info severity.
             </summary>
             <param name="message">Message to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Info(System.Exception,System.String)">
             <summary>
-            Writes message to log with Info serverity, including parsed exception.
+            Writes message to log with Info severity, including parsed exception.
             </summary>
             <param name="exception">Message to be added into log.</param>
             <param name="message">Exception to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Debug(System.String)">
             <summary>
-            Writes message to log with Debug serverity.
+            Writes message to log with Debug severity.
             </summary>
             <param name="message">Message to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Debug(System.Exception,System.String)">
             <summary>
-            Writes message to log with Debug serverity, including parsed exception.
+            Writes message to log with Debug severity, including parsed exception.
             </summary>
             <param name="exception">Message to be added into log.</param>
             <param name="message">Exception to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Warn(System.String)">
             <summary>
-            Writes message to log with Warning serverity.
+            Writes message to log with Warning severity.
             </summary>
             <param name="message">Message to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Warn(System.Exception,System.String)">
             <summary>
-            Writes message to log with Warning serverity, including parsed exception.
+            Writes message to log with Warning severity, including parsed exception.
             </summary>
             <param name="exception">Message to be added into log.</param>
             <param name="message">Exception to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Error(System.String)">
             <summary>
-            Writes message to log with Error serverity.
+            Writes message to log with Error severity.
             </summary>
             <param name="message">Message to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Error(System.Exception,System.String)">
             <summary>
-            Writes message to log with Error serverity, including parsed exception.
+            Writes message to log with Error severity, including parsed exception.
             </summary>
             <param name="exception">Message to be added into log.</param>
             <param name="message">Exception to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Trace(System.String)">
             <summary>
-            Writes message to log with Trace serverity.
+            Writes message to log with Trace severity.
             </summary>
             <param name="message">Message to be added into log.</param>
         </member>
         <member name="M:Playnite.SDK.ILogger.Trace(System.Exception,System.String)">
             <summary>
-            Writes message to log with Trace serverity, including parsed exception.
+            Writes message to log with Trace severity, including parsed exception.
             </summary>
             <param name="exception">Message to be added into log.</param>
             <param name="message">Exception to be added into log.</param>
@@ -5761,6 +6878,21 @@
             
              </summary>
         </member>
+        <member name="T:Playnite.SDK.FullscreenView">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.FullscreenView.List">
+             <summary>
+            
+             </summary>
+        </member>
+        <member name="F:Playnite.SDK.FullscreenView.Details">
+             <summary>
+            
+             </summary>
+        </member>
         <member name="T:Playnite.SDK.IMainViewAPI">
             <summary>
             Describes object providing API for main UI view.
@@ -5769,6 +6901,31 @@
         <member name="P:Playnite.SDK.IMainViewAPI.ActiveDesktopView">
             <summary>
             Gets currently active Desktop mode view.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.IMainViewAPI.ActiveFullscreenView">
+            <summary>
+            Gets currently active Fullscreen mode view.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.IMainViewAPI.SortOrder">
+            <summary>
+            Gets currently active sorting order.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.IMainViewAPI.SortOrderDirection">
+            <summary>
+            Gets currently active sorting order direction.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.IMainViewAPI.Grouping">
+            <summary>
+            Gets currently active grouping field.
+            </summary>
+        </member>
+        <member name="P:Playnite.SDK.IMainViewAPI.UIDispatcher">
+            <summary>
+            Gets UI thread dispatcher.
             </summary>
         </member>
         <member name="P:Playnite.SDK.IMainViewAPI.SelectedGames">
@@ -5805,6 +6962,43 @@
             </summary>
             <param name="gameIds">List of game IDs to select.</param>
         </member>
+        <member name="M:Playnite.SDK.IMainViewAPI.ApplyFilterPreset(System.Guid)">
+            <summary>
+            Applies filter preset.
+            </summary>
+            <param name="filterId">Filter ID.</param>
+        </member>
+        <member name="M:Playnite.SDK.IMainViewAPI.ApplyFilterPreset(Playnite.SDK.Models.FilterPreset)">
+            <summary>
+            Applies filter preset.
+            </summary>
+            <param name="preset">Filter preset.</param>
+        </member>
+        <member name="M:Playnite.SDK.IMainViewAPI.GetActiveFilterPreset">
+            <summary>
+            Gets ID of currently active filter preset.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.IMainViewAPI.GetCurrentFilterSettings">
+            <summary>
+            Gets current filter settings.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Playnite.SDK.IMainViewAPI.OpenSearch(System.String)">
+            <summary>
+            Opens global search view.
+            </summary>
+            <param name="searchTerm">Default search term.</param>
+        </member>
+        <member name="M:Playnite.SDK.IMainViewAPI.OpenSearch(Playnite.SDK.Plugins.SearchContext,System.String)">
+            <summary>
+            Opens global search view.
+            </summary>
+            <param name="context">Search context to be activated after opening the view.</param>
+            <param name="searchTerm">Default search term.</param>
+        </member>
         <member name="T:Playnite.SDK.LibraryMetadataProvider">
             <summary>
             Describes metadata provider for library games.
@@ -5832,10 +7026,20 @@
             Ivokes when <see cref="P:Playnite.SDK.NotificationMessage.ActivationAction"/> is activated.
             </summary>
         </member>
+        <member name="E:Playnite.SDK.NotificationMessage.Closed">
+             <summary>
+            
+             </summary>
+        </member>
         <member name="P:Playnite.SDK.NotificationMessage.ActivateCommand">
             <summary>
             Gets command to activate <see cref="P:Playnite.SDK.NotificationMessage.ActivationAction"/>.
             </summary>
+        </member>
+        <member name="P:Playnite.SDK.NotificationMessage.CloseCommand">
+             <summary>
+            
+             </summary>
         </member>
         <member name="P:Playnite.SDK.NotificationMessage.ActivationAction">
             <summary>
@@ -5886,7 +7090,7 @@
         </member>
         <member name="F:Playnite.SDK.NotificationType.Error">
             <summary>
-            Error serverity
+            Error severity.
             </summary>
         </member>
         <member name="T:Playnite.SDK.INotificationsAPI">
@@ -5936,7 +7140,7 @@
         </member>
         <member name="P:Playnite.SDK.IPlayniteAPI.MainView">
             <summary>
-            Gest main view API.
+            Gets main view API.
             </summary>
         </member>
         <member name="P:Playnite.SDK.IPlayniteAPI.Database">
@@ -6002,6 +7206,15 @@
             <param name="inputString">String containing dynamic variables.</param>
             <returns>String with replaces variables.</returns>
         </member>
+        <member name="M:Playnite.SDK.IPlayniteAPI.ExpandGameVariables(Playnite.SDK.Models.Game,System.String,System.String)">
+            <summary>
+            Expands dynamic game variables in specified string.
+            </summary>
+            <param name="game">Game to use dynamic variables from.</param>
+            <param name="inputString">String containing dynamic variables.</param>
+            <param name="emulatorDir">String to be used to expand {EmulatorDir} variable if present.</param>
+            <returns>String with replaces variables.</returns>
+        </member>
         <member name="M:Playnite.SDK.IPlayniteAPI.ExpandGameVariables(Playnite.SDK.Models.Game,Playnite.SDK.Models.GameAction)">
             <summary>
             Expands dynamic game variables in specified game action.
@@ -6042,6 +7255,13 @@
              <param name="source"></param>
              <param name="args"></param>
         </member>
+        <member name="M:Playnite.SDK.IPlayniteAPI.AddConvertersSupport(Playnite.SDK.Plugins.Plugin,Playnite.SDK.Plugins.AddConvertersSupportArgs)">
+             <summary>
+            
+             </summary>
+             <param name="source"></param>
+             <param name="args"></param>
+        </member>
         <member name="T:Playnite.SDK.API">
             <summary>
             Represents access class to API instances.
@@ -6069,22 +7289,22 @@
         </member>
         <member name="P:Playnite.SDK.IPlayniteInfoAPI.IsPortable">
             <summary>
-            Indicatets whether application is running in portable mode.
+            Indicates whether application is running in portable mode.
             </summary>
         </member>
         <member name="P:Playnite.SDK.IPlayniteInfoAPI.InOfflineMode">
             <summary>
-            Indicatets whether application is running in offline mode.
+            Indicates whether application is running in offline mode.
             </summary>
         </member>
         <member name="P:Playnite.SDK.IPlayniteInfoAPI.IsDebugBuild">
             <summary>
-            Indicatets whether application was built in DEBUG configuration.
+            Indicates whether application was built in DEBUG configuration.
             </summary>
         </member>
         <member name="P:Playnite.SDK.IPlayniteInfoAPI.ThrowAllErrors">
             <summary>
-            Indicatets whether application is configured to fail for most unhandled errors.
+            Indicates whether application is configured to fail for most unhandled errors.
             </summary>
         </member>
         <member name="T:Playnite.SDK.IPlaynitePathsAPI">
@@ -6248,6 +7468,12 @@
             </summary>
             <param name="domain">Cookie domain.</param>
         </member>
+        <member name="M:Playnite.SDK.IWebView.DeleteDomainCookiesRegex(System.String)">
+            <summary>
+            Deletes all cookies from domains matching specified regular expression.
+            </summary>
+            <param name="domainRegex"></param>
+        </member>
         <member name="M:Playnite.SDK.IWebView.DeleteCookies(System.String,System.String)">
             <summary>
             Deletes cookies.
@@ -6296,6 +7522,11 @@
             <param name="script"></param>
             <returns></returns>
         </member>
+        <member name="P:Playnite.SDK.IWebView.WindowHost">
+            <summary>
+            Gets window host for the web view. Doesn't apply to off-screen views.
+            </summary>
+        </member>
         <member name="T:Playnite.SDK.IWebViewFactory">
             <summary>
             Describes web view factory provider.
@@ -6340,7 +7571,7 @@
         </member>
         <member name="T:Playnite.SDK.HttpCookie">
             <summary>
-            Represetn web view cookie object.
+            Represents web view cookie object.
             </summary>
         </member>
         <member name="M:Playnite.SDK.HttpCookie.#ctor">
@@ -6591,7 +7822,7 @@
         </member>
         <member name="T:System.Collections.Generic.ComparableDbItemList`1">
             <summary>
-            Represent comparable database item collection.
+            Represents comparable database item collection.
             </summary>
             <typeparam name="T">Database object type.</typeparam>
         </member>
@@ -6674,36 +7905,42 @@
              <param name="propertyNames"></param>
         </member>
         <member name="T:System.Collections.Generic.RangeObservableCollection`1">
-            <summary>
+             <summary>
             
-            </summary>
-            <typeparam name="T"></typeparam>
+             </summary>
+             <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:System.Collections.Generic.RangeObservableCollection`1.OnCollectionChangedPublic(System.Collections.Specialized.NotifyCollectionChangedEventArgs)">
+             <summary>
+            
+             </summary>
+             <param name="e"></param>
         </member>
         <member name="M:System.Collections.Generic.RangeObservableCollection`1.OnCollectionChanged(System.Collections.Specialized.NotifyCollectionChangedEventArgs)">
-            <summary>
+             <summary>
             
-            </summary>
-            <param name="e"></param>
+             </summary>
+             <param name="e"></param>
         </member>
         <member name="M:System.Collections.Generic.RangeObservableCollection`1.OnItemMoved(System.Object,System.Int32,System.Int32)">
-            <summary>
+             <summary>
             
-            </summary>
-            <param name="obj"></param>
-            <param name="index"></param>
-            <param name="oldIndex"></param>
+             </summary>
+             <param name="obj"></param>
+             <param name="index"></param>
+             <param name="oldIndex"></param>
         </member>
         <member name="M:System.Collections.Generic.RangeObservableCollection`1.AddRange(System.Collections.Generic.IEnumerable{`0})">
-            <summary>
+             <summary>
             
-            </summary>
-            <param name="list"></param>
+             </summary>
+             <param name="list"></param>
         </member>
         <member name="M:System.Collections.Generic.RangeObservableCollection`1.RemoveRange(System.Collections.Generic.IEnumerable{`0})">
-            <summary>
+             <summary>
             
-            </summary>
-            <param name="list"></param>
+             </summary>
+             <param name="list"></param>
         </member>
         <member name="T:System.Collections.Generic.ListExtensions">
             <summary>
@@ -6751,7 +7988,7 @@
             <typeparam name="T"></typeparam>
             <param name="source"></param>
             <param name="items"></param>
-            <returns>True if an item was added, false if none item was added.</returns>
+            <returns>True if an item was added, false if no item was added.</returns>
         </member>
         <member name="M:System.Collections.Generic.ListExtensions.HasNonEmptyItems(System.Collections.Generic.IEnumerable{System.String})">
             <summary>
@@ -6767,7 +8004,7 @@
             <param name="source"></param>
             <param name="target"></param>
             <param name="comparison"></param>
-            <returns>True of target collection contains items that are also part of source collection.</returns>
+            <returns>True if target collection contains items that are also part of source collection.</returns>
         </member>
         <member name="M:System.Collections.Generic.ListExtensions.IntersectsExactlyWith(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.StringComparison)">
             <summary>
@@ -6776,11 +8013,11 @@
             <param name="source"></param>
             <param name="target"></param>
             <param name="comparison"></param>
-            <returns>True of target collection contains items that are also part of source collection.</returns>
+            <returns>True if target collection contains items that are also part of source collection.</returns>
         </member>
         <member name="M:System.Collections.Generic.ListExtensions.ContainsString(System.Collections.Generic.IEnumerable{System.String},System.String,System.StringComparison)">
             <summary>
-            Checks if source collection constains specified string completely.
+            Checks if source collection contains specified string completely.
             </summary>
         </member>
         <member name="M:System.Collections.Generic.ListExtensions.ContainsStringPartial(System.Collections.Generic.IEnumerable{System.String},System.String,System.StringComparison)">
@@ -6790,7 +8027,7 @@
         </member>
         <member name="M:System.Collections.Generic.ListExtensions.ContainsPartOfString(System.Collections.Generic.IEnumerable{System.String},System.String,System.StringComparison)">
             <summary>
-            Checks if source collection constains part of specified string.
+            Checks if source collection contains part of specified string.
             </summary>
         </member>
         <member name="M:System.Collections.Generic.ListExtensions.IsListEqual``1(System.Collections.Generic.IEnumerable{``0},System.Collections.Generic.IEnumerable{``0})">
@@ -6830,7 +8067,7 @@
         </member>
         <member name="M:System.Collections.Generic.ListExtensions.Merge``1(System.Collections.Generic.IEnumerable{System.Collections.Generic.IEnumerable{``0}})">
             <summary>
-            Merge collection together.
+            Merge collections together.
             </summary>
             <typeparam name="T"></typeparam>
             <param name="lists"></param>
@@ -6838,7 +8075,7 @@
         </member>
         <member name="M:System.Collections.Generic.ListExtensions.Merge``1(System.Collections.Generic.IEnumerable{``0},System.Collections.Generic.IEnumerable{``0})">
             <summary>
-            Merge two collection together.
+            Merge two collections together.
             </summary>
             <typeparam name="T"></typeparam>
             <param name="list1"></param>
@@ -6885,7 +8122,7 @@
             <summary>Event raised when the collection changes.</summary>
         </member>
         <member name="E:System.Collections.Concurrent.ObservableConcurrentDictionary`2.PropertyChanged">
-            <summary>Event raised when a property on the collection changes.</summary>
+            <summary>Event raised when a property in the collection changes.</summary>
         </member>
         <member name="M:System.Collections.Concurrent.ObservableConcurrentDictionary`2.NotifyObserversOfChange">
             <summary>
@@ -6960,6 +8197,18 @@
              </summary>
              <param name="key"></param>
              <returns></returns>
+        </member>
+        <member name="T:System.StrExtensions">
+            <summary>
+            <see cref="T:System.String"/> extension methods.
+            </summary>
+        </member>
+        <member name="M:System.StrExtensions.GetLocalized(System.String)">
+            <summary>
+            Returns localized version of string key.
+            </summary>
+            <param name="stringKey">Localization string key starting with LOC.</param>
+            <returns></returns>
         </member>
     </members>
 </doc>
