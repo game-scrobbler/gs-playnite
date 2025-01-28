@@ -84,9 +84,9 @@ namespace GsPlugin
                     );
 
                     // Ensure the request was successful or throw an exception if not
-                    //response.EnsureSuccessStatusCode();
+                    response.EnsureSuccessStatusCode();
 
-                    // Optionally read and process the response content
+
                     var responseBody = await response.Content.ReadAsStringAsync();
                     PlayniteApi.Dialogs.ShowMessage(responseBody);
                     JObject obj = JObject.Parse(responseBody);
@@ -114,7 +114,7 @@ namespace GsPlugin
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
             var emptyObj = new { };
-            // Add code to be executed when game is preparing to be started.
+            
             PlayniteApi.Dialogs.ShowMessage(sessionID);
             TimeTrackerEnd startData = new TimeTrackerEnd
             {
@@ -143,7 +143,7 @@ namespace GsPlugin
                     // Ensure the request was successful or throw an exception if not
                     response.EnsureSuccessStatusCode();
 
-                    // Optionally read and process the response content
+
                     var responseBody = await response.Content.ReadAsStringAsync();
                     PlayniteApi.Dialogs.ShowMessage(responseBody);
                 }
@@ -164,52 +164,10 @@ namespace GsPlugin
             // Add code to be executed when game is uninstalled.
         }
 
-        public override async void OnApplicationStarted(OnApplicationStartedEventArgs args)
+        public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             // Add code to be executed when Playnite is initialized.
-            var library = PlayniteApi.Database.Games.ToList();
-            Sync sync =  new  Sync
-            {
-                user_id = settings.InstallID,
-              
-            };
-
-            
-            string jsonLib = JsonConvert.SerializeObject(library);
-            string jsonSync = JsonConvert.SerializeObject(sync);
-            string input = jsonSync + jsonLib;
-            string modified = Regex.Replace(input, "(\"user_id\":\"[^\"]+\")}\\[", "$1, \"library\": [");
-            var content = new StringContent(modified += "}", Encoding.UTF8, "application/json");
-
-            using (HttpClient httpClient = new HttpClient())
-            {
-
-                try
-                {
-
-
-                    // Send the POST request to the endpoint
-                    var response = await httpClient.PostAsync(
-                        "https://api.gamescrobbler.com/api/playnite/sync",
-                        content
-                    );
-
-                    // Ensure the request was successful or throw an exception if not
-                    response.EnsureSuccessStatusCode();
-
-                    // Optionally read and process the response content
-                    var responseBody = await response.Content.ReadAsStringAsync();
-                    PlayniteApi.Dialogs.ShowMessage(responseBody);
-                }
-                catch (HttpRequestException ex)
-                {
-
-                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
-                }
-
-
-
-            }
+         
 
         }
 
@@ -222,7 +180,7 @@ namespace GsPlugin
             // Add code to be executed when Playnite is shutting down.
         }
 
-        public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args)
+        public override void OnLibraryUpdated(OnLibraryUpdatedEventArgs args)
         {
             // Add code to be executed when library is updated.
             base.OnLibraryUpdated(args);
@@ -295,7 +253,7 @@ namespace GsPlugin
                 Opened = () =>
                 {
                     // Return a new instance of your custom UserControl (WPF)
-                    return new MySidebarView();
+                    return new MySidebarView(settings, PlayniteApi);
                 },
 
             };
