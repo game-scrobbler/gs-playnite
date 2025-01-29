@@ -36,7 +36,7 @@ namespace MySidebarPlugin
             // Example: injecting the same HTML snippet with the flourish iframe
             string userId = viewSettings.InstallID; // Or get it from plugin settings
 
-            viewPlayniteApi.Dialogs.ShowMessage(userId);
+           
 
             // Use $@ for verbatim + interpolation
             string htmlContent = $@"

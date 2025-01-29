@@ -164,10 +164,52 @@ namespace GsPlugin
             // Add code to be executed when game is uninstalled.
         }
 
-        public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
+        public override async void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             // Add code to be executed when Playnite is initialized.
-         
+            var library = PlayniteApi.Database.Games.ToList();
+            Sync sync = new Sync
+            {
+                user_id = settings.InstallID,
+
+            };
+
+
+            string jsonLib = JsonConvert.SerializeObject(library);
+            string jsonSync = JsonConvert.SerializeObject(sync);
+            string input = jsonSync + jsonLib;
+            string modified = Regex.Replace(input, "(\"user_id\":\"[^\"]+\")}\\[", "$1, \"library\": [");
+            var content = new StringContent(modified += "}", Encoding.UTF8, "application/json");
+
+            using (HttpClient httpClient = new HttpClient())
+            {
+
+                try
+                {
+
+
+                    // Send the POST request to the endpoint
+                    var response = await httpClient.PostAsync(
+                        "https://api.gamescrobbler.com/api/playnite/sync",
+                        content
+                    );
+
+                    // Ensure the request was successful or throw an exception if not
+                    response.EnsureSuccessStatusCode();
+
+                    // Optionally read and process the response content
+                    var responseBody = await response.Content.ReadAsStringAsync();
+                    PlayniteApi.Dialogs.ShowMessage(responseBody);
+                }
+                catch (HttpRequestException ex)
+                {
+
+                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
+                }
+
+
+
+            }
 
         }
 
@@ -187,49 +229,7 @@ namespace GsPlugin
 
             
             // Retrieve the game database:
-            var temp = PlayniteApi.Database.CompletionStatuses;
-            // entire list of games
-            var Library = PlayniteApi.Database.Games.ToList();
-            // time of game starting
-
-            //startData startData = new startData("this is my id", "my game", "empty", localDate.ToString("yyyy-MM-ddThh:mm:ss"));
-
-            // For example, show a dialog with the count of games
-            //PlayniteApi.Dialogs.ShowMessage($"You have {allGames.Count} games in your Playnite library.");
-            //PlayniteApi.Dialogs.ShowMessage($"You have {allData.Count()} ,{allData[0]} , {allData[1]} , {allData[2]} , {allData[3]}, {allData[4]}, {allData[5]}, {allData[6]} games in your Playnite library.");
-
-            // Create an instance of HttpClient (ideally, you’d do this once and reuse it throughout your app)
-         
-            
-
-            string jsonData = JsonConvert.SerializeObject(temp);
-            var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-
-            using (HttpClient httpClient = new HttpClient()) {
-
-                //try
-                //{
-
-
-                //    // Send the POST request to the endpoint
-                //    var response = await httpClient.PostAsync(
-                //        "https://wikidata-worker.mehrad77.workers.dev?log=true",
-                //        content
-                //    );
-
-                //    // Ensure the request was successful or throw an exception if not
-                //    response.EnsureSuccessStatusCode();
-
-                //    // Optionally read and process the response content
-                //    var responseBody = await response.Content.ReadAsStringAsync();
-                //    PlayniteApi.Dialogs.ShowMessage(responseBody);
-                //}
-                //catch (HttpRequestException ex)
-                //{
-
-                //    PlayniteApi.Dialogs.ShowMessage(ex.Message);
-                //}
-            }
+           
     }
 
         public override ISettings GetSettings(bool firstRunSettings)
