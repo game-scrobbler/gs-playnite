@@ -61,7 +61,7 @@ namespace GsPlugin
             TimeTracker startData = new TimeTracker
             {
                 user_id = settings.InstallID,
-                game = startedGame.Name,
+                game_name = startedGame.Name,
                 gameID = startedGame.Id.ToString(),
                 metadata = emptyObj,
                 started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
@@ -84,7 +84,7 @@ namespace GsPlugin
                     );
 
                     // Ensure the request was successful or throw an exception if not
-                    response.EnsureSuccessStatusCode();
+                    //response.EnsureSuccessStatusCode();
 
 
                     var responseBody = await response.Content.ReadAsStringAsync();
@@ -267,7 +267,7 @@ namespace GsPlugin
     class TimeTracker
     {
        public string user_id { get; set; }
-        public string game { get; set; }
+        public string game_name { get; set; }
         public string gameID { get; set; }
         public object metadata { get; set; }
         public string started_at { get; set; }
