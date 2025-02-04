@@ -1,0 +1,20 @@
+on: 
+  push:
+    tags:
+      - '*' # any tag
+
+name: Release Build
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: checkout powershell-yaml
+        uses: actions/checkout@v4
+        with:
+          repository: cloudbase/powershell-yaml
+          path: powershell-yaml
+

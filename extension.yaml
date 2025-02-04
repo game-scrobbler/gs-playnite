@@ -1,7 +1,7 @@
-﻿Id: GsPlugin_32975fed-6915-4dd3-a230-030cdc5265ae
-Name: Generic Plugin
-Author: John Doe
-Version: 1.0
+﻿Id: 32975fed-6915-4dd3-a230-030cdc5265ae
+Name: Game Spectrum
+Author: Game Scrobbler Team
+Version: 0.1
 Module: GsPlugin.dll
 Type: GenericPlugin
 Icon: icon.png
