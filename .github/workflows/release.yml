@@ -9,6 +9,8 @@ name: Release Build
 jobs:
   build:
     runs-on: windows-2022
+    permissions:
+      contents: write
     steps:
       - name: checkout
         uses: actions/checkout@v4
