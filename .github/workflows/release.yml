@@ -1,7 +1,7 @@
-on: 
+on:
   push:
     tags:
-      - '*' # any tag
+      - "*" # any tag
 
 name: Release Build
 
@@ -18,3 +18,48 @@ jobs:
           repository: cloudbase/powershell-yaml
           path: powershell-yaml
 
+      - name: Nuget Restore
+        run: nuget restore .\GsPlugin.sln
+
+      - name: Build entire solution (.NET Framework 4.6.2)
+        run: |
+          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\"
+          .\MSBuild.exe $Env:GITHUB_WORKSPACE\GsPlugin.sln -p:Configuration=Release -restore -clp:ErrorsOnly
+
+      - name: Setup Playnite
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/JosefNemec/Playnite/releases/download/10.34/Playnite1034.zip" -OutFile "$Env:GITHUB_WORKSPACE\Playnite.zip"
+          Expand-Archive "$Env:GITHUB_WORKSPACE\Playnite.zip" -DestinationPath "$Env:GITHUB_WORKSPACE\Playnite"
+
+      # - name: Pack with Playnite
+      #   run: |
+      #     mkdir "PackingOutput"
+      #     Write-Host "${{ steps.projectselection.outputs.projects }}"
+      #     $projects = ConvertFrom-Json '${{ steps.projectselection.outputs.projects }}'
+
+      #     foreach ($p in $projects) {
+      #       Write-Host "Packing project $p"
+      #       $ver = $p.Version -replace '\.', '_'
+      #       & "$Env:GITHUB_WORKSPACE\Playnite\Toolbox.exe" pack "$Env:GITHUB_WORKSPACE\source\$($p.Name)\bin\Release\net462" "$Env:GITHUB_WORKSPACE\PackingOutput"
+      #       Get-ChildItem "$Env:GITHUB_WORKSPACE\PackingOutput" -Filter *.pext | Rename-Item -NewName "$($p.Name)_${ver}.pext"
+      #       Move-Item -Path "$Env:GITHUB_WORKSPACE\PackingOutput\*.pext" -Destination $Env:GITHUB_WORKSPACE
+      #     }
+
+      # - name: New release
+      #   uses: softprops/action-gh-release@v2
+      #   if: "steps.projectselection.outputs.newrelease == 'True'"
+      #   with:
+      #     draft: false
+      #     name: "${{ steps.projectselection.outputs.releasetitle }}"
+      #     body_path: 'publish/release_notes.txt'
+      #     files: '*.pext'
+
+      # - name: Upload file to existing release
+      #   if: "steps.projectselection.outputs.newrelease == 'False'"
+      #   env:
+      #     GH_TOKEN: ${{ github.token }}
+      #   run: |
+      #       $files = Get-ChildItem -Path *.pext -Name
+      #       foreach ($file in $files) {
+      #         gh release upload ${{ steps.projectselection.outputs.releasetag }} $file
+      #       }
