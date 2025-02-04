@@ -1,7 +1,9 @@
 on:
   push:
-    tags:
-      - "*" # any tag
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
 
 name: Release Build
 
