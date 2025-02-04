@@ -46,7 +46,7 @@ jobs:
       - name: Pack with Playnite
         run: |
           mkdir "PackingOutput"
-          & "$Env:GITHUB_WORKSPACE\Playnite\Toolbox.exe" pack "$Env:GITHUB_WORKSPACE\bin\Release\net462" "$Env:GITHUB_WORKSPACE\PackingOutput"
+          & "$Env:GITHUB_WORKSPACE\Playnite\Toolbox.exe" pack "$Env:GITHUB_WORKSPACE\bin\Release" "$Env:GITHUB_WORKSPACE\PackingOutput"
           Get-ChildItem "$Env:GITHUB_WORKSPACE\PackingOutput" -Filter *.pext | Rename-Item -NewName "GsPlugin_${{ github.ref_name }}.pext"
           Move-Item -Path "$Env:GITHUB_WORKSPACE\PackingOutput\*.pext" -Destination $Env:GITHUB_WORKSPACE
 
