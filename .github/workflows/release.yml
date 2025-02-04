@@ -51,6 +51,7 @@ jobs:
           Move-Item -Path "$Env:GITHUB_WORKSPACE\PackingOutput\*.pext" -Destination $Env:GITHUB_WORKSPACE
 
       - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
         uses: actions/create-release@v1
         env:
           GH_TOKEN: ${{ github.token }}
