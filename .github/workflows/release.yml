@@ -61,4 +61,6 @@ jobs:
 
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: gh release upload ${{ steps.release.outputs.tag_name }} .\*.pext
