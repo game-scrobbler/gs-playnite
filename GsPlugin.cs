@@ -33,7 +33,7 @@ namespace GsPlugin
         {
             settings = new GsPluginSettings(this);
 
-            // Define plugin properties
+            
             Properties = new GenericPluginProperties
             {
                 HasSettings = true
@@ -57,7 +57,7 @@ namespace GsPlugin
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
             var emptyObj = new { };
-            // Add code to be executed when game is preparing to be started.
+           
             TimeTracker startData = new TimeTracker
             {
                 user_id = settings.InstallID,
@@ -77,18 +77,14 @@ namespace GsPlugin
                 {
 
 
-                    // Send the POST request to the endpoint
+                    
                     var response = await httpClient.PostAsync(
                         "https://api.gamescrobbler.com/api/playnite/scrobble/start",
                         content
                     );
 
-                    // Ensure the request was successful or throw an exception if not
-                    //response.EnsureSuccessStatusCode();
-
-
                     var responseBody = await response.Content.ReadAsStringAsync();
-                    PlayniteApi.Dialogs.ShowMessage(responseBody);
+                  
                     JObject obj = JObject.Parse(responseBody);
                     string sessionId = (string)obj["session_id"];
                     sessionID = sessionId;
@@ -115,7 +111,7 @@ namespace GsPlugin
             var startedGame = args.Game;
             var emptyObj = new { };
             
-            PlayniteApi.Dialogs.ShowMessage(sessionID);
+          
             TimeTrackerEnd startData = new TimeTrackerEnd
             {
                 user_id = settings.InstallID,
@@ -145,7 +141,7 @@ namespace GsPlugin
 
 
                     var responseBody = await response.Content.ReadAsStringAsync();
-                    PlayniteApi.Dialogs.ShowMessage(responseBody);
+                    
                 }
                 catch (HttpRequestException ex)
                 {
@@ -199,7 +195,7 @@ namespace GsPlugin
 
                     // Optionally read and process the response content
                     var responseBody = await response.Content.ReadAsStringAsync();
-                    PlayniteApi.Dialogs.ShowMessage(responseBody);
+                   
                 }
                 catch (HttpRequestException ex)
                 {
