@@ -2,12 +2,11 @@
   "packages": {
     ".": {
       "package-name": "GsPlugin",
-      "release-as": "0.1.2",
       "changelog-path": "CHANGELOG.md",
       "release-type": "simple",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": false,
-      "draft": false,
+      "draft": true,
       "prerelease": false
     }
   },
