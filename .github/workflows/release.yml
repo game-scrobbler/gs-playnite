@@ -51,9 +51,7 @@ jobs:
           command: manifest
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          token: ${{secrets.GITHUB_TOKEN}}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Rename Packed File name to Release Tag
         if: github.ref == 'refs/heads/main'
@@ -63,6 +61,4 @@ jobs:
 
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload ${{ steps.release.outputs.tag_name }} .\*.pext
