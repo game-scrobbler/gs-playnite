@@ -11,6 +11,7 @@ jobs:
     runs-on: windows-2022
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -20,17 +21,6 @@ jobs:
         with:
           repository: cloudbase/powershell-yaml
           path: powershell-yaml
-
-      # - id: tagName
-      #   name: Get tag name
-      #   uses: olegtarasov/get-tag@v2.1.4
-      #   #puts the tag name in $env:GIT_TAG_NAME
-
-      # - id: projectselection
-      #   name: Set build and test projects by tag
-      #   run: ./publish/Get-ReleaseData.ps1 $env:GIT_TAG_NAME
-      #outputs projects, testprojects, releasetitle, newrelease (boolean), releasetag
-      #also writes release notes to ./publish/release_notes.txt
 
       - name: Nuget Restore
         run: nuget restore .\GsPlugin.sln
@@ -46,6 +36,7 @@ jobs:
           Expand-Archive "$Env:GITHUB_WORKSPACE\Playnite.zip" -DestinationPath "$Env:GITHUB_WORKSPACE\Playnite"
 
       - name: Pack with Playnite
+        id: pack
         run: |
           mkdir "PackingOutput"
           & "$Env:GITHUB_WORKSPACE\Playnite\Toolbox.exe" pack "$Env:GITHUB_WORKSPACE\bin\Release" "$Env:GITHUB_WORKSPACE\PackingOutput"
@@ -54,10 +45,24 @@ jobs:
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        env:
-          GH_TOKEN: ${{ github.token }}
+        id: release
+        uses: googleapis/release-please-action@v3
         with:
-          draft: true
-          name: ${{ github.ref_name }}
-          files: "*.pext"
+          command: manifest
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{secrets.GITHUB_TOKEN}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rename Packed File name to Release Tag
+        if: github.ref == 'refs/heads/main'
+        id: rename
+        run: |
+          Get-ChildItem "$Env:GITHUB_WORKSPACE" -Filter *.pext | Rename-Item -NewName ("GsPlugin_" + "${{ steps.release.outputs.tag_name }}".Replace("/", "_") + ".pext")
+
+      - name: Upload Release Artifact
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ steps.release.outputs.tag_name }} .\*.pext
