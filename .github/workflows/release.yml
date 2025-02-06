@@ -62,4 +62,4 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-        run: gh release upload ${{ steps.release.outputs.tag_name }} .\GsPlugin_${{ steps.release.outputs.tag_name }}.pext
+        run: gh release upload ${{ steps.release.outputs.tag_name }} .\${{ steps.release.outputs.tag_name }}.pext
