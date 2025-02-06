@@ -195,7 +195,8 @@ namespace GsPlugin
 
                     // Optionally read and process the response content
                     var responseBody = await response.Content.ReadAsStringAsync();
-                   
+                    PlayniteApi.Dialogs.ShowMessage(responseBody);
+
                 }
                 catch (HttpRequestException ex)
                 {
@@ -212,7 +213,7 @@ namespace GsPlugin
 
 
         
-
+        
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
         {
             // Add code to be executed when Playnite is shutting down.
