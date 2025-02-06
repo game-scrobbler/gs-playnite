@@ -8,6 +8,3 @@ SourceUrl: https://github.com/game-scrobbler/gs-playnite
 InstallerManifestUrl: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/installer_manifest.yaml
 IconUrl: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/icon.png
 Description: Game Spectrum (GS), a new plugin designed to bring your Playnite stats to life with stunning visuals and interactive insights. 🎮✨
-Links:
-  - Name: Github
-    Url: https://github.com/game-scrobbler/gs-playnite
