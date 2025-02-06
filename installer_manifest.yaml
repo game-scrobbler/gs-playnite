@@ -3,7 +3,7 @@ Packages:
   - Version: 0.2.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-06
-    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.0.0/GsPlugin-v2.0.0.pext
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.2.0/GsPlugin-v0.2.0.pext
     Changelog:
       - Fix a dependency bug that caused the plugin to not load
   - Version: 0.1.3
