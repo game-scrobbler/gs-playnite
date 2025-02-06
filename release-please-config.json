@@ -13,7 +13,7 @@
         {
           "type": "xml",
           "path": "GsPlugin.csproj",
-          "xpath": "//Project/PropertyGroup/Version" 
+          "xpath": "//Project/PropertyGroup/Version"
         },
         {
           "type": "yaml",
