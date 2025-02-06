@@ -16,6 +16,7 @@ namespace GsPlugin
         private bool option2 = false;
         private bool optionThatWontBeSaved = false;
         public string InstallID { get; set; } = string.Empty;
+
         private readonly GsPlugin plugin;
 
 
@@ -44,7 +45,7 @@ namespace GsPlugin
             {
                 // Generate a new GUID if not already set
                 InstallID = System.Guid.NewGuid().ToString();
-
+                
                 // Save the new settings immediately to persist the InstallID
                 plugin.SavePluginSettings(this);
             }
@@ -105,7 +106,7 @@ namespace GsPlugin
             else
             {
                
-
+                
                 Settings = new GsPluginSettings();
             }
         }
@@ -139,4 +140,11 @@ namespace GsPlugin
             return true;
         }
     }
+    class InitSync
+    {
+
+
+        public string user_id { get; set; }
+
+    };
 }
