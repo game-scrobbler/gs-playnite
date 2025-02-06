@@ -57,7 +57,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         id: rename
         run: |
-          Get-ChildItem "$Env:GITHUB_WORKSPACE" -Filter *.pext | Rename-Item -NewName ("GsPlugin_" + "${{ steps.release.outputs.tag_name }}".Replace("/", "_") + ".pext")
+          Get-ChildItem "$Env:GITHUB_WORKSPACE" -Filter *.pext | Rename-Item -NewName ("${{ steps.release.outputs.tag_name }}".Replace("/", "_") + ".pext")
 
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
