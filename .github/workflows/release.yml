@@ -46,9 +46,8 @@ jobs:
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
         id: release
-        uses: googleapis/release-please-action@v3
+        uses: googleapis/release-please-action@v4
         with:
-          command: manifest
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
