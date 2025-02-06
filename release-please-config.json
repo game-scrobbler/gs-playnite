@@ -16,10 +16,9 @@
           "xpath": "//Project/PropertyGroup/Version" 
         },
         {
-          "type": "json",
+          "type": "yaml",
           "path": "extension.yaml",
           "jsonpath": "$.Version",
-          "versioning": "yaml",
           "field": "Version"
         }
       ]
