@@ -1,5 +1,4 @@
 {
-  "release-type": "simple",
   "packages": {
     ".": {
       "package-name": "GsPlugin",
@@ -7,8 +6,9 @@
       "release-type": "simple",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": false,
-      "draft": true,
+      "draft": false,
       "prerelease": false,
+      "release-as": "0.2.0",
       "extra-files": [
         {
           "type": "xml",
