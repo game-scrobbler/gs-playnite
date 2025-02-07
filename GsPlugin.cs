@@ -167,17 +167,17 @@ namespace GsPlugin
             // Add code to be executed when game is uninstalled.
         }
 
-        public override async void OnApplicationStarted(OnApplicationStartedEventArgs args)
+        public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            
-          
+
+
             // Add code to be executed when Playnite is initialized.
-          
+            SyncLib();
 
         }
 
 
-
+        
         
         
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -229,6 +229,7 @@ namespace GsPlugin
 
         public async void SyncLib()
         {
+            
             var library = PlayniteApi.Database.Games.ToList();
             Sync sync = new Sync
             {
@@ -261,6 +262,7 @@ namespace GsPlugin
 
                     // Optionally read and process the response content
                     var responseBody = await response.Content.ReadAsStringAsync();
+
 
                 }
                 catch (HttpRequestException ex)
