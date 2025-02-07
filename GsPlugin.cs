@@ -13,6 +13,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 
+
 using System.Runtime.InteropServices.ComTypes;
 using System.Text.RegularExpressions;
 
@@ -20,6 +21,8 @@ using System.Text.RegularExpressions;
 using Sentry;
 using System.Text.Encodings.Web;
 
+
+using System.IO;
 
 
 namespace GsPlugin
@@ -31,19 +34,40 @@ namespace GsPlugin
 
 
         private GsPluginSettings settings { get; set; }
+        
         private string sessionID { get; set; }
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
         public GsPlugin(IPlayniteAPI api) : base(api)
         {
             settings = new GsPluginSettings(this);
-
             
+
+
             Properties = new GenericPluginProperties
             {
                 HasSettings = true
             };
 
+        }
+
+        private string GetPluginVersion()
+        {
+            string pluginFolder = Path.GetDirectoryName(GetType().Assembly.Location);
+            string yamlPath = Path.Combine(pluginFolder, "extension.yaml");
+
+            if (File.Exists(yamlPath))
+            {
+                foreach (var line in File.ReadAllLines(yamlPath))
+                {
+                    if (line.StartsWith("Version:"))
+                    {
+                        return line.Split(':')[1].Trim();
+                    }
+                }
+            }
+
+            return "Unknown Version";
         }
 
         public override void OnGameInstalled(OnGameInstalledEventArgs args)
@@ -110,7 +134,8 @@ namespace GsPlugin
                 catch (HttpRequestException ex)
                 {
 
-                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
+                    SentrySdk.CaptureException(ex);
+
                 }
 
 
@@ -166,7 +191,8 @@ namespace GsPlugin
                 catch (HttpRequestException ex)
                 {
 
-                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
+                    SentrySdk.CaptureException(ex);
+
                 }
 
 
@@ -184,8 +210,8 @@ namespace GsPlugin
         {
 
             SentryInit();
-            SentrySdk.CaptureMessage("Something went wrong");
-
+          
+   
             // Add code to be executed when Playnite is initialized.
             SyncLib();
 
@@ -232,7 +258,7 @@ namespace GsPlugin
                 Opened = () =>
                 {
                     // Return a new instance of your custom UserControl (WPF)
-                    return new MySidebarView(settings, PlayniteApi);
+                    return new MySidebarView(settings, PlayniteApi, GetPluginVersion());
                 },
 
             };
@@ -282,11 +308,10 @@ namespace GsPlugin
                 }
                 catch (HttpRequestException ex)
                 {
-
-                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
+                    SentrySdk.CaptureException(ex);
                 }
 
-
+               
 
             }
         }
