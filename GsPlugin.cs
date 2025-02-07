@@ -9,15 +9,20 @@ using System.Data;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+
 
 using System.Runtime.InteropServices.ComTypes;
 using System.Text.RegularExpressions;
 
-using Utf8Json;
-using Utf8Json.Resolvers;
 
+using Sentry;
+using System.Text.Encodings.Web;
+
+
+using System.IO;
 
 
 namespace GsPlugin
@@ -29,19 +34,40 @@ namespace GsPlugin
 
 
         private GsPluginSettings settings { get; set; }
+        
         private string sessionID { get; set; }
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
         public GsPlugin(IPlayniteAPI api) : base(api)
         {
             settings = new GsPluginSettings(this);
-
             
+
+
             Properties = new GenericPluginProperties
             {
                 HasSettings = true
             };
 
+        }
+
+        private string GetPluginVersion()
+        {
+            string pluginFolder = Path.GetDirectoryName(GetType().Assembly.Location);
+            string yamlPath = Path.Combine(pluginFolder, "extension.yaml");
+
+            if (File.Exists(yamlPath))
+            {
+                foreach (var line in File.ReadAllLines(yamlPath))
+                {
+                    if (line.StartsWith("Version:"))
+                    {
+                        return line.Split(':')[1].Trim();
+                    }
+                }
+            }
+
+            return "Unknown Version";
         }
 
         public override void OnGameInstalled(OnGameInstalledEventArgs args)
@@ -60,7 +86,13 @@ namespace GsPlugin
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
             var emptyObj = new { };
-           
+
+            var options = new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // Prevents escaping +
+            };
+
+
             TimeTracker startData = new TimeTracker
             {
                 user_id = settings.InstallID,
@@ -69,8 +101,9 @@ namespace GsPlugin
                 metadata = emptyObj,
                 started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
-
-            string jsonData = JsonSerializer.ToJsonString(startData, StandardResolver.AllowPrivate);
+           
+           
+            string jsonData = JsonSerializer.Serialize(startData, options);
             var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
 
             using (HttpClient httpClient = new HttpClient())
@@ -87,11 +120,9 @@ namespace GsPlugin
                     );
 
                     var responseBody = await response.Content.ReadAsStringAsync();
-                    PlayniteApi.Dialogs.ShowMessage(responseBody);
+                    
                     SessionData obj = JsonSerializer.Deserialize<SessionData>(responseBody);
                   
-                    PlayniteApi.Dialogs.ShowMessage(obj.session_id);
-                 
                     string sessionId = obj.session_id;
                     sessionID = sessionId;
                   
@@ -103,7 +134,8 @@ namespace GsPlugin
                 catch (HttpRequestException ex)
                 {
 
-                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
+                    SentrySdk.CaptureException(ex);
+
                 }
 
 
@@ -117,8 +149,13 @@ namespace GsPlugin
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
             var emptyObj = new { };
-            
-          
+
+
+            var options = new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // Prevents escaping +
+            };
+
             TimeTrackerEnd startData = new TimeTrackerEnd
             {
                 user_id = settings.InstallID,
@@ -127,7 +164,7 @@ namespace GsPlugin
                 finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
 
-            string jsonData = JsonSerializer.ToJsonString(startData, StandardResolver.AllowPrivate);
+            string jsonData = JsonSerializer.Serialize(startData, options);
             var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
 
             using (HttpClient httpClient = new HttpClient())
@@ -148,12 +185,14 @@ namespace GsPlugin
 
 
                     var responseBody = await response.Content.ReadAsStringAsync();
-                    
+                
+
                 }
                 catch (HttpRequestException ex)
                 {
 
-                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
+                    SentrySdk.CaptureException(ex);
+
                 }
 
 
@@ -170,7 +209,9 @@ namespace GsPlugin
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
 
-
+            SentryInit();
+          
+   
             // Add code to be executed when Playnite is initialized.
             SyncLib();
 
@@ -217,7 +258,7 @@ namespace GsPlugin
                 Opened = () =>
                 {
                     // Return a new instance of your custom UserControl (WPF)
-                    return new MySidebarView(settings, PlayniteApi);
+                    return new MySidebarView(settings, PlayniteApi, GetPluginVersion());
                 },
 
             };
@@ -238,8 +279,8 @@ namespace GsPlugin
             };
 
 
-            string jsonLib = JsonSerializer.ToJsonString(library, StandardResolver.AllowPrivate);
-            string jsonSync = JsonSerializer.ToJsonString(sync, StandardResolver.AllowPrivate);
+            string jsonLib = JsonSerializer.Serialize(library);
+            string jsonSync = JsonSerializer.Serialize(sync);
             string input = jsonSync + jsonLib;
             string modified = Regex.Replace(input, "(\"user_id\":\"[^\"]+\")}\\[", "$1, \"library\": [");
             var content = new StringContent(modified += "}", Encoding.UTF8, "application/json");
@@ -262,23 +303,62 @@ namespace GsPlugin
 
                     // Optionally read and process the response content
                     var responseBody = await response.Content.ReadAsStringAsync();
-
+                    
 
                 }
                 catch (HttpRequestException ex)
                 {
-
-                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
+                    SentrySdk.CaptureException(ex);
                 }
 
-
+               
 
             }
         }
 
+        public void SentryInit()
+        {
+            SentrySdk.Init(options =>
+            {
+                // A Sentry Data Source Name (DSN) is required.
+                // See https://docs.sentry.io/product/sentry-basics/dsn-explainer/
+                // You can set it in the SENTRY_DSN environment variable, or you can set it in code here.
+                options.Dsn = "https://af79b5bda2a052b04b3f490b79d0470a@o4508777256124416.ingest.de.sentry.io/4508777265627216";
+
+                // When debug is enabled, the Sentry client will emit detailed debugging information to the console.
+                // This might be helpful, or might interfere with the normal operation of your application.
+                // We enable it here for demonstration purposes when first trying Sentry.
+                // You shouldn't do this in your applications unless you're troubleshooting issues with Sentry.
+                options.Debug = true;
+
+                // This option is recommended. It enables Sentry's "Release Health" feature.
+                options.AutoSessionTracking = true;
+
+                // Set TracesSampleRate to 1.0 to capture 100%
+                // of transactions for tracing.
+                // We recommend adjusting this value in production.
+                options.TracesSampleRate = 1.0;
+
+                // Sample rate for profiling, applied on top of othe TracesSampleRate,
+                // e.g. 0.2 means we want to profile 20 % of the captured transactions.
+                // We recommend adjusting this value in production.
+                options.ProfilesSampleRate = 1.0;
+                // Requires NuGet package: Sentry.Profiling
+                // Note: By default, the profiler is initialized asynchronously. This can
+                // be tuned by passing a desired initialization timeout to the constructor.
+                //options.AddIntegration(new ProfilingIntegration(
+                    // During startup, wait up to 500ms to profile the app startup code.
+                    // This could make launching the app a bit slower so comment it out if you
+                    // prefer profiling to start asynchronously
+                    //TimeSpan.FromMilliseconds(500)
+                //));
+            });
+
+        }
+
     }
 
-
+       
 
 
     class TimeTracker

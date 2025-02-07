@@ -17,7 +17,8 @@ namespace MySidebarPlugin
         private GsPluginSettings viewSettings { get; set; }
         private IPlayniteAPI viewPlayniteApi { get; set; }
 
-        public MySidebarView(GsPluginSettings settings, IPlayniteAPI playniteApi)
+        private string viewPluginVer { get; set; }
+        public MySidebarView(GsPluginSettings settings, IPlayniteAPI playniteApi, string pluginVersion)
         {
             InitializeComponent();
 
@@ -25,6 +26,7 @@ namespace MySidebarPlugin
             this.Loaded += MySidebarView_Loaded;
             viewSettings = settings ?? new GsPluginSettings();
             viewPlayniteApi = playniteApi;
+            viewPluginVer = pluginVersion;
         }
         
         private async void MySidebarView_Loaded(object sender, RoutedEventArgs e)
@@ -46,7 +48,7 @@ namespace MySidebarPlugin
   </head>
   <body style='margin:0; padding:0; width:100%;height:100%;'>
     <iframe
-      src='https://playnite.gamescrobbler.com?user_id={userId}'
+      src='https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}'
       frameborder='0'
       scrolling='yes'
       style='width:100%;height:100%;'
