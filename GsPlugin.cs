@@ -172,49 +172,7 @@ namespace GsPlugin
             
           
             // Add code to be executed when Playnite is initialized.
-            var library = PlayniteApi.Database.Games.ToList();
-            Sync sync = new Sync
-            {
-                user_id = settings.InstallID,
-
-            };
-
-
-            string jsonLib = JsonSerializer.ToJsonString(library, StandardResolver.AllowPrivate);
-            string jsonSync = JsonSerializer.ToJsonString(sync, StandardResolver.AllowPrivate);
-            string input = jsonSync + jsonLib;
-            string modified = Regex.Replace(input, "(\"user_id\":\"[^\"]+\")}\\[", "$1, \"library\": [");
-            var content = new StringContent(modified += "}", Encoding.UTF8, "application/json");
-
-            using (HttpClient httpClient = new HttpClient())
-            {
-
-                try
-                {
-
-
-                    // Send the POST request to the endpoint
-                    var response = await httpClient.PostAsync(
-                        "https://api.gamescrobbler.com/api/playnite/sync",
-                        content
-                    );
-
-                    // Ensure the request was successful or throw an exception if not
-                    response.EnsureSuccessStatusCode();
-
-                    // Optionally read and process the response content
-                    var responseBody = await response.Content.ReadAsStringAsync();
-                   
-                }
-                catch (HttpRequestException ex)
-                {
-
-                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
-                }
-
-
-
-            }
+          
 
         }
 
@@ -225,16 +183,17 @@ namespace GsPlugin
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
         {
             // Add code to be executed when Playnite is shutting down.
+            SyncLib();
         }
 
         public override void OnLibraryUpdated(OnLibraryUpdatedEventArgs args)
         {
             // Add code to be executed when library is updated.
             base.OnLibraryUpdated(args);
+            SyncLib();
 
             
-            // Retrieve the game database:
-           
+
     }
 
         public override ISettings GetSettings(bool firstRunSettings)
@@ -268,7 +227,58 @@ namespace GsPlugin
             // return an item with Type = SidebarItemType.Action, plus an OpenCommand.
         }
 
+        public async void SyncLib()
+        {
+            var library = PlayniteApi.Database.Games.ToList();
+            Sync sync = new Sync
+            {
+                user_id = settings.InstallID,
+
+            };
+
+
+            string jsonLib = JsonSerializer.ToJsonString(library, StandardResolver.AllowPrivate);
+            string jsonSync = JsonSerializer.ToJsonString(sync, StandardResolver.AllowPrivate);
+            string input = jsonSync + jsonLib;
+            string modified = Regex.Replace(input, "(\"user_id\":\"[^\"]+\")}\\[", "$1, \"library\": [");
+            var content = new StringContent(modified += "}", Encoding.UTF8, "application/json");
+
+            using (HttpClient httpClient = new HttpClient())
+            {
+
+                try
+                {
+
+
+                    // Send the POST request to the endpoint
+                    var response = await httpClient.PostAsync(
+                        "https://api.gamescrobbler.com/api/playnite/sync",
+                        content
+                    );
+
+                    // Ensure the request was successful or throw an exception if not
+                    response.EnsureSuccessStatusCode();
+
+                    // Optionally read and process the response content
+                    var responseBody = await response.Content.ReadAsStringAsync();
+
+                }
+                catch (HttpRequestException ex)
+                {
+
+                    PlayniteApi.Dialogs.ShowMessage(ex.Message);
+                }
+
+
+
+            }
+        }
+
     }
+
+
+
+
     class TimeTracker
     {
        public string user_id { get; set; }
