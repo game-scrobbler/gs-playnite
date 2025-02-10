@@ -17,36 +17,28 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 
-namespace GsPlugin
-{
-    public class GsPlugin : GenericPlugin
-    {
+namespace GsPlugin {
+    public class GsPlugin : GenericPlugin {
         private static readonly ILogger logger = LogManager.GetLogger();
 
         private GsPluginSettings settings;
         private string sessionID;
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
-        public GsPlugin(IPlayniteAPI api) : base(api)
-        {
+        public GsPlugin(IPlayniteAPI api) : base(api) {
             settings = new GsPluginSettings(this);
-            Properties = new GenericPluginProperties
-            {
+            Properties = new GenericPluginProperties {
                 HasSettings = true
             };
         }
 
-        private string GetPluginVersion()
-        {
+        private string GetPluginVersion() {
             string pluginFolder = Path.GetDirectoryName(GetType().Assembly.Location);
             string yamlPath = Path.Combine(pluginFolder, "extension.yaml");
 
-            if (File.Exists(yamlPath))
-            {
-                foreach (var line in File.ReadAllLines(yamlPath))
-                {
-                    if (line.StartsWith("Version:"))
-                    {
+            if (File.Exists(yamlPath)) {
+                foreach (var line in File.ReadAllLines(yamlPath)) {
+                    if (line.StartsWith("Version:")) {
                         return line.Split(':')[1].Trim();
                     }
                 }
@@ -55,24 +47,20 @@ namespace GsPlugin
             return "Unknown Version";
         }
 
-        public override void OnGameInstalled(OnGameInstalledEventArgs args)
-        {
+        public override void OnGameInstalled(OnGameInstalledEventArgs args) {
             // Add code to be executed when game is finished installing.
         }
 
-        public override void OnGameStarted(OnGameStartedEventArgs args)
-        {
+        public override void OnGameStarted(OnGameStartedEventArgs args) {
             // Add code to be executed when game is started running.
 
         }
 
-        public override async void OnGameStarting(OnGameStartingEventArgs args)
-        {
+        public override async void OnGameStarting(OnGameStartingEventArgs args) {
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
 
-            var timeTrackerData = new TimeTracker
-            {
+            var timeTrackerData = new TimeTracker {
                 user_id = settings.InstallID,
                 game_name = startedGame.Name,
                 gameID = startedGame.Id.ToString(),
@@ -83,13 +71,11 @@ namespace GsPlugin
             await PostDataAsync("https://api.gamescrobbler.com/api/playnite/scrobble/start", timeTrackerData);
         }
 
-        public override async void OnGameStopped(OnGameStoppedEventArgs args)
-        {
+        public override async void OnGameStopped(OnGameStoppedEventArgs args) {
             // Add code to be executed when game is preparing to be started.
             DateTime localDate = DateTime.Now;
 
-            var timeTrackerEndData = new TimeTrackerEnd
-            {
+            var timeTrackerEndData = new TimeTrackerEnd {
                 user_id = settings.InstallID,
                 session_id = sessionID,
                 metadata = new { },
@@ -99,26 +85,22 @@ namespace GsPlugin
             await PostDataAsync("https://api.gamescrobbler.com/api/playnite/scrobble/finish", timeTrackerEndData);
         }
 
-        public override void OnGameUninstalled(OnGameUninstalledEventArgs args)
-        {
+        public override void OnGameUninstalled(OnGameUninstalledEventArgs args) {
             // Add code to be executed when game is uninstalled.
         }
 
-        public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
-        {
+        public override void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             SentryInit();
             // Add code to be executed when Playnite is initialized.
             SyncLib();
         }
 
-        public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
-        {
+        public override void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
             // Add code to be executed when Playnite is shutting down.
             SyncLib();
         }
 
-        public override void OnLibraryUpdated(OnLibraryUpdatedEventArgs args)
-        {
+        public override void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
             // Add code to be executed when library is updated.
             base.OnLibraryUpdated(args);
             SyncLib();
@@ -128,11 +110,9 @@ namespace GsPlugin
 
         public override UserControl GetSettingsView(bool firstRunSettings) => new GsPluginSettingsView();
 
-        public override IEnumerable<SidebarItem> GetSidebarItems()
-        {
+        public override IEnumerable<SidebarItem> GetSidebarItems() {
             // Return one or more SidebarItem objects
-            yield return new SidebarItem
-            {
+            yield return new SidebarItem {
                 Type = (SiderbarItemType)1,
                 Title = "Show My Data",
                 Icon = new TextBlock { Text = "📋" }, // or a path to an image icon
@@ -143,11 +123,9 @@ namespace GsPlugin
             };
         }
 
-        public async void SyncLib()
-        {
+        public async void SyncLib() {
             var library = PlayniteApi.Database.Games.ToList();
-            var syncData = new Sync
-            {
+            var syncData = new Sync {
                 user_id = settings.InstallID,
             };
 
@@ -159,51 +137,41 @@ namespace GsPlugin
             await PostDataAsync("https://api.gamescrobbler.com/api/playnite/sync", modifiedInput);
         }
 
-        private static async Task PostDataAsync(string url, object data)
-        {
+        private static async Task PostDataAsync(string url, object data) {
             var jsonData = JsonSerializer.Serialize(data, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
             var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
 
-            using (HttpClient httpClient = new HttpClient())
-            {
-                try
-                {
+            using (HttpClient httpClient = new HttpClient()) {
+                try {
                     // Send the POST request to the endpoint
                     var response = await httpClient.PostAsync(url, content);
                     response.EnsureSuccessStatusCode();
                     await response.Content.ReadAsStringAsync();
                 }
-                catch (HttpRequestException ex)
-                {
+                catch (HttpRequestException ex) {
                     SentrySdk.CaptureException(ex);
                 }
             }
         }
 
-        private static async Task PostDataAsync(string url, string data)
-        {
+        private static async Task PostDataAsync(string url, string data) {
             var content = new StringContent(data, Encoding.UTF8, "application/json");
 
-            using (HttpClient httpClient = new HttpClient())
-            {
-                try
-                {
+            using (HttpClient httpClient = new HttpClient()) {
+                try {
                     var response = await httpClient.PostAsync(url, content);
                     response.EnsureSuccessStatusCode();
                     // Optionally read and process the response content
                     await response.Content.ReadAsStringAsync();
                 }
-                catch (HttpRequestException ex)
-                {
+                catch (HttpRequestException ex) {
                     SentrySdk.CaptureException(ex);
                 }
             }
         }
 
-        public static void SentryInit()
-        {
-            SentrySdk.Init(options =>
-            {
+        public static void SentryInit() {
+            SentrySdk.Init(options => {
                 // A Sentry Data Source Name (DSN) is required.
                 // See https://docs.sentry.io/product/sentry-basics/dsn-explainer/
                 // You can set it in the SENTRY_DSN environment variable, or you can set it in code here.
@@ -240,8 +208,7 @@ namespace GsPlugin
         }
     }
 
-    class TimeTracker
-    {
+    class TimeTracker {
         public string user_id { get; set; }
         public string game_name { get; set; }
         public string gameID { get; set; }
@@ -249,21 +216,18 @@ namespace GsPlugin
         public string started_at { get; set; }
     };
 
-    class TimeTrackerEnd
-    {
+    class TimeTrackerEnd {
         public string user_id { get; set; }
         public object metadata { get; set; }
         public string finished_at { get; set; }
         public string session_id { get; set; }
     };
 
-    class Sync
-    {
+    class Sync {
         public string user_id { get; set; }
     };
 
-    public class SessionData
-    {
+    public class SessionData {
         public string session_id { get; set; }
     }
 }

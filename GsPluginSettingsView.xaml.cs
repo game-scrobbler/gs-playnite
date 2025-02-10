@@ -13,12 +13,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace GsPlugin
-{
-    public partial class GsPluginSettingsView : UserControl
-    {
-        public GsPluginSettingsView()
-        {
+namespace GsPlugin {
+    public partial class GsPluginSettingsView : UserControl {
+        public GsPluginSettingsView() {
             InitializeComponent();
         }
     }

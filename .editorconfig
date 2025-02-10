@@ -15,3 +15,6 @@ insert_final_newline = true
 [*.cs]
 dotnet_analyzer_diagnostic_severity = warning
 dotnet_diagnostic.CA1822.severity = error  # Example: Mark members as static
+
+# Ensure braces are on the same line as the if/for/while statement
+csharp_new_line_before_open_brace = none

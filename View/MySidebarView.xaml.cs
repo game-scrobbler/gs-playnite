@@ -7,16 +7,13 @@ using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Web.WebView2.Wpf;
 using Playnite.SDK;   // For WebView2
 
-namespace MySidebarPlugin
-{
-    public partial class MySidebarView : UserControl
-    {
+namespace MySidebarPlugin {
+    public partial class MySidebarView : UserControl {
         private GsPluginSettings viewSettings { get; set; }
         private IPlayniteAPI viewPlayniteApi { get; set; }
 
         private string viewPluginVer { get; set; }
-        public MySidebarView(GsPluginSettings settings, IPlayniteAPI playniteApi, string pluginVersion)
-        {
+        public MySidebarView(GsPluginSettings settings, IPlayniteAPI playniteApi, string pluginVersion) {
             InitializeComponent();
 
             // One approach is to wait until the control is actually loaded in the visual tree.
@@ -26,8 +23,7 @@ namespace MySidebarPlugin
             viewPluginVer = pluginVersion;
         }
 
-        private async void MySidebarView_Loaded(object sender, RoutedEventArgs e)
-        {
+        private async void MySidebarView_Loaded(object sender, RoutedEventArgs e) {
             // Ensure the CoreWebView2 is ready to receive commands
             await MyWebView2.EnsureCoreWebView2Async();
 
