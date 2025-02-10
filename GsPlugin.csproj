@@ -103,13 +103,6 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>libs\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-      <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="GsPlugin.cs" />
     <Compile Include="GsPluginSettings.cs" />
     <Compile Include="GsPluginSettingsView.xaml.cs">
