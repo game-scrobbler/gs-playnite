@@ -1,0 +1,20 @@
+# Remove the line below if you want to inherit .editorconfig settings from higher directories
+root = true
+
+# Formatting
+[*]
+indent_size = 4
+indent_style = space
+tab_width = 4
+charset = utf-8
+end_of_line = crlf
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# C# Rules
+[*.cs]
+dotnet_analyzer_diagnostic_severity = warning
+dotnet_diagnostic.CA1822.severity = error  # Example: Mark members as static
+
+# Ensure braces are on the same line as the if/for/while statement
+csharp_new_line_before_open_brace = none
