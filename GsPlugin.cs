@@ -99,7 +99,7 @@ namespace GsPlugin
             await PostDataAsync("https://api.gamescrobbler.com/api/playnite/scrobble/finish", timeTrackerEndData);
         }
 
-       public override void OnGameUninstalled(OnGameUninstalledEventArgs args)
+        public override void OnGameUninstalled(OnGameUninstalledEventArgs args)
         {
             // Add code to be executed when game is uninstalled.
         }
@@ -133,13 +133,14 @@ namespace GsPlugin
             // Return one or more SidebarItem objects
             yield return new SidebarItem
             {
-                Type = SidebarItemType.Action,
+                Type = (SiderbarItemType)1,
                 Title = "Show My Data",
                 Icon = new TextBlock { Text = "📋" }, // or a path to an image icon
                 // Return a new instance of your custom UserControl (WPF)
                 Opened = () => new MySidebarView(settings, PlayniteApi, GetPluginVersion())
-                 // If you want a simple *action* instead of a custom panel, you can
+                // If you want a simple *action* instead of a custom panel, you can
                 // return an item with Type = SidebarItemType.Action, plus an OpenCommand.
+            };
         }
 
         public async void SyncLib()
@@ -158,7 +159,7 @@ namespace GsPlugin
             await PostDataAsync("https://api.gamescrobbler.com/api/playnite/sync", modifiedInput);
         }
 
-        private async Task PostDataAsync(string url, object data)
+        private static async Task PostDataAsync(string url, object data)
         {
             var jsonData = JsonSerializer.Serialize(data, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
             var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
@@ -179,7 +180,7 @@ namespace GsPlugin
             }
         }
 
-        private async Task PostDataAsync(string url, string data)
+        private static async Task PostDataAsync(string url, string data)
         {
             var content = new StringContent(data, Encoding.UTF8, "application/json");
 
