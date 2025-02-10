@@ -14,6 +14,12 @@ An extension for [Playnite](https://playnite.link) that offers:
 - ✨ Playtime Insights: See where your gaming hours go with beautiful charts and graphs.
 - ⏳ Achievement Visualization: Track your milestones and unlock patterns in your game play.
 
+## Contributions
+
+We welcome all contributions! If you have an idea for a new feature or have found a bug, feel free to open an issue or submit a pull request.
+
+To ensure consistency, please format your code with `dotnet format GsPlugin.sln` before submitting a PR.
+
 ## More
 
-Help support [Playnite on Patreon](https://www.patreon.com/playnite).
+If you enjoy this plugin, help support [Playnite launcher on Patreon](https://www.patreon.com/playnite).
