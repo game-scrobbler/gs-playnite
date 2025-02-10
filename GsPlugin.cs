@@ -1,37 +1,30 @@
 using MySidebarPlugin;
+
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
+using Sentry;
+
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-
-
-using System.Runtime.InteropServices.ComTypes;
-using System.Text.RegularExpressions;
-
-
-using Sentry;
-using System.Text.Encodings.Web;
-
-
-using System.IO;
-
 
 namespace GsPlugin
 {
     public class GsPlugin : GenericPlugin
     {
         private static readonly ILogger logger = LogManager.GetLogger();
-
-
 
         private GsPluginSettings settings { get; set; }
 
@@ -41,21 +34,16 @@ namespace GsPlugin
         public GsPlugin(IPlayniteAPI api) : base(api)
         {
             settings = new GsPluginSettings(this);
-
-
-
             Properties = new GenericPluginProperties
             {
                 HasSettings = true
             };
-
         }
 
         private string GetPluginVersion()
         {
             string pluginFolder = Path.GetDirectoryName(GetType().Assembly.Location);
             string yamlPath = Path.Combine(pluginFolder, "extension.yaml");
-
             if (File.Exists(yamlPath))
             {
                 foreach (var line in File.ReadAllLines(yamlPath))
@@ -92,7 +80,6 @@ namespace GsPlugin
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // Prevents escaping +
             };
 
-
             TimeTracker startData = new TimeTracker
             {
                 user_id = settings.InstallID,
@@ -102,44 +89,27 @@ namespace GsPlugin
                 started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
 
-
             string jsonData = JsonSerializer.Serialize(startData, options);
             var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
 
             using (HttpClient httpClient = new HttpClient())
             {
-
                 try
                 {
-
-
-
                     var response = await httpClient.PostAsync(
                         "https://api.gamescrobbler.com/api/playnite/scrobble/start",
                         content
                     );
 
                     var responseBody = await response.Content.ReadAsStringAsync();
-
                     SessionData obj = JsonSerializer.Deserialize<SessionData>(responseBody);
-
                     string sessionId = obj.session_id;
                     sessionID = sessionId;
-
-
-
-
-
                 }
                 catch (HttpRequestException ex)
                 {
-
                     SentrySdk.CaptureException(ex);
-
                 }
-
-
-
             }
         }
 
@@ -149,7 +119,6 @@ namespace GsPlugin
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
             var emptyObj = new { };
-
 
             var options = new JsonSerializerOptions
             {
@@ -169,11 +138,8 @@ namespace GsPlugin
 
             using (HttpClient httpClient = new HttpClient())
             {
-
                 try
                 {
-
-
                     // Send the POST request to the endpoint
                     var response = await httpClient.PostAsync(
                         "https://api.gamescrobbler.com/api/playnite/scrobble/finish",
@@ -182,23 +148,13 @@ namespace GsPlugin
 
                     // Ensure the request was successful or throw an exception if not
                     response.EnsureSuccessStatusCode();
-
-
                     var responseBody = await response.Content.ReadAsStringAsync();
-
-
                 }
                 catch (HttpRequestException ex)
                 {
-
                     SentrySdk.CaptureException(ex);
-
                 }
-
-
-
             }
-
         }
 
         public override void OnGameUninstalled(OnGameUninstalledEventArgs args)
@@ -210,16 +166,10 @@ namespace GsPlugin
         {
 
             SentryInit();
-
-
             // Add code to be executed when Playnite is initialized.
             SyncLib();
 
         }
-
-
-
-
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
         {
@@ -262,23 +212,18 @@ namespace GsPlugin
                 },
 
             };
-
-
             // If you want a simple *action* instead of a custom panel, you can
             // return an item with Type = SidebarItemType.Action, plus an OpenCommand.
         }
 
         public async void SyncLib()
         {
-
             var library = PlayniteApi.Database.Games.ToList();
             Sync sync = new Sync
             {
                 user_id = settings.InstallID,
 
             };
-
-
             string jsonLib = JsonSerializer.Serialize(library);
             string jsonSync = JsonSerializer.Serialize(sync);
             string input = jsonSync + jsonLib;
@@ -287,11 +232,8 @@ namespace GsPlugin
 
             using (HttpClient httpClient = new HttpClient())
             {
-
                 try
                 {
-
-
                     // Send the POST request to the endpoint
                     var response = await httpClient.PostAsync(
                         "https://api.gamescrobbler.com/api/playnite/sync",
@@ -303,16 +245,11 @@ namespace GsPlugin
 
                     // Optionally read and process the response content
                     var responseBody = await response.Content.ReadAsStringAsync();
-
-
                 }
                 catch (HttpRequestException ex)
                 {
                     SentrySdk.CaptureException(ex);
                 }
-
-
-
             }
         }
 
@@ -358,9 +295,6 @@ namespace GsPlugin
 
     }
 
-
-
-
     class TimeTracker
     {
         public string user_id { get; set; }
@@ -379,8 +313,6 @@ namespace GsPlugin
     };
     class Sync
     {
-
-
         public string user_id { get; set; }
 
     };
