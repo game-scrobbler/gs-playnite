@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.2.0...GsPlugin-v0.3.0) (2025-02-10)
+
+
+### Features
+
+* add favicon to project ([f5ce14c](https://github.com/game-scrobbler/gs-playnite/commit/f5ce14c6ee26e62d12bb2cbec5efa0e901367d14))
+* added sentry logs and ver to the web view link ([c9d3650](https://github.com/game-scrobbler/gs-playnite/commit/c9d365081132933d251c54dd6909fe4566f0cf31))
+* added sentry package(not implemented) and resolved conflicts. ([e1e7adc](https://github.com/game-scrobbler/gs-playnite/commit/e1e7adc65e41397bc4db73c27e6a7dbdd0bfb662))
+
+
+### Bug Fixes
+
+* added sync on app exit ([3131cd0](https://github.com/game-scrobbler/gs-playnite/commit/3131cd0d2b432f79007238a73105542dc48a985b))
+* remove extra lines ([eed04ef](https://github.com/game-scrobbler/gs-playnite/commit/eed04efcb94fd155f3fd8864faf99b2c8f8487ae))
+* the data is now sync when the game library is updated ([c274b2e](https://github.com/game-scrobbler/gs-playnite/commit/c274b2e8fa28a34af29f9065257ca8185c96dd98))
+
 ## [0.2.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.2.0...GsPlugin-v0.2.0) (2025-02-06)
 
 
