@@ -1,4 +1,4 @@
-﻿using Playnite.SDK;
+using Playnite.SDK;
 using Playnite.SDK.Data;
 using Playnite.SDK.Plugins;
 using System;
@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace GsPlugin
 {
-    public class GsPluginSettings : ObservableObject , ISettings
+    public class GsPluginSettings : ObservableObject, ISettings
     {
         private string option1 = string.Empty;
         private bool option2 = false;
@@ -45,7 +45,7 @@ namespace GsPlugin
             {
                 // Generate a new GUID if not already set
                 InstallID = System.Guid.NewGuid().ToString();
-                
+
                 // Save the new settings immediately to persist the InstallID
                 plugin.SavePluginSettings(this);
             }
@@ -74,7 +74,7 @@ namespace GsPlugin
     {
         private readonly GsPlugin plugin;
         private GsPluginSettings editingClone { get; set; }
-        
+
 
 
         private GsPluginSettings settings;
@@ -92,21 +92,21 @@ namespace GsPlugin
         {
             // Injecting your plugin instance is required for Save/Load method because Playnite saves data to a location based on what plugin requested the operation.
             this.plugin = plugin;
-            
+
             // Load saved settings.
             var savedSettings = plugin.LoadPluginSettings<GsPluginSettings>();
 
             // LoadPluginSettings returns null if no saved data is available.
             if (savedSettings != null)
             {
-                
+
                 Settings = savedSettings;
 
             }
             else
             {
-               
-                
+
+
                 Settings = new GsPluginSettings();
             }
         }

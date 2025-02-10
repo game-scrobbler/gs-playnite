@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using GsPlugin;
@@ -6,9 +6,6 @@ using Microsoft.Web.WebView2.Core;  // For CoreWebView2
 using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Web.WebView2.Wpf;
 using Playnite.SDK;   // For WebView2
-
-
-
 
 namespace MySidebarPlugin
 {
@@ -28,7 +25,7 @@ namespace MySidebarPlugin
             viewPlayniteApi = playniteApi;
             viewPluginVer = pluginVersion;
         }
-        
+
         private async void MySidebarView_Loaded(object sender, RoutedEventArgs e)
         {
             // Ensure the CoreWebView2 is ready to receive commands
@@ -37,8 +34,6 @@ namespace MySidebarPlugin
             // Now you can navigate to an HTML string or a URL.
             // Example: injecting the same HTML snippet with the flourish iframe
             string userId = viewSettings.InstallID; // Or get it from plugin settings
-
-           
 
             // Use $@ for verbatim + interpolation
             string htmlContent = $@"
@@ -59,7 +54,6 @@ namespace MySidebarPlugin
   </body>
 </html>
 ";
-
 
             // Navigate to the embedded HTML
             MyWebView2.CoreWebView2.NavigateToString(htmlContent);

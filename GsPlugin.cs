@@ -1,4 +1,4 @@
-﻿using MySidebarPlugin;
+using MySidebarPlugin;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
@@ -30,18 +30,18 @@ namespace GsPlugin
     public class GsPlugin : GenericPlugin
     {
         private static readonly ILogger logger = LogManager.GetLogger();
-        
+
 
 
         private GsPluginSettings settings { get; set; }
-        
+
         private string sessionID { get; set; }
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
         public GsPlugin(IPlayniteAPI api) : base(api)
         {
             settings = new GsPluginSettings(this);
-            
+
 
 
             Properties = new GenericPluginProperties
@@ -101,8 +101,8 @@ namespace GsPlugin
                 metadata = emptyObj,
                 started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
-           
-           
+
+
             string jsonData = JsonSerializer.Serialize(startData, options);
             var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
 
@@ -113,19 +113,19 @@ namespace GsPlugin
                 {
 
 
-                    
+
                     var response = await httpClient.PostAsync(
                         "https://api.gamescrobbler.com/api/playnite/scrobble/start",
                         content
                     );
 
                     var responseBody = await response.Content.ReadAsStringAsync();
-                    
+
                     SessionData obj = JsonSerializer.Deserialize<SessionData>(responseBody);
-                  
+
                     string sessionId = obj.session_id;
                     sessionID = sessionId;
-                  
+
 
 
 
@@ -159,7 +159,7 @@ namespace GsPlugin
             TimeTrackerEnd startData = new TimeTrackerEnd
             {
                 user_id = settings.InstallID,
-               session_id = sessionID,
+                session_id = sessionID,
                 metadata = emptyObj,
                 finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
@@ -185,7 +185,7 @@ namespace GsPlugin
 
 
                     var responseBody = await response.Content.ReadAsStringAsync();
-                
+
 
                 }
                 catch (HttpRequestException ex)
@@ -210,17 +210,17 @@ namespace GsPlugin
         {
 
             SentryInit();
-          
-   
+
+
             // Add code to be executed when Playnite is initialized.
             SyncLib();
 
         }
 
 
-        
-        
-        
+
+
+
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
         {
             // Add code to be executed when Playnite is shutting down.
@@ -233,9 +233,9 @@ namespace GsPlugin
             base.OnLibraryUpdated(args);
             SyncLib();
 
-            
 
-    }
+
+        }
 
         public override ISettings GetSettings(bool firstRunSettings)
         {
@@ -270,7 +270,7 @@ namespace GsPlugin
 
         public async void SyncLib()
         {
-            
+
             var library = PlayniteApi.Database.Games.ToList();
             Sync sync = new Sync
             {
@@ -303,7 +303,7 @@ namespace GsPlugin
 
                     // Optionally read and process the response content
                     var responseBody = await response.Content.ReadAsStringAsync();
-                    
+
 
                 }
                 catch (HttpRequestException ex)
@@ -311,12 +311,12 @@ namespace GsPlugin
                     SentrySdk.CaptureException(ex);
                 }
 
-               
+
 
             }
         }
 
-        public void SentryInit()
+        public static void SentryInit()
         {
             SentrySdk.Init(options =>
             {
@@ -347,10 +347,10 @@ namespace GsPlugin
                 // Note: By default, the profiler is initialized asynchronously. This can
                 // be tuned by passing a desired initialization timeout to the constructor.
                 //options.AddIntegration(new ProfilingIntegration(
-                    // During startup, wait up to 500ms to profile the app startup code.
-                    // This could make launching the app a bit slower so comment it out if you
-                    // prefer profiling to start asynchronously
-                    //TimeSpan.FromMilliseconds(500)
+                // During startup, wait up to 500ms to profile the app startup code.
+                // This could make launching the app a bit slower so comment it out if you
+                // prefer profiling to start asynchronously
+                //TimeSpan.FromMilliseconds(500)
                 //));
             });
 
@@ -358,12 +358,12 @@ namespace GsPlugin
 
     }
 
-       
+
 
 
     class TimeTracker
     {
-       public string user_id { get; set; }
+        public string user_id { get; set; }
         public string game_name { get; set; }
         public string gameID { get; set; }
         public object metadata { get; set; }
@@ -378,12 +378,12 @@ namespace GsPlugin
         public string session_id { get; set; }
     };
     class Sync
-{
-    
+    {
 
-    public string user_id { get; set; }
 
-};
+        public string user_id { get; set; }
+
+    };
     public class SessionData
     {
         public string session_id { get; set; }
