@@ -1,12 +1,12 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 Packages:
-  # - Version: 0.3.0
-  #   RequiredApiVersion: 6.11.0
-  #   ReleaseDate: 2025-02-10
-  #   PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.3.0/GsPlugin-v0.3.0.pext
-  #   Changelog:
-  #     - Refactoring & Improve code quality
-  #     - Add Sentry for error tracking
+  - Version: 0.3.0
+    RequiredApiVersion: 6.11.0
+    ReleaseDate: 2025-02-10
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.3.0/GsPlugin-v0.3.0.pext
+    Changelog:
+      - Refactoring & Improve code quality
+      - Add Sentry for error tracking
   - Version: 0.2.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-06
