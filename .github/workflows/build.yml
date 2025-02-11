@@ -13,19 +13,25 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - name: checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: checkout powershell-yaml
+      - name: Checkout powershell-yaml
         uses: actions/checkout@v4
         with:
           repository: cloudbase/powershell-yaml
           path: powershell-yaml
 
-      - name: Nuget Restore
+      - name: NuGet Restore
         run: nuget restore .\GsPlugin.sln
 
-      - name: Build entire solution (.NET Framework 4.6.2)
+      - name: Verify Code Formatting
+        run: |
+          echo "Running code formatting checks..."
+          dotnet format .\GsPlugin.sln  --verify-no-changes
+        continue-on-error: false
+
+      - name: Build Entire Solution (.NET Framework 4.6.2)
         run: |
           cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\"
           .\MSBuild.exe $Env:GITHUB_WORKSPACE\GsPlugin.sln -p:Configuration=Release -restore -clp:ErrorsOnly
@@ -52,7 +58,7 @@ jobs:
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
-      - name: Rename Packed File name to Release Tag
+      - name: Rename Packed File Name to Release Tag
         if: github.ref == 'refs/heads/main'
         id: rename
         run: |
