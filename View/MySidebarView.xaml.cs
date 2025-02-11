@@ -1,10 +1,6 @@
-using System;
 using System.Windows;
 using System.Windows.Controls;
 using GsPlugin;
-using Microsoft.Web.WebView2.Core;  // For CoreWebView2
-using Microsoft.Web.WebView2.WinForms;
-using Microsoft.Web.WebView2.Wpf;
 using Playnite.SDK;   // For WebView2
 
 namespace MySidebarPlugin {

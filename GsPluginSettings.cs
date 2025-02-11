@@ -1,12 +1,6 @@
+using System.Collections.Generic;
 using Playnite.SDK;
 using Playnite.SDK.Data;
-using Playnite.SDK.Plugins;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GsPlugin {
     public class GsPluginSettings : ObservableObject, ISettings {

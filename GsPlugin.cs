@@ -1,23 +1,18 @@
-﻿using MySidebarPlugin;
-using Playnite.SDK;
-using Playnite.SDK.Events;
-using Playnite.SDK.Models;
-using Playnite.SDK.Plugins;
-using Sentry;
-
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using MySidebarPlugin;
+using Playnite.SDK;
+using Playnite.SDK.Events;
+using Playnite.SDK.Plugins;
+using Sentry;
 
 namespace GsPlugin {
     public class GsPlugin : GenericPlugin {
@@ -127,12 +122,9 @@ namespace GsPlugin {
             SyncLib();
         }
 
-        public override UserControl GetSettingsView(bool firstRunSettings)
-        {
+        public override UserControl GetSettingsView(bool firstRunSettings) {
             return new GsPluginSettingsView(PlayniteApi, settings);
         }
-
-        public override UserControl GetSettingsView(bool firstRunSettings) => new GsPluginSettingsView();
 
         public override IEnumerable<SidebarItem> GetSidebarItems() {
             // Return one or more SidebarItem objects
