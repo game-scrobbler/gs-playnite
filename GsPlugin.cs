@@ -244,7 +244,7 @@ namespace GsPlugin
 
         public override UserControl GetSettingsView(bool firstRunSettings)
         {
-            return new GsPluginSettingsView();
+            return new GsPluginSettingsView(PlayniteApi, settings);
         }
 
         public override IEnumerable<SidebarItem> GetSidebarItems()
