@@ -211,7 +211,7 @@ namespace GsPlugin {
         /// <param name="payload">The payload object to serialize as JSON.</param>
         /// <param name="ensureSuccess">If true, the response.EnsureSuccessStatusCode() is called.</param>
         /// <returns>The deserialized response object, or null if an exception occurs.</returns>
-        private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
+        private static async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
             where TResponse : class {
             string jsonData = JsonSerializer.Serialize(payload, jsonOptions);
             using (var content = new StringContent(jsonData, Encoding.UTF8, "application/json")) {
