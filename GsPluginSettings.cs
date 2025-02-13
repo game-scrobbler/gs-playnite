@@ -8,7 +8,7 @@ namespace GsPlugin {
         private bool option2 = false;
         private bool optionThatWontBeSaved = false;
         public string InstallID { get; set; } = string.Empty;
-
+        public string session_id { get; set; } = null;
         private readonly GsPlugin plugin;
 
 
@@ -34,6 +34,16 @@ namespace GsPlugin {
             else {
                 // Generate a new GUID if not already set
                 InstallID = System.Guid.NewGuid().ToString();
+
+                // Save the new settings immediately to persist the InstallID
+                plugin.SavePluginSettings(this);
+            }
+            if (savedSettings != null && !string.IsNullOrEmpty(savedSettings.session_id)) {
+                session_id = savedSettings.session_id;
+            }
+            else {
+                // Generate a new GUID if not already set
+                session_id = System.Guid.NewGuid().ToString();
 
                 // Save the new settings immediately to persist the InstallID
                 plugin.SavePluginSettings(this);

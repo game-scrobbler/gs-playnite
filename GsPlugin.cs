@@ -20,7 +20,6 @@ namespace GsPlugin {
 
         private GsPluginSettings settings { get; set; }
 
-        private string sessionID { get; set; }
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
         // Use a single shared HttpClient instance per best practices.
@@ -78,7 +77,7 @@ namespace GsPlugin {
             SessionData sessionData = await PostJsonAsync<SessionData>(
                 "https://api.gamescrobbler.com/api/playnite/scrobble/start", startData);
             if (sessionData != null) {
-                sessionID = sessionData.session_id;
+                settings.session_id = sessionData.session_id;
             }
         }
 
@@ -90,7 +89,7 @@ namespace GsPlugin {
             // Build the payload for scrobbling the game finish.
             TimeTrackerEnd startData = new TimeTrackerEnd {
                 user_id = settings.InstallID,
-                session_id = sessionID,
+                session_id = settings.session_id,
                 metadata = new { },
                 finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
@@ -98,6 +97,9 @@ namespace GsPlugin {
             // Send POST request and ensure success.
             FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
                 "https://api.gamescrobbler.com/api/playnite/scrobble/finish", startData, true);
+            if (finishResponse != null) {
+                settings.session_id = null;
+            }
             // Optionally log finishResponse.status if needed.
         }
 
@@ -209,11 +211,10 @@ namespace GsPlugin {
         /// <param name="payload">The payload object to serialize as JSON.</param>
         /// <param name="ensureSuccess">If true, the response.EnsureSuccessStatusCode() is called.</param>
         /// <returns>The deserialized response object, or null if an exception occurs.</returns>
-        private static async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
+        private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
             where TResponse : class {
             string jsonData = JsonSerializer.Serialize(payload, jsonOptions);
             using (var content = new StringContent(jsonData, Encoding.UTF8, "application/json")) {
-
                 HttpResponseMessage response = null;
                 string responseBody = null;
 
