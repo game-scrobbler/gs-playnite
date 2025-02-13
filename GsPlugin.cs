@@ -8,6 +8,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using System.Windows.Markup;
 using MySidebarPlugin;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -66,7 +67,7 @@ namespace GsPlugin {
 
             // Build the payload for scrobbling the game start.
             TimeTracker startData = new TimeTracker {
-                user_id = settings.InstallID,
+                user_id = GSDataManager.Data.InstallID,
                 game_name = startedGame.Name,
                 gameID = startedGame.Id.ToString(),
                 metadata = new { },
@@ -77,7 +78,8 @@ namespace GsPlugin {
             SessionData sessionData = await PostJsonAsync<SessionData>(
                 "https://api.gamescrobbler.com/api/playnite/scrobble/start", startData);
             if (sessionData != null) {
-                settings.session_id = sessionData.session_id;
+                GSDataManager.Data.SessionId = sessionData.session_id;
+                GSDataManager.Save();   
             }
         }
 
@@ -88,17 +90,18 @@ namespace GsPlugin {
 
             // Build the payload for scrobbling the game finish.
             TimeTrackerEnd startData = new TimeTrackerEnd {
-                user_id = settings.InstallID,
-                session_id = settings.session_id,
+                user_id = GSDataManager.Data.InstallID,
+                session_id = GSDataManager.Data.SessionId,
                 metadata = new { },
                 finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
 
             // Send POST request and ensure success.
             FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
-                "https://api.gamescrobbler.com/api/playnite/scrobble/finish", startData, true);
+            "https://api.gamescrobbler.com/api/playnite/scrobble/finish", startData, true);
             if (finishResponse != null) {
-                settings.session_id = null;
+                GSDataManager.Data.SessionId = null;
+                GSDataManager.Save();   
             }
             // Optionally log finishResponse.status if needed.
         }
@@ -109,12 +112,31 @@ namespace GsPlugin {
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             SentryInit();
-            // Add code to be executed when Playnite is initialized.
+            GSDataManager.Initialize(GetPluginUserDataPath(), settings.InstallID);
+           
+
+
             SyncLib();
         }
 
-        public override void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
-            // Add code to be executed when Playnite is shutting down.
+        public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
+            if (GSDataManager.Data.SessionId != null) {
+                DateTime localDate = DateTime.Now;
+
+                TimeTrackerEnd startData = new TimeTrackerEnd {
+                    user_id = GSDataManager.Data.InstallID,
+                    session_id = GSDataManager.Data.SessionId,
+                    metadata = new { },
+                    finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                };
+
+                FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
+                "https://api.gamescrobbler.com/api/playnite/scrobble/finish", startData, true);
+                if (finishResponse != null) {
+                    GSDataManager.Data.SessionId = null;
+                    GSDataManager.Save();
+                }
+            }
             SyncLib();
         }
 
@@ -149,7 +171,7 @@ namespace GsPlugin {
         public async void SyncLib() {
             var library = PlayniteApi.Database.Games.ToList();
             LibrarySync librarySync = new LibrarySync {
-                user_id = settings.InstallID,
+                user_id = GSDataManager.Data.InstallID,
                 library = library
             };
 
@@ -256,7 +278,7 @@ namespace GsPlugin {
     // Request and Response Models
     // --------------------
 
-    class TimeTracker {
+    public class TimeTracker {
         public string user_id { get; set; }
         public string game_name { get; set; }
         public string gameID { get; set; }

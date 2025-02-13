@@ -103,6 +103,9 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GSData.cs" />
+    <Compile Include="GSDataManager.cs" />
+    <Compile Include="GSDataStorage.cs" />
     <Compile Include="GsPlugin.cs" />
     <Compile Include="GsPluginSettings.cs" />
     <Compile Include="GsPluginSettingsView.xaml.cs">
