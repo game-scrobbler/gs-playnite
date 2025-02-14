@@ -113,7 +113,6 @@ namespace GsPlugin {
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             SentryInit();
             GSDataManager.Initialize(GetPluginUserDataPath(), settings.InstallID);
-           PlayniteApi.Dialogs.ShowMessage(settings.InstallID);
             SyncLib();
         }
 
