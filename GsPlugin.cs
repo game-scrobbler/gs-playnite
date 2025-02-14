@@ -19,7 +19,7 @@ namespace GsPlugin {
     public class GsPlugin : GenericPlugin {
         private static readonly ILogger logger = LogManager.GetLogger();
 
-        private GsPluginSettings settings { get; set; }
+        private GsPluginSettingsViewModel settings { get; set; }
 
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
@@ -32,7 +32,7 @@ namespace GsPlugin {
         };
 
         public GsPlugin(IPlayniteAPI api) : base(api) {
-            settings = new GsPluginSettings(this);
+            settings = new GsPluginSettingsViewModel(this);
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
@@ -113,9 +113,7 @@ namespace GsPlugin {
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             SentryInit();
             GSDataManager.Initialize(GetPluginUserDataPath(), settings.InstallID);
-           
-
-
+           PlayniteApi.Dialogs.ShowMessage(settings.InstallID);
             SyncLib();
         }
 
@@ -146,8 +144,12 @@ namespace GsPlugin {
             SyncLib();
         }
 
+        public override ISettings GetSettings(bool firstRunSettings) {
+            return (ISettings)settings;
+        }
+
         public override UserControl GetSettingsView(bool firstRunSettings) {
-            return new GsPluginSettingsView(PlayniteApi, settings);
+            return new GsPluginSettingsView();
         }
 
         public override IEnumerable<SidebarItem> GetSidebarItems() {
@@ -158,7 +160,7 @@ namespace GsPlugin {
                 Icon = new TextBlock { Text = "📋" }, // or a path to an image icon
                 Opened = () => {
                     // Return a new instance of your custom UserControl (WPF)
-                    return new MySidebarView(settings, PlayniteApi, GetPluginVersion());
+                    return new MySidebarView(GetPluginVersion());
                 },
             };
             // If you want a simple *action* instead of a custom panel, you can

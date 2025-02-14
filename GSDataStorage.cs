@@ -29,9 +29,10 @@ namespace GsPlugin {
                 var json = File.ReadAllText(filePath);
                 return JsonSerializer.Deserialize<GSData>(json) ?? new GSData();
             }
-            catch (Exception ex) {
+            catch (Exception) {
                 // Optionally log the error using Playnite's logging
                 // For example: Playnite.SDK.Logger.Error(ex, "Failed to load custom data");
+                
                 return new GSData();
             }
         }
@@ -44,7 +45,7 @@ namespace GsPlugin {
                 var json = JsonSerializer.Serialize(data);
                 File.WriteAllText(filePath, json);
             }
-            catch (Exception ex) {
+            catch (Exception) {
                 // Optionally log the error
                 // For example: Playnite.SDK.Logger.Error(ex, "Failed to save custom data");
             }

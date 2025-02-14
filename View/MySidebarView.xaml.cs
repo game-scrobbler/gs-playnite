@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using GsPlugin;
@@ -5,17 +6,13 @@ using Playnite.SDK;   // For WebView2
 
 namespace MySidebarPlugin {
     public partial class MySidebarView : UserControl {
-        private GsPluginSettings viewSettings { get; set; }
-        private IPlayniteAPI viewPlayniteApi { get; set; }
 
         private string viewPluginVer { get; set; }
-        public MySidebarView(GsPluginSettings settings, IPlayniteAPI playniteApi, string pluginVersion) {
+        public MySidebarView(string pluginVersion) {
             InitializeComponent();
 
             // One approach is to wait until the control is actually loaded in the visual tree.
             this.Loaded += MySidebarView_Loaded;
-            viewSettings = settings ?? new GsPluginSettings();
-            viewPlayniteApi = playniteApi;
             viewPluginVer = pluginVersion;
         }
 
@@ -25,8 +22,8 @@ namespace MySidebarPlugin {
 
             // Now you can navigate to an HTML string or a URL.
             // Example: injecting the same HTML snippet with the flourish iframe
-            string userId = viewSettings.InstallID; // Or get it from plugin settings
-
+            string userId = GSDataManager.Data.InstallID; // Or get it from plugin settings
+            Boolean isDark = GSDataManager.Data.IsDark;
             // Use $@ for verbatim + interpolation
             string htmlContent = $@"
 <html style='width:100%;height:100%;'>
@@ -35,7 +32,7 @@ namespace MySidebarPlugin {
   </head>
   <body style='margin:0; padding:0; width:100%;height:100%;'>
     <iframe
-      src='https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}'
+      src='https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}&is_dark={isDark.ToString()}'
       frameborder='0'
       scrolling='yes'
       style='width:100%;height:100%;'

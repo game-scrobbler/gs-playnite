@@ -2,23 +2,18 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Playnite.SDK;
 
 namespace GsPlugin {
     public partial class GsPluginSettingsView : UserControl {
-        private readonly IPlayniteAPI PlayniteApi;
-        private GsPluginSettings viewSettings { get; set; }
 
-        public GsPluginSettingsView(IPlayniteAPI api, GsPluginSettings settings) {
+        public GsPluginSettingsView() {
             InitializeComponent();
-            PlayniteApi = api; // Store Playnite API instance
-            viewSettings = settings ?? new GsPluginSettings();
             Loaded += GsPluginSettingsView_Loaded;
         }
 
         private void GsPluginSettingsView_Loaded(object sender, RoutedEventArgs e) {
             // Find the TextBlock by name and update its text
-            IDTextBlock.Text = viewSettings.InstallID;
+            IDTextBlock.Text = GSDataManager.Data.InstallID;
         }
         private void TextBlock_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) {
             if (sender is TextBlock textBlock) {
@@ -34,6 +29,19 @@ namespace GsPlugin {
                     MessageBox.Show($"Failed to copy text: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        private void HandleCheck(object sender, RoutedEventArgs e) {
+                // Dark mode is enabled
+            GSDataManager.Data.IsDark = true;
+            GSDataManager.Save();
+            MessageBox.Show("Dark Mode Enabled!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        private void HandleUnchecked(object sender, RoutedEventArgs e) {
+            // Dark mode is not enabled
+            GSDataManager.Data.IsDark = false;
+            GSDataManager.Save();
+            MessageBox.Show("Dark Mode Disabled!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 }
