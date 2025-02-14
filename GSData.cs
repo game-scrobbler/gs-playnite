@@ -1,6 +1,4 @@
 using System;
-using Playnite.SDK.Models; // For Game
-using Playnite.SDK;         // For TimeTracker if available
 
 namespace GsPlugin {
     /// <summary>

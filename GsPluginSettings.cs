@@ -1,10 +1,6 @@
+using System.Collections.Generic;
 using Playnite.SDK;
 using Playnite.SDK.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GsPlugin {
     public class GsPluginSettings : ObservableObject {
@@ -25,7 +21,7 @@ namespace GsPlugin {
                 OnPropertyChanged();
             }
         }
-            
+
 
         public GsPluginSettingsViewModel(GsPlugin plugin) {
             // Injecting your plugin instance is required for Save/Load method because Playnite saves data to a location based on what plugin requested the operation.

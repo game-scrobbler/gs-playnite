@@ -32,7 +32,7 @@ namespace GsPlugin {
         }
 
         private void HandleCheck(object sender, RoutedEventArgs e) {
-                // Dark mode is enabled
+            // Dark mode is enabled
             GSDataManager.Data.IsDark = true;
             GSDataManager.Save();
             MessageBox.Show("Dark Mode Enabled!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);

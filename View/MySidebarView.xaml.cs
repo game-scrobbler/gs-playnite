@@ -2,7 +2,6 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using GsPlugin;
-using Playnite.SDK;   // For WebView2
 
 namespace MySidebarPlugin {
     public partial class MySidebarView : UserControl {

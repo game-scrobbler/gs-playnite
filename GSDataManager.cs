@@ -26,7 +26,7 @@ namespace GsPlugin {
                 Save();
             }
             // If InstallID is missing or empty, create a new one and save.
-           
+
         }
 
         /// <summary>

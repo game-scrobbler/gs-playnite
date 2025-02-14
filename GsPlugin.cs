@@ -8,7 +8,6 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using System.Windows.Markup;
 using MySidebarPlugin;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -79,7 +78,7 @@ namespace GsPlugin {
                 "https://api.gamescrobbler.com/api/playnite/scrobble/start", startData);
             if (sessionData != null) {
                 GSDataManager.Data.SessionId = sessionData.session_id;
-                GSDataManager.Save();   
+                GSDataManager.Save();
             }
         }
 
@@ -101,7 +100,7 @@ namespace GsPlugin {
             "https://api.gamescrobbler.com/api/playnite/scrobble/finish", startData, true);
             if (finishResponse != null) {
                 GSDataManager.Data.SessionId = null;
-                GSDataManager.Save();   
+                GSDataManager.Save();
             }
             // Optionally log finishResponse.status if needed.
         }

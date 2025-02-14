@@ -1,7 +1,5 @@
 using System;
 using System.IO;
-using System.Text.Json.Serialization;
-using System.Xml;
 using System.Text.Json;
 
 namespace GsPlugin {
@@ -32,7 +30,7 @@ namespace GsPlugin {
             catch (Exception) {
                 // Optionally log the error using Playnite's logging
                 // For example: Playnite.SDK.Logger.Error(ex, "Failed to load custom data");
-                
+
                 return new GSData();
             }
         }
