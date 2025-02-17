@@ -20,6 +20,7 @@ namespace GsPlugin {
     /// </summary>
     public class GsPlugin : GenericPlugin {
         private static readonly ILogger logger = LogManager.GetLogger();
+        private static readonly string API_BASE_URL = "https://api.gamescrobbler.com";
 
         /// Plugin settings view model.
         private GsPluginSettingsViewModel settings { get; set; }
@@ -88,7 +89,7 @@ namespace GsPlugin {
 
             // Send POST request using the helper.
             SessionData sessionData = await PostJsonAsync<SessionData>(
-                "https://api.gamescrobbler.com/api/playnite/scrobble/start", startData);
+                $"{API_BASE_URL}/api/playnite/scrobble/start", startData);
             if (sessionData != null) {
                 GSDataManager.Data.SessionId = sessionData.session_id;
                 GSDataManager.Save();
@@ -110,7 +111,7 @@ namespace GsPlugin {
 
             // Send POST request and ensure success.
             FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
-            "https://api.gamescrobbler.com/api/playnite/scrobble/finish", startData, true);
+            $"{API_BASE_URL}/api/playnite/scrobble/finish", startData, true);
             if (finishResponse != null) {
                 GSDataManager.Data.SessionId = null;
                 GSDataManager.Save();
@@ -140,7 +141,7 @@ namespace GsPlugin {
                 };
 
                 FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
-                "https://api.gamescrobbler.com/api/playnite/scrobble/finish", startData, true);
+                $"{API_BASE_URL}/api/playnite/scrobble/finish", startData, true);
                 if (finishResponse != null) {
                     GSDataManager.Data.SessionId = null;
                     GSDataManager.Save();
@@ -189,7 +190,7 @@ namespace GsPlugin {
 
             // Send POST request and ensure success.
             SyncResponse syncResponse = await PostJsonAsync<SyncResponse>(
-                "https://api.gamescrobbler.com/api/playnite/sync", librarySync, true);
+                $"{API_BASE_URL}/api/playnite/sync", librarySync, true);
             // Optionally, use syncResponse.result.added and syncResponse.result.updated as needed.
         }
 
