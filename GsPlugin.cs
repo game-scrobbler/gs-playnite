@@ -208,7 +208,13 @@ namespace GsPlugin {
                 // This might be helpful, or might interfere with the normal operation of your application.
                 // We enable it here for demonstration purposes when first trying Sentry.
                 // You shouldn't do this in your applications unless you're troubleshooting issues with Sentry.
-                options.Debug = true;
+                #if DEBUG
+                    options.Environment = "development";
+                    options.Debug = true;
+                #else
+                    options.Environment = "production";
+                    options.Debug = false;
+                #endif
 
                 // This option is recommended. It enables Sentry's "Release Health" feature.
                 options.AutoSessionTracking = true;
