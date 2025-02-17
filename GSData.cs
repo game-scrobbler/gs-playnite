@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Playnite.SDK;
 
 namespace GsPlugin {
     /// <summary>
@@ -9,7 +10,7 @@ namespace GsPlugin {
     public class GSData {
         public string InstallID { get; set; } = null;
         public string SessionId { get; set; } = null;
-        public Boolean IsDark { get; set; } = false;
+        public bool IsDark { get; set; } = true;
     }
 
     /// <summary>
@@ -17,6 +18,10 @@ namespace GsPlugin {
     /// </summary>
     public class GSDataStorage {
         private readonly string filePath;
+        private static readonly ILogger logger = LogManager.GetLogger();
+        private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
+            WriteIndented = true
+        };
 
         public GSDataStorage(string folderPath) {
             // Build the path for the custom data file.
@@ -34,12 +39,10 @@ namespace GsPlugin {
 
             try {
                 var json = File.ReadAllText(filePath);
-                return JsonSerializer.Deserialize<GSData>(json) ?? new GSData();
+                return JsonSerializer.Deserialize<GSData>(json, jsonOptions) ?? new GSData();
             }
-            catch (Exception) {
-                // Optionally log the error using Playnite's logging
-                // For example: Playnite.SDK.Logger.Error(ex, "Failed to load custom data");
-
+            catch (Exception ex) {
+                logger.Error(ex, "Failed to load custom GS data");
                 return new GSData();
             }
         }
@@ -49,20 +52,19 @@ namespace GsPlugin {
         /// </summary>
         public void Save(GSData data) {
             try {
-                var json = JsonSerializer.Serialize(data);
+                var json = JsonSerializer.Serialize(data, jsonOptions);
                 File.WriteAllText(filePath, json);
             }
-            catch (Exception) {
-                // Optionally log the error
-                // For example: Playnite.SDK.Logger.Error(ex, "Failed to save custom data");
+            catch (Exception ex) {
+                logger.Error(ex, "Failed to save custom GS data");
             }
         }
     }
 
-
     public static class GSDataManager {
         private static GSDataStorage storage;
         private static GSData data;
+        private static readonly ILogger logger = LogManager.GetLogger();
 
         /// <summary>
         /// Initializes the custom data manager.
@@ -74,18 +76,16 @@ namespace GsPlugin {
             storage = new GSDataStorage(folderPath);
             data = storage.Load();
 
-            if (string.IsNullOrEmpty(oldID)) {
-                if (string.IsNullOrEmpty(data.InstallID)) {
+            if (string.IsNullOrEmpty(data.InstallID)) {
+                if (string.IsNullOrEmpty(oldID)) {
                     data.InstallID = Guid.NewGuid().ToString();
-                    Save();
+                    logger.Info("Generated new GS InstallID.");
+                } else {
+                    data.InstallID = oldID;
+                    logger.Info("Converted oldID to new GS InstallID.");
                 }
-            }
-            else {
-                data.InstallID = oldID;
                 Save();
             }
-            // If InstallID is missing or empty, create a new one and save.
-
         }
 
         /// <summary>
