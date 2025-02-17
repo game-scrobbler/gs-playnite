@@ -133,7 +133,6 @@ namespace GsPlugin {
                     GSDataManager.Save();
                 }
             }
-            SyncLib();
         }
 
         public override void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
