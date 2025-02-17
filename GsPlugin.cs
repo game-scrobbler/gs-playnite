@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using MySidebarPlugin;
 using Playnite.SDK;
@@ -208,13 +209,13 @@ namespace GsPlugin {
                 // This might be helpful, or might interfere with the normal operation of your application.
                 // We enable it here for demonstration purposes when first trying Sentry.
                 // You shouldn't do this in your applications unless you're troubleshooting issues with Sentry.
-                #if DEBUG
-                    options.Environment = "development";
-                    options.Debug = true;
-                #else
+#if DEBUG
+                options.Environment = "development";
+                options.Debug = true;
+#else
                     options.Environment = "production";
                     options.Debug = false;
-                #endif
+#endif
 
                 // This option is recommended. It enables Sentry's "Release Health" feature.
                 options.AutoSessionTracking = true;
@@ -263,6 +264,10 @@ namespace GsPlugin {
                     response = await httpClient.PostAsync(url, content).ConfigureAwait(false);
                     responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
+#if DEBUG
+                    ShowNonBlockingNotification($"Request URL: {url}\nPayload: {jsonData}\nResponse Status: {response.StatusCode}\nBody: {responseBody}", "HTTP Request/Response");
+#endif
+
                     if (ensureSuccess && !response.IsSuccessStatusCode) {
                         var httpEx = new HttpRequestException(
                             $"Request failed with status {(int)response.StatusCode} ({response.StatusCode}) for URL {url}");
@@ -280,6 +285,10 @@ namespace GsPlugin {
                     return JsonSerializer.Deserialize<TResponse>(responseBody);
                 }
                 catch (Exception ex) {
+#if DEBUG
+                    ShowNonBlockingNotification($"Error: {ex.Message}\nStack Trace: {ex.StackTrace}", "HTTP Error");
+#endif
+
                     SentrySdk.CaptureException(ex, scope => {
                         scope.SetExtra("RequestUrl", url);
                         scope.SetExtra("RequestBody", jsonData);
@@ -291,6 +300,23 @@ namespace GsPlugin {
                 }
             }
         }
+
+#if DEBUG
+        private static void ShowNonBlockingNotification(string message, string title) {
+            Application.Current.Dispatcher.BeginInvoke(new Action(() => {
+                var notificationWindow = new Window {
+                    Title = title,
+                    Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                    Width = 300,
+                    Height = 200,
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                    Topmost = true,
+                    ShowInTaskbar = false
+                };
+                notificationWindow.Show();
+            }));
+        }
+#endif
     }
 
     // --------------------
