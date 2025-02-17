@@ -15,17 +15,26 @@ using Playnite.SDK.Plugins;
 using Sentry;
 
 namespace GsPlugin {
+    /// <summary>
+    /// Main plugin class that handles integration with Playnite.
+    /// </summary>
     public class GsPlugin : GenericPlugin {
         private static readonly ILogger logger = LogManager.GetLogger();
 
+        /// Plugin settings view model.
         private GsPluginSettingsViewModel settings { get; set; }
 
+        /// Unique identifier for the plugin itself.
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
-        // Use a single shared HttpClient instance per best practices.
+        /// <summary>
+        /// Shared HTTP client instance for making API requests.
+        /// </summary>
         private static readonly HttpClient httpClient = new HttpClient(new SentryHttpMessageHandler());
 
-        // Preconfigured JSON options to be used for serialization.
+        /// <summary>
+        /// JSON serialization options used throughout the plugin.
+        /// </summary>
         private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // Prevents escaping +
         };
@@ -37,6 +46,10 @@ namespace GsPlugin {
             };
         }
 
+        /// <summary>
+        /// Retrieves the current version of the plugin from the extension.yaml file.
+        /// </summary>
+        /// <returns>The version string or "Unknown Version" if not found.</returns>
         private static string GetPluginVersion() {
             string pluginFolder = Path.GetDirectoryName(typeof(GsPlugin).Assembly.Location);
             string yamlPath = Path.Combine(pluginFolder, "extension.yaml");
@@ -277,6 +290,9 @@ namespace GsPlugin {
     // Request and Response Models
     // --------------------
 
+    /// <summary>
+    /// Model for tracking game start events.
+    /// </summary>
     public class TimeTracker {
         public string user_id { get; set; }
         public string game_name { get; set; }
@@ -285,6 +301,9 @@ namespace GsPlugin {
         public string started_at { get; set; }
     };
 
+    /// <summary>
+    /// Model for tracking game end events.
+    /// </summary>
     class TimeTrackerEnd {
         public string user_id { get; set; }
         public object metadata { get; set; }
@@ -292,23 +311,33 @@ namespace GsPlugin {
         public string session_id { get; set; }
     };
 
-    // A simple type representing the session data returned by the start scrobble endpoint.
+    /// <summary>
+    /// Response model for start scrobble request.
+    /// </summary>
     public class SessionData {
         public string session_id { get; set; }
     }
 
-    // A type to represent the full library sync payload.
+    /// <summary>
+    /// Model for library synchronization request.
+    /// </summary>
     class LibrarySync {
         public string user_id { get; set; }
         public List<Playnite.SDK.Models.Game> library { get; set; }
     }
 
-    // Response model for the sync endpoint.
+    /// <summary>
+    /// Response model for library synchronization.
+    /// </summary>
     public class SyncResponse {
         public string status { get; set; }
         public SyncResult result { get; set; }
     }
 
+
+    /// <summary>
+    /// Details of library synchronization results.
+    /// </summary>
     public class SyncResult {
         public int added { get; set; }
         public int updated { get; set; }
