@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Windows;
 using Playnite.SDK;
 using Sentry;
 
@@ -11,7 +12,7 @@ namespace GsPlugin {
     public class GSData {
         public string InstallID { get; set; } = null;
         public string SessionId { get; set; } = null;
-        public bool IsDark { get; set; } = true;
+        public string Theme { get; set; } = "Dark";
     }
 
     /// <summary>
@@ -87,10 +88,16 @@ namespace GsPlugin {
         public static void Save() {
             try {
                 var json = JsonSerializer.Serialize(data, jsonOptions);
+#if DEBUG
+                MessageBox.Show($"Saving the plugin data: {json}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
                 File.WriteAllText(filePath, json);
             }
             catch (Exception ex) {
                 logger.Error(ex, "Failed to save custom GS data");
+#if DEBUG
+                MessageBox.Show($"Failed to save the plugin data", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+#endif
                 SentrySdk.CaptureException(ex, scope => {
                     scope.SetExtra("FilePath", filePath);
                     scope.SetExtra("AttemptedData", JsonSerializer.Serialize(data));

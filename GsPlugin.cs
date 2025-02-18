@@ -42,10 +42,13 @@ namespace GsPlugin {
         };
 
         public GsPlugin(IPlayniteAPI api) : base(api) {
+            // Ceate settings
             settings = new GsPluginSettingsViewModel(this);
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
+            // Initialize GSDataManager
+            GSDataManager.Initialize(GetPluginUserDataPath(), settings.InstallID);
         }
 
         /// <summary>
@@ -126,8 +129,7 @@ namespace GsPlugin {
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             SentryInit();
-            GSDataManager.Initialize(GetPluginUserDataPath(), settings.InstallID);
-            SyncLib();
+            // SyncLib();
         }
 
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {

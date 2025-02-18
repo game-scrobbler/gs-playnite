@@ -1,10 +1,17 @@
 using System.Collections.Generic;
 using Playnite.SDK;
 using Playnite.SDK.Data;
+using System.Windows;
 
 namespace GsPlugin {
     public class GsPluginSettings : ObservableObject {
-        public string InstallID;
+        private string theme = "Dark";
+        public string Theme {
+            get => theme;
+            set => SetValue(ref theme, value);
+        }
+
+        public string InstallID { get; set; }
     }
 
     public class GsPluginSettingsViewModel : ObservableObject, ISettings {
@@ -22,10 +29,12 @@ namespace GsPlugin {
             }
         }
 
+        public List<string> AvailableThemes { get; set; }
 
         public GsPluginSettingsViewModel(GsPlugin plugin) {
             // Injecting your plugin instance is required for Save/Load method because Playnite saves data to a location based on what plugin requested the operation.
             this.plugin = plugin;
+            AvailableThemes = new List<string> { "Dark", "Light" };
 
             // Load saved settings.
             var savedSettings = plugin.LoadPluginSettings<GsPluginSettings>();
@@ -34,9 +43,18 @@ namespace GsPlugin {
             if (savedSettings != null) {
                 Settings = savedSettings;
                 InstallID = savedSettings.InstallID;
+#if DEBUG
+                MessageBox.Show($"Loaded saved settings:\nInstallID: {InstallID}\nTheme: {savedSettings.Theme}",
+                    "Debug - Settings Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
             }
             else {
                 Settings = new GsPluginSettings();
+                Settings.Theme = AvailableThemes[0]; // Set default theme
+#if DEBUG
+                MessageBox.Show("No setting found. Created new settings instance - No saved settings found",
+                    "Debug", MessageBoxButton.OK, MessageBoxImage.Warning);
+#endif
             }
         }
 
@@ -47,14 +65,24 @@ namespace GsPlugin {
 
         public void CancelEdit() {
             // Code executed when user decides to cancel any changes made since BeginEdit was called.
-            // This method should revert any changes made to Option1 and Option2.
+            // This method should revert any changes made to options.
             Settings = editingClone;
+#if DEBUG
+            MessageBox.Show($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}",
+                "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
         }
 
         public void EndEdit() {
             // Code executed when user decides to confirm changes made since BeginEdit was called.
-            // This method should save settings made to Option1 and Option2.
             plugin.SavePluginSettings(Settings);
+            // Sync with GSDataManager
+            GSDataManager.Data.Theme = Settings.Theme;
+            GSDataManager.Save();
+#if DEBUG
+            MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}\nGSData Theme: {GSDataManager.Data.Theme}",
+                "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
         }
 
         public bool VerifySettings(out List<string> errors) {

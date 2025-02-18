@@ -22,7 +22,10 @@ namespace MySidebarPlugin {
             // Now you can navigate to an HTML string or a URL.
             // Example: injecting the same HTML snippet with the flourish iframe
             string userId = GSDataManager.Data.InstallID; // Or get it from plugin settings
-            Boolean isDark = GSDataManager.Data.IsDark;
+            string theme = GSDataManager.Data.Theme.ToLower();
+#if DEBUG
+            MessageBox.Show($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}");
+#endif
             // Use $@ for verbatim + interpolation
             string htmlContent = $@"
 <html style='width:100%;height:100%;'>
@@ -31,7 +34,7 @@ namespace MySidebarPlugin {
   </head>
   <body style='margin:0; padding:0; width:100%;height:100%;'>
     <iframe
-      src='https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}&is_dark={isDark.ToString()}'
+      src='https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}&theme={theme}'
       frameborder='0'
       scrolling='yes'
       style='width:100%;height:100%;'

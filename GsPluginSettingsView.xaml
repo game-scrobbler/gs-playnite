@@ -5,9 +5,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              d:DesignHeight="400" d:DesignWidth="600">
-    <StackPanel>
-        <TextBlock Text="Your Playnite ID" FontSize="16" Foreground="White"/>
-        <TextBlock 
+    <StackPanel Margin="20">
+        <TextBlock Text="Your GS ID" FontSize="16" Foreground="White"/>
+        <TextBlock
            Foreground="White"
            Background="#FF464141"
            Height="25"
@@ -20,6 +20,11 @@
            HorizontalAlignment="Center"
            MouseLeftButtonUp="TextBlock_MouseLeftButtonUp"/>
 
-        <CheckBox x:Name="DarkModeCheckBox" Content="Dark Mode" Foreground="White" Checked="HandleCheck" Unchecked="HandleUnchecked" />
+        <TextBlock Text="Theme Selection:" Margin="0,20,0,5"/>
+        <ComboBox x:Name="ThemeComboBox"
+                  Width="150"
+                  HorizontalAlignment="Left"
+                  ItemsSource="{Binding AvailableThemes}"
+                  SelectedItem="{Binding Settings.Theme, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
     </StackPanel>
 </UserControl>
