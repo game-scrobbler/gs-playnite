@@ -20,11 +20,11 @@ namespace GsPlugin {
     /// Main plugin class that handles integration with Playnite.
     /// </summary>
     public class GsPlugin : GenericPlugin {
-        private static readonly ILogger logger = LogManager.GetLogger();
-        private static readonly string API_BASE_URL = "https://api.gamescrobbler.com";
+        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
 
         /// Plugin settings view model.
-        private GsPluginSettingsViewModel settings { get; set; }
+        private GsPluginSettingsViewModel _settings { get; set; }
 
         /// Unique identifier for the plugin itself.
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
@@ -43,12 +43,12 @@ namespace GsPlugin {
 
         public GsPlugin(IPlayniteAPI api) : base(api) {
             // Ceate settings
-            settings = new GsPluginSettingsViewModel(this);
+            _settings = new GsPluginSettingsViewModel(this);
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
-            // Initialize GSDataManager
-            GSDataManager.Initialize(GetPluginUserDataPath(), settings.InstallID);
+            // Initialize GsDataManager
+            GsDataManager.Initialize(GetPluginUserDataPath(), _settings.InstallID);
         }
 
         /// <summary>
@@ -84,7 +84,7 @@ namespace GsPlugin {
 
             // Build the payload for scrobbling the game start.
             TimeTracker startData = new TimeTracker {
-                user_id = GSDataManager.Data.InstallID,
+                user_id = GsDataManager.Data.InstallID,
                 game_name = startedGame.Name,
                 gameID = startedGame.Id.ToString(),
                 metadata = new { },
@@ -92,11 +92,11 @@ namespace GsPlugin {
             };
 
             // Send POST request using the helper.
-            SessionData sessionData = await PostJsonAsync<SessionData>(
-                $"{API_BASE_URL}/api/playnite/scrobble/start", startData);
+            GameSessionResponse sessionData = await PostJsonAsync<GameSessionResponse>(
+                $"{_apiBaseUrl}/api/playnite/scrobble/start", startData);
             if (sessionData != null) {
-                GSDataManager.Data.SessionId = sessionData.session_id;
-                GSDataManager.Save();
+                GsDataManager.Data.SessionId = sessionData.SessionId;
+                GsDataManager.Save();
             }
         }
 
@@ -107,18 +107,18 @@ namespace GsPlugin {
 
             // Build the payload for scrobbling the game finish.
             TimeTrackerEnd startData = new TimeTrackerEnd {
-                user_id = GSDataManager.Data.InstallID,
-                session_id = GSDataManager.Data.SessionId,
+                user_id = GsDataManager.Data.InstallID,
+                session_id = GsDataManager.Data.SessionId,
                 metadata = new { },
                 finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
 
             // Send POST request and ensure success.
             FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
-            $"{API_BASE_URL}/api/playnite/scrobble/finish", startData, true);
+            $"{_apiBaseUrl}/api/playnite/scrobble/finish", startData, true);
             if (finishResponse != null) {
-                GSDataManager.Data.SessionId = null;
-                GSDataManager.Save();
+                GsDataManager.Data.SessionId = null;
+                GsDataManager.Save();
             }
             // Optionally log finishResponse.status if needed.
         }
@@ -133,21 +133,21 @@ namespace GsPlugin {
         }
 
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
-            if (GSDataManager.Data.SessionId != null) {
+            if (GsDataManager.Data.SessionId != null) {
                 DateTime localDate = DateTime.Now;
 
                 TimeTrackerEnd startData = new TimeTrackerEnd {
-                    user_id = GSDataManager.Data.InstallID,
-                    session_id = GSDataManager.Data.SessionId,
+                    user_id = GsDataManager.Data.InstallID,
+                    session_id = GsDataManager.Data.SessionId,
                     metadata = new { },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 };
 
                 FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
-                $"{API_BASE_URL}/api/playnite/scrobble/finish", startData, true);
+                $"{_apiBaseUrl}/api/playnite/scrobble/finish", startData, true);
                 if (finishResponse != null) {
-                    GSDataManager.Data.SessionId = null;
-                    GSDataManager.Save();
+                    GsDataManager.Data.SessionId = null;
+                    GsDataManager.Save();
                 }
             }
         }
@@ -159,7 +159,7 @@ namespace GsPlugin {
         }
 
         public override ISettings GetSettings(bool firstRunSettings) {
-            return (ISettings)settings;
+            return (ISettings)_settings;
         }
 
         public override UserControl GetSettingsView(bool firstRunSettings) {
@@ -187,13 +187,13 @@ namespace GsPlugin {
         public async void SyncLib() {
             var library = PlayniteApi.Database.Games.ToList();
             LibrarySync librarySync = new LibrarySync {
-                user_id = GSDataManager.Data.InstallID,
+                user_id = GsDataManager.Data.InstallID,
                 library = library
             };
 
             // Send POST request and ensure success.
             SyncResponse syncResponse = await PostJsonAsync<SyncResponse>(
-                $"{API_BASE_URL}/api/playnite/sync", librarySync, true);
+                $"{_apiBaseUrl}/api/playnite/sync", librarySync, true);
             // Optionally, use syncResponse.result.added and syncResponse.result.updated as needed.
         }
 
@@ -349,8 +349,8 @@ namespace GsPlugin {
     /// <summary>
     /// Response model for start scrobble request.
     /// </summary>
-    public class SessionData {
-        public string session_id { get; set; }
+    public class GameSessionResponse {
+        public string SessionId { get; set; }
     }
 
     /// <summary>

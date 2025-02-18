@@ -10,7 +10,7 @@ namespace GsPlugin {
     /// <summary>
     /// Holds custom persistent data.
     /// </summary>
-    public class GSData {
+    public class GsData {
         public string InstallID { get; set; } = null;
         public string SessionId { get; set; } = null;
         public string Theme { get; set; } = "Dark";
@@ -19,18 +19,18 @@ namespace GsPlugin {
     /// <summary>
     /// Static manager class for handling persistent data operations.
     /// </summary>
-    public static class GSDataManager {
+    public static class GsDataManager {
         /// <summary>
         /// The current data instance.
         /// </summary>
-        private static GSData data;
+        private static GsData _data;
 
         /// <summary>
         /// Path to the data storage file.
         /// </summary>
-        private static string filePath;
+        private static string _filePath;
 
-        private static readonly ILogger logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger();
         private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
             WriteIndented = true
         };
@@ -42,15 +42,15 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="folderPath">The folder path where the custom data file will be stored.</param>
         public static void Initialize(string folderPath, string oldID) {
-            filePath = Path.Combine(folderPath, "customData.json");
-            data = Load();
+            _filePath = Path.Combine(folderPath, "gs_data.json");
+            _data = Load();
 
             try {
-                if (string.IsNullOrEmpty(data.InstallID)) {
+                if (string.IsNullOrEmpty(_data.InstallID)) {
                     if (!string.IsNullOrEmpty(oldID)) {
-                        // Migrate InstallID from settings to GSData
-                        data.InstallID = oldID;
-                        logger.Info("Migrated InstallID from settings to GSData");
+                        // Migrate InstallID from settings to GsData
+                        _data.InstallID = oldID;
+                        _logger.Info("Migrated InstallID from settings to GsData");
                         SentrySdk.AddBreadcrumb(
                             message: "Migrated InstallID from settings",
                             category: "migration",
@@ -58,35 +58,35 @@ namespace GsPlugin {
                         );
                     }
                     else {
-                        // Generate new InstallID only if both GSData and settings are empty
-                        data.InstallID = Guid.NewGuid().ToString();
-                        logger.Info("Generated new InstallID");
+                        // Generate new InstallID only if both GsData and settings are empty
+                        _data.InstallID = Guid.NewGuid().ToString();
+                        _logger.Info("Generated new InstallID");
                         SentrySdk.AddBreadcrumb(
                             message: "Generated new InstallID",
                             category: "initialization",
-                            data: new Dictionary<string, string> { { "InstallID", data.InstallID } }
+                            data: new Dictionary<string, string> { { "InstallID", _data.InstallID } }
                         );
                     }
                     Save();
                 }
-                else if (!string.IsNullOrEmpty(oldID) && data.InstallID != oldID) {
+                else if (!string.IsNullOrEmpty(oldID) && _data.InstallID != oldID) {
                     // Log potential InstallID mismatch
-                    logger.Warning($"InstallID mismatch - GSData: {data.InstallID}, Settings: {oldID}");
+                    _logger.Warn($"InstallID mismatch - GsData: {_data.InstallID}, Settings: {oldID}");
                     SentrySdk.CaptureMessage(
                         "InstallID mismatch detected",
                         scope => {
                             scope.Level = SentryLevel.Warning;
-                            scope.SetExtra("GSDataInstallID", data.InstallID);
+                            scope.SetExtra("GsDataInstallID", _data.InstallID);
                             scope.SetExtra("SettingsInstallID", oldID);
                         }
                     );
                 }
             }
             catch (Exception ex) {
-                logger.Error(ex, "Failed to initialize GSData");
+                _logger.Error(ex, "Failed to initialize GsData");
                 SentrySdk.CaptureException(ex);
                 // Fallback to oldID or new GUID if initialization fails
-                data.InstallID = oldID ?? Guid.NewGuid().ToString();
+                _data.InstallID = oldID ?? Guid.NewGuid().ToString();
                 Save();
             }
         }
@@ -95,24 +95,24 @@ namespace GsPlugin {
         /// Loads the custom data from disk.
         /// Returns a new instance if the file does not exist.
         /// </summary>
-        private static GSData Load() {
-            if (!File.Exists(filePath)) {
-                return new GSData();
+        private static GsData Load() {
+            if (!File.Exists(_filePath)) {
+                return new GsData();
             }
 
             try {
-                var json = File.ReadAllText(filePath);
-                return JsonSerializer.Deserialize<GSData>(json, jsonOptions) ?? new GSData();
+                var json = File.ReadAllText(_filePath);
+                return JsonSerializer.Deserialize<GsData>(json, jsonOptions) ?? new GsData();
             }
             catch (Exception ex) {
-                logger.Error(ex, "Failed to load custom GS data");
+                _logger.Error(ex, "Failed to load custom GsData");
                 SentrySdk.CaptureException(ex, scope => {
-                    scope.SetExtra("FilePath", filePath);
-                    if (File.Exists(filePath)) {
-                        scope.SetExtra("FileContent", File.ReadAllText(filePath));
+                    scope.SetExtra("FilePath", _filePath);
+                    if (File.Exists(_filePath)) {
+                        scope.SetExtra("FileContent", File.ReadAllText(_filePath));
                     }
                 });
-                return new GSData();
+                return new GsData();
             }
         }
 
@@ -121,20 +121,20 @@ namespace GsPlugin {
         /// </summary>
         public static void Save() {
             try {
-                var json = JsonSerializer.Serialize(data, jsonOptions);
+                var json = JsonSerializer.Serialize(_data, jsonOptions);
 #if DEBUG
                 MessageBox.Show($"Saving the plugin data: {json}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
 #endif
-                File.WriteAllText(filePath, json);
+                File.WriteAllText(_filePath, json);
             }
             catch (Exception ex) {
-                logger.Error(ex, "Failed to save custom GS data");
+                _logger.Error(ex, "Failed to save custom GsData");
 #if DEBUG
                 MessageBox.Show($"Failed to save the plugin data", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
 #endif
                 SentrySdk.CaptureException(ex, scope => {
-                    scope.SetExtra("FilePath", filePath);
-                    scope.SetExtra("AttemptedData", JsonSerializer.Serialize(data));
+                    scope.SetExtra("FilePath", _filePath);
+                    scope.SetExtra("AttemptedData", JsonSerializer.Serialize(_data));
                 });
             }
         }
@@ -142,6 +142,6 @@ namespace GsPlugin {
         /// <summary>
         /// Gets the current custom data.
         /// </summary>
-        public static GSData Data => data;
+        public static GsData Data => _data;
     }
 }

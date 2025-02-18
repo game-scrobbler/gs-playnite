@@ -21,8 +21,8 @@ namespace MySidebarPlugin {
 
             // Now you can navigate to an HTML string or a URL.
             // Example: injecting the same HTML snippet with the flourish iframe
-            string userId = GSDataManager.Data.InstallID; // Or get it from plugin settings
-            string theme = GSDataManager.Data.Theme.ToLower();
+            string userId = GsDataManager.Data.InstallID; // Or get it from plugin settings
+            string theme = GsDataManager.Data.Theme.ToLower();
 #if DEBUG
             MessageBox.Show($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}");
 #endif

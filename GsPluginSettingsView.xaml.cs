@@ -14,7 +14,7 @@ namespace GsPlugin {
 
         private void GsPluginSettingsView_Loaded(object sender, RoutedEventArgs e) {
             // Find the TextBlock by name and update its text
-            IDTextBlock.Text = GSDataManager.Data.InstallID;
+            IDTextBlock.Text = GsDataManager.Data.InstallID;
         }
 
         private void TextBlock_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) {

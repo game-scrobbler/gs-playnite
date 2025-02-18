@@ -2,13 +2,14 @@ using System.Collections.Generic;
 using Playnite.SDK;
 using Playnite.SDK.Data;
 using System.Windows;
+using Sentry;
 
 namespace GsPlugin {
     public class GsPluginSettings : ObservableObject {
-        private string theme = "Dark";
+        private string _theme = "Dark";
         public string Theme {
-            get => theme;
-            set => SetValue(ref theme, value);
+            get => _theme;
+            set => SetValue(ref _theme, value);
         }
 
         // InstallID should be preserved across upgrades and stored in both settings and GSData
@@ -16,16 +17,16 @@ namespace GsPlugin {
     }
 
     public class GsPluginSettingsViewModel : ObservableObject, ISettings {
-        private readonly GsPlugin plugin;
+        private readonly GsPlugin _plugin;
 
         public string InstallID;
-        private GsPluginSettings editingClone { get; set; }
+        private GsPluginSettings _editingClone { get; set; }
 
-        private GsPluginSettings settings;
+        private GsPluginSettings _settings;
         public GsPluginSettings Settings {
-            get => settings;
+            get => _settings;
             set {
-                settings = value;
+                _settings = value;
                 OnPropertyChanged();
             }
         }
@@ -34,7 +35,7 @@ namespace GsPlugin {
 
         public GsPluginSettingsViewModel(GsPlugin plugin) {
             // Injecting your plugin instance is required for Save/Load method because Playnite saves data to a location based on what plugin requested the operation.
-            this.plugin = plugin;
+            _plugin = plugin;
             AvailableThemes = new List<string> { "Dark", "Light" };
 
             // Load saved settings.
@@ -77,13 +78,13 @@ namespace GsPlugin {
 
         public void BeginEdit() {
             // Code executed when settings view is opened and user starts editing values.
-            editingClone = Serialization.GetClone(Settings);
+            _editingClone = Serialization.GetClone(Settings);
         }
 
         public void CancelEdit() {
             // Code executed when user decides to cancel any changes made since BeginEdit was called.
             // This method should revert any changes made to options.
-            Settings = editingClone;
+            Settings = _editingClone;
 #if DEBUG
             MessageBox.Show($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}",
                 "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -92,12 +93,12 @@ namespace GsPlugin {
 
         public void EndEdit() {
             // Code executed when user decides to confirm changes made since BeginEdit was called.
-            plugin.SavePluginSettings(Settings);
-            // Sync with GSDataManager
-            GSDataManager.Data.Theme = Settings.Theme;
-            GSDataManager.Save();
+            _plugin.SavePluginSettings(Settings);
+            // Sync with GsDataManager
+            GsDataManager.Data.Theme = Settings.Theme;
+            GsDataManager.Save();
 #if DEBUG
-            MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}\nGSData Theme: {GSDataManager.Data.Theme}",
+            MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}\nGSData Theme: {GsDataManager.Data.Theme}",
                 "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
 #endif
         }
