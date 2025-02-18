@@ -11,6 +11,7 @@ namespace GsPlugin {
             set => SetValue(ref theme, value);
         }
 
+        // InstallID should be preserved across upgrades and stored in both settings and GSData
         public string InstallID { get; set; }
     }
 
@@ -43,6 +44,16 @@ namespace GsPlugin {
             if (savedSettings != null) {
                 Settings = savedSettings;
                 InstallID = savedSettings.InstallID;
+
+                // Log successful settings load to Sentry
+                SentrySdk.AddBreadcrumb(
+                    message: "Successfully loaded plugin settings",
+                    category: "settings",
+                    data: new Dictionary<string, string> {
+                        { "InstallID", InstallID },
+                        { "Theme", savedSettings.Theme }
+                    }
+                );
 #if DEBUG
                 MessageBox.Show($"Loaded saved settings:\nInstallID: {InstallID}\nTheme: {savedSettings.Theme}",
                     "Debug - Settings Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -51,6 +62,12 @@ namespace GsPlugin {
             else {
                 Settings = new GsPluginSettings();
                 Settings.Theme = AvailableThemes[0]; // Set default theme
+
+                // Log creation of new settings to Sentry
+                SentrySdk.AddBreadcrumb(
+                    message: "Created new plugin settings",
+                    category: "settings"
+                );
 #if DEBUG
                 MessageBox.Show("No setting found. Created new settings instance - No saved settings found",
                     "Debug", MessageBoxButton.OK, MessageBoxImage.Warning);

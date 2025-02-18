@@ -129,7 +129,7 @@ namespace GsPlugin {
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             SentryInit();
-            // SyncLib();
+            SyncLib();
         }
 
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {

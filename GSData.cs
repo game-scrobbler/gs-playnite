@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Windows;
 using Playnite.SDK;
 using Sentry;
+using System.Collections.Generic;
 
 namespace GsPlugin {
     /// <summary>
@@ -44,15 +45,48 @@ namespace GsPlugin {
             filePath = Path.Combine(folderPath, "customData.json");
             data = Load();
 
-            if (string.IsNullOrEmpty(data.InstallID)) {
-                if (string.IsNullOrEmpty(oldID)) {
-                    data.InstallID = Guid.NewGuid().ToString();
-                    logger.Info("Generated new GS InstallID.");
+            try {
+                if (string.IsNullOrEmpty(data.InstallID)) {
+                    if (!string.IsNullOrEmpty(oldID)) {
+                        // Migrate InstallID from settings to GSData
+                        data.InstallID = oldID;
+                        logger.Info("Migrated InstallID from settings to GSData");
+                        SentrySdk.AddBreadcrumb(
+                            message: "Migrated InstallID from settings",
+                            category: "migration",
+                            data: new Dictionary<string, string> { { "InstallID", oldID } }
+                        );
+                    }
+                    else {
+                        // Generate new InstallID only if both GSData and settings are empty
+                        data.InstallID = Guid.NewGuid().ToString();
+                        logger.Info("Generated new InstallID");
+                        SentrySdk.AddBreadcrumb(
+                            message: "Generated new InstallID",
+                            category: "initialization",
+                            data: new Dictionary<string, string> { { "InstallID", data.InstallID } }
+                        );
+                    }
+                    Save();
                 }
-                else {
-                    data.InstallID = oldID;
-                    logger.Info("Converted oldID to new GS InstallID.");
+                else if (!string.IsNullOrEmpty(oldID) && data.InstallID != oldID) {
+                    // Log potential InstallID mismatch
+                    logger.Warning($"InstallID mismatch - GSData: {data.InstallID}, Settings: {oldID}");
+                    SentrySdk.CaptureMessage(
+                        "InstallID mismatch detected",
+                        scope => {
+                            scope.Level = SentryLevel.Warning;
+                            scope.SetExtra("GSDataInstallID", data.InstallID);
+                            scope.SetExtra("SettingsInstallID", oldID);
+                        }
+                    );
                 }
+            }
+            catch (Exception ex) {
+                logger.Error(ex, "Failed to initialize GSData");
+                SentrySdk.CaptureException(ex);
+                // Fallback to oldID or new GUID if initialization fails
+                data.InstallID = oldID ?? Guid.NewGuid().ToString();
                 Save();
             }
         }
