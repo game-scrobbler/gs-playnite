@@ -38,7 +38,6 @@ namespace GsPlugin {
         /// </summary>
         private static string _filePath;
 
-        private static readonly ILogger _logger = LogManager.GetLogger();
         private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
             WriteIndented = true
         };
@@ -58,7 +57,7 @@ namespace GsPlugin {
                     if (!string.IsNullOrEmpty(oldID)) {
                         // Migrate InstallID from settings to GsData
                         _data.InstallID = oldID;
-                        _logger.Info("Migrated InstallID from settings to GsData");
+                        GsLogger.Info("Migrated InstallID from settings to GsData");
                         SentrySdk.AddBreadcrumb(
                             message: "Migrated InstallID from settings",
                             category: "migration",
@@ -68,7 +67,7 @@ namespace GsPlugin {
                     else {
                         // Generate new InstallID only if both GsData and settings are empty
                         _data.InstallID = Guid.NewGuid().ToString();
-                        _logger.Info("Generated new InstallID");
+                        GsLogger.Info("Generated new InstallID");
                         SentrySdk.AddBreadcrumb(
                             message: "Generated new InstallID",
                             category: "initialization",
@@ -79,7 +78,7 @@ namespace GsPlugin {
                 }
                 else if (!string.IsNullOrEmpty(oldID) && _data.InstallID != oldID) {
                     // Log potential InstallID mismatch
-                    _logger.Warn($"InstallID mismatch - GsData: {_data.InstallID}, Settings: {oldID}");
+                    GsLogger.Warn($"InstallID mismatch - GsData: {_data.InstallID}, Settings: {oldID}");
                     SentrySdk.CaptureMessage(
                         "InstallID mismatch detected",
                         scope => {
@@ -91,7 +90,7 @@ namespace GsPlugin {
                 }
             }
             catch (Exception ex) {
-                _logger.Error(ex, "Failed to initialize GsData");
+                GsLogger.Error("Failed to initialize GsData", ex);
                 SentrySdk.CaptureException(ex);
                 // Fallback to oldID or new GUID if initialization fails
                 _data.InstallID = oldID ?? Guid.NewGuid().ToString();
@@ -113,7 +112,7 @@ namespace GsPlugin {
                 return JsonSerializer.Deserialize<GsData>(json, jsonOptions) ?? new GsData();
             }
             catch (Exception ex) {
-                _logger.Error(ex, "Failed to load custom GsData");
+                GsLogger.Error("Failed to load custom GsData", ex);
                 SentrySdk.CaptureException(ex, scope => {
                     scope.SetExtra("FilePath", _filePath);
                     if (File.Exists(_filePath)) {
@@ -130,16 +129,11 @@ namespace GsPlugin {
         public static void Save() {
             try {
                 var json = JsonSerializer.Serialize(_data, jsonOptions);
-#if DEBUG
-                MessageBox.Show($"Saving the plugin data: {json}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+                GsLogger.Info($"Saving plugin data: {json}");
                 File.WriteAllText(_filePath, json);
             }
             catch (Exception ex) {
-                _logger.Error(ex, "Failed to save custom GsData");
-#if DEBUG
-                MessageBox.Show($"Failed to save the plugin data", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-#endif
+                GsLogger.Error("Failed to save custom GsData", ex);
                 SentrySdk.CaptureException(ex, scope => {
                     scope.SetExtra("FilePath", _filePath);
                     scope.SetExtra("AttemptedData", JsonSerializer.Serialize(_data));

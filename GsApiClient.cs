@@ -78,7 +78,7 @@ namespace GsPlugin {
                     responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
 #if DEBUG
-                    ShowDebugNotification(
+                    GsLogger.ShowHTTPDebugBox(
                         requestData: $"URL: {url}\nPayload: {jsonData}",
                         responseData: $"Status: {response.StatusCode}\nBody: {responseBody}");
 #endif
@@ -101,7 +101,7 @@ namespace GsPlugin {
                 }
                 catch (Exception ex) {
 #if DEBUG
-                    ShowDebugNotification(
+                    GsLogger.ShowHTTPDebugBox(
                         requestData: $"URL: {url}\nPayload: {jsonData}",
                         responseData: $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}",
                         isError: true);
@@ -118,97 +118,6 @@ namespace GsPlugin {
                 }
             }
         }
-
-#if DEBUG
-        private static void ShowDebugNotification(string requestData, string responseData, bool isError = false) {
-            Application.Current.Dispatcher.BeginInvoke(new Action(() => {
-                var requestBox = new TextBox {
-                    Text = requestData,
-                    AcceptsReturn = true,
-                    AcceptsTab = true,
-                    IsReadOnly = true,
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    TextWrapping = TextWrapping.Wrap,
-                    FontFamily = new System.Windows.Media.FontFamily("Consolas"),
-                    Background = System.Windows.Media.Brushes.Black,
-                    Foreground = System.Windows.Media.Brushes.LightGreen,
-                    Margin = new Thickness(5),
-                    Height = 150
-                };
-
-                var responseBox = new TextBox {
-                    Text = responseData,
-                    AcceptsReturn = true,
-                    AcceptsTab = true,
-                    IsReadOnly = true,
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    TextWrapping = TextWrapping.Wrap,
-                    FontFamily = new System.Windows.Media.FontFamily("Consolas"),
-                    Background = System.Windows.Media.Brushes.Black,
-                    Foreground = isError ? System.Windows.Media.Brushes.Red : System.Windows.Media.Brushes.White,
-                    Margin = new Thickness(5),
-                    Height = 150
-                };
-
-                var stackPanel = new StackPanel();
-                stackPanel.Children.Add(new TextBlock {
-                    Text = "Request:",
-                    Margin = new Thickness(5),
-                    Foreground = System.Windows.Media.Brushes.White
-                });
-                stackPanel.Children.Add(requestBox);
-                stackPanel.Children.Add(new TextBlock {
-                    Text = "Response:",
-                    Margin = new Thickness(5),
-                    Foreground = System.Windows.Media.Brushes.White
-                });
-                stackPanel.Children.Add(responseBox);
-
-                var toast = new Window {
-                    Title = isError ? "HTTP Debug - Error" : "HTTP Debug",
-                    Content = stackPanel,
-                    Width = 800,
-                    Height = 400,
-                    WindowStyle = WindowStyle.SingleBorderWindow,
-                    Background = System.Windows.Media.Brushes.Black,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    ShowInTaskbar = true,
-                    Topmost = true,
-                    ResizeMode = ResizeMode.CanResizeWithGrip
-                };
-
-                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation {
-                    From = 1.0,
-                    To = 0.0,
-                    Duration = new Duration(TimeSpan.FromSeconds(0.3)),
-                    BeginTime = TimeSpan.FromSeconds(5)
-                };
-
-                bool isMouseOver = false;
-                toast.MouseEnter += (s, e) => {
-                    isMouseOver = true;
-                    toast.BeginAnimation(UIElement.OpacityProperty, null);
-                    toast.Opacity = 1.0;
-                };
-
-                toast.MouseLeave += (s, e) => {
-                    isMouseOver = false;
-                    toast.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-                };
-
-                fadeOut.Completed += (s, e) => {
-                    if (!isMouseOver) {
-                        toast.Close();
-                    }
-                };
-
-                toast.Show();
-                toast.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-            }));
-        }
-#endif
 
         #region API Models
 
