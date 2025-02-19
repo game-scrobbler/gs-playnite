@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.3.0...GsPlugin-v0.4.0) (2025-02-19)
+
+
+### Features
+
+* add Privacy Controls to plugin settings ([3e0d8f9](https://github.com/game-scrobbler/gs-playnite/commit/3e0d8f99ceb6d07256f9691401d68d4c27d0182d))
+* add ShowNonBlockingNotification for visibility in development ([7228c4c](https://github.com/game-scrobbler/gs-playnite/commit/7228c4cd680c5d413bc3a8216b7d7a2cd1f13abf))
+* added dark mode ([952dc26](https://github.com/game-scrobbler/gs-playnite/commit/952dc26634abaa3891ecaee45f1c8aa78eded166))
+* updated setting so user can copy their ID ([bdf5a02](https://github.com/game-scrobbler/gs-playnite/commit/bdf5a025798170b2aaf695fc29fe540c0ea87188))
+
+
+### Bug Fixes
+
+* address concerns of migrating user_id ([8003277](https://github.com/game-scrobbler/gs-playnite/commit/8003277bdfdeda5d84d0527f7e02b36203ff1909))
+* set different sentry Environment for development and production ([608de0a](https://github.com/game-scrobbler/gs-playnite/commit/608de0a2c6a62c6bcc9a08a8e3e05169b10f4aca))
+* fix wrong session_id model ([d0914c1](https://github.com/game-scrobbler/gs-playnite/commit/d0914c1a88d680d7ee31e95336c06cd7b1108d37))
+
 ## [0.3.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.3.0...GsPlugin-v0.3.0) (2025-02-10)
 
 
