@@ -1,5 +1,15 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 Packages:
+  - Version: 0.4.0
+    RequiredApiVersion: 6.11.0
+    ReleaseDate: 2025-02-19
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.4.0/GsPlugin-v0.4.0.pext
+    Changelog:
+      - Add plugin setting page
+      - Add dark mode and support for themes
+      - Add opt out option for error tracking and game tracking
+      - Fix a bug that caused errors on persistent game tracking
+      - Fix a bug that caused plugin crash for some users
   - Version: 0.3.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-10
