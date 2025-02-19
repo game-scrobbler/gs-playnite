@@ -14,6 +14,25 @@ namespace GsPlugin {
 
         // InstallID should be preserved across upgrades and stored in both settings and GSData
         public string InstallID { get; set; }
+
+        private bool disableSentry = false;
+        private bool disableScrobbling = false;
+
+        public bool DisableSentry {
+            get => disableSentry;
+            set {
+                disableSentry = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool DisableScrobbling {
+            get => disableScrobbling;
+            set {
+                disableScrobbling = value;
+                OnPropertyChanged();
+            }
+        }
     }
 
     public class GsPluginSettingsViewModel : ObservableObject, ISettings {
@@ -96,9 +115,10 @@ namespace GsPlugin {
             _plugin.SavePluginSettings(Settings);
             // Sync with GsDataManager
             GsDataManager.Data.Theme = Settings.Theme;
+            GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling);
             GsDataManager.Save();
 #if DEBUG
-            MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}\nGSData Theme: {GsDataManager.Data.Theme}",
+            MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}",
                 "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
 #endif
         }

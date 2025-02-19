@@ -16,15 +16,21 @@
            Padding="5"
            x:Name="IDTextBlock"
            Cursor="Hand"
-           VerticalAlignment="Center"
-           HorizontalAlignment="Center"
            MouseLeftButtonUp="TextBlock_MouseLeftButtonUp"/>
 
-        <TextBlock Text="Theme Selection:" Margin="0,20,0,5"/>
+        <TextBlock Text="Theme Selection:" Margin="0,20,0,10"/>
         <ComboBox x:Name="ThemeComboBox"
                   Width="150"
                   HorizontalAlignment="Left"
                   ItemsSource="{Binding AvailableThemes}"
                   SelectedItem="{Binding Settings.Theme, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <TextBlock Text="Privacy Controls" FontSize="16" Foreground="White" Margin="0,20,0,10"/>
+        <CheckBox Content="Disable error reporting (Sentry)"
+                  Margin="0,5,0,5"
+                  IsChecked="{Binding Settings.DisableSentry, Mode=TwoWay}"/>
+        <CheckBox Content="Disable game activity tracking (Scrobbling)"
+                  Margin="0,5,0,5"
+                  IsChecked="{Binding Settings.DisableScrobbling, Mode=TwoWay}"/>
     </StackPanel>
 </UserControl>

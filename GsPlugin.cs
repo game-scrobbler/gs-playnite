@@ -79,6 +79,11 @@ namespace GsPlugin {
         }
 
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
+            // Skip scrobbling if disabled
+            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
+                return;
+            }
+
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
 
@@ -101,7 +106,11 @@ namespace GsPlugin {
         }
 
         public override async void OnGameStopped(OnGameStoppedEventArgs args) {
-            // Add code to be executed when game is preparing to be started.
+            // Skip scrobbling if disabled
+            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
+                return;
+            }
+
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
 
@@ -133,6 +142,11 @@ namespace GsPlugin {
         }
 
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
+            // Skip scrobbling if disabled
+            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
+                return;
+            }
+
             if (GsDataManager.Data.SessionId != null) {
                 DateTime localDate = DateTime.Now;
 
@@ -188,7 +202,8 @@ namespace GsPlugin {
             var library = PlayniteApi.Database.Games.ToList();
             LibrarySync librarySync = new LibrarySync {
                 user_id = GsDataManager.Data.InstallID,
-                library = library
+                library = library,
+                flags = GsDataManager.Data.Flags
             };
 
             // Send POST request and ensure success.
@@ -198,6 +213,9 @@ namespace GsPlugin {
         }
 
         public static void SentryInit() {
+            // Set sampling rates based on user preference
+            var disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry");
+
             SentrySdk.Init(options => {
                 // A Sentry Data Source Name (DSN) is required.
                 // See https://docs.sentry.io/product/sentry-basics/dsn-explainer/
@@ -215,25 +233,24 @@ namespace GsPlugin {
                 options.Environment = "development";
                 options.Debug = true;
 #else
-                    options.Environment = "production";
-                    options.Debug = false;
+                options.Environment = "production";
+                options.Debug = false;
 #endif
 
-                // This option is recommended. It enables Sentry's "Release Health" feature.
-                options.AutoSessionTracking = true;
-
-                options.CaptureFailedRequests = true;
+                // Set sample rates to 0 if user opted out of Sentry.
+                options.SendDefaultPii = false;
+                options.SampleRate = disableSentryFlag ? 0.0 : 1.0;
+                options.TracesSampleRate = disableSentryFlag ? 0.0 : 1.0;
+                options.ProfilesSampleRate = disableSentryFlag ? 0.0 : 1.0;
+                options.AutoSessionTracking = !disableSentryFlag;
+                options.CaptureFailedRequests = !disableSentryFlag;
                 options.FailedRequestStatusCodes.Add((400, 499));
 
-                // Set TracesSampleRate to 1.0 to capture 100%
-                // of transactions for tracing.
-                // We recommend adjusting this value in production.
-                options.TracesSampleRate = 1.0;
+                options.StackTraceMode = StackTraceMode.Enhanced;
+                options.IsGlobalModeEnabled = false;
+                options.DiagnosticLevel = SentryLevel.Warning;
+                options.AttachStacktrace = true;
 
-                // Sample rate for profiling, applied on top of other TracesSampleRate,
-                // e.g. 0.2 means we want to profile 20 % of the captured transactions.
-                // We recommend adjusting this value in production.
-                options.ProfilesSampleRate = 1.0;
                 // Requires NuGet package: Sentry.Profiling
                 // Note: By default, the profiler is initialized asynchronously. This can
                 // be tuned by passing a desired initialization timeout to the constructor.
@@ -359,6 +376,7 @@ namespace GsPlugin {
     class LibrarySync {
         public string user_id { get; set; }
         public List<Playnite.SDK.Models.Game> library { get; set; }
+        public string[] flags { get; set; }
     }
 
     /// <summary>
@@ -380,6 +398,7 @@ namespace GsPlugin {
 
     // Response model for the finish scrobble endpoint.
     public class FinishScrobbleResponse {
+
         public string status { get; set; }
     }
 }

@@ -14,6 +14,14 @@ namespace GsPlugin {
         public string InstallID { get; set; } = null;
         public string SessionId { get; set; } = null;
         public string Theme { get; set; } = "Dark";
+        public string[] Flags { get; set; } = Array.Empty<string>();
+
+        public void UpdateFlags(bool disableSentry, bool disableScrobbling) {
+            var flagsList = new List<string>();
+            if (disableSentry) flagsList.Add("no-sentry");
+            if (disableScrobbling) flagsList.Add("no-scrobble");
+            Flags = flagsList.ToArray();
+        }
     }
 
     /// <summary>
