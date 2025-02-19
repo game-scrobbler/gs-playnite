@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.3.0...GsPlugin-v0.4.0) (2025-02-19)
+
+
+### Features
+
+* add pirvacy controls to plugin settings ([3e0d8f9](https://github.com/game-scrobbler/gs-playnite/commit/3e0d8f99ceb6d07256f9691401d68d4c27d0182d))
+* add ShowNonBlockingNotification for visiblity in development ([7228c4c](https://github.com/game-scrobbler/gs-playnite/commit/7228c4cd680c5d413bc3a8216b7d7a2cd1f13abf))
+* added dark mode and cleaned the code ([952dc26](https://github.com/game-scrobbler/gs-playnite/commit/952dc26634abaa3891ecaee45f1c8aa78eded166))
+* persistence session_id and gamestop on playnite closed ([9a27eaf](https://github.com/game-scrobbler/gs-playnite/commit/9a27eafa2ddefcb6c002406c9d530ba7df842712))
+* updated setting so user can copy their ID ([bdf5a02](https://github.com/game-scrobbler/gs-playnite/commit/bdf5a025798170b2aaf695fc29fe540c0ea87188))
+
+
+### Bug Fixes
+
+* address concerns of migrating user_id ([8003277](https://github.com/game-scrobbler/gs-playnite/commit/8003277bdfdeda5d84d0527f7e02b36203ff1909))
+* code cleanup ([a24b6a5](https://github.com/game-scrobbler/gs-playnite/commit/a24b6a5e20eb2cd07ec8ba1ae98b3c893ac0cf83))
+* debug removed ([c8bf5ac](https://github.com/game-scrobbler/gs-playnite/commit/c8bf5ac4001b90649ec0effe0f7848822b086201))
+* disableSentryFlag is a bool ([484ab3e](https://github.com/game-scrobbler/gs-playnite/commit/484ab3e8af1d9cc3783a6ecd23a4a5970f4238b3))
+* do not call libSync in app stopped ([10065bb](https://github.com/game-scrobbler/gs-playnite/commit/10065bb056906104ce533144883afa3825ff5c07))
+* made function static ([9a88599](https://github.com/game-scrobbler/gs-playnite/commit/9a8859926efff7c7d6ece75b56c3623334b9a638))
+* made session ID persistence ([96363fc](https://github.com/game-scrobbler/gs-playnite/commit/96363fc42c0bf313fd9f04537415f3eccfdac9a3))
+* removed whitespace ([2177749](https://github.com/game-scrobbler/gs-playnite/commit/217774927263b999c14f30b601559494fe93109b))
+* set different sentry Environment for development and production ([608de0a](https://github.com/game-scrobbler/gs-playnite/commit/608de0a2c6a62c6bcc9a08a8e3e05169b10f4aca))
+* wrong session_id model ([d0914c1](https://github.com/game-scrobbler/gs-playnite/commit/d0914c1a88d680d7ee31e95336c06cd7b1108d37))
+
 ## [0.3.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.3.0...GsPlugin-v0.3.0) (2025-02-10)
 
 
