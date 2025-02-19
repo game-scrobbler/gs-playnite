@@ -8,7 +8,7 @@
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
       "prerelease": false,
-      "release-as": "0.4.0",
+      "release-as": "0.4.1",
       "extra-files": [
         {
           "type": "xml",
@@ -20,6 +20,10 @@
           "path": "extension.yaml",
           "jsonpath": "$.Version",
           "field": "Version"
+        },
+        {
+          "type": "generic",
+          "path": "Properties/AssemblyInfo.cs"
         }
       ]
     }
