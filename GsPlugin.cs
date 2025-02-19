@@ -3,11 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Controls;
 using MySidebarPlugin;
 using Playnite.SDK;
@@ -21,10 +18,10 @@ namespace GsPlugin {
     /// </summary>
     public class GsPlugin : GenericPlugin {
         private static readonly ILogger _logger = LogManager.GetLogger();
-        private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
 
         /// Plugin settings view model.
         private GsPluginSettingsViewModel _settings { get; set; }
+        private GsApiClient _apiClient;
 
         /// Unique identifier for the plugin itself.
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
@@ -47,6 +44,7 @@ namespace GsPlugin {
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
+            _apiClient = new GsApiClient();
             // Initialize GsDataManager
             GsDataManager.Initialize(GetPluginUserDataPath(), _settings.InstallID);
         }
@@ -88,7 +86,7 @@ namespace GsPlugin {
             var startedGame = args.Game;
 
             // Build the payload for scrobbling the game start.
-            TimeTracker startData = new TimeTracker {
+            var startData = new GsApiClient.TimeTracker {
                 user_id = GsDataManager.Data.InstallID,
                 game_name = startedGame.Name,
                 gameID = startedGame.Id.ToString(),
@@ -97,8 +95,7 @@ namespace GsPlugin {
             };
 
             // Send POST request using the helper.
-            GameSessionResponse sessionData = await PostJsonAsync<GameSessionResponse>(
-                $"{_apiBaseUrl}/api/playnite/scrobble/start", startData);
+            var sessionData = await _apiClient.StartGameSession(startData);
             if (sessionData != null) {
                 GsDataManager.Data.SessionId = sessionData.SessionId;
                 GsDataManager.Save();
@@ -115,7 +112,7 @@ namespace GsPlugin {
             var startedGame = args.Game;
 
             // Build the payload for scrobbling the game finish.
-            TimeTrackerEnd startData = new TimeTrackerEnd {
+            var startData = new GsApiClient.TimeTrackerEnd {
                 user_id = GsDataManager.Data.InstallID,
                 session_id = GsDataManager.Data.SessionId,
                 metadata = new { },
@@ -123,8 +120,7 @@ namespace GsPlugin {
             };
 
             // Send POST request and ensure success.
-            FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
-            $"{_apiBaseUrl}/api/playnite/scrobble/finish", startData, true);
+            var finishResponse = await _apiClient.FinishGameSession(startData);
             if (finishResponse != null) {
                 GsDataManager.Data.SessionId = null;
                 GsDataManager.Save();
@@ -150,15 +146,14 @@ namespace GsPlugin {
             if (GsDataManager.Data.SessionId != null) {
                 DateTime localDate = DateTime.Now;
 
-                TimeTrackerEnd startData = new TimeTrackerEnd {
+                var startData = new GsApiClient.TimeTrackerEnd {
                     user_id = GsDataManager.Data.InstallID,
                     session_id = GsDataManager.Data.SessionId,
                     metadata = new { },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 };
 
-                FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
-                $"{_apiBaseUrl}/api/playnite/scrobble/finish", startData, true);
+                var finishResponse = await _apiClient.FinishGameSession(startData);
                 if (finishResponse != null) {
                     GsDataManager.Data.SessionId = null;
                     GsDataManager.Save();
@@ -200,15 +195,14 @@ namespace GsPlugin {
         /// </summary>
         public async void SyncLib() {
             var library = PlayniteApi.Database.Games.ToList();
-            LibrarySync librarySync = new LibrarySync {
+            var librarySync = new GsApiClient.LibrarySync {
                 user_id = GsDataManager.Data.InstallID,
                 library = library,
                 flags = GsDataManager.Data.Flags
             };
 
             // Send POST request and ensure success.
-            SyncResponse syncResponse = await PostJsonAsync<SyncResponse>(
-                $"{_apiBaseUrl}/api/playnite/sync", librarySync, true);
+            var syncResponse = await _apiClient.SyncLibrary(librarySync);
             // Optionally, use syncResponse.result.added and syncResponse.result.updated as needed.
         }
 
@@ -239,9 +233,9 @@ namespace GsPlugin {
 
                 // Set sample rates to 0 if user opted out of Sentry.
                 options.SendDefaultPii = false;
-                options.SampleRate = disableSentryFlag ? 0.0 : 1.0;
-                options.TracesSampleRate = disableSentryFlag ? 0.0 : 1.0;
-                options.ProfilesSampleRate = disableSentryFlag ? 0.0 : 1.0;
+                options.SampleRate = disableSentryFlag ? (float?)null : 1.0f;
+                options.TracesSampleRate = disableSentryFlag ? (float?)null : 1.0f;
+                options.ProfilesSampleRate = disableSentryFlag ? (float?)null : 1.0f;
                 options.AutoSessionTracking = !disableSentryFlag;
                 options.CaptureFailedRequests = !disableSentryFlag;
                 options.FailedRequestStatusCodes.Add((400, 499));
@@ -262,143 +256,5 @@ namespace GsPlugin {
                 //));
             });
         }
-
-        /// <summary>
-        /// Helper method to POST JSON data to the specified URL and optionally ensure a successful response.
-        /// All errors are captured to Sentry with extra context (the request body and, if available, the response body).
-        /// </summary>
-        /// <typeparam name="TResponse">The expected type of the response data.</typeparam>
-        /// <param name="url">The target URL.</param>
-        /// <param name="payload">The payload object to serialize as JSON.</param>
-        /// <param name="ensureSuccess">If true, the response.EnsureSuccessStatusCode() is called.</param>
-        /// <returns>The deserialized response object, or null if an exception occurs.</returns>
-        private static async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
-            where TResponse : class {
-            string jsonData = JsonSerializer.Serialize(payload, jsonOptions);
-            using (var content = new StringContent(jsonData, Encoding.UTF8, "application/json")) {
-                HttpResponseMessage response = null;
-                string responseBody = null;
-
-                try {
-                    response = await httpClient.PostAsync(url, content).ConfigureAwait(false);
-                    responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-#if DEBUG
-                    ShowNonBlockingNotification($"Request URL: {url}\nPayload: {jsonData}\nResponse Status: {response.StatusCode}\nBody: {responseBody}", "HTTP Request/Response");
-#endif
-
-                    if (ensureSuccess && !response.IsSuccessStatusCode) {
-                        var httpEx = new HttpRequestException(
-                            $"Request failed with status {(int)response.StatusCode} ({response.StatusCode}) for URL {url}");
-
-                        SentrySdk.CaptureException(httpEx, scope => {
-                            scope.SetExtra("RequestUrl", url);
-                            scope.SetExtra("RequestBody", jsonData);
-                            scope.SetExtra("ResponseStatus", (int)response.StatusCode);
-                            scope.SetExtra("ResponseBody", responseBody);
-                        });
-
-                        return null;
-                    }
-
-                    return JsonSerializer.Deserialize<TResponse>(responseBody);
-                }
-                catch (Exception ex) {
-#if DEBUG
-                    ShowNonBlockingNotification($"Error: {ex.Message}\nStack Trace: {ex.StackTrace}", "HTTP Error");
-#endif
-
-                    SentrySdk.CaptureException(ex, scope => {
-                        scope.SetExtra("RequestUrl", url);
-                        scope.SetExtra("RequestBody", jsonData);
-                        scope.SetExtra("ResponseStatus", response?.StatusCode);
-                        scope.SetExtra("ResponseBody", responseBody);
-                    });
-
-                    return null;
-                }
-            }
-        }
-
-#if DEBUG
-        private static void ShowNonBlockingNotification(string message, string title) {
-            Application.Current.Dispatcher.BeginInvoke(new Action(() => {
-                var notificationWindow = new Window {
-                    Title = title,
-                    Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-                    Width = 300,
-                    Height = 200,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    Topmost = true,
-                    ShowInTaskbar = false
-                };
-                notificationWindow.Show();
-            }));
-        }
-#endif
-    }
-
-    // --------------------
-    // Request and Response Models
-    // --------------------
-
-    /// <summary>
-    /// Model for tracking game start events.
-    /// </summary>
-    public class TimeTracker {
-        public string user_id { get; set; }
-        public string game_name { get; set; }
-        public string gameID { get; set; }
-        public object metadata { get; set; }
-        public string started_at { get; set; }
-    };
-
-    /// <summary>
-    /// Model for tracking game end events.
-    /// </summary>
-    class TimeTrackerEnd {
-        public string user_id { get; set; }
-        public object metadata { get; set; }
-        public string finished_at { get; set; }
-        public string session_id { get; set; }
-    };
-
-    /// <summary>
-    /// Response model for start scrobble request.
-    /// </summary>
-    public class GameSessionResponse {
-        public string SessionId { get; set; }
-    }
-
-    /// <summary>
-    /// Model for library synchronization request.
-    /// </summary>
-    class LibrarySync {
-        public string user_id { get; set; }
-        public List<Playnite.SDK.Models.Game> library { get; set; }
-        public string[] flags { get; set; }
-    }
-
-    /// <summary>
-    /// Response model for library synchronization.
-    /// </summary>
-    public class SyncResponse {
-        public string status { get; set; }
-        public SyncResult result { get; set; }
-    }
-
-
-    /// <summary>
-    /// Details of library synchronization results.
-    /// </summary>
-    public class SyncResult {
-        public int added { get; set; }
-        public int updated { get; set; }
-    }
-
-    // Response model for the finish scrobble endpoint.
-    public class FinishScrobbleResponse {
-
-        public string status { get; set; }
     }
 }
