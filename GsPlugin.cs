@@ -214,7 +214,7 @@ namespace GsPlugin {
 
         public static void SentryInit() {
             // Set sampling rates based on user preference
-            var disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry");
+            bool disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry");
 
             SentrySdk.Init(options => {
                 // A Sentry Data Source Name (DSN) is required.
