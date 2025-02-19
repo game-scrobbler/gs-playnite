@@ -19,35 +19,16 @@ namespace MySidebarPlugin {
             // Ensure the CoreWebView2 is ready to receive commands
             await MyWebView2.EnsureCoreWebView2Async();
 
-            // Now you can navigate to an HTML string or a URL.
-            // Example: injecting the same HTML snippet with the flourish iframe
+            // Now you can navigate to a URL directly.
             string userId = GsDataManager.Data.InstallID; // Or get it from plugin settings
             string theme = GsDataManager.Data.Theme.ToLower();
 #if DEBUG
             MessageBox.Show($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}");
 #endif
-            // Use $@ for verbatim + interpolation
-            string htmlContent = $@"
-<html style='width:100%;height:100%;'>
-  <head>
-    <meta charset='UTF-8' />
-  </head>
-  <body style='margin:0; padding:0; width:100%;height:100%;'>
-    <iframe
-      src='https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}&theme={theme}'
-      frameborder='0'
-      scrolling='yes'
-      style='width:100%;height:100%;'
-      sandbox='allow-same-origin allow-forms allow-scripts allow-downloads
-               allow-popups allow-popups-to-escape-sandbox
-               allow-top-navigation-by-user-activation'>
-    </iframe>
-  </body>
-</html>
-";
+            string url = $"https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}&theme={theme}";
 
-            // Navigate to the embedded HTML
-            MyWebView2.CoreWebView2.NavigateToString(htmlContent);
+            // Navigate to the URL
+            MyWebView2.CoreWebView2.Navigate(url);
         }
     }
 }
