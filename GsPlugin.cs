@@ -1,48 +1,43 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Windows.Controls;
 using MySidebarPlugin;
 using Playnite.SDK;
 using Playnite.SDK.Events;
-using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using Sentry;
 
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Runtime.InteropServices.ComTypes;
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Windows.Controls;
-
 namespace GsPlugin {
+    /// <summary>
+    /// Main plugin class that handles integration with Playnite.
+    /// </summary>
     public class GsPlugin : GenericPlugin {
-        private static readonly ILogger logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger();
 
-        private GsPluginSettings settings { get; set; }
+        /// Plugin settings view model.
+        private GsPluginSettingsViewModel _settings { get; set; }
+        private GsApiClient _apiClient;
 
-        private string sessionID { get; set; }
+        /// Unique identifier for the plugin itself.
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
-        // Use a single shared HttpClient instance per best practices.
-        private static readonly HttpClient httpClient = new HttpClient(new SentryHttpMessageHandler());
-
-        // Preconfigured JSON options to be used for serialization.
-        private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // Prevents escaping +
-        };
-
         public GsPlugin(IPlayniteAPI api) : base(api) {
-            settings = new GsPluginSettings(this);
+            // Ceate settings
+            _settings = new GsPluginSettingsViewModel(this);
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
+            _apiClient = new GsApiClient();
+            // Initialize GsDataManager
+            GsDataManager.Initialize(GetPluginUserDataPath(), _settings.InstallID);
         }
 
+        /// <summary>
+        /// Retrieves the current version of the plugin from the extension.yaml file.
+        /// </summary>
+        /// <returns>The version string or "Unknown Version" if not found.</returns>
         private static string GetPluginVersion() {
             string pluginFolder = Path.GetDirectoryName(typeof(GsPlugin).Assembly.Location);
             string yamlPath = Path.Combine(pluginFolder, "extension.yaml");
@@ -67,43 +62,66 @@ namespace GsPlugin {
         }
 
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
+            // Skip scrobbling if disabled
+            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
+                return;
+            }
+
             DateTime localDate = DateTime.Now;
             var startedGame = args.Game;
 
             // Build the payload for scrobbling the game start.
-            TimeTracker startData = new TimeTracker {
-                user_id = settings.InstallID,
+            var startData = new GsApiClient.TimeTracker {
+                user_id = GsDataManager.Data.InstallID,
                 game_name = startedGame.Name,
-                gameID = startedGame.Id.ToString(),
+                game_id = startedGame.Id.ToString(),
                 metadata = new { },
                 started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
 
             // Send POST request using the helper.
-            SessionData sessionData = await PostJsonAsync<SessionData>(
-                "https://api.gamescrobbler.com/api/playnite/scrobble/start", startData);
+            var sessionData = await _apiClient.StartGameSession(startData);
             if (sessionData != null) {
-                sessionID = sessionData.session_id;
+                GsDataManager.Data.ActiveSessionId = sessionData.session_id;
+                GsDataManager.Save();
             }
         }
 
         public override async void OnGameStopped(OnGameStoppedEventArgs args) {
-            // Add code to be executed when game is preparing to be started.
-            DateTime localDate = DateTime.Now;
-            var startedGame = args.Game;
+            // Skip scrobbling if disabled
+            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
+                return;
+            }
 
-            // Build the payload for scrobbling the game finish.
-            TimeTrackerEnd startData = new TimeTrackerEnd {
-                user_id = settings.InstallID,
-                session_id = sessionID,
+            // Check if we have a valid session ID
+            if (string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
+                GsLogger.Warn("No active session ID found when stopping game");
+                return;
+            }
+
+            DateTime localDate = DateTime.Now;
+            var stoppedGame = args.Game;
+
+            // Build the payload for scrobbling the game finish
+            var endData = new GsApiClient.TimeTrackerEnd {
+                user_id = GsDataManager.Data.InstallID,
+                game_name = stoppedGame.Name,
+                game_id = stoppedGame.Id.ToString(),
+                session_id = GsDataManager.Data.ActiveSessionId,
                 metadata = new { },
                 finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
 
-            // Send POST request and ensure success.
-            FinishScrobbleResponse finishResponse = await PostJsonAsync<FinishScrobbleResponse>(
-                "https://api.gamescrobbler.com/api/playnite/scrobble/finish", startData, true);
-            // Optionally log finishResponse.status if needed.
+            // Send POST request and ensure success
+            var finishResponse = await _apiClient.FinishGameSession(endData);
+            if (finishResponse != null) {
+                // Only clear the session ID if the request was successful
+                GsDataManager.Data.ActiveSessionId = null;
+                GsDataManager.Save();
+            }
+            else {
+                GsLogger.Error($"Failed to finish game session for {stoppedGame.Name}");
+            }
         }
 
         public override void OnGameUninstalled(OnGameUninstalledEventArgs args) {
@@ -112,13 +130,31 @@ namespace GsPlugin {
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             SentryInit();
-            // Add code to be executed when Playnite is initialized.
             SyncLib();
         }
 
-        public override void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
-            // Add code to be executed when Playnite is shutting down.
-            SyncLib();
+        public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
+            // Skip scrobbling if disabled
+            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
+                return;
+            }
+
+            if (GsDataManager.Data.ActiveSessionId != null) {
+                DateTime localDate = DateTime.Now;
+
+                var startData = new GsApiClient.TimeTrackerEnd {
+                    user_id = GsDataManager.Data.InstallID,
+                    session_id = GsDataManager.Data.ActiveSessionId,
+                    metadata = new { },
+                    finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                };
+
+                var finishResponse = await _apiClient.FinishGameSession(startData);
+                if (finishResponse != null) {
+                    GsDataManager.Data.ActiveSessionId = null;
+                    GsDataManager.Save();
+                }
+            }
         }
 
         public override void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
@@ -127,9 +163,13 @@ namespace GsPlugin {
             SyncLib();
         }
 
-        public override ISettings GetSettings(bool firstRunSettings) => settings;
+        public override ISettings GetSettings(bool firstRunSettings) {
+            return (ISettings)_settings;
+        }
 
-        public override UserControl GetSettingsView(bool firstRunSettings) => new GsPluginSettingsView();
+        public override UserControl GetSettingsView(bool firstRunSettings) {
+            return new GsPluginSettingsView();
+        }
 
         public override IEnumerable<SidebarItem> GetSidebarItems() {
             // Return one or more SidebarItem objects
@@ -139,7 +179,7 @@ namespace GsPlugin {
                 Icon = new TextBlock { Text = "📋" }, // or a path to an image icon
                 Opened = () => {
                     // Return a new instance of your custom UserControl (WPF)
-                    return new MySidebarView(settings, PlayniteApi, GetPluginVersion());
+                    return new MySidebarView(GetPluginVersion());
                 },
             };
             // If you want a simple *action* instead of a custom panel, you can
@@ -151,18 +191,21 @@ namespace GsPlugin {
         /// </summary>
         public async void SyncLib() {
             var library = PlayniteApi.Database.Games.ToList();
-            LibrarySync librarySync = new LibrarySync {
-                user_id = settings.InstallID,
-                library = library
+            var librarySync = new GsApiClient.LibrarySync {
+                user_id = GsDataManager.Data.InstallID,
+                library = library,
+                flags = GsDataManager.Data.Flags
             };
 
             // Send POST request and ensure success.
-            SyncResponse syncResponse = await PostJsonAsync<SyncResponse>(
-                "https://api.gamescrobbler.com/api/playnite/sync", librarySync, true);
+            var syncResponse = await _apiClient.SyncLibrary(librarySync);
             // Optionally, use syncResponse.result.added and syncResponse.result.updated as needed.
         }
 
         public static void SentryInit() {
+            // Set sampling rates based on user preference
+            bool disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry");
+
             SentrySdk.Init(options => {
                 // A Sentry Data Source Name (DSN) is required.
                 // See https://docs.sentry.io/product/sentry-basics/dsn-explainer/
@@ -176,23 +219,28 @@ namespace GsPlugin {
                 // This might be helpful, or might interfere with the normal operation of your application.
                 // We enable it here for demonstration purposes when first trying Sentry.
                 // You shouldn't do this in your applications unless you're troubleshooting issues with Sentry.
+#if DEBUG
+                options.Environment = "development";
                 options.Debug = true;
+#else
+                options.Environment = "production";
+                options.Debug = false;
+#endif
 
-                // This option is recommended. It enables Sentry's "Release Health" feature.
-                options.AutoSessionTracking = true;
-
-                options.CaptureFailedRequests = true;
+                // Set sample rates to 0 if user opted out of Sentry.
+                options.SendDefaultPii = false;
+                options.SampleRate = disableSentryFlag ? (float?)null : 1.0f;
+                options.TracesSampleRate = disableSentryFlag ? (float?)null : 1.0f;
+                options.ProfilesSampleRate = disableSentryFlag ? (float?)null : 1.0f;
+                options.AutoSessionTracking = !disableSentryFlag;
+                options.CaptureFailedRequests = !disableSentryFlag;
                 options.FailedRequestStatusCodes.Add((400, 499));
 
-                // Set TracesSampleRate to 1.0 to capture 100%
-                // of transactions for tracing.
-                // We recommend adjusting this value in production.
-                options.TracesSampleRate = 1.0;
+                options.StackTraceMode = StackTraceMode.Enhanced;
+                options.IsGlobalModeEnabled = false;
+                options.DiagnosticLevel = SentryLevel.Warning;
+                options.AttachStacktrace = true;
 
-                // Sample rate for profiling, applied on top of other TracesSampleRate,
-                // e.g. 0.2 means we want to profile 20 % of the captured transactions.
-                // We recommend adjusting this value in production.
-                options.ProfilesSampleRate = 1.0;
                 // Requires NuGet package: Sentry.Profiling
                 // Note: By default, the profiler is initialized asynchronously. This can
                 // be tuned by passing a desired initialization timeout to the constructor.
@@ -204,101 +252,5 @@ namespace GsPlugin {
                 //));
             });
         }
-
-        /// <summary>
-        /// Helper method to POST JSON data to the specified URL and optionally ensure a successful response.
-        /// All errors are captured to Sentry with extra context (the request body and, if available, the response body).
-        /// </summary>
-        /// <typeparam name="TResponse">The expected type of the response data.</typeparam>
-        /// <param name="url">The target URL.</param>
-        /// <param name="payload">The payload object to serialize as JSON.</param>
-        /// <param name="ensureSuccess">If true, the response.EnsureSuccessStatusCode() is called.</param>
-        /// <returns>The deserialized response object, or null if an exception occurs.</returns>
-        private static async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
-            where TResponse : class {
-            string jsonData = JsonSerializer.Serialize(payload, jsonOptions);
-            using (var content = new StringContent(jsonData, Encoding.UTF8, "application/json")) {
-
-                HttpResponseMessage response = null;
-                string responseBody = null;
-
-                try {
-                    response = await httpClient.PostAsync(url, content).ConfigureAwait(false);
-                    responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                    if (ensureSuccess && !response.IsSuccessStatusCode) {
-                        var httpEx = new HttpRequestException(
-                            $"Request failed with status {(int)response.StatusCode} ({response.StatusCode}) for URL {url}");
-
-                        SentrySdk.CaptureException(httpEx, scope => {
-                            scope.SetExtra("RequestUrl", url);
-                            scope.SetExtra("RequestBody", jsonData);
-                            scope.SetExtra("ResponseStatus", (int)response.StatusCode);
-                            scope.SetExtra("ResponseBody", responseBody);
-                        });
-
-                        return null;
-                    }
-
-                    return JsonSerializer.Deserialize<TResponse>(responseBody);
-                }
-                catch (Exception ex) {
-                    SentrySdk.CaptureException(ex, scope => {
-                        scope.SetExtra("RequestUrl", url);
-                        scope.SetExtra("RequestBody", jsonData);
-                        scope.SetExtra("ResponseStatus", response?.StatusCode);
-                        scope.SetExtra("ResponseBody", responseBody);
-                    });
-
-                    return null;
-                }
-            }
-        }
-    }
-
-    // --------------------
-    // Request and Response Models
-    // --------------------
-
-    class TimeTracker {
-        public string user_id { get; set; }
-        public string game_name { get; set; }
-        public string gameID { get; set; }
-        public object metadata { get; set; }
-        public string started_at { get; set; }
-    };
-
-    class TimeTrackerEnd {
-        public string user_id { get; set; }
-        public object metadata { get; set; }
-        public string finished_at { get; set; }
-        public string session_id { get; set; }
-    };
-
-    // A simple type representing the session data returned by the start scrobble endpoint.
-    public class SessionData {
-        public string session_id { get; set; }
-    }
-
-    // A type to represent the full library sync payload.
-    class LibrarySync {
-        public string user_id { get; set; }
-        public List<Playnite.SDK.Models.Game> library { get; set; }
-    }
-
-    // Response model for the sync endpoint.
-    public class SyncResponse {
-        public string status { get; set; }
-        public SyncResult result { get; set; }
-    }
-
-    public class SyncResult {
-        public int added { get; set; }
-        public int updated { get; set; }
-    }
-
-    // Response model for the finish scrobble endpoint.
-    public class FinishScrobbleResponse {
-        public string status { get; set; }
     }
 }

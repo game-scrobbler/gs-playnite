@@ -1,118 +1,126 @@
+using System.Collections.Generic;
 using Playnite.SDK;
 using Playnite.SDK.Data;
-using Playnite.SDK.Plugins;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime;
-using System.Text;
-using System.Threading.Tasks;
+using System.Windows;
+using Sentry;
 
 namespace GsPlugin {
-    public class GsPluginSettings : ObservableObject, ISettings {
-        private string option1 = string.Empty;
-        private bool option2 = false;
-        private bool optionThatWontBeSaved = false;
-        public string InstallID { get; set; } = string.Empty;
-
-        private readonly GsPlugin plugin;
-
-
-        public string Option1 { get => option1; set => SetValue(ref option1, value); }
-        public bool Option2 { get => option2; set => SetValue(ref option2, value); }
-        // Playnite serializes settings object to a JSON object and saves it as text file.
-        // If you want to exclude some property from being saved then use `JsonDontSerialize` ignore attribute.
-        [DontSerialize]
-        public bool OptionThatWontBeSaved { get => optionThatWontBeSaved; set => SetValue(ref optionThatWontBeSaved, value); }
-
-        // Parameterless constructor required for serialization
-        public GsPluginSettings() { }
-
-        // Constructor linking settings with the plugin
-        public GsPluginSettings(GsPlugin plugin) {
-            this.plugin = plugin;
-
-            // Attempt to load existing settings
-            var savedSettings = plugin.LoadPluginSettings<GsPluginSettings>();
-            if (savedSettings != null && !string.IsNullOrEmpty(savedSettings.InstallID)) {
-                InstallID = savedSettings.InstallID;
-            }
-            else {
-                // Generate a new GUID if not already set
-                InstallID = System.Guid.NewGuid().ToString();
-
-                // Save the new settings immediately to persist the InstallID
-                plugin.SavePluginSettings(this);
-            }
+    public class GsPluginSettings : ObservableObject {
+        private string _theme = "Dark";
+        public string Theme {
+            get => _theme;
+            set => SetValue(ref _theme, value);
         }
 
-        // ISettings interface methods
-        public void BeginEdit() { }
+        // InstallID should be preserved across upgrades and stored in both settings and GSData
+        public string InstallID { get; set; }
 
-        public void EndEdit() {
-            // Save settings when editing ends
-            plugin.SavePluginSettings(this);
-        }
+        private bool disableSentry = false;
+        private bool disableScrobbling = false;
 
-        public void CancelEdit() { }
-        public bool VerifySettings(out List<string> errors) {
-
-            errors = new List<string>();
-            return true;
-        }
-
-    }
-
-    public class GsPluginSettingsViewModel : ObservableObject, ISettings {
-        private readonly GsPlugin plugin;
-        private GsPluginSettings editingClone { get; set; }
-
-
-
-        private GsPluginSettings settings;
-        public GsPluginSettings Settings {
-            get => settings;
+        public bool DisableSentry {
+            get => disableSentry;
             set {
-                settings = value;
+                disableSentry = value;
                 OnPropertyChanged();
             }
         }
 
+        public bool DisableScrobbling {
+            get => disableScrobbling;
+            set {
+                disableScrobbling = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public class GsPluginSettingsViewModel : ObservableObject, ISettings {
+        private readonly GsPlugin _plugin;
+
+        public string InstallID;
+        private GsPluginSettings _editingClone { get; set; }
+
+        private GsPluginSettings _settings;
+        public GsPluginSettings Settings {
+            get => _settings;
+            set {
+                _settings = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public List<string> AvailableThemes { get; set; }
+
         public GsPluginSettingsViewModel(GsPlugin plugin) {
             // Injecting your plugin instance is required for Save/Load method because Playnite saves data to a location based on what plugin requested the operation.
-            this.plugin = plugin;
+            _plugin = plugin;
+            AvailableThemes = new List<string> { "Dark", "Light" };
 
             // Load saved settings.
             var savedSettings = plugin.LoadPluginSettings<GsPluginSettings>();
 
             // LoadPluginSettings returns null if no saved data is available.
             if (savedSettings != null) {
-
                 Settings = savedSettings;
+                InstallID = savedSettings.InstallID;
 
+                // Log successful settings load to Sentry
+                SentrySdk.AddBreadcrumb(
+                    message: "Successfully loaded plugin settings",
+                    category: "settings",
+                    data: new Dictionary<string, string> {
+                        { "InstallID", InstallID },
+                        { "Theme", savedSettings.Theme }
+                    }
+                );
+#if DEBUG
+                MessageBox.Show($"Loaded saved settings:\nInstallID: {InstallID}\nTheme: {savedSettings.Theme}",
+                    "Debug - Settings Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
             }
             else {
-
-
                 Settings = new GsPluginSettings();
+                Settings.Theme = AvailableThemes[0]; // Set default theme
+
+                // Log creation of new settings to Sentry
+                SentrySdk.AddBreadcrumb(
+                    message: "Created new plugin settings",
+                    category: "settings"
+                );
+#if DEBUG
+                MessageBox.Show("No setting found. Created new settings instance - No saved settings found",
+                    "Debug", MessageBoxButton.OK, MessageBoxImage.Warning);
+#endif
             }
         }
 
         public void BeginEdit() {
             // Code executed when settings view is opened and user starts editing values.
-            editingClone = Serialization.GetClone(Settings);
+            _editingClone = Serialization.GetClone(Settings);
         }
 
         public void CancelEdit() {
             // Code executed when user decides to cancel any changes made since BeginEdit was called.
-            // This method should revert any changes made to Option1 and Option2.
-            Settings = editingClone;
+            // This method should revert any changes made to options.
+            Settings = _editingClone;
+#if DEBUG
+            MessageBox.Show($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}",
+                "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
         }
 
         public void EndEdit() {
             // Code executed when user decides to confirm changes made since BeginEdit was called.
-            // This method should save settings made to Option1 and Option2.
-            plugin.SavePluginSettings(Settings);
+            _plugin.SavePluginSettings(Settings);
+            // Sync with GsDataManager
+            GsDataManager.Data.Theme = Settings.Theme;
+            GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling);
+            GsDataManager.Save();
+#if DEBUG
+            MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}",
+                "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
         }
 
         public bool VerifySettings(out List<string> errors) {
@@ -123,10 +131,4 @@ namespace GsPlugin {
             return true;
         }
     }
-    class InitSync {
-
-
-        public string user_id { get; set; }
-
-    };
 }
