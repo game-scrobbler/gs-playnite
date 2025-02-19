@@ -25,11 +25,38 @@ namespace GsPlugin {
         }
 
         public async Task<GameSessionResponse> StartGameSession(TimeTracker startData) {
-            return await PostJsonAsync<GameSessionResponse>(
+            var response = await PostJsonAsync<GameSessionResponse>(
                 $"{_apiBaseUrl}/api/playnite/scrobble/start", startData);
+
+            if (response == null || string.IsNullOrEmpty(response.session_id)) {
+                GsLogger.Error("Failed to get valid session ID from start session response");
+                SentrySdk.CaptureMessage(
+                    "Invalid session response",
+                    scope => {
+                        scope.Level = SentryLevel.Error;
+                        scope.SetExtra("GameName", startData.game_name);
+                        scope.SetExtra("UserId", startData.user_id);
+                    }
+                );
+            }
+
+            return response;
         }
 
         public async Task<FinishScrobbleResponse> FinishGameSession(TimeTrackerEnd endData) {
+            if (string.IsNullOrEmpty(endData.session_id)) {
+                GsLogger.Error("Attempted to finish session with null session_id");
+                SentrySdk.CaptureMessage(
+                    "Null session ID in finish request",
+                    scope => {
+                        scope.Level = SentryLevel.Error;
+                        scope.SetExtra("GameName", endData.game_name);
+                        scope.SetExtra("UserId", endData.user_id);
+                    }
+                );
+                return null;
+            }
+
             return await PostJsonAsync<FinishScrobbleResponse>(
                 $"{_apiBaseUrl}/api/playnite/scrobble/finish", endData, true);
         }
@@ -51,7 +78,9 @@ namespace GsPlugin {
                     responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
 #if DEBUG
-                    ShowDebugNotification($"Request URL: {url}\nPayload: {jsonData}\nResponse Status: {response.StatusCode}\nBody: {responseBody}");
+                    ShowDebugNotification(
+                        requestData: $"URL: {url}\nPayload: {jsonData}",
+                        responseData: $"Status: {response.StatusCode}\nBody: {responseBody}");
 #endif
 
                     if (ensureSuccess && !response.IsSuccessStatusCode) {
@@ -72,7 +101,10 @@ namespace GsPlugin {
                 }
                 catch (Exception ex) {
 #if DEBUG
-                    ShowDebugNotification($"Error: {ex.Message}\nStack Trace: {ex.StackTrace}");
+                    ShowDebugNotification(
+                        requestData: $"URL: {url}\nPayload: {jsonData}",
+                        responseData: $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}",
+                        isError: true);
 #endif
 
                     SentrySdk.CaptureException(ex, scope => {
@@ -88,27 +120,58 @@ namespace GsPlugin {
         }
 
 #if DEBUG
-        private static void ShowDebugNotification(string message, string title = "HTTP Debug") {
+        private static void ShowDebugNotification(string requestData, string responseData, bool isError = false) {
             Application.Current.Dispatcher.BeginInvoke(new Action(() => {
-                var messageBox = new TextBox {
-                    Text = message,
+                var requestBox = new TextBox {
+                    Text = requestData,
                     AcceptsReturn = true,
                     AcceptsTab = true,
-                    IsReadOnly = false,
+                    IsReadOnly = true,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    TextWrapping = TextWrapping.Wrap,
                     FontFamily = new System.Windows.Media.FontFamily("Consolas"),
                     Background = System.Windows.Media.Brushes.Black,
-                    Foreground = System.Windows.Media.Brushes.White,
-                    Margin = new Thickness(5)
+                    Foreground = System.Windows.Media.Brushes.LightGreen,
+                    Margin = new Thickness(5),
+                    Height = 150
                 };
 
+                var responseBox = new TextBox {
+                    Text = responseData,
+                    AcceptsReturn = true,
+                    AcceptsTab = true,
+                    IsReadOnly = true,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                    Background = System.Windows.Media.Brushes.Black,
+                    Foreground = isError ? System.Windows.Media.Brushes.Red : System.Windows.Media.Brushes.White,
+                    Margin = new Thickness(5),
+                    Height = 150
+                };
+
+                var stackPanel = new StackPanel();
+                stackPanel.Children.Add(new TextBlock {
+                    Text = "Request:",
+                    Margin = new Thickness(5),
+                    Foreground = System.Windows.Media.Brushes.White
+                });
+                stackPanel.Children.Add(requestBox);
+                stackPanel.Children.Add(new TextBlock {
+                    Text = "Response:",
+                    Margin = new Thickness(5),
+                    Foreground = System.Windows.Media.Brushes.White
+                });
+                stackPanel.Children.Add(responseBox);
+
                 var toast = new Window {
-                    Title = title,
-                    Content = messageBox,
-                    Width = 600,
+                    Title = isError ? "HTTP Debug - Error" : "HTTP Debug",
+                    Content = stackPanel,
+                    Width = 800,
                     Height = 400,
-                    WindowStyle = WindowStyle.SingleBorderWindow, // This gives us the native title bar with close button
+                    WindowStyle = WindowStyle.SingleBorderWindow,
                     Background = System.Windows.Media.Brushes.Black,
                     WindowStartupLocation = WindowStartupLocation.CenterScreen,
                     ShowInTaskbar = true,
@@ -116,12 +179,11 @@ namespace GsPlugin {
                     ResizeMode = ResizeMode.CanResizeWithGrip
                 };
 
-                // Create fade-out animation
                 var fadeOut = new System.Windows.Media.Animation.DoubleAnimation {
                     From = 1.0,
                     To = 0.0,
                     Duration = new Duration(TimeSpan.FromSeconds(0.3)),
-                    BeginTime = TimeSpan.FromSeconds(3)
+                    BeginTime = TimeSpan.FromSeconds(5)
                 };
 
                 bool isMouseOver = false;
@@ -156,7 +218,7 @@ namespace GsPlugin {
         public class TimeTracker {
             public string user_id { get; set; }
             public string game_name { get; set; }
-            public string gameID { get; set; }
+            public string game_id { get; set; }
             public object metadata { get; set; }
             public string started_at { get; set; }
         }
@@ -166,6 +228,8 @@ namespace GsPlugin {
         /// </summary>
         public class TimeTrackerEnd {
             public string user_id { get; set; }
+            public string game_name { get; set; }
+            public string game_id { get; set; }
             public object metadata { get; set; }
             public string finished_at { get; set; }
             public string session_id { get; set; }
@@ -175,7 +239,7 @@ namespace GsPlugin {
         /// Response model for start scrobble request.
         /// </summary>
         public class GameSessionResponse {
-            public string SessionId { get; set; }
+            public string session_id { get; set; }
         }
 
         /// <summary>

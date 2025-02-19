@@ -12,7 +12,7 @@ namespace GsPlugin {
     /// </summary>
     public class GsData {
         public string InstallID { get; set; } = null;
-        public string SessionId { get; set; } = null;
+        public string ActiveSessionId { get; set; } = null;
         public string Theme { get; set; } = "Dark";
         public string[] Flags { get; set; } = Array.Empty<string>();
 

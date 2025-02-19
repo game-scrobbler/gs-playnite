@@ -2,9 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Text.Encodings.Web;
-using System.Text.Json;
 using System.Windows.Controls;
 using MySidebarPlugin;
 using Playnite.SDK;
@@ -25,18 +22,6 @@ namespace GsPlugin {
 
         /// Unique identifier for the plugin itself.
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
-
-        /// <summary>
-        /// Shared HTTP client instance for making API requests.
-        /// </summary>
-        private static readonly HttpClient httpClient = new HttpClient(new SentryHttpMessageHandler());
-
-        /// <summary>
-        /// JSON serialization options used throughout the plugin.
-        /// </summary>
-        private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // Prevents escaping +
-        };
 
         public GsPlugin(IPlayniteAPI api) : base(api) {
             // Ceate settings
@@ -89,7 +74,7 @@ namespace GsPlugin {
             var startData = new GsApiClient.TimeTracker {
                 user_id = GsDataManager.Data.InstallID,
                 game_name = startedGame.Name,
-                gameID = startedGame.Id.ToString(),
+                game_id = startedGame.Id.ToString(),
                 metadata = new { },
                 started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
@@ -97,7 +82,7 @@ namespace GsPlugin {
             // Send POST request using the helper.
             var sessionData = await _apiClient.StartGameSession(startData);
             if (sessionData != null) {
-                GsDataManager.Data.SessionId = sessionData.SessionId;
+                GsDataManager.Data.ActiveSessionId = sessionData.session_id;
                 GsDataManager.Save();
             }
         }
@@ -108,24 +93,35 @@ namespace GsPlugin {
                 return;
             }
 
-            DateTime localDate = DateTime.Now;
-            var startedGame = args.Game;
+            // Check if we have a valid session ID
+            if (string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
+                GsLogger.Warn("No active session ID found when stopping game");
+                return;
+            }
 
-            // Build the payload for scrobbling the game finish.
-            var startData = new GsApiClient.TimeTrackerEnd {
+            DateTime localDate = DateTime.Now;
+            var stoppedGame = args.Game;
+
+            // Build the payload for scrobbling the game finish
+            var endData = new GsApiClient.TimeTrackerEnd {
                 user_id = GsDataManager.Data.InstallID,
-                session_id = GsDataManager.Data.SessionId,
+                game_name = stoppedGame.Name,
+                game_id = stoppedGame.Id.ToString(),
+                session_id = GsDataManager.Data.ActiveSessionId,
                 metadata = new { },
                 finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
             };
 
-            // Send POST request and ensure success.
-            var finishResponse = await _apiClient.FinishGameSession(startData);
+            // Send POST request and ensure success
+            var finishResponse = await _apiClient.FinishGameSession(endData);
             if (finishResponse != null) {
-                GsDataManager.Data.SessionId = null;
+                // Only clear the session ID if the request was successful
+                GsDataManager.Data.ActiveSessionId = null;
                 GsDataManager.Save();
             }
-            // Optionally log finishResponse.status if needed.
+            else {
+                GsLogger.Error($"Failed to finish game session for {stoppedGame.Name}");
+            }
         }
 
         public override void OnGameUninstalled(OnGameUninstalledEventArgs args) {
@@ -143,19 +139,19 @@ namespace GsPlugin {
                 return;
             }
 
-            if (GsDataManager.Data.SessionId != null) {
+            if (GsDataManager.Data.ActiveSessionId != null) {
                 DateTime localDate = DateTime.Now;
 
                 var startData = new GsApiClient.TimeTrackerEnd {
                     user_id = GsDataManager.Data.InstallID,
-                    session_id = GsDataManager.Data.SessionId,
+                    session_id = GsDataManager.Data.ActiveSessionId,
                     metadata = new { },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 };
 
                 var finishResponse = await _apiClient.FinishGameSession(startData);
                 if (finishResponse != null) {
-                    GsDataManager.Data.SessionId = null;
+                    GsDataManager.Data.ActiveSessionId = null;
                     GsDataManager.Save();
                 }
             }
