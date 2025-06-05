@@ -162,7 +162,9 @@ namespace GsPlugin {
             MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}",
                 "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
 #endif
-        }        public async void LinkAccount() {
+        }
+
+        public async void LinkAccount() {
             if (string.IsNullOrWhiteSpace(Settings.LinkToken)) {
                 Settings.LinkStatusMessage = "Please enter a token";
                 return;
