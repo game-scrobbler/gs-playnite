@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using MySidebarPlugin;
 using Playnite.SDK;
@@ -32,6 +34,9 @@ namespace GsPlugin {
             _apiClient = new GsApiClient();
             // Initialize GsDataManager
             GsDataManager.Initialize(GetPluginUserDataPath(), _settings.InstallID);
+
+            // Register URI handler for automatic account linking
+            RegisterUriHandler();
         }
 
         /// <summary>
@@ -209,6 +214,184 @@ namespace GsPlugin {
             }
             else {
                 GsLogger.Error("Failed to synchronize library with the external API.");
+            }
+        }
+
+        /// <summary>
+        /// Registers the URI handler for automatic account linking.
+        /// </summary>
+        private void RegisterUriHandler() {
+            try {
+                PlayniteApi.UriHandler.RegisterSource("gamescrobbler", HandleUriRequest);
+                GsLogger.Info("Successfully registered URI handler for gamescrobbler:// links");
+
+                SentrySdk.AddBreadcrumb(
+                    message: "URI handler registered",
+                    category: "initialization"
+                );
+            }
+            catch (Exception ex) {
+                GsLogger.Error("Failed to register URI handler", ex);
+                SentrySdk.CaptureException(ex);
+            }
+        }
+
+        /// <summary>
+        /// Handles URI requests for automatic account linking.
+        /// Expected format: playnite://gamescrobbler/link/[token]
+        /// </summary>
+        /// <param name="args">URI arguments containing the token</param>
+        private async void HandleUriRequest(PlayniteUriEventArgs args) {
+            try {
+                GsLogger.Info($"Received URI request with {args.Arguments.Length} arguments");
+
+                // Log the arguments for debugging
+                for (int i = 0; i < args.Arguments.Length; i++) {
+                    GsLogger.Info($"Argument {i}: {args.Arguments[i]}");
+                }
+
+                // Expected format: playnite://gamescrobbler/link/[token]
+                if (args.Arguments.Length >= 2 && args.Arguments[0].Equals("link", StringComparison.OrdinalIgnoreCase)) {
+                    string token = args.Arguments[1];
+
+                    if (string.IsNullOrWhiteSpace(token)) {
+                        GsLogger.Warn("Empty token received in URI request");
+                        PlayniteApi.Dialogs.ShowMessage(
+                            "Invalid linking token received.",
+                            "Account Linking Error",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning
+                        );
+                        return;
+                    }
+
+                    // Check if already linked
+                    if (GsDataManager.Data.IsLinked) {
+                        var result = PlayniteApi.Dialogs.ShowMessage(
+                            $"Account is already linked to User ID: {GsDataManager.Data.LinkedUserId}\n\nDo you want to link to a different account?",
+                            "Account Already Linked",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question
+                        );
+
+                        if (result != MessageBoxResult.Yes) {
+                            return;
+                        }
+                    }
+
+                    // Show linking in progress dialog
+                    PlayniteApi.Dialogs.ShowMessage(
+                        "Processing account linking request...",
+                        "Account Linking",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+
+                    // Attempt to link the account
+                    await ProcessAutomaticLinking(token);
+                }
+                else {
+                    GsLogger.Warn($"Invalid URI format. Expected: playnite://gamescrobbler/link/[token], got {args.Arguments.Length} arguments");
+                    PlayniteApi.Dialogs.ShowMessage(
+                        "Invalid linking request format.",
+                        "Account Linking Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning
+                    );
+                }
+            }
+            catch (Exception ex) {
+                GsLogger.Error("Error handling URI request", ex);
+                SentrySdk.CaptureException(ex);
+
+                PlayniteApi.Dialogs.ShowMessage(
+                    $"Error processing linking request: {ex.Message}",
+                    "Account Linking Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
+            }
+        }
+
+        /// <summary>
+        /// Processes automatic account linking using the provided token.
+        /// </summary>
+        /// <param name="token">The linking token from the web app</param>
+        private async Task ProcessAutomaticLinking(string token) {
+            try {
+                GsLogger.Info($"Processing automatic linking with token: {token.Substring(0, Math.Min(8, token.Length))}...");
+
+                SentrySdk.AddBreadcrumb(
+                    message: "Starting automatic account linking",
+                    category: "linking",
+                    data: new Dictionary<string, string> {
+                        { "TokenLength", token.Length.ToString() },
+                        { "InstallID", GsDataManager.Data.InstallID }
+                    }
+                );
+
+                // Use the existing API client to verify the token
+                var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
+
+                if (response != null && response.status == "success") {
+                    // Update the linking state
+                    GsDataManager.Data.IsLinked = true;
+                    GsDataManager.Data.LinkedUserId = response.userId;
+                    GsDataManager.Save();
+
+                    // Notify any listening UI components
+                    GsPluginSettingsViewModel.LinkingStatusChanged?.Invoke(this, EventArgs.Empty);
+
+                    // Show success message
+                    PlayniteApi.Dialogs.ShowMessage(
+                        $"Account successfully linked!\nUser ID: {response.userId}",
+                        "Account Linking Success",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+
+                    GsLogger.Info($"Account successfully linked automatically to User ID: {response.userId}");
+
+                    SentrySdk.AddBreadcrumb(
+                        message: "Automatic account linking successful",
+                        category: "linking",
+                        data: new Dictionary<string, string> {
+                            { "UserId", response.userId },
+                            { "InstallID", GsDataManager.Data.InstallID }
+                        }
+                    );
+                }
+                else {
+                    string errorMessage = response?.message ?? "Unknown error occurred during linking";
+                    GsLogger.Error($"Automatic linking failed: {errorMessage}");
+
+                    PlayniteApi.Dialogs.ShowMessage(
+                        $"Account linking failed: {errorMessage}",
+                        "Account Linking Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error
+                    );
+
+                    SentrySdk.CaptureMessage(
+                        "Automatic account linking failed",
+                        scope => {
+                            scope.Level = SentryLevel.Warning;
+                            scope.SetExtra("ErrorMessage", errorMessage);
+                            scope.SetExtra("ResponseStatus", response?.status ?? "null");
+                        }
+                    );
+                }
+            }
+            catch (Exception ex) {
+                GsLogger.Error("Exception during automatic linking", ex);
+                SentrySdk.CaptureException(ex);
+
+                PlayniteApi.Dialogs.ShowMessage(
+                    $"Error during automatic linking: {ex.Message}",
+                    "Account Linking Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
             }
         }
 

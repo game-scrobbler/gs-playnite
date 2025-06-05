@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Data;
 using System.Windows;
@@ -224,6 +225,43 @@ namespace GsPlugin {
                 MessageBox.Show($"Link account process completed.\nFinal Status: IsLinked = {GsDataManager.Data.IsLinked}\nLinked User ID: {GsDataManager.Data.LinkedUserId ?? "null"}",
                     "Debug - Link Complete", MessageBoxButton.OK, MessageBoxImage.Information);
 #endif
+            }
+        }
+
+        public async Task<bool> LinkAccountWithToken(string token) {
+            if (string.IsNullOrWhiteSpace(token)) {
+                return false;
+            }
+
+            Settings.IsLinking = true;
+            Settings.LinkStatusMessage = "Verifying token...";
+
+            try {
+                var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
+
+                if (response != null && response.status == "success") {
+                    GsDataManager.Data.IsLinked = true;
+                    GsDataManager.Data.LinkedUserId = response.userId;
+                    GsDataManager.Save();
+
+                    Settings.LinkStatusMessage = "Successfully linked account!";
+                    Settings.LinkToken = ""; // Clear any existing token
+
+                    LinkingStatusChanged?.Invoke(this, EventArgs.Empty);
+                    return true;
+                }
+                else {
+                    Settings.LinkStatusMessage = response?.message ?? "Unknown error occurred";
+                    return false;
+                }
+            }
+            catch (Exception ex) {
+                Settings.LinkStatusMessage = $"Error: {ex.Message}";
+                SentrySdk.CaptureException(ex);
+                return false;
+            }
+            finally {
+                Settings.IsLinking = false;
             }
         }
 
