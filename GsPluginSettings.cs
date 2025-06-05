@@ -168,14 +168,27 @@ namespace GsPlugin {
         public async void LinkAccount() {
             if (string.IsNullOrWhiteSpace(Settings.LinkToken)) {
                 Settings.LinkStatusMessage = "Please enter a token";
+#if DEBUG
+                MessageBox.Show("Link Account failed: Token is empty or whitespace",
+                    "Debug - Link Account", MessageBoxButton.OK, MessageBoxImage.Warning);
+#endif
                 return;
             }
+#if DEBUG
+            MessageBox.Show($"Starting link account process with token: {Settings.LinkToken}\nInstallID: {GsDataManager.Data.InstallID}",
+                "Debug - Link Account", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
 
             Settings.IsLinking = true;
             Settings.LinkStatusMessage = "Verifying token...";
 
             try {
                 var response = await _apiClient.VerifyToken(Settings.LinkToken, GsDataManager.Data.InstallID);
+
+#if DEBUG
+                MessageBox.Show($"API Response received:\nStatus: {response?.status ?? "null"}\nMessage: {response?.message ?? "null"}\nUserId: {response?.userId ?? "null"}",
+                    "Debug - API Response", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
 
                 if (response != null && response.status == "success") {
                     GsDataManager.Data.IsLinked = true;
@@ -184,17 +197,34 @@ namespace GsPlugin {
 
                     Settings.LinkStatusMessage = "Successfully linked account!";
                     Settings.LinkToken = ""; // Clear the token
+
+#if DEBUG
+                    MessageBox.Show($"Account successfully linked!\nLinked User ID: {response.userId}\nIsLinked: {GsDataManager.Data.IsLinked}",
+                        "Debug - Link Success", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
                 }
                 else {
                     Settings.LinkStatusMessage = response?.message ?? "Unknown error occurred";
+#if DEBUG
+                    MessageBox.Show($"Link failed:\nStatus: {response?.status ?? "null"}\nMessage: {response?.message ?? "Unknown error occurred"}",
+                        "Debug - Link Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+#endif
                 }
             }
             catch (Exception ex) {
                 Settings.LinkStatusMessage = $"Error: {ex.Message}";
                 SentrySdk.CaptureException(ex);
+#if DEBUG
+                MessageBox.Show($"Exception during linking:\nType: {ex.GetType().Name}\nMessage: {ex.Message}\nStack Trace: {ex.StackTrace}",
+                    "Debug - Exception", MessageBoxButton.OK, MessageBoxImage.Error);
+#endif
             }
             finally {
                 Settings.IsLinking = false;
+#if DEBUG
+                MessageBox.Show($"Link account process completed.\nFinal Status: IsLinked = {GsDataManager.Data.IsLinked}\nLinked User ID: {GsDataManager.Data.LinkedUserId ?? "null"}",
+                    "Debug - Link Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+#endif
             }
         }
 
