@@ -1,16 +1,39 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
 namespace GsPlugin {
-    public partial class GsPluginSettingsView : UserControl {
+    public partial class GsPluginSettingsView : UserControl, INotifyPropertyChanged {
         private GsPluginSettingsViewModel _viewModel;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName = null) {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         public GsPluginSettingsView() {
             InitializeComponent();
             Loaded += GsPluginSettingsView_Loaded;
+            Unloaded += GsPluginSettingsView_Unloaded;
+
+            // Subscribe to static linking status changed event
+            GsPluginSettingsViewModel.LinkingStatusChanged += OnLinkingStatusChanged;
+        }
+
+        private void GsPluginSettingsView_Unloaded(object sender, RoutedEventArgs e) {
+            // Unsubscribe from events to prevent memory leaks
+            GsPluginSettingsViewModel.LinkingStatusChanged -= OnLinkingStatusChanged;
+        }
+
+        private void OnLinkingStatusChanged(object sender, EventArgs e) {
+            // Update the UI when linking status changes
+            Dispatcher.Invoke(() => {
+                UpdateConnectionStatus();
+            });
         }
 
         private void GsPluginSettingsView_Loaded(object sender, RoutedEventArgs e) {
@@ -40,18 +63,26 @@ namespace GsPlugin {
         private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e) {
             if (e.PropertyName == nameof(GsPluginSettings.IsLinking)) {
                 UpdateLinkingState();
+                // When linking state changes, also check if connection status changed
+                if (!_viewModel.Settings.IsLinking) {
+                    UpdateConnectionStatus();
+                }
             }
             else if (e.PropertyName == nameof(GsPluginSettings.LinkStatusMessage)) {
                 UpdateStatusMessage();
             }
         }
-
         private void UpdateConnectionStatus() {
             // Update using static properties
             ConnectionStatusTextBlock.Text = GsPluginSettingsViewModel.ConnectionStatus;
             ConnectionStatusTextBlock.Foreground = GsPluginSettingsViewModel.IsLinked
                 ? new SolidColorBrush(Colors.Green)
                 : new SolidColorBrush(Colors.Red);
+
+            // Update the visibility of linking controls directly
+            LinkingControlsGrid.Visibility = GsPluginSettingsViewModel.ShowLinkingControls
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private void UpdateLinkingState() {
