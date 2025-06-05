@@ -28,11 +28,8 @@ namespace GsPlugin {
         }
 
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e) {
-            if (e.PropertyName == nameof(GsPluginSettingsViewModel.IsLinked) ||
-                e.PropertyName == nameof(GsPluginSettingsViewModel.ConnectionStatus)) {
-                UpdateConnectionStatus();
-            }
-            else if (e.PropertyName == "Settings") {
+            // ConnectionStatus is now static, so we don't need to listen for property changes
+            if (e.PropertyName == "Settings") {
                 var settings = _viewModel?.Settings;
                 if (settings != null) {
                     settings.PropertyChanged += Settings_PropertyChanged;
@@ -50,12 +47,11 @@ namespace GsPlugin {
         }
 
         private void UpdateConnectionStatus() {
-            if (_viewModel != null) {
-                ConnectionStatusTextBlock.Text = _viewModel.ConnectionStatus;
-                ConnectionStatusTextBlock.Foreground = _viewModel.IsLinked
-                    ? new SolidColorBrush(Colors.Green)
-                    : new SolidColorBrush(Colors.Red);
-            }
+            // Update using static properties
+            ConnectionStatusTextBlock.Text = GsPluginSettingsViewModel.ConnectionStatus;
+            ConnectionStatusTextBlock.Foreground = GsPluginSettingsViewModel.IsLinked
+                ? new SolidColorBrush(Colors.Green)
+                : new SolidColorBrush(Colors.Red);
         }
 
         private void UpdateLinkingState() {

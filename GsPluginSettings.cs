@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Playnite.SDK;
 using Playnite.SDK.Data;
@@ -81,9 +82,9 @@ namespace GsPlugin {
 
         private GsApiClient _apiClient;
 
-        public bool IsLinked => GsDataManager.Data.IsLinked;
+        public static bool IsLinked => GsDataManager.Data.IsLinked;
 
-        public string ConnectionStatus => IsLinked
+        public static string ConnectionStatus => IsLinked
             ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
             : "Disconnected";
 
@@ -183,10 +184,6 @@ namespace GsPlugin {
 
                     Settings.LinkStatusMessage = "Successfully linked account!";
                     Settings.LinkToken = ""; // Clear the token
-
-                    // Notify that connection status changed
-                    OnPropertyChanged(nameof(IsLinked));
-                    OnPropertyChanged(nameof(ConnectionStatus));
                 }
                 else {
                     Settings.LinkStatusMessage = response?.message ?? "Unknown error occurred";
