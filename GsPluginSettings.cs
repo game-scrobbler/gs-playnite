@@ -94,6 +94,11 @@ namespace GsPlugin {
         // Static event to notify when linking status changes
         public static event EventHandler LinkingStatusChanged;
 
+        // Public static method to trigger the linking status changed event
+        public static void OnLinkingStatusChanged() {
+            LinkingStatusChanged?.Invoke(null, EventArgs.Empty);
+        }
+
         public GsPluginSettingsViewModel(GsPlugin plugin) {
             // Injecting your plugin instance is required for Save/Load method because Playnite saves data to a location based on what plugin requested the operation.
             _plugin = plugin;
@@ -200,7 +205,7 @@ namespace GsPlugin {
                     Settings.LinkStatusMessage = "Successfully linked account!";
                     Settings.LinkToken = ""; // Clear the token
 
-                    LinkingStatusChanged?.Invoke(this, EventArgs.Empty);
+                    OnLinkingStatusChanged();
 
 #if DEBUG
                     MessageBox.Show($"Account successfully linked!\nLinked User ID: {response.userId}\nIsLinked: {GsDataManager.Data.IsLinked}",
@@ -247,7 +252,7 @@ namespace GsPlugin {
                     Settings.LinkStatusMessage = "Successfully linked account!";
                     Settings.LinkToken = ""; // Clear any existing token
 
-                    LinkingStatusChanged?.Invoke(this, EventArgs.Empty);
+                    OnLinkingStatusChanged();
                     return true;
                 }
                 else {

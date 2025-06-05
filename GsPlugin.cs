@@ -340,7 +340,7 @@ namespace GsPlugin {
                     GsDataManager.Save();
 
                     // Notify any listening UI components
-                    GsPluginSettingsViewModel.LinkingStatusChanged?.Invoke(this, EventArgs.Empty);
+                    GsPluginSettingsViewModel.OnLinkingStatusChanged();
 
                     // Show success message
                     PlayniteApi.Dialogs.ShowMessage(
