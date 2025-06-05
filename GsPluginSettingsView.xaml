@@ -5,6 +5,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              d:DesignHeight="400" d:DesignWidth="600">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <StackPanel Margin="20">
         <TextBlock Text="Your GS ID" FontSize="16" Foreground="White"/>
         <TextBlock
@@ -24,6 +27,37 @@
                   HorizontalAlignment="Left"
                   ItemsSource="{Binding AvailableThemes}"
                   SelectedItem="{Binding Settings.Theme, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <TextBlock Text="Account Linking" FontSize="16" Foreground="White" Margin="0,20,0,10"/>
+        <TextBlock x:Name="ConnectionStatusTextBlock"
+                   FontWeight="Bold"
+                   Margin="0,0,0,10"/>
+
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox Grid.Column="0"
+                     x:Name="TokenTextBox"
+                     Text="{Binding Settings.LinkToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,10,0"
+                     Padding="5"
+                     Height="25"
+                     VerticalContentAlignment="Center"/>
+
+            <Button Grid.Column="1"
+                    x:Name="LinkAccountButton"
+                    Content="Link Account"
+                    Click="LinkAccount_Click"
+                    Padding="10,3"/>
+        </Grid>
+
+        <TextBlock x:Name="LinkStatusTextBlock"
+                   Foreground="Yellow"
+                   FontSize="12"
+                   Margin="0,0,0,10"/>
 
         <TextBlock Text="Privacy Controls" FontSize="16" Foreground="White" Margin="0,20,0,10"/>
         <CheckBox Content="Disable error reporting (Sentry)"

@@ -14,6 +14,7 @@ namespace GsPlugin {
     public class GsApiClient {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
+        private static readonly string _nextApiBaseUrl = "https://gamescrobbler.com";
         private readonly HttpClient _httpClient;
         private readonly JsonSerializerOptions _jsonOptions;
 
@@ -64,6 +65,16 @@ namespace GsPlugin {
         public async Task<SyncResponse> SyncLibrary(LibrarySync librarySync) {
             return await PostJsonAsync<SyncResponse>(
                 $"{_apiBaseUrl}/api/playnite/sync", librarySync, true);
+        }
+
+        public async Task<TokenVerificationResponse> VerifyToken(string token, string playniteId) {
+            var payload = new TokenVerificationRequest {
+                token = token,
+                playniteId = playniteId,
+            };
+
+            return await PostJsonAsync<TokenVerificationResponse>(
+                $"{_nextApiBaseUrl}/api/auth/playnite/verify", payload);
         }
 
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
@@ -120,6 +131,23 @@ namespace GsPlugin {
         }
 
         #region API Models
+
+        /// <summary>
+        /// Model for token verification request.
+        /// </summary>
+        public class TokenVerificationRequest {
+            public string token { get; set; }
+            public string playniteId { get; set; }
+        }
+
+        /// <summary>
+        /// Response model for token verification.
+        /// </summary>
+        public class TokenVerificationResponse {
+            public string status { get; set; }
+            public string message { get; set; }
+            public string userId { get; set; }
+        }
 
         /// <summary>
         /// Model for tracking game start events.

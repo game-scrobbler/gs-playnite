@@ -17,6 +17,9 @@ namespace GsPlugin {
 
         private bool disableSentry = false;
         private bool disableScrobbling = false;
+        private string _linkToken = "";
+        private bool _isLinking = false;
+        private string _linkStatusMessage = "";
 
         public bool DisableSentry {
             get => disableSentry;
@@ -30,6 +33,30 @@ namespace GsPlugin {
             get => disableScrobbling;
             set {
                 disableScrobbling = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LinkToken {
+            get => _linkToken;
+            set {
+                _linkToken = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsLinking {
+            get => _isLinking;
+            set {
+                _isLinking = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LinkStatusMessage {
+            get => _linkStatusMessage;
+            set {
+                _linkStatusMessage = value;
                 OnPropertyChanged();
             }
         }
@@ -52,9 +79,18 @@ namespace GsPlugin {
 
         public List<string> AvailableThemes { get; set; }
 
+        private GsApiClient _apiClient;
+
+        public bool IsLinked => GsDataManager.Data.IsLinked;
+
+        public string ConnectionStatus => IsLinked
+            ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
+            : "Disconnected";
+
         public GsPluginSettingsViewModel(GsPlugin plugin) {
             // Injecting your plugin instance is required for Save/Load method because Playnite saves data to a location based on what plugin requested the operation.
             _plugin = plugin;
+            _apiClient = new GsApiClient();
             AvailableThemes = new List<string> { "Dark", "Light" };
 
             // Load saved settings.
@@ -93,6 +129,11 @@ namespace GsPlugin {
                     "Debug", MessageBoxButton.OK, MessageBoxImage.Warning);
 #endif
             }
+
+            // Subscribe to settings property changes
+            if (Settings != null) {
+                Settings.PropertyChanged += (s, e) => OnPropertyChanged("Settings");
+            }
         }
 
         public void BeginEdit() {
@@ -121,6 +162,41 @@ namespace GsPlugin {
             MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}",
                 "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
 #endif
+        }        public async void LinkAccount() {
+            if (string.IsNullOrWhiteSpace(Settings.LinkToken)) {
+                Settings.LinkStatusMessage = "Please enter a token";
+                return;
+            }
+
+            Settings.IsLinking = true;
+            Settings.LinkStatusMessage = "Verifying token...";
+
+            try {
+                var response = await _apiClient.VerifyToken(Settings.LinkToken, GsDataManager.Data.InstallID);
+
+                if (response != null && response.status == "success") {
+                    GsDataManager.Data.IsLinked = true;
+                    GsDataManager.Data.LinkedUserId = response.userId;
+                    GsDataManager.Save();
+
+                    Settings.LinkStatusMessage = "Successfully linked account!";
+                    Settings.LinkToken = ""; // Clear the token
+
+                    // Notify that connection status changed
+                    OnPropertyChanged(nameof(IsLinked));
+                    OnPropertyChanged(nameof(ConnectionStatus));
+                }
+                else {
+                    Settings.LinkStatusMessage = response?.message ?? "Unknown error occurred";
+                }
+            }
+            catch (Exception ex) {
+                Settings.LinkStatusMessage = $"Error: {ex.Message}";
+                SentrySdk.CaptureException(ex);
+            }
+            finally {
+                Settings.IsLinking = false;
+            }
         }
 
         public bool VerifySettings(out List<string> errors) {
