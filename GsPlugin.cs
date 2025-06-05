@@ -199,7 +199,17 @@ namespace GsPlugin {
 
             // Send POST request and ensure success.
             var syncResponse = await _apiClient.SyncLibrary(librarySync);
-            // Optionally, use syncResponse.result.added and syncResponse.result.updated as needed.
+            if (syncResponse != null) {
+                GsDataManager.Data.IsLinked = syncResponse.status != "not_linked";
+                GsDataManager.Data.LinkedUserId = syncResponse.userId;
+                GsDataManager.Save();
+
+                // Log the result of the synchronization.
+                GsLogger.Info($"Library sync completed: {syncResponse.result.added} added, {syncResponse.result.updated} updated.");
+            }
+            else {
+                GsLogger.Error("Failed to synchronize library with the external API.");
+            }
         }
 
         public static void SentryInit() {

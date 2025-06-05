@@ -194,6 +194,8 @@ namespace GsPlugin {
         public class SyncResponse {
             public string status { get; set; }
             public SyncResult result { get; set; }
+            // If account not linked yet it will be "not_linked"
+            public string userId { get; set; }
         }
 
         /// <summary>

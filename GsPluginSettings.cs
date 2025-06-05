@@ -174,10 +174,6 @@ namespace GsPlugin {
 #endif
                 return;
             }
-#if DEBUG
-            MessageBox.Show($"Starting link account process with token: {Settings.LinkToken}\nInstallID: {GsDataManager.Data.InstallID}",
-                "Debug - Link Account", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
 
             Settings.IsLinking = true;
             Settings.LinkStatusMessage = "Verifying token...";
@@ -214,10 +210,6 @@ namespace GsPlugin {
             catch (Exception ex) {
                 Settings.LinkStatusMessage = $"Error: {ex.Message}";
                 SentrySdk.CaptureException(ex);
-#if DEBUG
-                MessageBox.Show($"Exception during linking:\nType: {ex.GetType().Name}\nMessage: {ex.Message}\nStack Trace: {ex.StackTrace}",
-                    "Debug - Exception", MessageBoxButton.OK, MessageBoxImage.Error);
-#endif
             }
             finally {
                 Settings.IsLinking = false;
