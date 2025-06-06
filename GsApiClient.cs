@@ -115,7 +115,7 @@ namespace GsPlugin {
         }
 
         public class TokenVerificationRes {
-            public string status { get; set; }
+            public bool success { get; set; }
             public string message { get; set; }
             public string userId { get; set; }
         }
