@@ -95,16 +95,17 @@ namespace GsPlugin {
                 var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
 
                 if (response.success) {
-                    if (response.userId == "not_linked" ) {
+                    if (response.userId == "not_linked") {
                         GsDataManager.Data.LinkedUserId = null;
-                    } else {
+                    }
+                    else {
                         GsDataManager.Data.LinkedUserId = response.userId;
                     }
                     GsDataManager.Save();
                     // Notify listeners of status change
                     OnLinkingStatusChanged();
 
-                   GsLogger.Info($"Account successfully linked via {context} to User ID: {response.userId}");
+                    GsLogger.Info($"Account successfully linked via {context} to User ID: {response.userId}");
                     SentrySdk.AddBreadcrumb(
                         message: $"{context} account linking successful",
                         category: "linking",

@@ -59,7 +59,8 @@ namespace GsPlugin {
             // Only set LinkedUserId if it's a valid ID (not "not_linked")
             if (userId == "not_linked" || string.IsNullOrEmpty(userId)) {
                 GsDataManager.Data.LinkedUserId = null;
-            } else {
+            }
+            else {
                 GsDataManager.Data.LinkedUserId = userId;
             }
             GsDataManager.Save();
