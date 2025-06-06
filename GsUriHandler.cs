@@ -13,12 +13,12 @@ namespace GsPlugin {
     /// </summary>
     public class GsUriHandler {
         private readonly IPlayniteAPI _playniteApi;
-        private readonly GsApiClient _apiClient;
+        private readonly GsAccountLinkingService _linkingService;
         private static readonly ILogger _logger = LogManager.GetLogger();
 
-        public GsUriHandler(IPlayniteAPI playniteApi, GsApiClient apiClient) {
+        public GsUriHandler(IPlayniteAPI playniteApi, GsAccountLinkingService linkingService) {
             _playniteApi = playniteApi ?? throw new ArgumentNullException(nameof(playniteApi));
-            _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
+            _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
         }
 
         /// <summary>
@@ -64,7 +64,7 @@ namespace GsPlugin {
                     }
 
                     // Check if already linked and get user confirmation if needed
-                    if (GsDataManager.Data.IsLinked !== "not_linked" && !ShouldProceedWithRelinking()) {
+                    if (GsDataManager.Data.IsLinked && !_linkingService.ShouldProceedWithRelinking()) {
                         return;
                     }
 
@@ -89,16 +89,15 @@ namespace GsPlugin {
         /// <param name="token">The linking token from the web app</param>
         private async Task ProcessAutomaticLinking(string token) {
             try {
-                LogLinkingAttempt(token);
+                // Use the centralized linking service
+                var result = await _linkingService.LinkAccountAsync(token, LinkingContext.AutomaticUri);
 
-                // Use the existing API client to verify the token
-                var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
-
-                if (response != null && response.status == "success") {
-                    await HandleSuccessfulLinking(response);
+                if (result.Success) {
+                    _playniteApi.Dialogs.ShowMessage($"Account successfully linked!\nUser ID: {result.UserId}", "Account Linking Success", MessageBoxButton.OK,MessageBoxImage.Information
+                    );
                 }
                 else {
-                    HandleFailedLinking(response);
+                    _playniteApi.Dialogs.ShowMessage($"Account linking failed: {result.ErrorMessage}","Account Linking Failed", MessageBoxButton.OK,MessageBoxImage.Error);
                 }
             }
             catch (Exception ex) {
@@ -106,63 +105,6 @@ namespace GsPlugin {
             }
         }
 
-        /// <summary>
-        /// Handles successful account linking.
-        /// </summary>
-        /// <param name="response">The successful API response</param>
-        private async Task HandleSuccessfulLinking(GsApiClient.TokenVerificationRes response) {
-            // Update the linking state
-            GsDataManager.Data.IsLinked = true;
-            GsDataManager.Data.LinkedUserId = response.userId;
-            GsDataManager.Save();
-
-            // Notify any listening UI components
-            GsPluginSettingsViewModel.OnLinkingStatusChanged();
-
-            // Show success message
-            _playniteApi.Dialogs.ShowMessage(
-                $"Account successfully linked!\nUser ID: {response.userId}",
-                "Account Linking Success",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information
-            );
-
-            GsLogger.Info($"Account successfully linked automatically to User ID: {response.userId}");
-
-            SentrySdk.AddBreadcrumb(
-                message: "Automatic account linking successful",
-                category: "linking",
-                data: new Dictionary<string, string> {
-                    { "UserId", response.userId },
-                    { "InstallID", GsDataManager.Data.InstallID }
-                }
-            );
-        }
-
-        /// <summary>
-        /// Handles failed account linking.
-        /// </summary>
-        /// <param name="response">The failed API response</param>
-        private void HandleFailedLinking(GsApiClient.TokenVerificationRes response) {
-            string errorMessage = response?.message ?? "Unknown error occurred during linking";
-            GsLogger.Error($"Automatic linking failed: {errorMessage}");
-
-            _playniteApi.Dialogs.ShowMessage(
-                $"Account linking failed: {errorMessage}",
-                "Account Linking Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error
-            );
-
-            SentrySdk.CaptureMessage(
-                "Automatic account linking failed",
-                scope => {
-                    scope.Level = SentryLevel.Warning;
-                    scope.SetExtra("ErrorMessage", errorMessage);
-                    scope.SetExtra("ResponseStatus", response?.status ?? "null");
-                }
-            );
-        }
 
         /// <summary>
         /// Handles empty token scenario.
@@ -174,63 +116,6 @@ namespace GsPlugin {
                 "Account Linking Error",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning
-            );
-        }
-
-        /// <summary>
-        /// Checks if the user wants to proceed with relinking to a different account.
-        /// </summary>
-        /// <returns>True if the user wants to proceed, false otherwise</returns>
-        private bool ShouldProceedWithRelinking() {
-            var result = _playniteApi.Dialogs.ShowMessage(
-                $"Account is already linked to User ID: {GsDataManager.Data.LinkedUserId}\n\nDo you want to link to a different account?",
-                "Account Already Linked",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question
-            );
-
-            return result == MessageBoxResult.Yes;
-        }
-
-        /// <summary>
-        /// Shows the linking in progress dialog.
-        /// </summary>
-        private void ShowLinkingInProgressDialog() {
-            _playniteApi.Dialogs.ShowMessage(
-                "Processing account linking request...",
-                "Account Linking",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information
-            );
-        }
-
-        /// <summary>
-        /// Handles invalid URI format scenario.
-        /// </summary>
-        /// <param name="argumentCount">The number of arguments received</param>
-        private void HandleInvalidUriFormat(int argumentCount) {
-            GsLogger.Warn($"Invalid URI format. Expected: playnite://gamescrobbler/link/[token], got {argumentCount} arguments");
-            _playniteApi.Dialogs.ShowMessage(
-                "Invalid linking request format.",
-                "Account Linking Error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning
-            );
-        }
-
-        /// <summary>
-        /// Handles exceptions during URI request processing.
-        /// </summary>
-        /// <param name="ex">The exception that occurred</param>
-        private void HandleUriRequestException(Exception ex) {
-            GsLogger.Error("Error handling URI request", ex);
-            SentrySdk.CaptureException(ex);
-
-            _playniteApi.Dialogs.ShowMessage(
-                $"Error processing linking request: {ex.Message}",
-                "Account Linking Error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error
             );
         }
 
@@ -251,20 +136,30 @@ namespace GsPlugin {
         }
 
         /// <summary>
-        /// Logs the linking attempt with partial token for security.
+        /// Handles invalid URI format scenario.
         /// </summary>
-        /// <param name="token">The linking token</param>
-        private static void LogLinkingAttempt(string token) {
-            GsLogger.Info($"Processing automatic linking with token: {token.Substring(0, Math.Min(8, token.Length))}...");
+        /// <param name="argumentCount">Number of arguments received</param>
+        private void HandleInvalidUriFormat(int argumentCount) {
+            GsLogger.Warn($"Invalid URI format. Expected 'link/[token]', received {argumentCount} arguments");
+        }
 
-            SentrySdk.AddBreadcrumb(
-                message: "Starting automatic account linking",
-                category: "linking",
-                data: new Dictionary<string, string> {
-                    { "TokenLength", token.Length.ToString() },
-                    { "InstallID", GsDataManager.Data.InstallID }
-                }
-            );
+        /// <summary>
+        /// Shows a dialog indicating that linking is in progress.
+        /// </summary>
+        private void ShowLinkingInProgressDialog() {
+            // Note: This is a fire-and-forget notification
+            // In a production environment, you might want to show a proper progress dialog
+            GsLogger.Info("Account linking initiated via URI handler");
+        }
+
+        /// <summary>
+        /// Handles general URI request exceptions.
+        /// </summary>
+        /// <param name="ex">The exception that occurred</param>
+        private void HandleUriRequestException(Exception ex) {
+            GsLogger.Error("Unexpected error handling URI request", ex);
+            SentrySdk.CaptureException(ex);
+            _playniteApi.Dialogs.ShowMessage($"Unexpected error processing URI request: {ex.Message}", "Account Linking Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }

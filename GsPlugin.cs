@@ -17,6 +17,7 @@ namespace GsPlugin {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private GsPluginSettingsViewModel _settings { get; set; }
         private GsApiClient _apiClient;
+        private GsAccountLinkingService _linkingService;
         private GsUriHandler _uriHandler;
         private GsScrobblingService _scrobblingService;
         /// Unique identifier for the plugin itself.
@@ -27,24 +28,29 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="api">Instance of Playnite API to be injected.</param>
         public GsPlugin(IPlayniteAPI api) : base(api) {
-            // Create settings
-            _settings = new GsPluginSettingsViewModel(this);
-            Properties = new GenericPluginProperties {
-                HasSettings = true
-            };
-            _apiClient = new GsApiClient();
-
             // Initialize Sentry for error tracking
             GsSentry.Initialize();
 
-            // Initialize GsDataManager
+            // Initialize API client
+            _apiClient = new GsApiClient();
+
+             // Initialize centralized account linking service
+            _linkingService = new GsAccountLinkingService(_apiClient);
+
+            // Create settings with linking service dependency
+            _settings = new GsPluginSettingsViewModel(this, _linkingService);
+            Properties = new GenericPluginProperties {
+                HasSettings = true
+            };
+
+            // Initialize GsDataManager first
             GsDataManager.Initialize(GetPluginUserDataPath(), _settings.InstallID);
 
             // Initialize scrobbling services
             _scrobblingService = new GsScrobblingService(_apiClient);
 
             // Initialize and register URI handler for automatic account linking
-            _uriHandler = new GsUriHandler(api, _apiClient);
+            _uriHandler = new GsUriHandler(api, _linkingService);
             _uriHandler.RegisterUriHandler();
         }
 

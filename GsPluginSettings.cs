@@ -73,7 +73,7 @@ namespace GsPlugin {
     /// </summary>
     public class GsPluginSettingsViewModel : ObservableObject, ISettings {
         private readonly GsPlugin _plugin;
-        private readonly GsApiClient _apiClient;
+        private readonly GsAccountLinkingService _linkingService;
         private GsPluginSettings _editingClone;
         private GsPluginSettings _settings;
 
@@ -103,10 +103,11 @@ namespace GsPlugin {
         /// Initializes a new instance of the GsPluginSettingsViewModel.
         /// </summary>
         /// <param name="plugin">The plugin instance for settings persistence.</param>
-        public GsPluginSettingsViewModel(GsPlugin plugin) {
+        /// <param name="linkingService">The account linking service.</param>
+        public GsPluginSettingsViewModel(GsPlugin plugin, GsAccountLinkingService linkingService) {
             // Store plugin reference for save/load operations
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
-            _apiClient = new GsApiClient();
+            _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
             AvailableThemes = new List<string> { "Dark", "Light" };
 
             InitializeSettings();
@@ -233,70 +234,31 @@ namespace GsPlugin {
         }
 
         /// <summary>
-        /// Performs the actual account linking operation.
+        /// Performs the actual account linking operation using the centralized service.
         /// </summary>
         private async Task PerformLinking() {
             Settings.IsLinking = true;
             Settings.LinkStatusMessage = "Verifying token...";
 
             try {
-                var response = await _apiClient.VerifyToken(Settings.LinkToken, GsDataManager.Data.InstallID);
-                HandleLinkingResponse(response);
+                var result = await _linkingService.LinkAccountAsync(Settings.LinkToken, LinkingContext.ManualSettings);
+
+                if (result.Success) {
+                    Settings.LinkStatusMessage = "Successfully linked account!";
+                    Settings.LinkToken = "";
+                    OnLinkingStatusChanged();
+                } else {
+                    Settings.LinkStatusMessage = result.ErrorMessage;
+                }
             }
             catch (Exception ex) {
-                HandleLinkingError(ex);
+                Settings.LinkStatusMessage = $"Error: {ex.Message}";
             }
             finally {
-                CompleteLinking();
+                 Settings.IsLinking = false;
             }
         }
 
-        /// <summary>
-        /// Handles the response from the linking API call.
-        /// </summary>
-        private void HandleLinkingResponse(dynamic response) {
-            if (response?.status == "success") {
-                ProcessSuccessfulLink(response);
-            }
-            else {
-                Settings.LinkStatusMessage = response?.message ?? "Unknown error occurred";
-            }
-        }
-
-        /// <summary>
-        /// Processes a successful account link.
-        /// </summary>
-        private void ProcessSuccessfulLink(dynamic response) {
-            // Update data manager
-            GsDataManager.Data.IsLinked = true;
-            GsDataManager.Data.LinkedUserId = response.userId;
-            GsDataManager.Save();
-
-            // Update UI state
-            Settings.LinkStatusMessage = "Successfully linked account!";
-            Settings.LinkToken = "";
-
-            // Notify other components
-            OnLinkingStatusChanged();
-
-            GsLogger.ShowDebugInfoBox($"Account successfully linked!\nLinked User ID: {response.userId}\nIsLinked: {GsDataManager.Data.IsLinked}", "Debug - Link Success");
-        }
-
-        /// <summary>
-        /// Handles errors that occur during linking.
-        /// </summary>
-        private void HandleLinkingError(Exception ex) {
-            Settings.LinkStatusMessage = $"Error: {ex.Message}";
-            SentrySdk.CaptureException(ex);
-        }
-
-        /// <summary>
-        /// Completes the linking process and updates UI state.
-        /// </summary>
-        private void CompleteLinking() {
-            Settings.IsLinking = false;
-            GsLogger.ShowDebugInfoBox($"Link account process completed.\nFinal Status: IsLinked = {GsDataManager.Data.IsLinked}\nLinked User ID: {GsDataManager.Data.LinkedUserId ?? "null"}", "Debug - Link Complete");
-        }
         #endregion
 
     }

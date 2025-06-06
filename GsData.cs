@@ -1,10 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using System.Windows;
 using Playnite.SDK;
 using Sentry;
-using System.Collections.Generic;
 
 namespace GsPlugin {
     /// <summary>
