@@ -193,7 +193,7 @@ namespace GsPlugin {
                 var syncResponse = await _apiClient.SyncLibrary(new GsApiClient.LibrarySyncReq {
                     user_id = GsDataManager.Data.InstallID,
                     library = library,
-                    flags = GsDataManager.Data.Flags
+                    flags = GsDataManager.Data.Flags.ToArray()
                 });
                 if (syncResponse != null) {
                     // Update linked status based on API response
