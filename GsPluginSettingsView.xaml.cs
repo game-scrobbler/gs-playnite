@@ -1,9 +1,11 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Navigation;
 
 namespace GsPlugin {
     /// <summary>
@@ -197,6 +199,26 @@ namespace GsPlugin {
             catch (Exception ex) {
                 MessageBox.Show(
                     $"Failed to copy text: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Handles hyperlink navigation requests.
+        /// </summary>
+        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e) {
+            try {
+                Process.Start(new ProcessStartInfo {
+                    FileName = e.Uri.AbsoluteUri,
+                    UseShellExecute = true
+                });
+                e.Handled = true;
+            }
+            catch (Exception ex) {
+                MessageBox.Show(
+                    $"Failed to open URL: {ex.Message}",
                     "Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);

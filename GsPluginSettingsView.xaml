@@ -52,6 +52,20 @@
         <!-- Account Linking Section -->
         <TextBlock Text="Account Linking" Style="{StaticResource SectionHeaderStyle}"/>
 
+        <!-- Hint Text -->
+        <TextBlock FontSize="12"
+                   FontStyle="Italic"
+                   Margin="0,0,0,10"
+                   TextWrapping="Wrap">
+            <Run Text="Tip: To own and persist your GS data, link your plugin installation to your GS account via "
+                 Foreground="LightBlue"/>
+            <Hyperlink NavigateUri="https://gamescrobbler.com"
+                       RequestNavigate="Hyperlink_RequestNavigate"
+                       Foreground="CornflowerBlue">
+                <Run Text="gamescrobbler.com"/>
+            </Hyperlink>
+        </TextBlock>
+
         <!-- Connection Status -->
         <TextBlock x:Name="ConnectionStatusTextBlock"
                    FontWeight="Bold"
