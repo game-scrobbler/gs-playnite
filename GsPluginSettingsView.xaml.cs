@@ -6,53 +6,101 @@ using System.Windows.Input;
 using System.Windows.Media;
 
 namespace GsPlugin {
+    /// <summary>
+    /// Interaction logic for GsPluginSettingsView.xaml
+    /// </summary>
     public partial class GsPluginSettingsView : UserControl, INotifyPropertyChanged {
         private GsPluginSettingsViewModel _viewModel;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
+        #region Constructor
+        public GsPluginSettingsView() {
+            InitializeComponent();
+            InitializeEventHandlers();
+        }
+
+        /// <summary>
+        /// Sets up event handlers for the view lifecycle.
+        /// </summary>
+        private void InitializeEventHandlers() {
+            Loaded += GsPluginSettingsView_Loaded;
+            Unloaded += GsPluginSettingsView_Unloaded;
+
+            // Subscribe to static linking status changes
+            GsPluginSettingsViewModel.LinkingStatusChanged += OnLinkingStatusChanged;
+        }
+        #endregion
+
         protected virtual void OnPropertyChanged(string propertyName = null) {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        public GsPluginSettingsView() {
-            InitializeComponent();
-            Loaded += GsPluginSettingsView_Loaded;
-            Unloaded += GsPluginSettingsView_Unloaded;
-
-            // Subscribe to static linking status changed event
-            GsPluginSettingsViewModel.LinkingStatusChanged += OnLinkingStatusChanged;
-        }
-
+        #region View Lifecycle Events
+        /// <summary>
+        /// Handles cleanup when the view is unloaded.
+        /// </summary>
         private void GsPluginSettingsView_Unloaded(object sender, RoutedEventArgs e) {
             // Unsubscribe from events to prevent memory leaks
             GsPluginSettingsViewModel.LinkingStatusChanged -= OnLinkingStatusChanged;
+
+            if (_viewModel != null) {
+                _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+
+                if (_viewModel.Settings != null) {
+                    _viewModel.Settings.PropertyChanged -= Settings_PropertyChanged;
+                }
+            }
         }
 
+        /// <summary>
+        /// Handles initialization when the view is loaded.
+        /// </summary>
+        private void GsPluginSettingsView_Loaded(object sender, RoutedEventArgs e) {
+            InitializeViewData();
+            SetupViewModelBinding();
+        }
+
+        /// <summary>
+        /// Initializes view-specific data that doesn't depend on the view model.
+        /// </summary>
+        private void InitializeViewData() {
+            // Display the installation ID
+            IDTextBlock.Text = GsDataManager.Data.InstallID;
+        }
+
+        /// <summary>
+        /// Sets up data binding and event subscriptions with the view model.
+        /// </summary>
+        private void SetupViewModelBinding() {
+            _viewModel = DataContext as GsPluginSettingsViewModel;
+            if (_viewModel != null) {
+                // Subscribe to view model property changes
+                _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+
+                // Initialize UI state
+                UpdateConnectionStatus();
+                UpdateLinkingState();
+            }
+        }
+        #endregion
+
+        /// <summary>
+        /// Handles changes to the linking status from external sources.
+        /// </summary>
         private void OnLinkingStatusChanged(object sender, EventArgs e) {
-            // Update the UI when linking status changes
+            // Ensure UI updates happen on the UI thread
             Dispatcher.Invoke(() => {
                 UpdateConnectionStatus();
             });
         }
 
-        private void GsPluginSettingsView_Loaded(object sender, RoutedEventArgs e) {
-            // Find the TextBlock by name and update its text
-            IDTextBlock.Text = GsDataManager.Data.InstallID;
-
-            // Get the view model from DataContext
-            _viewModel = DataContext as GsPluginSettingsViewModel;
-            if (_viewModel != null) {
-                // Subscribe to property changes to update UI
-                _viewModel.PropertyChanged += ViewModel_PropertyChanged;
-                UpdateConnectionStatus();
-                UpdateLinkingState();
-            }
-        }
-
-        private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e) {
-            // ConnectionStatus is now static, so we don't need to listen for property changes
+        /// <summary>
+        /// Handles property changes on the main view model.
+        /// </summary>
+        private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e) {
             if (e.PropertyName == "Settings") {
+                // Subscribe to the new settings object property changes
                 var settings = _viewModel?.Settings;
                 if (settings != null) {
                     settings.PropertyChanged += Settings_PropertyChanged;
@@ -60,65 +108,100 @@ namespace GsPlugin {
             }
         }
 
-        private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e) {
-            if (e.PropertyName == nameof(GsPluginSettings.IsLinking)) {
-                UpdateLinkingState();
-                // When linking state changes, also check if connection status changed
-                if (!_viewModel.Settings.IsLinking) {
-                    UpdateConnectionStatus();
-                }
-            }
-            else if (e.PropertyName == nameof(GsPluginSettings.LinkStatusMessage)) {
-                UpdateStatusMessage();
+        /// <summary>
+        /// Handles property changes on the settings object.
+        /// </summary>
+        private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e) {
+            switch (e.PropertyName) {
+                case nameof(GsPluginSettings.IsLinking):
+                    UpdateLinkingState();
+                    // Also check connection status when linking completes
+                    if (!_viewModel.Settings.IsLinking) {
+                        UpdateConnectionStatus();
+                    }
+                    break;
+
+                case nameof(GsPluginSettings.LinkStatusMessage):
+                    UpdateStatusMessage();
+                    break;
             }
         }
+
+        #region UI Update Methods
+        /// <summary>
+        /// Updates the connection status display and related UI elements.
+        /// </summary>
         private void UpdateConnectionStatus() {
-            // Update using static properties
+            // Update status text and color
             ConnectionStatusTextBlock.Text = GsPluginSettingsViewModel.ConnectionStatus;
             ConnectionStatusTextBlock.Foreground = GsPluginSettingsViewModel.IsLinked
                 ? new SolidColorBrush(Colors.Green)
                 : new SolidColorBrush(Colors.Red);
 
-            // Update the visibility of linking controls directly
+            // Show/hide linking controls based on connection status
             LinkingControlsGrid.Visibility = GsPluginSettingsViewModel.ShowLinkingControls
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
 
+        /// <summary>
+        /// Updates the UI state during linking operations.
+        /// </summary>
         private void UpdateLinkingState() {
-            if (_viewModel?.Settings != null) {
-                bool isLinking = _viewModel.Settings.IsLinking;
-                TokenTextBox.IsEnabled = !isLinking;
-                LinkAccountButton.IsEnabled = !isLinking;
-                LinkAccountButton.Content = isLinking ? "Linking..." : "Link Account";
-            }
+            if (_viewModel?.Settings == null) return;
+
+            bool isLinking = _viewModel.Settings.IsLinking;
+            // Disable controls during linking
+            TokenTextBox.IsEnabled = !isLinking;
+            LinkAccountButton.IsEnabled = !isLinking;
+            // Update button text
+            LinkAccountButton.Content = isLinking ? "Linking..." : "Link Account";
         }
 
+        /// <summary>
+        /// Updates the status message display.
+        /// </summary>
         private void UpdateStatusMessage() {
-            if (_viewModel?.Settings != null) {
-                string message = _viewModel.Settings.LinkStatusMessage;
-                LinkStatusTextBlock.Text = message;
-                LinkStatusTextBlock.Visibility = string.IsNullOrEmpty(message)
-                    ? Visibility.Collapsed
-                    : Visibility.Visible;
-            }
-        }
+            if (_viewModel?.Settings == null) return;
 
+            string message = _viewModel.Settings.LinkStatusMessage;
+            LinkStatusTextBlock.Text = message;
+            LinkStatusTextBlock.Visibility = string.IsNullOrEmpty(message)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+        #endregion
+
+         #region User Interaction Handlers
+        /// <summary>
+        /// Handles the link account button click event.
+        /// </summary>
         private void LinkAccount_Click(object sender, RoutedEventArgs e) {
             _viewModel?.LinkAccount();
         }
 
+        /// <summary>
+        /// Handles clicking on text blocks to copy their content to clipboard.
+        /// </summary>
         private void TextBlock_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) {
-            if (sender is TextBlock textBlock) {
-                try {
-                    // Copy text to clipboard
-                    Clipboard.SetText(textBlock.Text);
-                    MessageBox.Show("Text copied to clipboard!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex) {
-                    MessageBox.Show($"Failed to copy text: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+            if (!(sender is TextBlock textBlock)) return;
+
+            try {
+                Clipboard.SetText(textBlock.Text);
+                MessageBox.Show(
+                    "Text copied to clipboard!",
+                    "Success",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex) {
+                MessageBox.Show(
+                    $"Failed to copy text: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
+        #endregion
     }
 }
