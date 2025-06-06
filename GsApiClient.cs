@@ -49,7 +49,8 @@ namespace GsPlugin {
                 $"{_apiBaseUrl}/api/playnite/scrobble/start", startData);
 
             if (response == null || string.IsNullOrEmpty(response.session_id)) {
-                GsLogger.Error("Failed to get valid session ID from start session response");                CaptureSentryMessage("Invalid session response", SentryLevel.Error, startData.game_name, startData.user_id);
+                GsLogger.Error("Failed to get valid session ID from start session response");
+                CaptureSentryMessage("Invalid session response", SentryLevel.Error, startData.game_name, startData.user_id);
             }
 
             return response;
@@ -137,7 +138,7 @@ namespace GsPlugin {
         /// <summary>
         /// Helper method to capture HTTP-related exceptions with consistent context.
         /// </summary>
-        private void CaptureHttpException(Exception exception, string url, string requestBody, HttpResponseMessage response = null, string responseBody = null) {
+        private static void CaptureHttpException(Exception exception, string url, string requestBody, HttpResponseMessage response = null, string responseBody = null) {
             SentrySdk.CaptureException(exception, scope => {
                 scope.SetExtra("RequestUrl", url);
                 scope.SetExtra("RequestBody", requestBody);
@@ -146,7 +147,7 @@ namespace GsPlugin {
             });
         }
 
-        private void CaptureSentryMessage(string message, SentryLevel level, string gameName = null, string userId = null, string sessionId = null) {
+        private static void CaptureSentryMessage(string message, SentryLevel level, string gameName = null, string userId = null, string sessionId = null) {
             SentrySdk.CaptureMessage(message, scope => {
                 scope.Level = level;
                 if (!string.IsNullOrEmpty(gameName)) {

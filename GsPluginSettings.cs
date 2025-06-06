@@ -103,8 +103,7 @@ namespace GsPlugin {
         /// Initializes a new instance of the GsPluginSettingsViewModel.
         /// </summary>
         /// <param name="plugin">The plugin instance for settings persistence.</param>
-        public GsPluginSettingsViewModel(GsPlugin plugin)
-        {
+        public GsPluginSettingsViewModel(GsPlugin plugin) {
             // Store plugin reference for save/load operations
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
             _apiClient = new GsApiClient();
@@ -120,7 +119,8 @@ namespace GsPlugin {
             var savedSettings = _plugin.LoadPluginSettings<GsPluginSettings>();
             if (savedSettings != null) {
                 LoadExistingSettings(savedSettings);
-            } else {
+            }
+            else {
                 CreateDefaultSettings();
             }
             // Subscribe to property changes for UI updates

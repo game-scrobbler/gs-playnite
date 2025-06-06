@@ -172,7 +172,7 @@ namespace GsPlugin {
         }
         #endregion
 
-         #region User Interaction Handlers
+        #region User Interaction Handlers
         /// <summary>
         /// Handles the link account button click event.
         /// </summary>

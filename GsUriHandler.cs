@@ -254,7 +254,7 @@ namespace GsPlugin {
         /// Logs the linking attempt with partial token for security.
         /// </summary>
         /// <param name="token">The linking token</param>
-        private void LogLinkingAttempt(string token) {
+        private static void LogLinkingAttempt(string token) {
             GsLogger.Info($"Processing automatic linking with token: {token.Substring(0, Math.Min(8, token.Length))}...");
 
             SentrySdk.AddBreadcrumb(

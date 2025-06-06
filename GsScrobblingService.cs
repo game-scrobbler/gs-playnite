@@ -25,7 +25,7 @@ namespace GsPlugin {
         /// <summary>
         /// Manually clears the active session ID. Use with caution.
         /// </summary>
-        private void ClearActiveSession() {
+        private static void ClearActiveSession() {
             if (!string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
                 _logger.Info("Manually clearing active session ID");
                 GsDataManager.Data.ActiveSessionId = null;
@@ -37,7 +37,7 @@ namespace GsPlugin {
         /// Sets the active session ID and persists it to storage.
         /// </summary>
         /// <param name="sessionId">The session ID to set as active.</param>
-        private void SetActiveSession(string sessionId) {
+        private static void SetActiveSession(string sessionId) {
             if (string.IsNullOrEmpty(sessionId)) {
                 _logger.Warn("Attempted to set empty or null session ID");
                 return;
@@ -53,7 +53,7 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="isLinked">Whether the user account is linked</param>
         /// <param name="userId">The linked user ID, or null if not linked</param>
-        private void SetLinkedUser(bool isLinked, string userId = null) {
+        private static void SetLinkedUser(bool isLinked, string userId = null) {
             var oldState = GsDataManager.Data.IsLinked;
             var oldId = GsDataManager.Data.LinkedUserId;
 
