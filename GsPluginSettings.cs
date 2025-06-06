@@ -247,7 +247,8 @@ namespace GsPlugin {
                     Settings.LinkStatusMessage = "Successfully linked account!";
                     Settings.LinkToken = "";
                     OnLinkingStatusChanged();
-                } else {
+                }
+                else {
                     Settings.LinkStatusMessage = result.ErrorMessage;
                 }
             }
@@ -255,7 +256,7 @@ namespace GsPlugin {
                 Settings.LinkStatusMessage = $"Error: {ex.Message}";
             }
             finally {
-                 Settings.IsLinking = false;
+                Settings.IsLinking = false;
             }
         }
 

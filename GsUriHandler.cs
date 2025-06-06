@@ -93,11 +93,11 @@ namespace GsPlugin {
                 var result = await _linkingService.LinkAccountAsync(token, LinkingContext.AutomaticUri);
 
                 if (result.Success) {
-                    _playniteApi.Dialogs.ShowMessage($"Account successfully linked!\nUser ID: {result.UserId}", "Account Linking Success", MessageBoxButton.OK,MessageBoxImage.Information
+                    _playniteApi.Dialogs.ShowMessage($"Account successfully linked!\nUser ID: {result.UserId}", "Account Linking Success", MessageBoxButton.OK, MessageBoxImage.Information
                     );
                 }
                 else {
-                    _playniteApi.Dialogs.ShowMessage($"Account linking failed: {result.ErrorMessage}","Account Linking Failed", MessageBoxButton.OK,MessageBoxImage.Error);
+                    _playniteApi.Dialogs.ShowMessage($"Account linking failed: {result.ErrorMessage}", "Account Linking Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             catch (Exception ex) {
@@ -139,14 +139,14 @@ namespace GsPlugin {
         /// Handles invalid URI format scenario.
         /// </summary>
         /// <param name="argumentCount">Number of arguments received</param>
-        private void HandleInvalidUriFormat(int argumentCount) {
+        private static void HandleInvalidUriFormat(int argumentCount) {
             GsLogger.Warn($"Invalid URI format. Expected 'link/[token]', received {argumentCount} arguments");
         }
 
         /// <summary>
         /// Shows a dialog indicating that linking is in progress.
         /// </summary>
-        private void ShowLinkingInProgressDialog() {
+        private static void ShowLinkingInProgressDialog() {
             // Note: This is a fire-and-forget notification
             // In a production environment, you might want to show a proper progress dialog
             GsLogger.Info("Account linking initiated via URI handler");

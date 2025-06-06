@@ -34,7 +34,7 @@ namespace GsPlugin {
             // Initialize API client
             _apiClient = new GsApiClient();
 
-             // Initialize centralized account linking service
+            // Initialize centralized account linking service
             _linkingService = new GsAccountLinkingService(_apiClient);
 
             // Create settings with linking service dependency
