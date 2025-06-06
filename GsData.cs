@@ -48,52 +48,28 @@ namespace GsPlugin {
         /// and pass in your plugin's user data folder.
         /// </summary>
         /// <param name="folderPath">The folder path where the custom data file will be stored.</param>
+        /// <param name="oldID">Legacy parameter - no longer used as InstallID is exclusively managed by GsData.</param>
         public static void Initialize(string folderPath, string oldID) {
             _filePath = Path.Combine(folderPath, "gs_data.json");
             _data = Load();
 
             try {
                 if (string.IsNullOrEmpty(_data.InstallID)) {
-                    if (!string.IsNullOrEmpty(oldID)) {
-                        // Migrate InstallID from settings to GsData
-                        _data.InstallID = oldID;
-                        GsLogger.Info("Migrated InstallID from settings to GsData");
-                        SentrySdk.AddBreadcrumb(
-                            message: "Migrated InstallID from settings",
-                            category: "migration",
-                            data: new Dictionary<string, string> { { "InstallID", oldID } }
-                        );
-                    }
-                    else {
-                        // Generate new InstallID only if both GsData and settings are empty
-                        _data.InstallID = Guid.NewGuid().ToString();
-                        GsLogger.Info("Generated new InstallID");
-                        SentrySdk.AddBreadcrumb(
-                            message: "Generated new InstallID",
-                            category: "initialization",
-                            data: new Dictionary<string, string> { { "InstallID", _data.InstallID } }
-                        );
-                    }
+                    // Generate new InstallID if not present
+                    _data.InstallID = Guid.NewGuid().ToString();
+                    GsLogger.Info("Generated new InstallID");
+                    SentrySdk.AddBreadcrumb(
+                        message: "Generated new InstallID",
+                        category: "initialization",
+                        data: new Dictionary<string, string> { { "InstallID", _data.InstallID } }
+                    );
                     Save();
                 }
-                else if (!string.IsNullOrEmpty(oldID) && _data.InstallID != oldID) {
-                    // Log potential InstallID mismatch
-                    GsLogger.Warn($"InstallID mismatch - GsData: {_data.InstallID}, Settings: {oldID}");
-                    SentrySdk.CaptureMessage(
-                        "InstallID mismatch detected",
-                        scope => {
-                            scope.Level = SentryLevel.Warning;
-                            scope.SetExtra("GsDataInstallID", _data.InstallID);
-                            scope.SetExtra("SettingsInstallID", oldID);
-                        }
-                    );
-                }
-            }
-            catch (Exception ex) {
+            }            catch (Exception ex) {
                 GsLogger.Error("Failed to initialize GsData", ex);
                 SentrySdk.CaptureException(ex);
-                // Fallback to oldID or new GUID if initialization fails
-                _data.InstallID = oldID ?? Guid.NewGuid().ToString();
+                // Fallback to new GUID if initialization fails
+                _data.InstallID = Guid.NewGuid().ToString();
                 Save();
             }
         }

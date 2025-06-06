@@ -17,12 +17,6 @@ namespace GsPlugin {
             set => SetValue(ref _theme, value);
         }
 
-        /// <summary>
-        /// Unique installation identifier preserved across upgrades.
-        /// Stored in both settings and GSData for redundancy.
-        /// </summary>
-        public string InstallID { get; set; }
-
         private bool _disableSentry = false;
         public bool DisableSentry {
             get => _disableSentry;
@@ -76,7 +70,6 @@ namespace GsPlugin {
         private GsPluginSettings _editingClone;
         private GsPluginSettings _settings;
 
-        public string InstallID { get; set; }
         public GsPluginSettings Settings {
             get => _settings;
             set {
@@ -134,19 +127,17 @@ namespace GsPlugin {
         /// </summary>
         private void LoadExistingSettings(GsPluginSettings savedSettings) {
             Settings = savedSettings;
-            InstallID = savedSettings.InstallID;
 
             // Log successful load for debugging
             SentrySdk.AddBreadcrumb(
                 message: "Successfully loaded plugin settings",
                 category: "settings",
                 data: new Dictionary<string, string> {
-                    { "InstallID", InstallID },
                     { "Theme", savedSettings.Theme }
                 }
             );
 
-            GsLogger.ShowDebugInfoBox($"Loaded saved settings:\nInstallID: {InstallID}\nTheme: {savedSettings.Theme}", "Debug - Settings Loaded");
+            GsLogger.ShowDebugInfoBox($"Loaded saved settings:\nTheme: {savedSettings.Theme}", "Debug - Settings Loaded");
         }
 
         /// <summary>
@@ -182,7 +173,7 @@ namespace GsPlugin {
         /// </summary>
         public void CancelEdit() {
             Settings = _editingClone;
-            GsLogger.ShowDebugInfoBox($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}", "Debug - Edit Cancelled");
+            GsLogger.ShowDebugInfoBox($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}", "Debug - Edit Cancelled");
         }
 
         /// <summary>

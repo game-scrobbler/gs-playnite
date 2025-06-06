@@ -20,7 +20,8 @@ namespace MySidebarPlugin {
             await MyWebView2.EnsureCoreWebView2Async();
 
             // Now you can navigate to a URL directly.
-            string userId = GsDataManager.Data.InstallID; // Or get it from plugin settings
+            string userId = GsDataManager.Data.InstallID;
+
             string theme = GsDataManager.Data.Theme.ToLower();
             GsLogger.ShowDebugInfoBox($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}");
             string url = $"https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}&theme={theme}";

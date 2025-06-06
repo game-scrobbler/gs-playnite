@@ -29,6 +29,9 @@ namespace GsPlugin {
             // Initialize API client
             _apiClient = new GsApiClient();
 
+            // Initialize GsDataManager - no migration needed since InstallID is now only in GsData
+            GsDataManager.Initialize(GetPluginUserDataPath(), null);
+
             // Initialize centralized account linking service
             _linkingService = new GsAccountLinkingService(_apiClient, api);
 
@@ -38,8 +41,6 @@ namespace GsPlugin {
                 HasSettings = true
             };
 
-            // Initialize GsDataManager first
-            GsDataManager.Initialize(GetPluginUserDataPath(), _settings.InstallID);
 
             // Initialize scrobbling services
             _scrobblingService = new GsScrobblingService(_apiClient);
