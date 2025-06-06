@@ -28,7 +28,7 @@
     <StackPanel Margin="20">
 
         <!-- Installation ID Section -->
-        <TextBlock Text="Your GS ID" Style="{StaticResource SectionHeaderStyle}"/>
+        <TextBlock Text="Your Installation ID" Style="{StaticResource SectionHeaderStyle}"/>
         <TextBlock x:Name="IDTextBlock"
                    Foreground="White"
                    Background="#FF464141"
