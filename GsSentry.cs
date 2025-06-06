@@ -18,7 +18,7 @@ namespace GsPlugin {
                 _logger.Info("Initializing Sentry error tracking");
 
                 // Set sampling rates based on user preference
-                bool disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry");
+                bool disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry", StringComparison.OrdinalIgnoreCase);
 
                 SentrySdk.Init(options => {
                     // A Sentry Data Source Name (DSN) is required.
@@ -85,7 +85,7 @@ namespace GsPlugin {
         /// <param name="level">The severity level of the message.</param>
         public static void CaptureMessage(string message, SentryLevel level = SentryLevel.Info) {
             // Skip if Sentry is disabled
-            if (GsDataManager.Data.Flags.Contains("no-sentry")) {
+            if (GsDataManager.Data.Flags.Contains("no-sentry", StringComparison.OrdinalIgnoreCase)) {
                 return;
             }
 
@@ -103,7 +103,7 @@ namespace GsPlugin {
         /// <param name="message">An optional message describing the context of the exception.</param>
         public static void CaptureException(Exception exception, string message = null) {
             // Skip if Sentry is disabled
-            if (GsDataManager.Data.Flags.Contains("no-sentry")) {
+            if (GsDataManager.Data.Flags.Contains("no-sentry", StringComparison.OrdinalIgnoreCase)) {
                 return;
             }
 
