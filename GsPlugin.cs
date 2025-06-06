@@ -1,15 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Controls;
 using MySidebarPlugin;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
-using Sentry;
 
 namespace GsPlugin {
 
@@ -35,7 +30,7 @@ namespace GsPlugin {
             _apiClient = new GsApiClient();
 
             // Initialize centralized account linking service
-            _linkingService = new GsAccountLinkingService(_apiClient);
+            _linkingService = new GsAccountLinkingService(_apiClient, api);
 
             // Create settings with linking service dependency
             _settings = new GsPluginSettingsViewModel(this, _linkingService);

@@ -75,7 +75,7 @@ namespace GsPlugin {
         /// Handles the game starting event and initiates a new scrobbling session.
         /// </summary>
         /// <param name="args">Event arguments containing game information.</param>
-        public async Task OnGameStartAsync(OnGameStartEventArgs args) {
+        public async Task OnGameStartAsync(OnGameStartingEventArgs args) {
             try {
                 // Skip scrobbling if disabled
                 if (GsDataManager.Data.Flags.Contains("no-scrobble")) {

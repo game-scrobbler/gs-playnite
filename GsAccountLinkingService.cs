@@ -111,7 +111,7 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="token">The token to validate</param>
         /// <returns>True if token is valid, false otherwise</returns>
-        public bool ValidateToken(string token) {
+        public static bool ValidateToken(string token) {
             return !string.IsNullOrWhiteSpace(token);
         }
 
@@ -119,7 +119,7 @@ namespace GsPlugin {
         /// Checks if account linking can proceed (i.e., not already linked or user confirms relinking).
         /// </summary>
         /// <returns>True if linking can proceed, false otherwise</returns>
-        public bool CanProceedWithLinking() {
+        public static bool CanProceedWithLinking() {
             return !GsDataManager.Data.IsLinked;
         }
 
@@ -146,7 +146,7 @@ namespace GsPlugin {
         /// Updates the linking state in persistent storage.
         /// </summary>
         /// <param name="userId">The linked user ID</param>
-        private void UpdateLinkingState(string userId) {
+        private static void UpdateLinkingState(string userId) {
             GsDataManager.Data.IsLinked = true;
             GsDataManager.Data.LinkedUserId = userId;
             GsDataManager.Save();
@@ -160,7 +160,7 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="token">The linking token</param>
         /// <param name="context">The linking context</param>
-        private void LogLinkingAttempt(string token, LinkingContext context) {
+        private static void LogLinkingAttempt(string token, LinkingContext context) {
             string maskedToken = token.Substring(0, Math.Min(8, token.Length)) + "...";
             GsLogger.Info($"Starting {context} account linking with token: {maskedToken}");
 
@@ -180,7 +180,7 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="userId">The linked user ID</param>
         /// <param name="context">The linking context</param>
-        private void LogSuccessfulLinking(string userId, LinkingContext context) {
+        private static void LogSuccessfulLinking(string userId, LinkingContext context) {
             GsLogger.Info($"Account successfully linked via {context} to User ID: {userId}");
 
             SentrySdk.AddBreadcrumb(
@@ -199,7 +199,7 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="errorMessage">The error message</param>
         /// <param name="context">The linking context</param>
-        private void LogFailedLinking(string errorMessage, LinkingContext context) {
+        private static void LogFailedLinking(string errorMessage, LinkingContext context) {
             GsLogger.Error($"{context} linking failed: {errorMessage}");
 
             SentrySdk.CaptureMessage(
@@ -217,7 +217,7 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="ex">The exception that occurred</param>
         /// <param name="context">The linking context</param>
-        private void LogLinkingException(Exception ex, LinkingContext context) {
+        private static void LogLinkingException(Exception ex, LinkingContext context) {
             GsLogger.Error($"Exception during {context} linking", ex);
             SentrySdk.CaptureException(ex, scope => {
                 scope.SetExtra("Context", context.ToString());

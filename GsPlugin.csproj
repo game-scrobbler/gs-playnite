@@ -109,6 +109,7 @@
     <Compile Include="GsPlugin.cs" />
     <Compile Include="GsPluginSettings.cs" />
     <Compile Include="GsScrobblingService.cs" />
+    <Compile Include="GsAccountLinkingService.cs" />
     <Compile Include="GsSentry.cs" />
     <Compile Include="GsUriHandler.cs" />
     <Compile Include="GsPluginSettingsView.xaml.cs">

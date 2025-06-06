@@ -5,8 +5,6 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
 using Playnite.SDK;
 using Sentry;
 

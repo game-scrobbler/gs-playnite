@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Data;
-using System.Windows;
 using Sentry;
 
 namespace GsPlugin {
