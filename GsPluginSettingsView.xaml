@@ -59,7 +59,7 @@
                    TextWrapping="Wrap">
             <Run Text="Tip: To own and persist your GS data, link your plugin installation to your GS account via "
                  Foreground="LightBlue"/>
-            <Hyperlink NavigateUri="https://gamescrobbler.com"
+            <Hyperlink NavigateUri="https://gamescrobbler.com?utm_source=playnite_plugin&amp;utm_medium=settings_page&amp;utm_campaign=account_linking&amp;utm_content=hint_text"
                        RequestNavigate="Hyperlink_RequestNavigate"
                        Foreground="CornflowerBlue">
                 <Run Text="gamescrobbler.com"/>
