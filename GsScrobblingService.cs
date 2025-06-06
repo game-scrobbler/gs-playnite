@@ -86,7 +86,7 @@ namespace GsPlugin {
                 DateTime localDate = DateTime.Now;
                 var startedGame = args.Game;
                 _logger.Info($"Starting scrobble session for game: {startedGame.Name}");
-                var sessionData = await _apiClient.StartGameSession({
+                var sessionData = await _apiClient.StartGameSession(new GsApiClient.ScrobbleStartReq {
                     user_id = GsDataManager.Data.InstallID,
                     game_name = startedGame.Name,
                     game_id = startedGame.Id.ToString(),
@@ -124,7 +124,7 @@ namespace GsPlugin {
                 DateTime localDate = DateTime.Now;
                 var stoppedGame = args.Game;
                 _logger.Info($"Stopping scrobble session for game: {stoppedGame.Name}");
-                var finishResponse = await _apiClient.FinishGameSession({
+                var finishResponse = await _apiClient.FinishGameSession(new GsApiClient.ScrobbleFinishReq {
                     user_id = GsDataManager.Data.InstallID,
                     game_name = stoppedGame.Name,
                     game_id = stoppedGame.Id.ToString(),
@@ -163,7 +163,7 @@ namespace GsPlugin {
 
                 _logger.Info("Application stopping with active session, finishing scrobble session");
                 DateTime localDate = DateTime.Now;
-                var finishResponse = await _apiClient.FinishGameSession({
+                var finishResponse = await _apiClient.FinishGameSession(new GsApiClient.ScrobbleFinishReq {
                     user_id = GsDataManager.Data.InstallID,
                     session_id = GsDataManager.Data.ActiveSessionId,
                     metadata = new { reason = "application_stopped" },
@@ -190,7 +190,7 @@ namespace GsPlugin {
             try {
                 _logger.Info("Starting library sync with GameScrobbler API");
                 var library = playniteDatabaseGames.ToList();
-                var syncResponse = await _apiClient.SyncLibrary({
+                var syncResponse = await _apiClient.SyncLibrary(new GsApiClient.LibrarySyncReq {
                     user_id = GsDataManager.Data.InstallID,
                     library = library,
                     flags = GsDataManager.Data.Flags
