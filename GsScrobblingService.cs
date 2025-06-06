@@ -49,25 +49,29 @@ namespace GsPlugin {
         }
 
         /// <summary>
-        /// Sets the linked user state and persists it to storage.
+        /// Sets the linked user information in the data manager.
         /// </summary>
-        /// <param name="isLinked">Whether the user account is linked</param>
         /// <param name="userId">The linked user ID, or null if not linked</param>
-        private static void SetLinkedUser(bool isLinked, string userId = null) {
-            var oldState = GsDataManager.Data.IsLinked;
+        private static void SetLinkedUser(string userId = null) {
+            bool oldLinked = !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
             var oldId = GsDataManager.Data.LinkedUserId;
 
-            GsDataManager.Data.IsLinked = isLinked;
-            GsDataManager.Data.LinkedUserId = userId;
+            // Only set LinkedUserId if it's a valid ID (not "not_linked")
+            if (userId == "not_linked" || string.IsNullOrEmpty(userId)) {
+                GsDataManager.Data.LinkedUserId = null;
+            } else {
+                GsDataManager.Data.LinkedUserId = userId;
+            }
             GsDataManager.Save();
 
             // Log state changes
-            if (oldState != isLinked) {
-                _logger.Info($"User link status changed: {oldState} -> {isLinked}");
+            bool newLinked = !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
+            if (oldLinked != newLinked) {
+                _logger.Info($"User link status changed: {oldLinked} -> {newLinked}");
             }
 
-            if (oldId != userId) {
-                _logger.Info($"Linked user ID changed: {oldId ?? "null"} -> {userId ?? "null"}");
+            if (oldId != GsDataManager.Data.LinkedUserId) {
+                _logger.Info($"Linked user ID changed: {oldId ?? "null"} -> {GsDataManager.Data.LinkedUserId ?? "null"}");
             }
         }
 
@@ -197,7 +201,7 @@ namespace GsPlugin {
                 });
                 if (syncResponse != null) {
                     // Update linked status based on API response
-                    SetLinkedUser(syncResponse.status != "not_linked", syncResponse.userId);
+                    SetLinkedUser(syncResponse.userId);
                     _logger.Info($"Library sync completed: {syncResponse.result.added} added, {syncResponse.result.updated} updated.");
                     return true;
                 }

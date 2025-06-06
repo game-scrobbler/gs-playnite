@@ -88,11 +88,10 @@ namespace GsPlugin {
             if (GsDataManager.Data.Flags.Contains("no-sentry")) {
                 return;
             }
-
             SentrySdk.CaptureMessage(message, scope => {
                 scope.Level = level;
                 scope.SetTag("installId", GsDataManager.Data.InstallID);
-                scope.SetTag("isLinked", GsDataManager.Data.IsLinked.ToString());
+                scope.SetTag("LinkedUserId", GsDataManager.Data.LinkedUserId);
             });
         }
 
@@ -109,7 +108,7 @@ namespace GsPlugin {
 
             SentrySdk.CaptureException(exception, scope => {
                 scope.SetTag("installId", GsDataManager.Data.InstallID);
-                scope.SetTag("isLinked", GsDataManager.Data.IsLinked.ToString());
+                scope.SetTag("LinkedUserId", GsDataManager.Data.LinkedUserId);
 
                 if (!string.IsNullOrEmpty(message)) {
                     scope.SetExtra("contextMessage", message);

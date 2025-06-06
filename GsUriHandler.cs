@@ -63,7 +63,8 @@ namespace GsPlugin {
                     }
 
                     // Check if already linked and get user confirmation if needed
-                    if (GsDataManager.Data.IsLinked && !_linkingService.ShouldProceedWithRelinking()) {
+                    bool isLinked = !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
+                    if (isLinked && !_linkingService.ShouldProceedWithRelinking()) {
                         return;
                     }
 

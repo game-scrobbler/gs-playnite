@@ -13,7 +13,6 @@ namespace GsPlugin {
         public string ActiveSessionId { get; set; } = null;
         public string Theme { get; set; } = "Dark";
         public List<string> Flags { get; set; } = new List<string>();
-        public bool IsLinked { get; set; } = false;
         public string LinkedUserId { get; set; } = null;
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling) {

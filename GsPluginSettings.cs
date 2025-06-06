@@ -79,7 +79,7 @@ namespace GsPlugin {
         }
 
         public List<string> AvailableThemes { get; set; }
-        public static bool IsLinked => GsDataManager.Data.IsLinked;
+        public static bool IsLinked => !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
         public static string ConnectionStatus => IsLinked
             ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
             : "Disconnected";

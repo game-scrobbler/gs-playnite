@@ -121,7 +121,7 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>True if linking can proceed, false otherwise</returns>
         public static bool CanProceedWithLinking() {
-            return !GsDataManager.Data.IsLinked;
+            return string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) || GsDataManager.Data.LinkedUserId == "not_linked";
         }
 
         /// <summary>
@@ -129,7 +129,7 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>True if the user wants to proceed, false otherwise</returns>
         public bool ShouldProceedWithRelinking() {
-            if (!GsDataManager.Data.IsLinked) {
+            if (string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) || GsDataManager.Data.LinkedUserId == "not_linked") {
                 return true;
             }
 
@@ -148,8 +148,12 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="userId">The linked user ID</param>
         private static void UpdateLinkingState(string userId) {
-            GsDataManager.Data.IsLinked = true;
-            GsDataManager.Data.LinkedUserId = userId;
+            // Only set LinkedUserId if it's a valid ID (not "not_linked")
+            if (userId == "not_linked" || string.IsNullOrEmpty(userId)) {
+                GsDataManager.Data.LinkedUserId = null;
+            } else {
+                GsDataManager.Data.LinkedUserId = userId;
+            }
             GsDataManager.Save();
 
             // Notify listeners of status change
@@ -236,7 +240,8 @@ namespace GsPlugin {
         /// Gets the current connection status for display.
         /// </summary>
         public static string GetConnectionStatus() {
-            return GsDataManager.Data.IsLinked
+            bool isLinked = !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
+            return isLinked
                 ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
                 : "Disconnected";
         }
@@ -244,7 +249,7 @@ namespace GsPlugin {
         /// <summary>
         /// Gets whether the account is currently linked.
         /// </summary>
-        public static bool IsLinked => GsDataManager.Data.IsLinked;
+        public static bool IsLinked => !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
 
     }
 }
