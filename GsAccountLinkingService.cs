@@ -79,30 +79,66 @@ namespace GsPlugin {
                 return LinkingResult.CreateError("Please enter a valid token", context);
             }
 
-            // Log linking attempt
-            LogLinkingAttempt(token, context);
+            GsLogger.Info($"Starting {context} account linking.");
+            SentrySdk.AddBreadcrumb(
+                message: $"Starting {context} account linking",
+                category: "linking",
+                data: new Dictionary<string, string> {
+                    { "Context", context.ToString() },
+                    { "TokenLength", token.Length.ToString() },
+                    { "InstallID", GsDataManager.Data.InstallID }
+                }
+            );
 
             try {
                 // Verify token with API
                 var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
+                // log the response
+                GsLogger.ShowDebugInfoBox($"!!!!Linking response: {response}", "Debug - Linking Response");
 
                 if (response != null && response.status == "success") {
-                    // Update linking state
-                    UpdateLinkingState(response.userId);
+                    if (response.userId == "not_linked" || string.IsNullOrEmpty(response.userId)) {
+                        GsDataManager.Data.LinkedUserId = null;
+                    } else {
+                        GsDataManager.Data.LinkedUserId = response.userId;
+                    }
+                    GsDataManager.Save();
+                    // Notify listeners of status change
+                    OnLinkingStatusChanged();
 
-                    // Log successful linking
-                    LogSuccessfulLinking(response.userId, context);
+                   GsLogger.Info($"Account successfully linked via {context} to User ID: {response.userId}");
+
+                    SentrySdk.AddBreadcrumb(
+                        message: $"{context} account linking successful",
+                        category: "linking",
+                        data: new Dictionary<string, string> {
+                            { "Context", context.ToString() },
+                            { "UserId", response.userId },
+                            { "InstallID", GsDataManager.Data.InstallID }
+                        }
+                    );
 
                     return LinkingResult.CreateSuccess(response.userId, context);
                 }
                 else {
                     string errorMessage = response?.message ?? "Unknown error occurred during linking";
-                    LogFailedLinking(errorMessage, context);
+                    GsLogger.Error($"{context} linking failed: {errorMessage}");
+                    SentrySdk.CaptureMessage(
+                        $"{context} account linking failed",
+                        scope => {
+                            scope.Level = SentryLevel.Warning;
+                            scope.SetExtra("Context", context.ToString());
+                            scope.SetExtra("ErrorMessage", errorMessage);
+                        }
+                    );
                     return LinkingResult.CreateError(errorMessage, context);
                 }
             }
             catch (Exception ex) {
-                LogLinkingException(ex, context);
+                GsLogger.Error($"Exception during {context} linking", ex);
+                SentrySdk.CaptureException(ex, scope => {
+                    scope.SetExtra("Context", context.ToString());
+                });
                 return LinkingResult.CreateError($"Error during linking: {ex.Message}", context, ex);
             }
         }
@@ -114,14 +150,6 @@ namespace GsPlugin {
         /// <returns>True if token is valid, false otherwise</returns>
         public static bool ValidateToken(string token) {
             return !string.IsNullOrWhiteSpace(token);
-        }
-
-        /// <summary>
-        /// Checks if account linking can proceed (i.e., not already linked or user confirms relinking).
-        /// </summary>
-        /// <returns>True if linking can proceed, false otherwise</returns>
-        public static bool CanProceedWithLinking() {
-            return string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) || GsDataManager.Data.LinkedUserId == "not_linked";
         }
 
         /// <summary>
@@ -144,112 +172,11 @@ namespace GsPlugin {
         }
 
         /// <summary>
-        /// Updates the linking state in persistent storage.
-        /// </summary>
-        /// <param name="userId">The linked user ID</param>
-        private static void UpdateLinkingState(string userId) {
-            // Only set LinkedUserId if it's a valid ID (not "not_linked")
-            if (userId == "not_linked" || string.IsNullOrEmpty(userId)) {
-                GsDataManager.Data.LinkedUserId = null;
-            } else {
-                GsDataManager.Data.LinkedUserId = userId;
-            }
-            GsDataManager.Save();
-
-            // Notify listeners of status change
-            OnLinkingStatusChanged();
-        }
-
-        /// <summary>
-        /// Logs the linking attempt with partial token for security.
-        /// </summary>
-        /// <param name="token">The linking token</param>
-        /// <param name="context">The linking context</param>
-        private static void LogLinkingAttempt(string token, LinkingContext context) {
-            string maskedToken = token.Substring(0, Math.Min(8, token.Length)) + "...";
-            GsLogger.Info($"Starting {context} account linking with token: {maskedToken}");
-
-            SentrySdk.AddBreadcrumb(
-                message: $"Starting {context} account linking",
-                category: "linking",
-                data: new Dictionary<string, string> {
-                    { "Context", context.ToString() },
-                    { "TokenLength", token.Length.ToString() },
-                    { "InstallID", GsDataManager.Data.InstallID }
-                }
-            );
-        }
-
-        /// <summary>
-        /// Logs successful account linking.
-        /// </summary>
-        /// <param name="userId">The linked user ID</param>
-        /// <param name="context">The linking context</param>
-        private static void LogSuccessfulLinking(string userId, LinkingContext context) {
-            GsLogger.Info($"Account successfully linked via {context} to User ID: {userId}");
-
-            SentrySdk.AddBreadcrumb(
-                message: $"{context} account linking successful",
-                category: "linking",
-                data: new Dictionary<string, string> {
-                    { "Context", context.ToString() },
-                    { "UserId", userId },
-                    { "InstallID", GsDataManager.Data.InstallID }
-                }
-            );
-        }
-
-        /// <summary>
-        /// Logs failed account linking.
-        /// </summary>
-        /// <param name="errorMessage">The error message</param>
-        /// <param name="context">The linking context</param>
-        private static void LogFailedLinking(string errorMessage, LinkingContext context) {
-            GsLogger.Error($"{context} linking failed: {errorMessage}");
-
-            SentrySdk.CaptureMessage(
-                $"{context} account linking failed",
-                scope => {
-                    scope.Level = SentryLevel.Warning;
-                    scope.SetExtra("Context", context.ToString());
-                    scope.SetExtra("ErrorMessage", errorMessage);
-                }
-            );
-        }
-
-        /// <summary>
-        /// Logs exceptions during the linking process.
-        /// </summary>
-        /// <param name="ex">The exception that occurred</param>
-        /// <param name="context">The linking context</param>
-        private static void LogLinkingException(Exception ex, LinkingContext context) {
-            GsLogger.Error($"Exception during {context} linking", ex);
-            SentrySdk.CaptureException(ex, scope => {
-                scope.SetExtra("Context", context.ToString());
-            });
-        }
-
-        /// <summary>
         /// Triggers the linking status changed event.
         /// </summary>
         public static void OnLinkingStatusChanged() {
             LinkingStatusChanged?.Invoke(null, EventArgs.Empty);
         }
-
-        /// <summary>
-        /// Gets the current connection status for display.
-        /// </summary>
-        public static string GetConnectionStatus() {
-            bool isLinked = !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
-            return isLinked
-                ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
-                : "Disconnected";
-        }
-
-        /// <summary>
-        /// Gets whether the account is currently linked.
-        /// </summary>
-        public static bool IsLinked => !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
 
     }
 }
