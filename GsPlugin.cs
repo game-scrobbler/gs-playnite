@@ -23,14 +23,15 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="api">Instance of Playnite API to be injected.</param>
         public GsPlugin(IPlayniteAPI api) : base(api) {
+
+            // Initialize GsDataManager
+            GsDataManager.Initialize(GetPluginUserDataPath(), null);
+
             // Initialize Sentry for error tracking
             GsSentry.Initialize();
 
             // Initialize API client
             _apiClient = new GsApiClient();
-
-            // Initialize GsDataManager - no migration needed since InstallID is now only in GsData
-            GsDataManager.Initialize(GetPluginUserDataPath(), null);
 
             // Initialize centralized account linking service
             _linkingService = new GsAccountLinkingService(_apiClient, api);
