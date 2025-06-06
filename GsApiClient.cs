@@ -13,8 +13,13 @@ using Sentry;
 namespace GsPlugin {
     public class GsApiClient {
         private static readonly ILogger _logger = LogManager.GetLogger();
+#if DEBUG
+        private static readonly string _apiBaseUrl = "https://api.stage.gamescrobbler.com";
+        private static readonly string _nextApiBaseUrl = "https://stage.gamescrobbler.com";
+#else
         private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
         private static readonly string _nextApiBaseUrl = "https://gamescrobbler.com";
+#endif
         private readonly HttpClient _httpClient;
         private readonly JsonSerializerOptions _jsonOptions;
 
@@ -25,56 +30,135 @@ namespace GsPlugin {
             };
         }
 
-        public async Task<GameSessionResponse> StartGameSession(TimeTracker startData) {
-            var response = await PostJsonAsync<GameSessionResponse>(
+        #region Game Session Management
+
+        public class ScrobbleStartReq {
+            public string user_id { get; set; }
+            public string game_name { get; set; }
+            public string game_id { get; set; }
+            public object metadata { get; set; }
+            public string started_at { get; set; }
+        }
+
+        public class ScrobbleStartRes {
+            public string session_id { get; set; }
+        }
+
+        public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) {
+            var response = await PostJsonAsync<ScrobbleStartRes>(
                 $"{_apiBaseUrl}/api/playnite/scrobble/start", startData);
 
             if (response == null || string.IsNullOrEmpty(response.session_id)) {
-                GsLogger.Error("Failed to get valid session ID from start session response");
-                SentrySdk.CaptureMessage(
-                    "Invalid session response",
-                    scope => {
-                        scope.Level = SentryLevel.Error;
-                        scope.SetExtra("GameName", startData.game_name);
-                        scope.SetExtra("UserId", startData.user_id);
-                    }
-                );
+                GsLogger.Error("Failed to get valid session ID from start session response");                CaptureSentryMessage("Invalid session response", SentryLevel.Error, startData.game_name, startData.user_id);
             }
 
             return response;
         }
 
-        public async Task<FinishScrobbleResponse> FinishGameSession(TimeTrackerEnd endData) {
+        public class ScrobbleFinishReq {
+            public string user_id { get; set; }
+            public string game_name { get; set; }
+            public string game_id { get; set; }
+            public object metadata { get; set; }
+            public string finished_at { get; set; }
+            public string session_id { get; set; }
+        }
+
+        public class ScrobbleFinishRes {
+            public string status { get; set; }
+        }
+
+        public async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData) {
             if (string.IsNullOrEmpty(endData.session_id)) {
                 GsLogger.Error("Attempted to finish session with null session_id");
-                SentrySdk.CaptureMessage(
-                    "Null session ID in finish request",
-                    scope => {
-                        scope.Level = SentryLevel.Error;
-                        scope.SetExtra("GameName", endData.game_name);
-                        scope.SetExtra("UserId", endData.user_id);
-                    }
-                );
+                CaptureSentryMessage("Null session ID in finish request", SentryLevel.Error, endData.game_name, endData.user_id);
                 return null;
             }
 
-            return await PostJsonAsync<FinishScrobbleResponse>(
+            return await PostJsonAsync<ScrobbleFinishRes>(
                 $"{_apiBaseUrl}/api/playnite/scrobble/finish", endData, true);
         }
 
-        public async Task<SyncResponse> SyncLibrary(LibrarySync librarySync) {
-            return await PostJsonAsync<SyncResponse>(
-                $"{_apiBaseUrl}/api/playnite/sync", librarySync, true);
+        #endregion
+
+        #region Library Synchronization
+
+        public class LibrarySyncReq {
+            public string user_id { get; set; }
+            public List<Playnite.SDK.Models.Game> library { get; set; }
+            public string[] flags { get; set; }
         }
 
-        public async Task<TokenVerificationResponse> VerifyToken(string token, string playniteId) {
-            var payload = new TokenVerificationRequest {
+        public class LibrarySyncRes {
+            public string status { get; set; }
+            public LibrarySyncDetails result { get; set; }
+            // If account not linked yet it will be "not_linked"
+            public string userId { get; set; }
+        }
+
+        public class LibrarySyncDetails {
+            public int added { get; set; }
+            public int updated { get; set; }
+        }
+
+        public async Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq) {
+            return await PostJsonAsync<LibrarySyncRes>(
+                $"{_apiBaseUrl}/api/playnite/sync", librarySyncReq, true);
+        }
+
+        #endregion
+
+        #region Token Verification
+
+        public class TokenVerificationReq {
+            public string token { get; set; }
+            public string playniteId { get; set; }
+        }
+
+        public class TokenVerificationRes {
+            public string status { get; set; }
+            public string message { get; set; }
+            public string userId { get; set; }
+        }
+
+        public async Task<TokenVerificationRes> VerifyToken(string token, string playniteId) {
+            var payload = new TokenVerificationReq {
                 token = token,
                 playniteId = playniteId,
             };
-
-            return await PostJsonAsync<TokenVerificationResponse>(
+            return await PostJsonAsync<TokenVerificationRes>(
                 $"{_nextApiBaseUrl}/api/auth/playnite/verify", payload);
+        }
+
+        #endregion
+
+        #region HTTP Helper Methods
+
+        /// <summary>
+        /// Helper method to capture HTTP-related exceptions with consistent context.
+        /// </summary>
+        private void CaptureHttpException(Exception exception, string url, string requestBody, HttpResponseMessage response = null, string responseBody = null) {
+            SentrySdk.CaptureException(exception, scope => {
+                scope.SetExtra("RequestUrl", url);
+                scope.SetExtra("RequestBody", requestBody);
+                scope.SetExtra("ResponseStatus", response?.StatusCode);
+                scope.SetExtra("ResponseBody", responseBody);
+            });
+        }
+
+        private void CaptureSentryMessage(string message, SentryLevel level, string gameName = null, string userId = null, string sessionId = null) {
+            SentrySdk.CaptureMessage(message, scope => {
+                scope.Level = level;
+                if (!string.IsNullOrEmpty(gameName)) {
+                    scope.SetExtra("GameName", gameName);
+                }
+                if (!string.IsNullOrEmpty(userId)) {
+                    scope.SetExtra("UserId", userId);
+                }
+                if (!string.IsNullOrEmpty(sessionId)) {
+                    scope.SetExtra("SessionId", sessionId);
+                }
+            });
         }
 
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
@@ -88,129 +172,30 @@ namespace GsPlugin {
                     response = await _httpClient.PostAsync(url, content).ConfigureAwait(false);
                     responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-#if DEBUG
                     GsLogger.ShowHTTPDebugBox(
                         requestData: $"URL: {url}\nPayload: {jsonData}",
                         responseData: $"Status: {response.StatusCode}\nBody: {responseBody}");
-#endif
 
                     if (ensureSuccess && !response.IsSuccessStatusCode) {
                         var httpEx = new HttpRequestException(
                             $"Request failed with status {(int)response.StatusCode} ({response.StatusCode}) for URL {url}");
 
-                        SentrySdk.CaptureException(httpEx, scope => {
-                            scope.SetExtra("RequestUrl", url);
-                            scope.SetExtra("RequestBody", jsonData);
-                            scope.SetExtra("ResponseStatus", (int)response.StatusCode);
-                            scope.SetExtra("ResponseBody", responseBody);
-                        });
-
+                        CaptureHttpException(httpEx, url, jsonData, response, responseBody);
                         return null;
                     }
 
                     return JsonSerializer.Deserialize<TResponse>(responseBody);
                 }
                 catch (Exception ex) {
-#if DEBUG
                     GsLogger.ShowHTTPDebugBox(
                         requestData: $"URL: {url}\nPayload: {jsonData}",
                         responseData: $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}",
                         isError: true);
-#endif
 
-                    SentrySdk.CaptureException(ex, scope => {
-                        scope.SetExtra("RequestUrl", url);
-                        scope.SetExtra("RequestBody", jsonData);
-                        scope.SetExtra("ResponseStatus", response?.StatusCode);
-                        scope.SetExtra("ResponseBody", responseBody);
-                    });
-
+                    CaptureHttpException(ex, url, jsonData, response, responseBody);
                     return null;
                 }
             }
-        }
-
-        #region API Models
-
-        /// <summary>
-        /// Model for token verification request.
-        /// </summary>
-        public class TokenVerificationRequest {
-            public string token { get; set; }
-            public string playniteId { get; set; }
-        }
-
-        /// <summary>
-        /// Response model for token verification.
-        /// </summary>
-        public class TokenVerificationResponse {
-            public string status { get; set; }
-            public string message { get; set; }
-            public string userId { get; set; }
-        }
-
-        /// <summary>
-        /// Model for tracking game start events.
-        /// </summary>
-        public class TimeTracker {
-            public string user_id { get; set; }
-            public string game_name { get; set; }
-            public string game_id { get; set; }
-            public object metadata { get; set; }
-            public string started_at { get; set; }
-        }
-
-        /// <summary>
-        /// Model for tracking game end events.
-        /// </summary>
-        public class TimeTrackerEnd {
-            public string user_id { get; set; }
-            public string game_name { get; set; }
-            public string game_id { get; set; }
-            public object metadata { get; set; }
-            public string finished_at { get; set; }
-            public string session_id { get; set; }
-        }
-
-        /// <summary>
-        /// Response model for start scrobble request.
-        /// </summary>
-        public class GameSessionResponse {
-            public string session_id { get; set; }
-        }
-
-        /// <summary>
-        /// Model for library synchronization request.
-        /// </summary>
-        public class LibrarySync {
-            public string user_id { get; set; }
-            public List<Playnite.SDK.Models.Game> library { get; set; }
-            public string[] flags { get; set; }
-        }
-
-        /// <summary>
-        /// Response model for library synchronization.
-        /// </summary>
-        public class SyncResponse {
-            public string status { get; set; }
-            public SyncResult result { get; set; }
-            // If account not linked yet it will be "not_linked"
-            public string userId { get; set; }
-        }
-
-        /// <summary>
-        /// Details of library synchronization results.
-        /// </summary>
-        public class SyncResult {
-            public int added { get; set; }
-            public int updated { get; set; }
-        }
-
-        /// <summary>
-        /// Response model for the finish scrobble endpoint.
-        /// </summary>
-        public class FinishScrobbleResponse {
-            public string status { get; set; }
         }
 
         #endregion

@@ -122,24 +122,20 @@ namespace GsPlugin {
                         { "Theme", savedSettings.Theme }
                     }
                 );
-#if DEBUG
-                MessageBox.Show($"Loaded saved settings:\nInstallID: {InstallID}\nTheme: {savedSettings.Theme}",
-                    "Debug - Settings Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+                GsLogger.ShowDebugInfoBox($"Loaded saved settings:\nInstallID: {InstallID}\nTheme: {savedSettings.Theme}",
+                    "Debug - Settings Loaded");
             }
             else {
                 Settings = new GsPluginSettings();
-                Settings.Theme = AvailableThemes[0]; // Set default theme
+                Settings.Theme = AvailableThemes[0];
 
                 // Log creation of new settings to Sentry
                 SentrySdk.AddBreadcrumb(
                     message: "Created new plugin settings",
                     category: "settings"
                 );
-#if DEBUG
-                MessageBox.Show("No setting found. Created new settings instance - No saved settings found",
-                    "Debug", MessageBoxButton.OK, MessageBoxImage.Warning);
-#endif
+                GsLogger.ShowDebugInfoBox("No setting found. Created new settings instance - No saved settings found",
+                    "Debug");
             }
 
             // Subscribe to settings property changes
@@ -149,7 +145,6 @@ namespace GsPlugin {
         }
 
         public void BeginEdit() {
-            // Code executed when settings view is opened and user starts editing values.
             _editingClone = Serialization.GetClone(Settings);
         }
 
@@ -157,32 +152,23 @@ namespace GsPlugin {
             // Code executed when user decides to cancel any changes made since BeginEdit was called.
             // This method should revert any changes made to options.
             Settings = _editingClone;
-#if DEBUG
-            MessageBox.Show($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}",
-                "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+            GsLogger.ShowDebugInfoBox($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}",
+                "Debug");
         }
 
         public void EndEdit() {
-            // Code executed when user decides to confirm changes made since BeginEdit was called.
             _plugin.SavePluginSettings(Settings);
-            // Sync with GsDataManager
             GsDataManager.Data.Theme = Settings.Theme;
             GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling);
             GsDataManager.Save();
-#if DEBUG
-            MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}",
-                "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+
+            GsLogger.ShowDebugInfoBox($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}",
+                "Debug");
         }
 
         public async void LinkAccount() {
             if (string.IsNullOrWhiteSpace(Settings.LinkToken)) {
                 Settings.LinkStatusMessage = "Please enter a token";
-#if DEBUG
-                MessageBox.Show("Link Account failed: Token is empty or whitespace",
-                    "Debug - Link Account", MessageBoxButton.OK, MessageBoxImage.Warning);
-#endif
                 return;
             }
 
@@ -192,32 +178,21 @@ namespace GsPlugin {
             try {
                 var response = await _apiClient.VerifyToken(Settings.LinkToken, GsDataManager.Data.InstallID);
 
-#if DEBUG
-                MessageBox.Show($"API Response received:\nStatus: {response?.status ?? "null"}\nMessage: {response?.message ?? "null"}\nUserId: {response?.userId ?? "null"}",
-                    "Debug - API Response", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
-
                 if (response != null && response.status == "success") {
                     GsDataManager.Data.IsLinked = true;
                     GsDataManager.Data.LinkedUserId = response.userId;
                     GsDataManager.Save();
 
                     Settings.LinkStatusMessage = "Successfully linked account!";
-                    Settings.LinkToken = ""; // Clear the token
+                    Settings.LinkToken = "";
 
                     OnLinkingStatusChanged();
 
-#if DEBUG
-                    MessageBox.Show($"Account successfully linked!\nLinked User ID: {response.userId}\nIsLinked: {GsDataManager.Data.IsLinked}",
-                        "Debug - Link Success", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+                    GsLogger.ShowDebugInfoBox($"Account successfully linked!\nLinked User ID: {response.userId}\nIsLinked: {GsDataManager.Data.IsLinked}",
+                        "Debug - Link Success");
                 }
                 else {
                     Settings.LinkStatusMessage = response?.message ?? "Unknown error occurred";
-#if DEBUG
-                    MessageBox.Show($"Link failed:\nStatus: {response?.status ?? "null"}\nMessage: {response?.message ?? "Unknown error occurred"}",
-                        "Debug - Link Failed", MessageBoxButton.OK, MessageBoxImage.Error);
-#endif
                 }
             }
             catch (Exception ex) {
@@ -226,49 +201,11 @@ namespace GsPlugin {
             }
             finally {
                 Settings.IsLinking = false;
-#if DEBUG
-                MessageBox.Show($"Link account process completed.\nFinal Status: IsLinked = {GsDataManager.Data.IsLinked}\nLinked User ID: {GsDataManager.Data.LinkedUserId ?? "null"}",
-                    "Debug - Link Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+                GsLogger.ShowDebugInfoBox($"Link account process completed.\nFinal Status: IsLinked = {GsDataManager.Data.IsLinked}\nLinked User ID: {GsDataManager.Data.LinkedUserId ?? "null"}",
+                    "Debug - Link Complete");
             }
         }
 
-        public async Task<bool> LinkAccountWithToken(string token) {
-            if (string.IsNullOrWhiteSpace(token)) {
-                return false;
-            }
-
-            Settings.IsLinking = true;
-            Settings.LinkStatusMessage = "Verifying token...";
-
-            try {
-                var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
-
-                if (response != null && response.status == "success") {
-                    GsDataManager.Data.IsLinked = true;
-                    GsDataManager.Data.LinkedUserId = response.userId;
-                    GsDataManager.Save();
-
-                    Settings.LinkStatusMessage = "Successfully linked account!";
-                    Settings.LinkToken = ""; // Clear any existing token
-
-                    OnLinkingStatusChanged();
-                    return true;
-                }
-                else {
-                    Settings.LinkStatusMessage = response?.message ?? "Unknown error occurred";
-                    return false;
-                }
-            }
-            catch (Exception ex) {
-                Settings.LinkStatusMessage = $"Error: {ex.Message}";
-                SentrySdk.CaptureException(ex);
-                return false;
-            }
-            finally {
-                Settings.IsLinking = false;
-            }
-        }
 
         public bool VerifySettings(out List<string> errors) {
             // Code execute when user decides to confirm changes made since BeginEdit was called.

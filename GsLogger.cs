@@ -14,26 +14,21 @@ namespace GsPlugin {
 
         public static void Warn(string message) {
             _logger.Warn(message);
-#if DEBUG
             ShowDebugMessage(message, "Warning");
-#endif
         }
 
         public static void Error(string message) {
             _logger.Error(message);
-#if DEBUG
             ShowDebugMessage(message, "Error");
-#endif
         }
 
         public static void Error(string message, System.Exception ex) {
             _logger.Error(ex, message);
-#if DEBUG
             ShowDebugMessage($"{message}\n\nException: {ex.Message}", "Error");
-#endif
         }
 
         private static void ShowDebugMessage(string message, string type) {
+#if DEBUG
             Application.Current.Dispatcher.BeginInvoke(new System.Action(() => {
                 MessageBox.Show(
                     message,
@@ -42,10 +37,11 @@ namespace GsPlugin {
                     type == "Error" ? MessageBoxImage.Error : MessageBoxImage.Warning
                 );
             }));
+#endif
         }
 
-#if DEBUG
         public static void ShowHTTPDebugBox(string requestData, string responseData, bool isError = false) {
+#if DEBUG
             Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                 var requestBox = new TextBox {
                     Text = requestData,
@@ -131,6 +127,19 @@ namespace GsPlugin {
 
                 window.Show();
                 window.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            }));
+#endif
+        }
+
+        public static void ShowDebugInfoBox(string message, string title = "Debug Info") {
+#if DEBUG
+            Application.Current.Dispatcher.BeginInvoke(new Action(() => {
+                MessageBox.Show(
+                    message,
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information
+                );
             }));
         }
 #endif

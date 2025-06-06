@@ -22,9 +22,7 @@ namespace MySidebarPlugin {
             // Now you can navigate to a URL directly.
             string userId = GsDataManager.Data.InstallID; // Or get it from plugin settings
             string theme = GsDataManager.Data.Theme.ToLower();
-#if DEBUG
-            MessageBox.Show($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}");
-#endif
+            GsLogger.ShowDebugInfoBox($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}");
             string url = $"https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}&theme={theme}";
 
             // Navigate to the URL
