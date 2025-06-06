@@ -65,7 +65,8 @@ namespace GsPlugin {
                     );
                     Save();
                 }
-            }            catch (Exception ex) {
+            }
+            catch (Exception ex) {
                 GsLogger.Error("Failed to initialize GsData", ex);
                 SentrySdk.CaptureException(ex);
                 // Fallback to new GUID if initialization fails

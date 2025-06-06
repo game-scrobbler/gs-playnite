@@ -94,7 +94,8 @@ namespace GsPlugin {
                     LogSuccessfulLinking(response.userId, context);
 
                     return LinkingResult.CreateSuccess(response.userId, context);
-                } else {
+                }
+                else {
                     string errorMessage = response?.message ?? "Unknown error occurred during linking";
                     LogFailedLinking(errorMessage, context);
                     return LinkingResult.CreateError(errorMessage, context);
