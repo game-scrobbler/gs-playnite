@@ -235,7 +235,6 @@ namespace GsPlugin {
 
                 if (result.Success) {
                     Settings.LinkStatusMessage = "Successfully linked account!";
-                    Settings.LinkToken = "";
                     OnLinkingStatusChanged();
                 }
                 else {
@@ -247,6 +246,7 @@ namespace GsPlugin {
             }
             finally {
                 Settings.IsLinking = false;
+                Settings.LinkToken = "";
             }
         }
 
