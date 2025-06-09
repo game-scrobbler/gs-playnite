@@ -141,7 +141,7 @@ namespace GsPlugin {
                     MessageBoxImage.Information
                 );
             }));
-        }
 #endif
+        }
     }
 }
