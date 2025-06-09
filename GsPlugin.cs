@@ -1,176 +1,156 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Windows.Controls;
 using MySidebarPlugin;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
-using Sentry;
 
 namespace GsPlugin {
-    /// <summary>
-    /// Main plugin class that handles integration with Playnite.
-    /// </summary>
+
     public class GsPlugin : GenericPlugin {
         private static readonly ILogger _logger = LogManager.GetLogger();
-
-        /// Plugin settings view model.
         private GsPluginSettingsViewModel _settings { get; set; }
         private GsApiClient _apiClient;
-
+        private GsAccountLinkingService _linkingService;
+        private GsUriHandler _uriHandler;
+        private GsScrobblingService _scrobblingService;
         /// Unique identifier for the plugin itself.
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
+        /// <summary>
+        /// Constructor for the plugin. Initializes all required services and components.
+        /// </summary>
+        /// <param name="api">Instance of Playnite API to be injected.</param>
         public GsPlugin(IPlayniteAPI api) : base(api) {
-            // Ceate settings
-            _settings = new GsPluginSettingsViewModel(this);
+
+            // Initialize GsDataManager
+            GsDataManager.Initialize(GetPluginUserDataPath(), null);
+
+            // Initialize Sentry for error tracking
+            GsSentry.Initialize();
+
+            // Initialize API client
+            _apiClient = new GsApiClient();
+
+            // Initialize centralized account linking service
+            _linkingService = new GsAccountLinkingService(_apiClient, api);
+
+            // Create settings with linking service dependency
+            _settings = new GsPluginSettingsViewModel(this, _linkingService);
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
-            _apiClient = new GsApiClient();
-            // Initialize GsDataManager
-            GsDataManager.Initialize(GetPluginUserDataPath(), _settings.InstallID);
+
+
+            // Initialize scrobbling services
+            _scrobblingService = new GsScrobblingService(_apiClient);
+
+            // Initialize and register URI handler for automatic account linking
+            _uriHandler = new GsUriHandler(api, _linkingService);
+            _uriHandler.RegisterUriHandler();
         }
 
         /// <summary>
-        /// Retrieves the current version of the plugin from the extension.yaml file.
+        /// Called when a game has been installed.
         /// </summary>
-        /// <returns>The version string or "Unknown Version" if not found.</returns>
-        private static string GetPluginVersion() {
-            string pluginFolder = Path.GetDirectoryName(typeof(GsPlugin).Assembly.Location);
-            string yamlPath = Path.Combine(pluginFolder, "extension.yaml");
-
-            if (File.Exists(yamlPath)) {
-                foreach (var line in File.ReadAllLines(yamlPath)) {
-                    if (line.StartsWith("Version:")) {
-                        return line.Split(':')[1].Trim();
-                    }
-                }
-            }
-
-            return "Unknown Version";
-        }
-
         public override void OnGameInstalled(OnGameInstalledEventArgs args) {
-            // Add code to be executed when game is finished installing.
+            base.OnGameInstalled(args);
         }
 
+        /// <summary>
+        /// Called when a game has started running.
+        /// </summary>
         public override void OnGameStarted(OnGameStartedEventArgs args) {
-            // Add code to be executed when game is started running.
+            base.OnGameStarted(args);
         }
 
+        /// <summary>
+        /// Called before a game is started. This happens when the user clicks Play but before the game actually launches.
+        /// </summary>
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
-            // Skip scrobbling if disabled
-            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
-                return;
-            }
-
-            DateTime localDate = DateTime.Now;
-            var startedGame = args.Game;
-
-            // Build the payload for scrobbling the game start.
-            var startData = new GsApiClient.TimeTracker {
-                user_id = GsDataManager.Data.InstallID,
-                game_name = startedGame.Name,
-                game_id = startedGame.Id.ToString(),
-                metadata = new { },
-                started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-            };
-
-            // Send POST request using the helper.
-            var sessionData = await _apiClient.StartGameSession(startData);
-            if (sessionData != null) {
-                GsDataManager.Data.ActiveSessionId = sessionData.session_id;
-                GsDataManager.Save();
-            }
+            await _scrobblingService.OnGameStartAsync(args);
+            base.OnGameStarting(args);
         }
 
+        /// <summary>
+        /// Called when a game stops running. This happens when the game process exits.
+        /// </summary>
         public override async void OnGameStopped(OnGameStoppedEventArgs args) {
-            // Skip scrobbling if disabled
-            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
-                return;
-            }
-
-            // Check if we have a valid session ID
-            if (string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
-                GsLogger.Warn("No active session ID found when stopping game");
-                return;
-            }
-
-            DateTime localDate = DateTime.Now;
-            var stoppedGame = args.Game;
-
-            // Build the payload for scrobbling the game finish
-            var endData = new GsApiClient.TimeTrackerEnd {
-                user_id = GsDataManager.Data.InstallID,
-                game_name = stoppedGame.Name,
-                game_id = stoppedGame.Id.ToString(),
-                session_id = GsDataManager.Data.ActiveSessionId,
-                metadata = new { },
-                finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-            };
-
-            // Send POST request and ensure success
-            var finishResponse = await _apiClient.FinishGameSession(endData);
-            if (finishResponse != null) {
-                // Only clear the session ID if the request was successful
-                GsDataManager.Data.ActiveSessionId = null;
-                GsDataManager.Save();
-            }
-            else {
-                GsLogger.Error($"Failed to finish game session for {stoppedGame.Name}");
-            }
+            await _scrobblingService.OnGameStoppedAsync(args);
+            base.OnGameStopped(args);
         }
 
+        /// <summary>
+        /// Called when a game has been uninstalled.
+        /// </summary>
         public override void OnGameUninstalled(OnGameUninstalledEventArgs args) {
-            // Add code to be executed when game is uninstalled.
+            base.OnGameUninstalled(args);
         }
 
-        public override void OnApplicationStarted(OnApplicationStartedEventArgs args) {
-            SentryInit();
-            SyncLib();
+        /// <summary>
+        /// Called when the application is started and initialized. This is a good place for one-time initialization tasks.
+        /// </summary>
+        public override async void OnApplicationStarted(OnApplicationStartedEventArgs args) {
+            await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+            base.OnApplicationStarted(args);
         }
 
+        /// <summary>
+        /// Called when the application is shutting down. This is the place to clean up resources.
+        /// </summary>
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
-            // Skip scrobbling if disabled
-            if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
-                return;
-            }
-
-            if (GsDataManager.Data.ActiveSessionId != null) {
-                DateTime localDate = DateTime.Now;
-
-                var startData = new GsApiClient.TimeTrackerEnd {
-                    user_id = GsDataManager.Data.InstallID,
-                    session_id = GsDataManager.Data.ActiveSessionId,
-                    metadata = new { },
-                    finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                };
-
-                var finishResponse = await _apiClient.FinishGameSession(startData);
-                if (finishResponse != null) {
-                    GsDataManager.Data.ActiveSessionId = null;
-                    GsDataManager.Save();
-                }
-            }
+            await _scrobblingService.OnApplicationStoppedAsync();
+            base.OnApplicationStopped(args);
         }
 
-        public override void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
-            // Add code to be executed when library is updated.
+        /// <summary>
+        /// Called when a library update has been finished. This happens after games are imported or metadata is updated.
+        /// </summary>
+        public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
+            await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
             base.OnLibraryUpdated(args);
-            SyncLib();
         }
 
+        /// <summary>
+        /// Called when game selection changes in the UI.
+        /// </summary>
+        public override void OnGameSelected(OnGameSelectedEventArgs args) {
+            base.OnGameSelected(args);
+        }
+
+        /// <summary>
+        /// Called when game startup is cancelled by the user or the system.
+        /// </summary>
+        public override void OnGameStartupCancelled(OnGameStartupCancelledEventArgs args) {
+            base.OnGameStartupCancelled(args);
+        }
+
+        /// <summary>
+        /// Gets plugin settings or null if plugin doesn't provide any settings.
+        /// Called by Playnite when it needs to access the plugin's settings.
+        /// </summary>
+        /// <param name="firstRunSettings">True if this is the first time settings are being requested (e.g., during first run of the plugin).</param>
+        /// <returns>The settings object for this plugin.</returns>
         public override ISettings GetSettings(bool firstRunSettings) {
             return (ISettings)_settings;
         }
 
+        /// <summary>
+        /// Gets plugin settings view or null if plugin doesn't provide settings view.
+        /// Called by Playnite when it needs to display the plugin's settings UI.
+        /// </summary>
+        /// <param name="firstRunSettings">True if this is the first time settings are being displayed (e.g., during first run of the plugin).</param>
+        /// <returns>A UserControl that represents the settings view.</returns>
         public override UserControl GetSettingsView(bool firstRunSettings) {
             return new GsPluginSettingsView();
         }
 
+        /// <summary>
+        /// Gets sidebar items provided by this plugin.
+        /// Called by Playnite when building the sidebar menu.
+        /// </summary>
+        /// <returns>A collection of SidebarItem objects to be displayed in the sidebar.</returns>
         public override IEnumerable<SidebarItem> GetSidebarItems() {
             // Return one or more SidebarItem objects
             yield return new SidebarItem {
@@ -179,78 +159,12 @@ namespace GsPlugin {
                 Icon = new TextBlock { Text = "📋" }, // or a path to an image icon
                 Opened = () => {
                     // Return a new instance of your custom UserControl (WPF)
-                    return new MySidebarView(GetPluginVersion());
+                    return new MySidebarView(GsSentry.GetPluginVersion());
                 },
             };
             // If you want a simple *action* instead of a custom panel, you can
             // return an item with Type = SidebarItemType.Action, plus an OpenCommand.
         }
-
-        /// <summary>
-        /// Synchronizes the Playnite library with the external API.
-        /// </summary>
-        public async void SyncLib() {
-            var library = PlayniteApi.Database.Games.ToList();
-            var librarySync = new GsApiClient.LibrarySync {
-                user_id = GsDataManager.Data.InstallID,
-                library = library,
-                flags = GsDataManager.Data.Flags
-            };
-
-            // Send POST request and ensure success.
-            var syncResponse = await _apiClient.SyncLibrary(librarySync);
-            // Optionally, use syncResponse.result.added and syncResponse.result.updated as needed.
-        }
-
-        public static void SentryInit() {
-            // Set sampling rates based on user preference
-            bool disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry");
-
-            SentrySdk.Init(options => {
-                // A Sentry Data Source Name (DSN) is required.
-                // See https://docs.sentry.io/product/sentry-basics/dsn-explainer/
-                // You can set it in the SENTRY_DSN environment variable, or you can set it in code here.
-                options.Dsn = "https://af79b5bda2a052b04b3f490b79d0470a@o4508777256124416.ingest.de.sentry.io/4508777265627216";
-
-                // Use a static method to get the plugin version.
-                options.Release = GsPlugin.GetPluginVersion();
-
-                // When debug is enabled, the Sentry client will emit detailed debugging information to the console.
-                // This might be helpful, or might interfere with the normal operation of your application.
-                // We enable it here for demonstration purposes when first trying Sentry.
-                // You shouldn't do this in your applications unless you're troubleshooting issues with Sentry.
-#if DEBUG
-                options.Environment = "development";
-                options.Debug = true;
-#else
-                options.Environment = "production";
-                options.Debug = false;
-#endif
-
-                // Set sample rates to 0 if user opted out of Sentry.
-                options.SendDefaultPii = false;
-                options.SampleRate = disableSentryFlag ? (float?)null : 1.0f;
-                options.TracesSampleRate = disableSentryFlag ? (float?)null : 1.0f;
-                options.ProfilesSampleRate = disableSentryFlag ? (float?)null : 1.0f;
-                options.AutoSessionTracking = !disableSentryFlag;
-                options.CaptureFailedRequests = !disableSentryFlag;
-                options.FailedRequestStatusCodes.Add((400, 499));
-
-                options.StackTraceMode = StackTraceMode.Enhanced;
-                options.IsGlobalModeEnabled = false;
-                options.DiagnosticLevel = SentryLevel.Warning;
-                options.AttachStacktrace = true;
-
-                // Requires NuGet package: Sentry.Profiling
-                // Note: By default, the profiler is initialized asynchronously. This can
-                // be tuned by passing a desired initialization timeout to the constructor.
-                //options.AddIntegration(new ProfilingIntegration(
-                // During startup, wait up to 500ms to profile the app startup code.
-                // This could make launching the app a bit slower so comment it out if you
-                // prefer profiling to start asynchronously
-                //TimeSpan.FromMilliseconds(500)
-                //));
-            });
-        }
     }
+
 }
