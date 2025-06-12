@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.4.0...GsPlugin-v0.5.0) (2025-06-12)
+
+
+### Features
+
+* release 0.5 ([04bbadb](https://github.com/game-scrobbler/gs-playnite/commit/04bbadb5d87354685669b099e15fe30b386b13b1))
+
 ## [0.4.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.3.0...GsPlugin-v0.4.0) (2025-02-19)
 
 
