@@ -108,7 +108,10 @@
     <Compile Include="GsData.cs" />
     <Compile Include="GsPlugin.cs" />
     <Compile Include="GsPluginSettings.cs" />
-    <Compile Include="GsPluginSettingsView.xaml.cs">
+    <Compile Include="GsScrobblingService.cs" />
+    <Compile Include="GsAccountLinkingService.cs" />
+    <Compile Include="GsSentry.cs" />    <Compile Include="GsUriHandler.cs" />
+    <Compile Include="View\GsPluginSettingsView.xaml.cs">
       <DependentUpon>GsPluginSettingsView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -134,7 +137,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="GsPluginSettingsView.xaml">
+    <Page Include="View\GsPluginSettingsView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

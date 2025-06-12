@@ -1,10 +1,15 @@
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Data;
-using System.Windows;
 using Sentry;
 
 namespace GsPlugin {
+    /// <summary>
+    /// Represents the settings data model for the GS Plugin.
+    /// Contains all user-configurable options and runtime state.
+    /// </summary>
     public class GsPluginSettings : ObservableObject {
         private string _theme = "Dark";
         public string Theme {
@@ -12,36 +17,59 @@ namespace GsPlugin {
             set => SetValue(ref _theme, value);
         }
 
-        // InstallID should be preserved across upgrades and stored in both settings and GSData
-        public string InstallID { get; set; }
-
-        private bool disableSentry = false;
-        private bool disableScrobbling = false;
-
+        private bool _disableSentry = false;
         public bool DisableSentry {
-            get => disableSentry;
+            get => _disableSentry;
             set {
-                disableSentry = value;
+                _disableSentry = value;
+                OnPropertyChanged();
+            }
+        }
+        private bool _disableScrobbling = false;
+        public bool DisableScrobbling {
+            get => _disableScrobbling;
+            set {
+                _disableScrobbling = value;
                 OnPropertyChanged();
             }
         }
 
-        public bool DisableScrobbling {
-            get => disableScrobbling;
+        private string _linkToken = "";
+        public string LinkToken {
+            get => _linkToken;
             set {
-                disableScrobbling = value;
+                _linkToken = value;
+                OnPropertyChanged();
+            }
+        }
+        private bool _isLinking = false;
+        public bool IsLinking {
+            get => _isLinking;
+            set {
+                _isLinking = value;
+                OnPropertyChanged();
+            }
+        }
+        private string _linkStatusMessage = "";
+        public string LinkStatusMessage {
+            get => _linkStatusMessage;
+            set {
+                _linkStatusMessage = value;
                 OnPropertyChanged();
             }
         }
     }
 
+    /// <summary>
+    /// View model for plugin settings that implements ISettings interface.
+    /// Handles settings persistence, validation, and account linking operations.
+    /// </summary>
     public class GsPluginSettingsViewModel : ObservableObject, ISettings {
         private readonly GsPlugin _plugin;
-
-        public string InstallID;
-        private GsPluginSettings _editingClone { get; set; }
-
+        private readonly GsAccountLinkingService _linkingService;
+        private GsPluginSettings _editingClone;
         private GsPluginSettings _settings;
+
         public GsPluginSettings Settings {
             get => _settings;
             set {
@@ -51,76 +79,116 @@ namespace GsPlugin {
         }
 
         public List<string> AvailableThemes { get; set; }
+        public static bool IsLinked => !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
+        public static string ConnectionStatus => IsLinked
+            ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
+            : "Disconnected";
+        public static bool ShowLinkingControls => !IsLinked;
 
-        public GsPluginSettingsViewModel(GsPlugin plugin) {
-            // Injecting your plugin instance is required for Save/Load method because Playnite saves data to a location based on what plugin requested the operation.
-            _plugin = plugin;
+        public static event EventHandler LinkingStatusChanged;
+        public static void OnLinkingStatusChanged() {
+            LinkingStatusChanged?.Invoke(null, EventArgs.Empty);
+        }
+
+        #region Constructor
+        /// <summary>
+        /// Initializes a new instance of the GsPluginSettingsViewModel.
+        /// </summary>
+        /// <param name="plugin">The plugin instance for settings persistence.</param>
+        /// <param name="linkingService">The account linking service.</param>
+        public GsPluginSettingsViewModel(GsPlugin plugin, GsAccountLinkingService linkingService) {
+            // Store plugin reference for save/load operations
+            _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
+            _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
             AvailableThemes = new List<string> { "Dark", "Light" };
 
-            // Load saved settings.
-            var savedSettings = plugin.LoadPluginSettings<GsPluginSettings>();
+            InitializeSettings();
+        }
 
-            // LoadPluginSettings returns null if no saved data is available.
+        /// <summary>
+        /// Initializes settings by loading saved data or creating defaults.
+        /// </summary>
+        private void InitializeSettings() {
+            var savedSettings = _plugin.LoadPluginSettings<GsPluginSettings>();
             if (savedSettings != null) {
-                Settings = savedSettings;
-                InstallID = savedSettings.InstallID;
-
-                // Log successful settings load to Sentry
-                SentrySdk.AddBreadcrumb(
-                    message: "Successfully loaded plugin settings",
-                    category: "settings",
-                    data: new Dictionary<string, string> {
-                        { "InstallID", InstallID },
-                        { "Theme", savedSettings.Theme }
-                    }
-                );
-#if DEBUG
-                MessageBox.Show($"Loaded saved settings:\nInstallID: {InstallID}\nTheme: {savedSettings.Theme}",
-                    "Debug - Settings Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+                LoadExistingSettings(savedSettings);
             }
             else {
-                Settings = new GsPluginSettings();
-                Settings.Theme = AvailableThemes[0]; // Set default theme
-
-                // Log creation of new settings to Sentry
-                SentrySdk.AddBreadcrumb(
-                    message: "Created new plugin settings",
-                    category: "settings"
-                );
-#if DEBUG
-                MessageBox.Show("No setting found. Created new settings instance - No saved settings found",
-                    "Debug", MessageBoxButton.OK, MessageBoxImage.Warning);
-#endif
+                CreateDefaultSettings();
+            }
+            // Subscribe to property changes for UI updates
+            if (Settings != null) {
+                Settings.PropertyChanged += (s, e) => OnPropertyChanged("Settings");
             }
         }
 
+        /// <summary>
+        /// Loads and validates existing settings from storage.
+        /// </summary>
+        private void LoadExistingSettings(GsPluginSettings savedSettings) {
+            Settings = savedSettings;
+
+            // Log successful load for debugging
+            SentrySdk.AddBreadcrumb(
+                message: "Successfully loaded plugin settings",
+                category: "settings",
+                data: new Dictionary<string, string> {
+                    { "Theme", savedSettings.Theme }
+                }
+            );
+
+            GsLogger.ShowDebugInfoBox($"Loaded saved settings:\nTheme: {savedSettings.Theme}", "Debug - Settings Loaded");
+        }
+
+        /// <summary>
+        /// Creates default settings for first-time use.
+        /// </summary>
+        private void CreateDefaultSettings() {
+            Settings = new GsPluginSettings {
+                Theme = AvailableThemes[0]
+            };
+
+            // Log creation for debugging
+            SentrySdk.AddBreadcrumb(
+                message: "Created new plugin settings",
+                category: "settings"
+            );
+
+            GsLogger.ShowDebugInfoBox("No saved settings found. Created new settings instance", "Debug - New Settings");
+        }
+
+        #endregion
+
+        #region ISettings Implementation
+
+        /// <summary>
+        /// Begins the editing process by creating a backup of current settings.
+        /// </summary>
         public void BeginEdit() {
-            // Code executed when settings view is opened and user starts editing values.
             _editingClone = Serialization.GetClone(Settings);
         }
 
+        /// <summary>
+        /// Cancels the editing process and reverts to the original settings.
+        /// </summary>
         public void CancelEdit() {
-            // Code executed when user decides to cancel any changes made since BeginEdit was called.
-            // This method should revert any changes made to options.
             Settings = _editingClone;
-#if DEBUG
-            MessageBox.Show($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}\nInstallID: {Settings.InstallID}",
-                "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+            GsLogger.ShowDebugInfoBox($"Edit Cancelled - Reverted to:\nTheme: {Settings.Theme}", "Debug - Edit Cancelled");
         }
 
+        /// <summary>
+        /// Commits the changes and saves settings to storage.
+        /// </summary>
         public void EndEdit() {
-            // Code executed when user decides to confirm changes made since BeginEdit was called.
+            // Save settings to Playnite storage
             _plugin.SavePluginSettings(Settings);
-            // Sync with GsDataManager
+
+            // Update global data manager
             GsDataManager.Data.Theme = Settings.Theme;
             GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling);
             GsDataManager.Save();
-#if DEBUG
-            MessageBox.Show($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}",
-                "Debug", MessageBoxButton.OK, MessageBoxImage.Information);
-#endif
+
+            GsLogger.ShowDebugInfoBox($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}", "Debug - Settings Saved");
         }
 
         public bool VerifySettings(out List<string> errors) {
@@ -130,5 +198,59 @@ namespace GsPlugin {
             errors = new List<string>();
             return true;
         }
+
+        #endregion
+
+        #region Account Linking Operations
+
+        /// <summary>
+        /// Performs account linking with the provided token.
+        /// </summary>
+        public async void LinkAccount() {
+            if (!ValidateLinkToken()) return;
+            await PerformLinking();
+        }
+
+        /// <summary>
+        /// Validates the link token before attempting to link.
+        /// </summary>
+        /// <returns>True if token is valid, false otherwise.</returns>
+        private bool ValidateLinkToken() {
+            if (string.IsNullOrWhiteSpace(Settings.LinkToken)) {
+                Settings.LinkStatusMessage = "Please enter a token";
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Performs the actual account linking operation using the centralized service.
+        /// </summary>
+        private async Task PerformLinking() {
+            Settings.IsLinking = true;
+            Settings.LinkStatusMessage = "Verifying token...";
+
+            try {
+                var result = await _linkingService.LinkAccountAsync(Settings.LinkToken, LinkingContext.ManualSettings);
+
+                if (result.Success) {
+                    Settings.LinkStatusMessage = "Successfully linked account!";
+                    OnLinkingStatusChanged();
+                }
+                else {
+                    Settings.LinkStatusMessage = result.ErrorMessage;
+                }
+            }
+            catch (Exception ex) {
+                Settings.LinkStatusMessage = $"Error: {ex.Message}";
+            }
+            finally {
+                Settings.IsLinking = false;
+                Settings.LinkToken = "";
+            }
+        }
+
+        #endregion
+
     }
 }
