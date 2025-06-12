@@ -1,5 +1,13 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
+
 Packages:
+  - Version: 0.5.0
+    RequiredApiVersion: 6.11.0
+    ReleaseDate: 2025-06-12
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.5.0/GsPlugin-v0.5.0.pext
+    Changelog:
+      - Ability to link GS account
+      - Small ug fixes
   - Version: 0.4.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-19
