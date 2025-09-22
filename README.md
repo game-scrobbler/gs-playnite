@@ -13,15 +13,19 @@ Game Spectrum is a Playnite plugin that provides game session tracking and stati
 - ⏳ **Achievement Visualization**: Track your milestones and spot patterns in your game play.
 - 🔗 **Data Ownership**: Own and persist your data via the help of Game Scrobbler
 - 📊 **Game Session Tracking**: Automatic scrobbling of game start/stop events
+- 🛡️ **Robust Error Handling**: Advanced fault tolerance with circuit breaker pattern and retry logic
+- 🔍 **Comprehensive Logging**: Detailed logging with context for better debugging and monitoring
 
 ## Services
 
-- **GsPlugin** acts as the central orchestrator, receiving events from Playnite SDK and delegating to appropriate services
-- **GsScrobblingService** communicates with **GsApiClient** for session start/stop operations
+- **GsPlugin** acts as the central orchestrator with comprehensive exception handling, receiving events from Playnite SDK and delegating to appropriate services
+- **GsScrobblingService** communicates with **GsApiClient** for session start/stop operations with enhanced null safety and logging
+- **GsApiClient** provides fault-tolerant HTTP communication using **GsCircuitBreaker** for resilience and retry logic
+- **GsCircuitBreaker** implements circuit breaker pattern with exponential backoff for API call protection
 - **GsAccountLinkingService** uses **GsApiClient** for token verification and user validation
 - **GsUriHandler** delegates account linking to **GsAccountLinkingService** when processing deep links
 - All services use **GsDataManager** for persistent state management
-- **GsLogger** and **GsSentry** provide cross-cutting logging and error tracking
+- **GsLogger** and **GsSentry** provide cross-cutting logging, error tracking, and global exception protection
 - Settings UI components use two-way data binding with **GsPluginSettings**
 - Event-driven updates propagate status changes between services and UI components
 
@@ -32,6 +36,7 @@ gs-playnite/
 ├── GsPlugin.cs                       # Main plugin entry point
 ├── GsData.cs                         # Persistent data models and manager
 ├── GsApiClient.cs                    # HTTP API communication layer
+├── GsCircuitBreaker.cs               # Circuit breaker pattern with retry logic
 ├── GsPluginSettings.cs               # Plugin settings data model
 ├── GsScrobblingService.cs            # Game session tracking
 ├── GsAccountLinkingService.cs        # Account linking functionality
@@ -58,10 +63,11 @@ gs-playnite/
 
 ## Core Services
 
-- **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events
-- **GsApiClient.cs** - HTTP API layer for GameScrobbler communication, handles authentication and serialization
+- **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events with comprehensive exception handling
+- **GsApiClient.cs** - HTTP API layer for GameScrobbler communication with circuit breaker protection, input validation, and retry logic
+- **GsCircuitBreaker.cs** - Implements circuit breaker pattern with exponential backoff retry logic for API resilience
 - **GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler
-- **GsScrobblingService.cs** - Tracks game sessions (start/stop events) and sends data via API client
+- **GsScrobblingService.cs** - Tracks game sessions (start/stop events) with enhanced logging and null safety checks
 - **GsUriHandler.cs** - Processes deep links (`playnite://gamescrobbler/...`) for automatic account linking
 
 ## Data Management
@@ -76,14 +82,38 @@ gs-playnite/
 
 ## Utilities
 
-- **GsLogger.cs** - Centralized logging with debug UI feedback and HTTP request/response logging
-- **GsSentry.cs** - Error tracking and reporting with user opt-out and contextual information
+- **GsLogger.cs** - Centralized logging with debug UI feedback, HTTP request/response logging, and enhanced context
+- **GsSentry.cs** - Advanced error tracking with global exception handlers, UnobservedTaskException protection, and contextual information
+
+## Reliability & Error Handling
+
+The plugin includes advanced fault tolerance mechanisms to ensure stable operation:
+
+### 🛡️ Circuit Breaker Pattern
+- **Failure Detection**: Automatically detects API failures and opens circuit after threshold
+- **Smart Recovery**: Half-open state tests service recovery before fully closing circuit
+- **Configurable Thresholds**: Customizable failure counts and timeout periods
+
+### ⚡ Retry Logic with Exponential Backoff
+- **Intelligent Retries**: Automatic retry for failed API calls with increasing delays
+- **Jitter Addition**: Random delays prevent thundering herd problems
+- **Operation-Specific**: Different retry counts for critical vs. non-critical operations
+
+### 🔍 Enhanced Logging & Monitoring
+- **Contextual Logging**: Game IDs, session IDs, and detailed error information
+- **Sentry Integration**: Automatic error reporting with rich context and filtering
+- **Debug Utilities**: HTTP request/response logging for troubleshooting
+
+### 🛡️ Global Exception Protection
+- **UnobservedTaskException Handling**: Prevents application crashes from background task failures
+- **Null Safety**: Comprehensive validation throughout the API layer
+- **JSON Validation**: Safe deserialization with error recovery
 
 ## Configuration Files
 
 - **extension.yaml** - Plugin metadata including ID, name, version, and author information
 - **manifest.yaml** - Plugin manifest information for the Playnite extension system
-- **app.config** - Application configuration file for .NET framework settings
+- **app.config** - Application configuration file for .NET Framework settings
 - **packages.config** - NuGet package dependencies and version specifications
 
 ## Commands

@@ -20,12 +20,17 @@ namespace GsPlugin {
 #endif
         private readonly HttpClient _httpClient;
         private readonly JsonSerializerOptions _jsonOptions;
+        private readonly GsCircuitBreaker _circuitBreaker;
 
         public GsApiClient() {
             _httpClient = new HttpClient(new SentryHttpMessageHandler());
             _jsonOptions = new JsonSerializerOptions {
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
+            _circuitBreaker = new GsCircuitBreaker(
+                failureThreshold: 3, 
+                timeout: TimeSpan.FromMinutes(2), 
+                retryDelay: TimeSpan.FromSeconds(10));
         }
 
         #region Game Session Management
@@ -43,8 +48,25 @@ namespace GsPlugin {
         }
 
         public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) {
-            var response = await PostJsonAsync<ScrobbleStartRes>(
-                $"{_apiBaseUrl}/api/playnite/scrobble/start", startData);
+            // Validate input before making API call
+            if (startData == null) {
+                _logger.Error("StartGameSession called with null startData");
+                return null;
+            }
+            
+            if (string.IsNullOrEmpty(startData.user_id)) {
+                _logger.Error("StartGameSession called with null or empty user_id");
+                return null;
+            }
+            
+            if (string.IsNullOrEmpty(startData.game_name)) {
+                _logger.Warn("StartGameSession called with null or empty game_name");
+            }
+
+            var response = await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<ScrobbleStartRes>(
+                    $"{_apiBaseUrl}/api/playnite/scrobble/start", startData);
+            }, maxRetries: 2);
 
             if (response == null || string.IsNullOrEmpty(response.session_id)) {
                 GsLogger.Error("Failed to get valid session ID from start session response");
@@ -68,14 +90,27 @@ namespace GsPlugin {
         }
 
         public async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData) {
+            // Validate input before making API call
+            if (endData == null) {
+                _logger.Error("FinishGameSession called with null endData");
+                return null;
+            }
+            
             if (string.IsNullOrEmpty(endData.session_id)) {
                 GsLogger.Error("Attempted to finish session with null session_id");
                 CaptureSentryMessage("Null session ID in finish request", SentryLevel.Error, endData.game_name, endData.user_id);
                 return null;
             }
+            
+            if (string.IsNullOrEmpty(endData.user_id)) {
+                _logger.Error("FinishGameSession called with null or empty user_id");
+                return null;
+            }
 
-            return await PostJsonAsync<ScrobbleFinishRes>(
-                $"{_apiBaseUrl}/api/playnite/scrobble/finish", endData, true);
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<ScrobbleFinishRes>(
+                    $"{_apiBaseUrl}/api/playnite/scrobble/finish", endData, true);
+            }, maxRetries: 2);
         }
 
         #endregion
@@ -101,8 +136,26 @@ namespace GsPlugin {
         }
 
         public async Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq) {
-            return await PostJsonAsync<LibrarySyncRes>(
-                $"{_apiBaseUrl}/api/playnite/sync", librarySyncReq, true);
+            // Validate input before making API call
+            if (librarySyncReq == null) {
+                _logger.Error("SyncLibrary called with null librarySyncReq");
+                return null;
+            }
+            
+            if (string.IsNullOrEmpty(librarySyncReq.user_id)) {
+                _logger.Error("SyncLibrary called with null or empty user_id");
+                return null;
+            }
+            
+            if (librarySyncReq.library == null) {
+                _logger.Warn("SyncLibrary called with null library, treating as empty");
+                librarySyncReq.library = new List<Playnite.SDK.Models.Game>();
+            }
+
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<LibrarySyncRes>(
+                    $"{_apiBaseUrl}/api/playnite/sync", librarySyncReq, true);
+            }, maxRetries: 1); // Library sync is less critical, only retry once
         }
 
         #endregion
@@ -121,12 +174,26 @@ namespace GsPlugin {
         }
 
         public async Task<TokenVerificationRes> VerifyToken(string token, string playniteId) {
+            // Validate input before making API call
+            if (string.IsNullOrEmpty(token)) {
+                _logger.Error("VerifyToken called with null or empty token");
+                return null;
+            }
+            
+            if (string.IsNullOrEmpty(playniteId)) {
+                _logger.Error("VerifyToken called with null or empty playniteId");
+                return null;
+            }
+            
             var payload = new TokenVerificationReq {
                 token = token,
                 playniteId = playniteId,
             };
-            return await PostJsonAsync<TokenVerificationRes>(
-                $"{_nextApiBaseUrl}/api/auth/playnite/verify", payload);
+            
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<TokenVerificationRes>(
+                    $"{_nextApiBaseUrl}/api/auth/playnite/verify", payload);
+            }, maxRetries: 1); // Token verification is less critical, only retry once
         }
 
         #endregion
@@ -183,7 +250,20 @@ namespace GsPlugin {
                         return null;
                     }
 
-                    return JsonSerializer.Deserialize<TResponse>(responseBody);
+                    // Validate response body before deserialization
+                    if (string.IsNullOrWhiteSpace(responseBody)) {
+                        _logger.Warn($"Received empty response body from {url}");
+                        return null;
+                    }
+                    
+                    try {
+                        return JsonSerializer.Deserialize<TResponse>(responseBody);
+                    }
+                    catch (JsonException jsonEx) {
+                        _logger.Error(jsonEx, $"Failed to deserialize JSON response from {url}. Response: {responseBody}");
+                        GsSentry.CaptureException(jsonEx, $"JSON deserialization failed for {url}");
+                        return null;
+                    }
                 }
                 catch (Exception ex) {
                     GsLogger.ShowHTTPDebugBox(

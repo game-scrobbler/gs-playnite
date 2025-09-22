@@ -69,16 +69,32 @@ namespace GsPlugin {
         /// Called before a game is started. This happens when the user clicks Play but before the game actually launches.
         /// </summary>
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
-            await _scrobblingService.OnGameStartAsync(args);
-            base.OnGameStarting(args);
+            try {
+                await _scrobblingService.OnGameStartAsync(args);
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Unhandled exception in OnGameStarting");
+                GsSentry.CaptureException(ex, "Unhandled exception in OnGameStarting");
+            }
+            finally {
+                base.OnGameStarting(args);
+            }
         }
 
         /// <summary>
         /// Called when a game stops running. This happens when the game process exits.
         /// </summary>
         public override async void OnGameStopped(OnGameStoppedEventArgs args) {
-            await _scrobblingService.OnGameStoppedAsync(args);
-            base.OnGameStopped(args);
+            try {
+                await _scrobblingService.OnGameStoppedAsync(args);
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Unhandled exception in OnGameStopped");
+                GsSentry.CaptureException(ex, "Unhandled exception in OnGameStopped");
+            }
+            finally {
+                base.OnGameStopped(args);
+            }
         }
 
         /// <summary>
@@ -92,24 +108,48 @@ namespace GsPlugin {
         /// Called when the application is started and initialized. This is a good place for one-time initialization tasks.
         /// </summary>
         public override async void OnApplicationStarted(OnApplicationStartedEventArgs args) {
-            await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
-            base.OnApplicationStarted(args);
+            try {
+                await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Unhandled exception in OnApplicationStarted");
+                GsSentry.CaptureException(ex, "Unhandled exception in OnApplicationStarted");
+            }
+            finally {
+                base.OnApplicationStarted(args);
+            }
         }
 
         /// <summary>
         /// Called when the application is shutting down. This is the place to clean up resources.
         /// </summary>
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
-            await _scrobblingService.OnApplicationStoppedAsync();
-            base.OnApplicationStopped(args);
+            try {
+                await _scrobblingService.OnApplicationStoppedAsync();
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Unhandled exception in OnApplicationStopped");
+                GsSentry.CaptureException(ex, "Unhandled exception in OnApplicationStopped");
+            }
+            finally {
+                base.OnApplicationStopped(args);
+            }
         }
 
         /// <summary>
         /// Called when a library update has been finished. This happens after games are imported or metadata is updated.
         /// </summary>
         public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
-            await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
-            base.OnLibraryUpdated(args);
+            try {
+                await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Unhandled exception in OnLibraryUpdated");
+                GsSentry.CaptureException(ex, "Unhandled exception in OnLibraryUpdated");
+            }
+            finally {
+                base.OnLibraryUpdated(args);
+            }
         }
 
         /// <summary>

@@ -1,6 +1,17 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 0.6.0
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-09-22
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.6.0/GsPlugin-v0.6.0.pext
+    Changelog:
+      - 🛡️ Major reliability improvements with circuit breaker pattern and retry logic
+      - 🚀 Enhanced error handling with global exception protection
+      - 🔍 Detailed logging with game context for better debugging
+      - 📦 Updated all dependencies to latest stable versions
+      - 🐛 Fixed UnobservedTaskException crashes and null reference issues
+      - 📚 Comprehensive documentation and architecture updates
   - Version: 0.5.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-06-12

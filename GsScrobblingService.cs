@@ -88,9 +88,14 @@ namespace GsPlugin {
                     return;
                 }
 
+                if (args?.Game == null) {
+                    _logger.Warn("OnGameStartAsync called with null game; skipping.");
+                    return;
+                }
+
                 DateTime localDate = DateTime.Now;
                 var startedGame = args.Game;
-                _logger.Info($"Starting scrobble session for game: {startedGame.Name}");
+                _logger.Info($"Starting scrobble session for game: {startedGame.Name} (ID: {startedGame.Id})");
                 var sessionData = await _apiClient.StartGameSession(new GsApiClient.ScrobbleStartReq {
                     user_id = GsDataManager.Data.InstallID,
                     game_name = startedGame.Name,
@@ -103,11 +108,11 @@ namespace GsPlugin {
                     _logger.Info($"Successfully started scrobble session with ID: {sessionData.session_id}");
                 }
                 else {
-                    _logger.Error($"Failed to start scrobble session for game: {startedGame.Name}");
+                    _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id})");
                 }
             }
             catch (Exception ex) {
-                _logger.Error(ex, $"Error starting scrobble session for game: {args.Game?.Name}");
+                _logger.Error(ex, $"Error starting scrobble session for game: {args?.Game?.Name ?? "<null>"} (ID: {(args?.Game != null ? args.Game.Id.ToString() : "<null>")})");
             }
         }
 
@@ -125,10 +130,14 @@ namespace GsPlugin {
                     _logger.Warn("No active session ID found when stopping game");
                     return;
                 }
+                if (args?.Game == null) {
+                    _logger.Warn("OnGameStoppedAsync called with null game; skipping.");
+                    return;
+                }
 
                 DateTime localDate = DateTime.Now;
                 var stoppedGame = args.Game;
-                _logger.Info($"Stopping scrobble session for game: {stoppedGame.Name}");
+                _logger.Info($"Stopping scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
                 var finishResponse = await _apiClient.FinishGameSession(new GsApiClient.ScrobbleFinishReq {
                     user_id = GsDataManager.Data.InstallID,
                     game_name = stoppedGame.Name,
@@ -140,14 +149,14 @@ namespace GsPlugin {
                 if (finishResponse != null) {
                     // Only clear the session ID if the request was successful
                     ClearActiveSession();
-                    _logger.Info($"Successfully finished scrobble session for game: {stoppedGame.Name}");
+                    _logger.Info($"Successfully finished scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
                 }
                 else {
-                    _logger.Error($"Failed to finish game session for {stoppedGame.Name}");
+                    _logger.Error($"Failed to finish game session for {stoppedGame.Name} (ID: {stoppedGame.Id})");
                 }
             }
             catch (Exception ex) {
-                _logger.Error(ex, $"Error stopping scrobble session for game: {args.Game?.Name}");
+                _logger.Error(ex, $"Error stopping scrobble session for game: {args?.Game?.Name ?? "<null>"} (ID: {(args?.Game != null ? args.Game.Id.ToString() : "<null>")})");
             }
         }
 

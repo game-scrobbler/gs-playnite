@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.6.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.5.0...GsPlugin-v0.6.0) (2025-09-22)
+
+### 🚀 Major Features
+
+* **Circuit Breaker Pattern**: Implemented advanced fault tolerance with automatic failure detection and recovery
+* **Exponential Backoff Retry Logic**: Added intelligent retry mechanism with jitter to prevent thundering herd problems
+* **Global Exception Protection**: Enhanced UnobservedTaskException handling to prevent application crashes
+* **Enhanced Logging**: Added contextual logging with game IDs, session IDs, and detailed error information
+
+### 🛡️ Reliability Improvements
+
+* **API Input Validation**: Comprehensive null and empty string validation across all API endpoints
+* **JSON Deserialization Safety**: Added safe JSON parsing with error recovery and detailed logging
+* **Session Management**: Enhanced null safety checks in game session tracking
+* **Error Context**: Improved error messages with game context for better debugging
+
+### 📦 Dependencies
+
+* **Sentry**: Updated from 5.1.0 to 5.15.1 for improved error tracking and performance
+* **PlayniteSDK**: Updated from 6.11.0 to 6.12.0 for latest platform features
+* **System Libraries**: Updated all System.* packages to latest stable versions for better compatibility
+* **Microsoft.Web.WebView2**: Updated to 1.0.3485.44 for enhanced web view functionality
+
+### 🔧 Technical Improvements
+
+* **Assembly Binding**: Updated all assembly redirects for latest dependency versions
+* **Build Configuration**: Enhanced MSBuild configuration with proper NuGet package management
+* **Code Quality**: Added comprehensive code analysis with Microsoft.CodeAnalysis.NetAnalyzers 9.0.0
+
+### 🐛 Bug Fixes
+
+* **UnobservedTaskException**: Fixed crash issues by implementing proper task exception observation
+* **Null Reference Exceptions**: Resolved null reference issues in game session handling
+* **API Response Parsing**: Fixed argument null exceptions in API response deserialization
+* **Memory Leaks**: Improved resource cleanup and disposal patterns
+
+### 📚 Documentation
+
+* **README Updates**: Comprehensive documentation of new reliability features and architecture
+* **Code Comments**: Enhanced inline documentation for better maintainability
+* **Architecture Diagrams**: Updated project structure to reflect new components
+
 ## [0.5.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.4.0...GsPlugin-v0.5.0) (2025-06-12)
 
 

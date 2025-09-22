@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Playnite.SDK;
 using Sentry;
 
@@ -50,7 +51,61 @@ namespace GsPlugin {
                     options.IsGlobalModeEnabled = false;
                     options.DiagnosticLevel = SentryLevel.Warning;
                     options.AttachStacktrace = true;
+
                 });
+
+                // Set global scope context/tags so any auto-captured events include our identifiers
+                try {
+                    SentrySdk.ConfigureScope(scope => {
+                        scope.SetTag("plugin", "GsPlugin");
+                        scope.SetTag("installId", GsDataManager.Data.InstallID);
+                        if (!string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId)) {
+                            scope.SetTag("LinkedUserId", GsDataManager.Data.LinkedUserId);
+                        }
+                    });
+                }
+                catch { /* best-effort */ }
+
+                // Hook global exception handlers to prevent UnobservedTaskException crashes and capture in Sentry
+                AppDomain.CurrentDomain.UnhandledException += (s, e) => {
+                    try {
+                        var ex = e.ExceptionObject as Exception;
+                        if (ex != null) {
+                            _logger.Error(ex, "Unhandled exception (AppDomain.CurrentDomain.UnhandledException)");
+                            CaptureException(ex, "AppDomain.CurrentDomain.UnhandledException");
+                        }
+                        else {
+                            _logger.Error("Unhandled exception (non-Exception type) captured in AppDomain.CurrentDomain.UnhandledException");
+                        }
+                    }
+                    catch { /* no-throw */ }
+                };
+
+                System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => {
+                    try {
+                        // Filter: only capture if stack trace points to our plugin to avoid reporting other extensions' errors
+                        bool fromUs = false;
+                        Exception ex = e.Exception;
+                        while (ex != null && !fromUs) {
+                            var stack = ex.StackTrace;
+                            if (!string.IsNullOrEmpty(stack) && stack.Contains("GsPlugin")) {
+                                fromUs = true;
+                                break;
+                            }
+                            ex = ex.InnerException;
+                        }
+
+                        if (fromUs) {
+                            _logger.Error(e.Exception, "UnobservedTaskException captured (from GsPlugin)");
+                            CaptureException(e.Exception, "TaskScheduler.UnobservedTaskException");
+                        } else {
+                            _logger.Warn("UnobservedTaskException not from our plugin; marking observed without capture.");
+                        }
+
+                        e.SetObserved();
+                    }
+                    catch { /* no-throw */ }
+                };
 
                 _logger.Info($"Sentry initialized. Tracking enabled: {!disableSentryFlag}");
             }
