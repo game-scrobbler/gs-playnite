@@ -109,6 +109,26 @@ The plugin includes advanced fault tolerance mechanisms to ensure stable operati
 - **Null Safety**: Comprehensive validation throughout the API layer
 - **JSON Validation**: Safe deserialization with error recovery
 
+## Development Tools
+
+### 🔧 Pre-commit Hooks
+The project includes automated code formatting via pre-commit hooks:
+
+- **setup-hooks.ps1** - Configures the pre-commit hook system for Windows
+- **.git/hooks/pre-commit.ps1** - PowerShell pre-commit hook for code validation  
+- **format-code.ps1** - Manual code formatting script for developers
+
+**Setup Instructions:**
+```powershell
+# Run once to setup the pre-commit hook
+powershell -ExecutionPolicy Bypass -File setup-hooks.ps1
+
+# Manual formatting when needed  
+powershell -ExecutionPolicy Bypass -File format-code.ps1
+```
+
+The pre-commit hook provides fast validation and guidance, while the CI pipeline handles comprehensive formatting verification.
+
 ## Configuration Files
 
 - **extension.yaml** - Plugin metadata including ID, name, version, and author information
