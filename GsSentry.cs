@@ -98,7 +98,8 @@ namespace GsPlugin {
                         if (fromUs) {
                             _logger.Error(e.Exception, "UnobservedTaskException captured (from GsPlugin)");
                             CaptureException(e.Exception, "TaskScheduler.UnobservedTaskException");
-                        } else {
+                        }
+                        else {
                             _logger.Warn("UnobservedTaskException not from our plugin; marking observed without capture.");
                         }
 

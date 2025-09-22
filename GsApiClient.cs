@@ -28,8 +28,8 @@ namespace GsPlugin {
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
             _circuitBreaker = new GsCircuitBreaker(
-                failureThreshold: 3, 
-                timeout: TimeSpan.FromMinutes(2), 
+                failureThreshold: 3,
+                timeout: TimeSpan.FromMinutes(2),
                 retryDelay: TimeSpan.FromSeconds(10));
         }
 
@@ -53,12 +53,12 @@ namespace GsPlugin {
                 _logger.Error("StartGameSession called with null startData");
                 return null;
             }
-            
+
             if (string.IsNullOrEmpty(startData.user_id)) {
                 _logger.Error("StartGameSession called with null or empty user_id");
                 return null;
             }
-            
+
             if (string.IsNullOrEmpty(startData.game_name)) {
                 _logger.Warn("StartGameSession called with null or empty game_name");
             }
@@ -95,13 +95,13 @@ namespace GsPlugin {
                 _logger.Error("FinishGameSession called with null endData");
                 return null;
             }
-            
+
             if (string.IsNullOrEmpty(endData.session_id)) {
                 GsLogger.Error("Attempted to finish session with null session_id");
                 CaptureSentryMessage("Null session ID in finish request", SentryLevel.Error, endData.game_name, endData.user_id);
                 return null;
             }
-            
+
             if (string.IsNullOrEmpty(endData.user_id)) {
                 _logger.Error("FinishGameSession called with null or empty user_id");
                 return null;
@@ -141,12 +141,12 @@ namespace GsPlugin {
                 _logger.Error("SyncLibrary called with null librarySyncReq");
                 return null;
             }
-            
+
             if (string.IsNullOrEmpty(librarySyncReq.user_id)) {
                 _logger.Error("SyncLibrary called with null or empty user_id");
                 return null;
             }
-            
+
             if (librarySyncReq.library == null) {
                 _logger.Warn("SyncLibrary called with null library, treating as empty");
                 librarySyncReq.library = new List<Playnite.SDK.Models.Game>();
@@ -179,17 +179,17 @@ namespace GsPlugin {
                 _logger.Error("VerifyToken called with null or empty token");
                 return null;
             }
-            
+
             if (string.IsNullOrEmpty(playniteId)) {
                 _logger.Error("VerifyToken called with null or empty playniteId");
                 return null;
             }
-            
+
             var payload = new TokenVerificationReq {
                 token = token,
                 playniteId = playniteId,
             };
-            
+
             return await _circuitBreaker.ExecuteAsync(async () => {
                 return await PostJsonAsync<TokenVerificationRes>(
                     $"{_nextApiBaseUrl}/api/auth/playnite/verify", payload);
@@ -255,7 +255,7 @@ namespace GsPlugin {
                         _logger.Warn($"Received empty response body from {url}");
                         return null;
                     }
-                    
+
                     try {
                         return JsonSerializer.Deserialize<TResponse>(responseBody);
                     }
