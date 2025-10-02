@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.6.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.6.1...GsPlugin-v0.6.2) (2025-10-02)
+
+
+### Bug Fixes
+
+* **dependencies**: Fix System.Text.Json version compatibility with Sentry 5.15.1
+  - Downgraded System.Text.Json from 9.0.9 to 6.0.10 to match Sentry requirements
+  - Downgraded System.Text.Encodings.Web from 9.0.9 to 6.0.0 for compatibility
+  - Updated System.Memory reference from 4.0.5.0 to 4.0.1.2 to match actual package version
+  - Fixed FileNotFoundException errors during plugin initialization
+  - Updated all assembly binding redirects to match installed package versions
+
+## [0.6.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.6.0...GsPlugin-v0.6.1) (2025-09-24)
+
+
+### Bug Fixes
+
+* Add pre-commit hook for automatic code formatting ([b3ba718](https://github.com/game-scrobbler/gs-playnite/commit/b3ba71825a8677a7889ed0a8a37f1ea787f47d05))
+* dump version ([70a636a](https://github.com/game-scrobbler/gs-playnite/commit/70a636ab2dbe957c95e968e6a3eef2ae23998d8f))
+
 ## [0.6.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.5.0...GsPlugin-v0.6.0) (2025-09-22)
 
 ### 🚀 Major Features
