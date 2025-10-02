@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(nuget restore:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet build:*)",
+      "Bash(where msbuild)",
+      "Bash(find:*)",
+      "Bash(nuget list:*)",
+      "Bash(\"C:\\Program Files\\Microsoft Visual Studio\\18\\Insiders\\MSBuild\\Current\\Bin\\amd64\\MSBuild.exe\" GsPlugin.sln -p:Configuration=Debug -clp:ErrorsOnly)",
+      "Bash(\"C:\\Program Files\\Microsoft Visual Studio\\18\\Insiders\\MSBuild\\Current\\Bin\\amd64\\MSBuild.exe\" GsPlugin.sln -t:restore)",
+      "Bash(where nuget.exe)",
+      "Bash(powershell:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
