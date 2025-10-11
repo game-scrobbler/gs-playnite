@@ -94,6 +94,12 @@ namespace GsPlugin {
                 // Verify token with API
                 var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
 
+                if (response == null) {
+                    string errorMessage = "Failed to verify token - no response from server";
+                    GsLogger.Error($"{context} linking failed: {errorMessage}");
+                    return LinkingResult.CreateError(errorMessage, context);
+                }
+
                 if (response.success) {
                     if (response.userId == "not_linked") {
                         GsDataManager.Data.LinkedUserId = null;

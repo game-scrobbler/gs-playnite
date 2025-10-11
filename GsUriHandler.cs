@@ -93,11 +93,11 @@ namespace GsPlugin {
                 var result = await _linkingService.LinkAccountAsync(token, LinkingContext.AutomaticUri);
 
                 if (result.Success) {
-                    _playniteApi.Dialogs.ShowMessage($"Account successfully linked!\nUser ID: {result.UserId}", "Account Linking Success", MessageBoxButton.OK, MessageBoxImage.Information
+                    _playniteApi?.Dialogs?.ShowMessage($"Account successfully linked!\nUser ID: {result.UserId}", "Account Linking Success", MessageBoxButton.OK, MessageBoxImage.Information
                     );
                 }
                 else {
-                    _playniteApi.Dialogs.ShowMessage($"Account linking failed: {result.ErrorMessage}", "Account Linking Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _playniteApi?.Dialogs?.ShowMessage($"Account linking failed: {result.ErrorMessage}", "Account Linking Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             catch (Exception ex) {
@@ -111,7 +111,7 @@ namespace GsPlugin {
         /// </summary>
         private void HandleEmptyToken() {
             GsLogger.Warn("Empty token received in URI request");
-            _playniteApi.Dialogs.ShowMessage(
+            _playniteApi?.Dialogs?.ShowMessage(
                 "Invalid linking token received.",
                 "Account Linking Error",
                 MessageBoxButton.OK,
@@ -127,7 +127,7 @@ namespace GsPlugin {
             GsLogger.Error("Exception during automatic linking", ex);
             SentrySdk.CaptureException(ex);
 
-            _playniteApi.Dialogs.ShowMessage(
+            _playniteApi?.Dialogs?.ShowMessage(
                 $"Error during automatic linking: {ex.Message}",
                 "Account Linking Error",
                 MessageBoxButton.OK,
@@ -159,7 +159,11 @@ namespace GsPlugin {
         private void HandleUriRequestException(Exception ex) {
             GsLogger.Error("Unexpected error handling URI request", ex);
             SentrySdk.CaptureException(ex);
-            _playniteApi.Dialogs.ShowMessage($"Unexpected error processing URI request: {ex.Message}", "Account Linking Error", MessageBoxButton.OK, MessageBoxImage.Error);
+
+            // Null check to prevent cascading exceptions
+            if (_playniteApi?.Dialogs != null) {
+                _playniteApi.Dialogs.ShowMessage($"Unexpected error processing URI request: {ex.Message}", "Account Linking Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 }

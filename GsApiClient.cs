@@ -11,13 +11,10 @@ using Sentry;
 namespace GsPlugin {
     public class GsApiClient {
         private static readonly ILogger _logger = LogManager.GetLogger();
-#if DEBUG
-        private static readonly string _apiBaseUrl = "https://api.stage.gamescrobbler.com";
-        private static readonly string _nextApiBaseUrl = "https://stage.gamescrobbler.com";
-#else
+        
         private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
         private static readonly string _nextApiBaseUrl = "https://gamescrobbler.com";
-#endif
+
         private readonly HttpClient _httpClient;
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly GsCircuitBreaker _circuitBreaker;
@@ -25,7 +22,8 @@ namespace GsPlugin {
         public GsApiClient() {
             _httpClient = new HttpClient(new SentryHttpMessageHandler());
             _jsonOptions = new JsonSerializerOptions {
-                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                PropertyNameCaseInsensitive = true
             };
             _circuitBreaker = new GsCircuitBreaker(
                 failureThreshold: 3,
@@ -257,7 +255,11 @@ namespace GsPlugin {
                     }
 
                     try {
-                        return JsonSerializer.Deserialize<TResponse>(responseBody);
+                        var deserializedResponse = JsonSerializer.Deserialize<TResponse>(responseBody);
+                        if (deserializedResponse == null) {
+                            _logger.Warn($"Deserialization returned null for {url}. Response: {responseBody}");
+                        }
+                        return deserializedResponse;
                     }
                     catch (JsonException jsonEx) {
                         _logger.Error(jsonEx, $"Failed to deserialize JSON response from {url}. Response: {responseBody}");
