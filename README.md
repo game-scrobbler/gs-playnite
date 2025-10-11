@@ -111,23 +111,62 @@ The plugin includes advanced fault tolerance mechanisms to ensure stable operati
 
 ## Development Tools
 
-### 🔧 Pre-commit Hooks
-The project includes automated code formatting via pre-commit hooks:
+### 🔧 Git Hooks
+The project includes automated validation via Git hooks:
 
-- **setup-hooks.ps1** - Configures the pre-commit hook system for Windows
-- **.git/hooks/pre-commit.ps1** - PowerShell pre-commit hook for code validation  
+#### 1. Pre-commit Hook (Code Formatting)
+- **setup-hooks.ps1** - Configures the Git hooks system for Windows
+- **.git/hooks/pre-commit.ps1** - PowerShell pre-commit hook for code formatting validation
 - **format-code.ps1** - Manual code formatting script for developers
+
+#### 2. Commit-msg Hook (Conventional Commits)
+- **.git/hooks/commit-msg.ps1** - PowerShell hook that validates commit messages
+- **.git/hooks/commit-msg** - Shell wrapper for Git integration
+- Enforces [Conventional Commits](https://www.conventionalcommits.org/) format
+- Ensures Release Please can properly auto-version the project
 
 **Setup Instructions:**
 ```powershell
-# Run once to setup the pre-commit hook
+# Run once to setup all Git hooks
 powershell -ExecutionPolicy Bypass -File setup-hooks.ps1
 
-# Manual formatting when needed  
+# Manual formatting when needed
 powershell -ExecutionPolicy Bypass -File format-code.ps1
 ```
 
-The pre-commit hook provides fast validation and guidance, while the CI pipeline handles comprehensive formatting verification.
+**Commit Message Format:**
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Examples:**
+```bash
+feat: add new statistics dashboard
+fix: resolve dependency version conflicts
+fix(api): correct session tracking bug
+docs: update README with commit guidelines
+feat!: redesign API interface (breaking change)
+```
+
+**Valid types:**
+- `feat`: New feature (triggers MINOR version bump)
+- `fix`: Bug fix (triggers PATCH version bump)
+- `docs`: Documentation changes
+- `style`: Code style/formatting changes
+- `refactor`: Code refactoring
+- `perf`: Performance improvements
+- `test`: Adding or updating tests
+- `build`: Build system or dependencies
+- `ci`: CI/CD configuration changes
+- `chore`: Other changes
+
+**Breaking changes:** Add `!` after type or include `BREAKING CHANGE:` in footer (triggers MAJOR version bump)
+
+The hooks provide fast local validation, while the CI pipeline handles comprehensive verification.
 
 ## Configuration Files
 
@@ -136,10 +175,82 @@ The pre-commit hook provides fast validation and guidance, while the CI pipeline
 - **app.config** - Application configuration file for .NET Framework settings
 - **packages.config** - NuGet package dependencies and version specifications
 
+## Release Management
+
+### Version Bumping
+
+This project uses **Release Please** for automated version management based on [Conventional Commits](https://www.conventionalcommits.org/).
+
+#### Automated Versioning (Recommended)
+
+The version is automatically determined from your commit messages:
+
+**PATCH version bump** (e.g., 0.6.2 → 0.6.3):
+```bash
+git commit -m "fix: resolve dependency version conflicts"
+git commit -m "fix: correct session tracking bug"
+```
+
+**MINOR version bump** (e.g., 0.6.2 → 0.7.0):
+```bash
+git commit -m "feat: add new statistics dashboard"
+git commit -m "feat: implement user preferences"
+```
+
+**MAJOR version bump** (e.g., 0.6.2 → 1.0.0):
+```bash
+git commit -m "feat!: redesign API interface
+
+BREAKING CHANGE: API endpoints have changed"
+```
+
+When commits are pushed to `main`, Release Please automatically:
+- Analyzes commit messages
+- Determines the appropriate version bump
+- Updates version in all configured files
+- Creates/updates CHANGELOG.md
+- Creates a GitHub release with release notes
+- Tags the release
+- Uploads the `.pext` package file
+
+#### Manual Version Override
+
+To manually set a specific version, update these files:
+
+1. **`.release-please-manifest.json`**:
+```json
+{
+  ".": "0.7.0"
+}
+```
+
+2. **`release-please-config.json`** (line 11):
+```json
+"release-as": "0.7.0",
+```
+
+3. **`extension.yaml`** (line 4):
+```yaml
+Version: 0.7.0
+```
+
+4. **`Properties/AssemblyInfo.cs`** (lines 36-37):
+```csharp
+[assembly: AssemblyVersion("0.7.0")]
+[assembly: AssemblyFileVersion("0.7.0")]
+```
+
+#### Version File Locations
+
+Release Please automatically updates:
+- `extension.yaml` - Plugin metadata version
+- `Properties/AssemblyInfo.cs` - Assembly version attributes
+- `GsPlugin.csproj` - Project version property
+
 ## Commands
 
-- `dotnet format .\GsPlugin.sln`
--
+- `dotnet format .\GsPlugin.sln` - Format code
+- `dotnet format .\GsPlugin.sln --verify-no-changes` - Verify formatting
 
 ## Contributions
 

@@ -14,7 +14,9 @@
       "Bash(powershell:*)",
       "WebFetch(domain:docs.sentry.io)",
       "Bash(dotnet format:*)",
-      "Bash(\"C:\\Program Files\\Microsoft Visual Studio\\18\\Insiders\\MSBuild\\Current\\Bin\\amd64\\MSBuild.exe\" GsPlugin.sln -p:Configuration=Release -clp:ErrorsOnly)"
+      "Bash(\"C:\\Program Files\\Microsoft Visual Studio\\18\\Insiders\\MSBuild\\Current\\Bin\\amd64\\MSBuild.exe\" GsPlugin.sln -p:Configuration=Release -clp:ErrorsOnly)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
