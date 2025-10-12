@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.6.2...GsPlugin-v0.7.0) (2025-10-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **git-hooks:** Commit messages must now follow the Conventional Commits specification to ensure proper versioning and release notes.
+
+### Features
+
+* **api:** add support for Git operations and API URLs ([8fd2cd9](https://github.com/game-scrobbler/gs-playnite/commit/8fd2cd9ecaff4561b9f95bb522d3d9379a1091db))
+* **git-hooks:** enhance hooks and add automated versioning ([257c47e](https://github.com/game-scrobbler/gs-playnite/commit/257c47eeddaf8bf50941b903083ff2e307d18c8c))
+
 ## [0.6.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.6.2...GsPlugin-v0.6.2) (2025-10-02)
 
 
