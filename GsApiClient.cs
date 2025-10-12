@@ -11,7 +11,7 @@ using Sentry;
 namespace GsPlugin {
     public class GsApiClient {
         private static readonly ILogger _logger = LogManager.GetLogger();
-        
+
         private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
         private static readonly string _nextApiBaseUrl = "https://gamescrobbler.com";
 
