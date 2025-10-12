@@ -8,7 +8,6 @@
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
       "prerelease": false,
-      "release-as": "0.6.2",
       "extra-files": [
         {
           "type": "xml",
