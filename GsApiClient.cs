@@ -45,7 +45,16 @@ namespace GsPlugin {
             public string session_id { get; set; }
         }
 
-        public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) {
+        public class AsyncQueuedResponse {
+            public bool success { get; set; }
+            public string status { get; set; }
+            public string queueId { get; set; }
+            public string message { get; set; }
+            public string timestamp { get; set; }
+            public string estimatedProcessingTime { get; set; }
+        }
+
+        public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData, bool useAsync = false) {
             // Validate input before making API call
             if (startData == null) {
                 _logger.Error("StartGameSession called with null startData");
@@ -61,17 +70,42 @@ namespace GsPlugin {
                 _logger.Warn("StartGameSession called with null or empty game_name");
             }
 
-            var response = await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<ScrobbleStartRes>(
-                    $"{_apiBaseUrl}/api/playnite/scrobble/start", startData);
-            }, maxRetries: 2);
-
-            if (response == null || string.IsNullOrEmpty(response.session_id)) {
-                GsLogger.Error("Failed to get valid session ID from start session response");
-                CaptureSentryMessage("Invalid session response", SentryLevel.Error, startData.game_name, startData.user_id);
+            // Build URL with async query parameter if needed
+            string url = $"{_apiBaseUrl}/api/playnite/scrobble/start";
+            if (useAsync) {
+                url += "?async=true";
             }
 
-            return response;
+            // If async mode, we expect AsyncQueuedResponse, otherwise ScrobbleStartRes
+            if (useAsync) {
+                var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
+                    return await PostJsonAsync<AsyncQueuedResponse>(url, startData);
+                }, maxRetries: 2);
+
+                if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
+                    _logger.Info($"Scrobble start queued with ID: {asyncResponse.queueId}");
+                    // Return a placeholder response for async mode
+                    // Session ID will be created on the backend
+                    return new ScrobbleStartRes { session_id = "queued" };
+                }
+                else {
+                    GsLogger.Error("Failed to queue scrobble start request");
+                    CaptureSentryMessage("Failed to queue scrobble start", SentryLevel.Error, startData.game_name, startData.user_id);
+                    return null;
+                }
+            }
+            else {
+                var response = await _circuitBreaker.ExecuteAsync(async () => {
+                    return await PostJsonAsync<ScrobbleStartRes>(url, startData);
+                }, maxRetries: 2);
+
+                if (response == null || string.IsNullOrEmpty(response.session_id)) {
+                    GsLogger.Error("Failed to get valid session ID from start session response");
+                    CaptureSentryMessage("Invalid session response", SentryLevel.Error, startData.game_name, startData.user_id);
+                }
+
+                return response;
+            }
         }
 
         public class ScrobbleFinishReq {
@@ -87,7 +121,7 @@ namespace GsPlugin {
             public string status { get; set; }
         }
 
-        public async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData) {
+        public async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData, bool useAsync = false) {
             // Validate input before making API call
             if (endData == null) {
                 _logger.Error("FinishGameSession called with null endData");
@@ -105,10 +139,33 @@ namespace GsPlugin {
                 return null;
             }
 
-            return await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<ScrobbleFinishRes>(
-                    $"{_apiBaseUrl}/api/playnite/scrobble/finish", endData, true);
-            }, maxRetries: 2);
+            // Build URL with async query parameter if needed
+            string url = $"{_apiBaseUrl}/api/playnite/scrobble/finish";
+            if (useAsync) {
+                url += "?async=true";
+            }
+
+            // If async mode, we expect AsyncQueuedResponse, otherwise ScrobbleFinishRes
+            if (useAsync) {
+                var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
+                    return await PostJsonAsync<AsyncQueuedResponse>(url, endData, true);
+                }, maxRetries: 2);
+
+                if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
+                    _logger.Info($"Scrobble finish queued with ID: {asyncResponse.queueId}");
+                    // Return a success response for async mode
+                    return new ScrobbleFinishRes { status = "queued" };
+                }
+                else {
+                    GsLogger.Error("Failed to queue scrobble finish request");
+                    return null;
+                }
+            }
+            else {
+                return await _circuitBreaker.ExecuteAsync(async () => {
+                    return await PostJsonAsync<ScrobbleFinishRes>(url, endData, true);
+                }, maxRetries: 2);
+            }
         }
 
         #endregion
@@ -133,7 +190,7 @@ namespace GsPlugin {
             public int updated { get; set; }
         }
 
-        public async Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq) {
+        public async Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq, bool useAsync = false) {
             // Validate input before making API call
             if (librarySyncReq == null) {
                 _logger.Error("SyncLibrary called with null librarySyncReq");
@@ -150,10 +207,37 @@ namespace GsPlugin {
                 librarySyncReq.library = new List<Playnite.SDK.Models.Game>();
             }
 
-            return await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<LibrarySyncRes>(
-                    $"{_apiBaseUrl}/api/playnite/sync", librarySyncReq, true);
-            }, maxRetries: 1); // Library sync is less critical, only retry once
+            // Build URL with async query parameter if needed
+            string url = $"{_apiBaseUrl}/api/playnite/sync";
+            if (useAsync) {
+                url += "?async=true";
+            }
+
+            // If async mode, we expect AsyncQueuedResponse, otherwise LibrarySyncRes
+            if (useAsync) {
+                var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
+                    return await PostJsonAsync<AsyncQueuedResponse>(url, librarySyncReq, true);
+                }, maxRetries: 1);
+
+                if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
+                    _logger.Info($"Library sync queued with ID: {asyncResponse.queueId}");
+                    // Return a placeholder response for async mode
+                    return new LibrarySyncRes {
+                        status = "queued",
+                        result = new LibrarySyncDetails { added = 0, updated = 0 },
+                        userId = null
+                    };
+                }
+                else {
+                    GsLogger.Error("Failed to queue library sync request");
+                    return null;
+                }
+            }
+            else {
+                return await _circuitBreaker.ExecuteAsync(async () => {
+                    return await PostJsonAsync<LibrarySyncRes>(url, librarySyncReq, true);
+                }, maxRetries: 1); // Library sync is less critical, only retry once
+            }
         }
 
         #endregion

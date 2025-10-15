@@ -102,7 +102,7 @@ namespace GsPlugin {
                     game_id = startedGame.Id.ToString(),
                     metadata = new { },
                     started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                });
+                }, useAsync: true);
                 if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
                     SetActiveSession(sessionData.session_id);
                     _logger.Info($"Successfully started scrobble session with ID: {sessionData.session_id}");
@@ -145,7 +145,7 @@ namespace GsPlugin {
                     session_id = GsDataManager.Data.ActiveSessionId,
                     metadata = new { },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                });
+                }, useAsync: true);
                 if (finishResponse != null) {
                     // Only clear the session ID if the request was successful
                     ClearActiveSession();
@@ -182,7 +182,7 @@ namespace GsPlugin {
                     session_id = GsDataManager.Data.ActiveSessionId,
                     metadata = new { reason = "application_stopped" },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                });
+                }, useAsync: true);
                 if (finishResponse != null) {
                     ClearActiveSession();
                     _logger.Info("Successfully cleaned up active session on application stop");
@@ -208,11 +208,9 @@ namespace GsPlugin {
                     user_id = GsDataManager.Data.InstallID,
                     library = library,
                     flags = GsDataManager.Data.Flags.ToArray()
-                });
+                }, useAsync: true);
                 if (syncResponse != null) {
-                    // Update linked status based on API response
-                    SetLinkedUser(syncResponse.userId);
-                    _logger.Info($"Library sync completed: {syncResponse.result.added} added, {syncResponse.result.updated} updated.");
+                    _logger.Info("Library sync request queued successfully.");
                     return true;
                 }
                 else {
