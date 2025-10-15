@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.7.0...GsPlugin-v0.8.0) (2025-10-15)
+
+
+### Features
+
+* **api:** add support for asynchronous operations ([c50d466](https://github.com/game-scrobbler/gs-playnite/commit/c50d466aa12ebdcbcb9a71155aee1074ad57fc6a))
+
 ## [0.7.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.6.2...GsPlugin-v0.7.0) (2025-10-12)
 
 
