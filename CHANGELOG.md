@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.8.0...GsPlugin-v0.9.0) (2025-10-16)
+
+
+### Features
+
+* **ci:** integrate Sentry release management in GitHub Actions ([226e7a0](https://github.com/game-scrobbler/gs-playnite/commit/226e7a066b51b206acc658de56399451a2c3c9ce))
+
 ## [0.8.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.7.0...GsPlugin-v0.8.0) (2025-10-15)
 
 
