@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.9.0...GsPlugin-v0.10.0) (2025-10-16)
+
+
+### Features
+
+* **sentry:** add user control for error reporting and scrobbling tracking ([e055acb](https://github.com/game-scrobbler/gs-playnite/commit/e055acb6b388c61c5eef1915acf6f0505fe1a98c))
+
 ## [0.9.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.8.0...GsPlugin-v0.9.0) (2025-10-16)
 
 
