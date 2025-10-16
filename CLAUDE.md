@@ -92,10 +92,11 @@ The codebase emphasizes robust error handling with circuit breakers, comprehensi
 Automatic release tracking is configured for comprehensive error monitoring:
 - **Runtime Tracking**: Plugin reports version to Sentry using `GsPlugin@X.Y.Z` format from AssemblyInfo
 - **CI/CD Integration**: GitHub Actions automatically creates Sentry releases, uploads debug symbols (PDB files), and associates commits
-- **Debug Symbols**: Portable PDB files are uploaded for proper stack trace symbolication and source code context
+- **Debug Symbols**: Portable PDB files (`.pdb`) are uploaded using `--type=portablepdb` for proper stack trace symbolication and source code context
 - **Version Sync**: release-please keeps versions synchronized across AssemblyInfo.cs, extension.yaml, and manifests
-- **Configuration**: `.sentryclirc` provides sentry-cli defaults; requires `SENTRY_AUTH_TOKEN` secret in GitHub
-- See `.github/SENTRY_RELEASES.md` for detailed documentation
+- **Configuration**: `.sentryclirc` is gitignored; use `.sentryclirc.template` as reference; Sentry project name is `gs-playnite`; requires `SENTRY_AUTH_TOKEN` secret in GitHub with scopes: `project:read`, `project:write`, `project:releases`, `org:read`
+- **Workflow**: Only runs when `release-please` creates a GitHub release (conditional on `${{ steps.release.outputs.release_created }}`)
+- **Troubleshooting**: "Project not found" errors indicate missing Sentry project or invalid auth token; "Invalid value 'portable'" means wrong type (should be `portablepdb`)
 
 ### UI Development
 Settings UI uses two-way data binding with GsPluginSettings. The sidebar uses WebView2 for displaying GameScrobbler statistics.

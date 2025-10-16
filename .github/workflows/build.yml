@@ -63,13 +63,13 @@ jobs:
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: game-scrobbler
-          SENTRY_PROJECT: GsPlugin
+          SENTRY_PROJECT: gs-playnite
         run: |
           npm install -g @sentry/cli
           $version = "${{ steps.release.outputs.tag_name }}".TrimStart('v')
           sentry-cli releases new "GsPlugin@$version"
           sentry-cli releases set-commits "GsPlugin@$version" --auto
-          sentry-cli upload-dif --type=portable "$Env:GITHUB_WORKSPACE\bin\Release" --log-level=info
+          sentry-cli upload-dif --type=portablepdb "$Env:GITHUB_WORKSPACE\bin\Release" --log-level=info
           sentry-cli releases finalize "GsPlugin@$version"
 
       - name: Rename Packed File Name to Release Tag

@@ -1,0 +1,11 @@
+[defaults]
+org=game-scrobbler
+project=gs-playnite
+
+# Authentication token should be provided via SENTRY_AUTH_TOKEN environment variable
+# or create a local .sentryclirc file (which is gitignored) with:
+#
+# [auth]
+# token=YOUR_SENTRY_AUTH_TOKEN_HERE
+#
+# Get your auth token from: https://sentry.io/settings/account/api/auth-tokens/
