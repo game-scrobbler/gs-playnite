@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using Playnite.SDK;
 using Sentry;
 
@@ -26,8 +27,16 @@ namespace GsPlugin {
                     // See https://docs.sentry.io/product/sentry-basics/dsn-explainer/
                     options.Dsn = "https://af79b5bda2a052b04b3f490b79d0470a@o4508777256124416.ingest.de.sentry.io/4508777265627216";
 
-                    // Use method to get the plugin version
-                    options.Release = GetPluginVersion();
+                    // Set release version for proper release tracking
+                    // Format: GsPlugin@version (e.g., GsPlugin@0.8.0)
+                    try {
+                        var version = Assembly.GetExecutingAssembly().GetName().Version;
+                        options.Release = $"GsPlugin@{version.Major}.{version.Minor}.{version.Build}";
+                    }
+                    catch (Exception ex) {
+                        _logger.Warn(ex, "Failed to get assembly version for Sentry release");
+                        options.Release = "GsPlugin@unknown";
+                    }
 
                     // Environment configuration based on build type
 #if DEBUG
@@ -116,22 +125,18 @@ namespace GsPlugin {
         }
 
         /// <summary>
-        /// Retrieves the current version of the plugin from the extension.yaml file.
+        /// Retrieves the current version of the plugin from the Assembly.
         /// </summary>
-        /// <returns>The version string or "Unknown Version" if not found.</returns>
+        /// <returns>The version string (e.g., "0.8.0") or "unknown" if not found.</returns>
         public static string GetPluginVersion() {
-            string pluginFolder = System.IO.Path.GetDirectoryName(typeof(GsPlugin).Assembly.Location);
-            string yamlPath = System.IO.Path.Combine(pluginFolder, "extension.yaml");
-
-            if (System.IO.File.Exists(yamlPath)) {
-                foreach (var line in System.IO.File.ReadAllLines(yamlPath)) {
-                    if (line.StartsWith("Version:")) {
-                        return line.Split(':')[1].Trim();
-                    }
-                }
+            try {
+                var version = Assembly.GetExecutingAssembly().GetName().Version;
+                return $"{version.Major}.{version.Minor}.{version.Build}";
             }
-
-            return "Unknown Version";
+            catch (Exception ex) {
+                LogManager.GetLogger().Warn(ex, "Failed to get assembly version");
+                return "unknown";
+            }
         }
 
         /// <summary>

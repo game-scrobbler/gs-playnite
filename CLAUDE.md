@@ -88,5 +88,14 @@ All code must be formatted using `dotnet format` before commits. The pre-commit 
 ### Error Handling
 The codebase emphasizes robust error handling with circuit breakers, comprehensive logging, and Sentry integration. When modifying API calls, ensure proper error handling and logging context.
 
+### Sentry Release Management
+Automatic release tracking is configured for comprehensive error monitoring:
+- **Runtime Tracking**: Plugin reports version to Sentry using `GsPlugin@X.Y.Z` format from AssemblyInfo
+- **CI/CD Integration**: GitHub Actions automatically creates Sentry releases, uploads debug symbols (PDB files), and associates commits
+- **Debug Symbols**: Portable PDB files are uploaded for proper stack trace symbolication and source code context
+- **Version Sync**: release-please keeps versions synchronized across AssemblyInfo.cs, extension.yaml, and manifests
+- **Configuration**: `.sentryclirc` provides sentry-cli defaults; requires `SENTRY_AUTH_TOKEN` secret in GitHub
+- See `.github/SENTRY_RELEASES.md` for detailed documentation
+
 ### UI Development
 Settings UI uses two-way data binding with GsPluginSettings. The sidebar uses WebView2 for displaying GameScrobbler statistics.
