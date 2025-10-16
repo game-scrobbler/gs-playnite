@@ -80,7 +80,7 @@ namespace GsPlugin {
             }
 
             GsLogger.Info($"Starting {context} account linking.");
-            SentrySdk.AddBreadcrumb(
+            GsSentry.AddBreadcrumb(
                 message: $"Starting {context} account linking",
                 category: "linking",
                 data: new Dictionary<string, string> {
@@ -112,7 +112,7 @@ namespace GsPlugin {
                     OnLinkingStatusChanged();
 
                     GsLogger.Info($"Account successfully linked via {context} to User ID: {response.userId}");
-                    SentrySdk.AddBreadcrumb(
+                    GsSentry.AddBreadcrumb(
                         message: $"{context} account linking successful",
                         category: "linking",
                         data: new Dictionary<string, string> {
@@ -127,22 +127,16 @@ namespace GsPlugin {
                 else {
                     string errorMessage = response?.message ?? "Unknown error occurred during linking";
                     GsLogger.Error($"{context} linking failed: {errorMessage}");
-                    SentrySdk.CaptureMessage(
-                        $"{context} account linking failed",
-                        scope => {
-                            scope.Level = SentryLevel.Warning;
-                            scope.SetExtra("Context", context.ToString());
-                            scope.SetExtra("ErrorMessage", errorMessage);
-                        }
+                    GsSentry.CaptureMessage(
+                        $"{context} account linking failed: {errorMessage}",
+                        SentryLevel.Warning
                     );
                     return LinkingResult.CreateError(errorMessage, context);
                 }
             }
             catch (Exception ex) {
                 GsLogger.Error($"Exception during {context} linking", ex);
-                SentrySdk.CaptureException(ex, scope => {
-                    scope.SetExtra("Context", context.ToString());
-                });
+                GsSentry.CaptureException(ex, $"Exception during {context} linking");
                 return LinkingResult.CreateError($"Error during linking: {ex.Message}", context, ex);
             }
         }

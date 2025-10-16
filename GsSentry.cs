@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Playnite.SDK;
@@ -175,6 +176,23 @@ namespace GsPlugin {
                     scope.SetExtra("contextMessage", message);
                 }
             });
+        }
+
+        /// <summary>
+        /// Adds a breadcrumb to the Sentry session for debugging context.
+        /// Breadcrumbs are only sent if an error occurs later.
+        /// </summary>
+        /// <param name="message">The breadcrumb message.</param>
+        /// <param name="category">The category of the breadcrumb.</param>
+        /// <param name="data">Optional key-value data to attach.</param>
+        /// <param name="level">The severity level of the breadcrumb.</param>
+        public static void AddBreadcrumb(string message, string category = null, Dictionary<string, string> data = null, BreadcrumbLevel level = BreadcrumbLevel.Info) {
+            // Skip if Sentry is disabled
+            if (GsDataManager.Data.Flags.Contains("no-sentry")) {
+                return;
+            }
+
+            SentrySdk.AddBreadcrumb(message, category, null, data, level);
         }
     }
 }

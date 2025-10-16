@@ -286,27 +286,22 @@ namespace GsPlugin {
         /// Helper method to capture HTTP-related exceptions with consistent context.
         /// </summary>
         private static void CaptureHttpException(Exception exception, string url, string requestBody, HttpResponseMessage response = null, string responseBody = null) {
-            SentrySdk.CaptureException(exception, scope => {
-                scope.SetExtra("RequestUrl", url);
-                scope.SetExtra("RequestBody", requestBody);
-                scope.SetExtra("ResponseStatus", response?.StatusCode);
-                scope.SetExtra("ResponseBody", responseBody);
-            });
+            string contextMessage = $"HTTP request failed for {url}. Status: {response?.StatusCode}";
+            GsSentry.CaptureException(exception, contextMessage);
         }
 
         private static void CaptureSentryMessage(string message, SentryLevel level, string gameName = null, string userId = null, string sessionId = null) {
-            SentrySdk.CaptureMessage(message, scope => {
-                scope.Level = level;
-                if (!string.IsNullOrEmpty(gameName)) {
-                    scope.SetExtra("GameName", gameName);
-                }
-                if (!string.IsNullOrEmpty(userId)) {
-                    scope.SetExtra("UserId", userId);
-                }
-                if (!string.IsNullOrEmpty(sessionId)) {
-                    scope.SetExtra("SessionId", sessionId);
-                }
-            });
+            string contextMessage = message;
+            if (!string.IsNullOrEmpty(gameName)) {
+                contextMessage += $" [Game: {gameName}]";
+            }
+            if (!string.IsNullOrEmpty(userId)) {
+                contextMessage += $" [User: {userId}]";
+            }
+            if (!string.IsNullOrEmpty(sessionId)) {
+                contextMessage += $" [Session: {sessionId}]";
+            }
+            GsSentry.CaptureMessage(contextMessage, level);
         }
 
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)

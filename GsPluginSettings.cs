@@ -129,7 +129,7 @@ namespace GsPlugin {
             Settings = savedSettings;
 
             // Log successful load for debugging
-            SentrySdk.AddBreadcrumb(
+            GsSentry.AddBreadcrumb(
                 message: "Successfully loaded plugin settings",
                 category: "settings",
                 data: new Dictionary<string, string> {
@@ -149,7 +149,7 @@ namespace GsPlugin {
             };
 
             // Log creation for debugging
-            SentrySdk.AddBreadcrumb(
+            GsSentry.AddBreadcrumb(
                 message: "Created new plugin settings",
                 category: "settings"
             );

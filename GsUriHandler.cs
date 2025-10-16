@@ -28,14 +28,14 @@ namespace GsPlugin {
                 _playniteApi.UriHandler.RegisterSource("gamescrobbler", HandleUriRequest);
                 GsLogger.Info("Successfully registered URI handler for playnite://gamescrobbler links");
 
-                SentrySdk.AddBreadcrumb(
+                GsSentry.AddBreadcrumb(
                     message: "URI handler registered",
                     category: "initialization"
                 );
             }
             catch (Exception ex) {
                 GsLogger.Error("Failed to register URI handler", ex);
-                SentrySdk.CaptureException(ex);
+                GsSentry.CaptureException(ex, "Failed to register URI handler");
             }
         }
 
@@ -125,7 +125,7 @@ namespace GsPlugin {
         /// <param name="ex">The exception that occurred</param>
         private void HandleLinkingException(Exception ex) {
             GsLogger.Error("Exception during automatic linking", ex);
-            SentrySdk.CaptureException(ex);
+            GsSentry.CaptureException(ex, "Exception during automatic linking via URI handler");
 
             _playniteApi?.Dialogs?.ShowMessage(
                 $"Error during automatic linking: {ex.Message}",
@@ -158,7 +158,7 @@ namespace GsPlugin {
         /// <param name="ex">The exception that occurred</param>
         private void HandleUriRequestException(Exception ex) {
             GsLogger.Error("Unexpected error handling URI request", ex);
-            SentrySdk.CaptureException(ex);
+            GsSentry.CaptureException(ex, "Unexpected error handling URI request");
 
             // Null check to prevent cascading exceptions
             if (_playniteApi?.Dialogs != null) {

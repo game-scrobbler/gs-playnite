@@ -56,7 +56,7 @@ namespace GsPlugin {
                     // Generate new InstallID if not present
                     _data.InstallID = Guid.NewGuid().ToString();
                     GsLogger.Info("Generated new InstallID");
-                    SentrySdk.AddBreadcrumb(
+                    GsSentry.AddBreadcrumb(
                         message: "Generated new InstallID",
                         category: "initialization",
                         data: new Dictionary<string, string> { { "InstallID", _data.InstallID } }
@@ -66,7 +66,7 @@ namespace GsPlugin {
             }
             catch (Exception ex) {
                 GsLogger.Error("Failed to initialize GsData", ex);
-                SentrySdk.CaptureException(ex);
+                GsSentry.CaptureException(ex, "Failed to initialize GsData");
                 // Fallback to new GUID if initialization fails
                 _data.InstallID = Guid.NewGuid().ToString();
                 Save();
@@ -88,12 +88,7 @@ namespace GsPlugin {
             }
             catch (Exception ex) {
                 GsLogger.Error("Failed to load custom GsData", ex);
-                SentrySdk.CaptureException(ex, scope => {
-                    scope.SetExtra("FilePath", _filePath);
-                    if (File.Exists(_filePath)) {
-                        scope.SetExtra("FileContent", File.ReadAllText(_filePath));
-                    }
-                });
+                GsSentry.CaptureException(ex, "Failed to load GsData from disk");
                 return new GsData();
             }
         }
@@ -109,10 +104,7 @@ namespace GsPlugin {
             }
             catch (Exception ex) {
                 GsLogger.Error("Failed to save custom GsData", ex);
-                SentrySdk.CaptureException(ex, scope => {
-                    scope.SetExtra("FilePath", _filePath);
-                    scope.SetExtra("AttemptedData", JsonSerializer.Serialize(_data));
-                });
+                GsSentry.CaptureException(ex, "Failed to save GsData to disk");
             }
         }
 

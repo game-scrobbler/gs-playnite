@@ -23,8 +23,9 @@ namespace MySidebarPlugin {
             string userId = GsDataManager.Data.InstallID;
 
             string theme = GsDataManager.Data.Theme.ToLower();
-            GsLogger.ShowDebugInfoBox($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}");
-            string url = $"https://playnite.gamescrobbler.com?user_id={userId}&plugin_version={viewPluginVer}&theme={theme}";
+            bool isScrobblingDisabled = GsDataManager.Data.Flags.Contains("no-scrobble");
+            GsLogger.ShowDebugInfoBox($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}\nScrobbling Disabled: {isScrobblingDisabled}");
+            string url = $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={viewPluginVer}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}";
 
             // Navigate to the URL
             MyWebView2.CoreWebView2.Navigate(url);
