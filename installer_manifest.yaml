@@ -1,92 +1,83 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
+
 Packages:
   - Version: 0.10.1
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.1/GsPlugin-v0.10.1.pext
     Changelog:
-      - '**ci:** automate installer_manifest.yaml updates and add missing versions ()'
-      - improve performance and error handling across multiple components ()
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.0/GsPlugin-v0.10.0.pext
-
+      - "ci: automate installer_manifest.yaml updates and add missing versions"
+      - "fix: improve performance and error handling across multiple components"
   - Version: 0.10.0
-    ReleaseDate: 2025-10-16
     RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-10-16
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.0/GsPlugin-v0.10.0.pext
     Changelog:
       - sentry: add user control for error reporting and scrobbling tracking
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.9.0/GsPlugin-v0.9.0.pext
-
   - Version: 0.9.0
-    ReleaseDate: 2025-10-16
     RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-10-16
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.9.0/GsPlugin-v0.9.0.pext
     Changelog:
       - ci: integrate Sentry release management in GitHub Actions
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.8.0/GsPlugin-v0.8.0.pext
-
   - Version: 0.8.0
-    ReleaseDate: 2025-10-15
     RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-10-15
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.8.0/GsPlugin-v0.8.0.pext
     Changelog:
       - api: add support for asynchronous operations
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.7.0/GsPlugin-v0.7.0.pext
-
   - Version: 0.7.0
-    ReleaseDate: 2025-10-12
     RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-10-12
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.7.0/GsPlugin-v0.7.0.pext
     Changelog:
       - api: add support for Git operations and API URLs
       - git-hooks: enhance hooks and add automated versioning
-      - "âš ï¸\x8F BREAKING: Commit messages must now follow Conventional Commits specification"
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.6.0/GsPlugin-v0.6.0.pext
-
+      - "BREAKING: Commit messages must now follow Conventional Commits specification"
   - Version: 0.6.0
-    ReleaseDate: 2025-09-22
     RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-09-22
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.6.0/GsPlugin-v0.6.0.pext
     Changelog:
-      - "ðŸ›¡ï¸\x8F Major reliability improvements with circuit breaker pattern and retry logic"
-      - ðŸš€ Enhanced error handling with global exception protection
-      - "ðŸ”\x8D Detailed logging with game context for better debugging"
-      - ðŸ“¦ Updated all dependencies to latest stable versions
-      - "ðŸ\x90› Fixed UnobservedTaskException crashes and null reference issues"
-      - ðŸ“š Comprehensive documentation and architecture updates
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.5.0/GsPlugin-v0.5.0.pext
-
+      - Major reliability improvements with circuit breaker pattern and retry logic
+      - Enhanced error handling with global exception protection
+      - Detailed logging with game context for better debugging
+      - Updated all dependencies to latest stable versions
+      - Fixed UnobservedTaskException crashes and null reference issues
+      - Comprehensive documentation and architecture updates
   - Version: 0.5.0
-    ReleaseDate: 2025-06-12
     RequiredApiVersion: 6.11.0
+    ReleaseDate: 2025-06-12
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.5.0/GsPlugin-v0.5.0.pext
     Changelog:
       - Ability to link GS account
-      - Small ug fixes
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.4.0/GsPlugin-v0.4.0.pext
-
+      - Small bug fixes
   - Version: 0.4.0
-    ReleaseDate: 2025-02-19
     RequiredApiVersion: 6.11.0
+    ReleaseDate: 2025-02-19
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.4.0/GsPlugin-v0.4.0.pext
     Changelog:
       - Add plugin setting page
       - Add dark mode and support for themes
       - Add opt out option for error tracking and game tracking
       - Fix a bug that caused errors on persistent game tracking
       - Fix a bug that caused plugin crash for some users
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.3.0/GsPlugin-v0.3.0.pext
-
   - Version: 0.3.0
+    RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-10
-    RequiredApiVersion: 6.11.0
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.3.0/GsPlugin-v0.3.0.pext
     Changelog:
-      - Refactoring & Improve code quality
+      - Refactoring and improve code quality
       - Add Sentry for error tracking
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.2.0/GsPlugin-v0.2.0.pext
-
   - Version: 0.2.0
-    ReleaseDate: 2025-02-06
     RequiredApiVersion: 6.11.0
+    ReleaseDate: 2025-02-06
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.2.0/GsPlugin-v0.2.0.pext
     Changelog:
       - Fix a dependency bug that caused the plugin to not load
-      - PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.1.3/GsPlugin_GsPlugin-v0.1.3.pext
-
   - Version: 0.1.3
-    ReleaseDate: 2025-02-05
     RequiredApiVersion: 6.11.0
+    ReleaseDate: 2025-02-05
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.1.3/GsPlugin_GsPlugin-v0.1.3.pext
     Changelog:
       - Initial release

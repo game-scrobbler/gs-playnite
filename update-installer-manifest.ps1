@@ -86,39 +86,35 @@ if ($existingVersionIndex -ge 0) {
     $manifest.Packages = @($newPackage) + $manifest.Packages
 }
 
-# Write the updated manifest back to file
-$yamlContent = ConvertTo-Yaml -Data $manifest -Options EmitDefaults
+# Generate clean YAML manually instead of relying on ConvertTo-Yaml
+# This ensures proper formatting and avoids library quirks
+$yamlLines = @()
+$yamlLines += "AddonId: $($manifest.AddonId)"
+$yamlLines += ""
+$yamlLines += "Packages:"
 
-# Fix YAML formatting issues
-$yamlContent = $yamlContent -replace "Packages:\r?\n- ", "Packages:`n  - "
-$yamlContent = $yamlContent -replace "\r?\n  Version:", "`n`n  - Version:"
-$yamlContent = $yamlContent -replace "\r?\n- Version:", "`n  - Version:"
+foreach ($package in $manifest.Packages) {
+    $yamlLines += "  - Version: $($package.Version)"
+    $yamlLines += "    RequiredApiVersion: $($package.RequiredApiVersion)"
+    $yamlLines += "    ReleaseDate: $($package.ReleaseDate)"
+    $yamlLines += "    PackageUrl: $($package.PackageUrl)"
+    $yamlLines += "    Changelog:"
 
-# Ensure proper indentation for all fields
-$lines = $yamlContent -split "`n"
-$formattedLines = @()
-$inPackages = $false
-
-foreach ($line in $lines) {
-    if ($line -match "^Packages:") {
-        $inPackages = $true
-        $formattedLines += $line
-    }
-    elseif ($inPackages -and $line -match "^\s*- Version:") {
-        $formattedLines += "  $($line.TrimStart())"
-    }
-    elseif ($inPackages -and $line -match "^\s*(RequiredApiVersion|ReleaseDate|PackageUrl|Changelog):") {
-        $formattedLines += "    $($line.TrimStart())"
-    }
-    elseif ($inPackages -and $line -match "^\s*-\s+") {
-        $formattedLines += "      $($line.TrimStart())"
-    }
-    else {
-        $formattedLines += $line
+    # Handle changelog entries
+    foreach ($entry in $package.Changelog) {
+        # Escape quotes and special characters in changelog entries
+        $escapedEntry = $entry
+        if ($escapedEntry -match '[:\[\]{}@&*#?|<>%`]|^-|\s+$') {
+            # If entry contains special YAML characters, quote it
+            $escapedEntry = $escapedEntry -replace '"', '\"'
+            $yamlLines += "      - `"$escapedEntry`""
+        } else {
+            $yamlLines += "      - $escapedEntry"
+        }
     }
 }
 
-$yamlContent = $formattedLines -join "`n"
+$yamlContent = $yamlLines -join "`n"
 
 # Write to file
 Set-Content -Path $manifestPath -Value $yamlContent -NoNewline
