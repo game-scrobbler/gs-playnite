@@ -33,6 +33,6 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 // x-release-please-start-version
-[assembly: AssemblyVersion("0.10.1")]
-[assembly: AssemblyFileVersion("0.10.1")]
+[assembly: AssemblyVersion("0.10.2")]
+[assembly: AssemblyFileVersion("0.10.2")]
 // x-release-please-end
