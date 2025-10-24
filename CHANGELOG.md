@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.10.1...GsPlugin-v0.10.2) (2025-10-24)
+
+
+### Bug Fixes
+
+* **ci:** fix YAML generation in update-installer-manifest script ([6e8e36b](https://github.com/game-scrobbler/gs-playnite/commit/6e8e36be7ba53538048773cc6a4d6314a648f543))
+
 ## [0.10.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.10.0...GsPlugin-v0.10.1) (2025-10-24)
 
 
