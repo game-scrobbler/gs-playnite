@@ -20,12 +20,12 @@ namespace MySidebarPlugin {
             await MyWebView2.EnsureCoreWebView2Async();
 
             // Now you can navigate to a URL directly.
-            string userId = GsDataManager.Data.InstallID;
-
-            string theme = GsDataManager.Data.Theme.ToLower();
+            // Properly encode all URL parameters to prevent injection attacks
+            string userId = Uri.EscapeDataString(GsDataManager.Data.InstallID);
+            string theme = Uri.EscapeDataString(GsDataManager.Data.Theme.ToLower());
             bool isScrobblingDisabled = GsDataManager.Data.Flags.Contains("no-scrobble");
-            GsLogger.ShowDebugInfoBox($"Debug Info:\nUser ID: {userId}\nTheme: {theme}\nPlugin Version: {viewPluginVer}\nScrobbling Disabled: {isScrobblingDisabled}");
-            string url = $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={viewPluginVer}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}";
+            bool isSentryDisabled = GsDataManager.Data.Flags.Contains("no-sentry");
+            string url = $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}";
 
             // Navigate to the URL
             MyWebView2.CoreWebView2.Navigate(url);

@@ -11,6 +11,10 @@ namespace GsPlugin {
     public class GsCircuitBreaker {
         private static readonly ILogger _logger = LogManager.GetLogger();
 
+        // Reuse a single Random instance for jitter calculation to improve performance
+        // and ensure better randomness distribution
+        private static readonly Random _random = new Random();
+
         public enum CircuitState {
             Closed,     // Normal operation
             Open,       // Circuit breaker is open, failing fast
@@ -74,9 +78,12 @@ namespace GsPlugin {
                     }
 
                     // Exponential backoff: delay = baseDelay * 2^attempt with some jitter
+                    int jitter;
+                    lock (_lock) {
+                        jitter = _random.Next(0, 1000); // Add jitter up to 1 second
+                    }
                     var waitTime = TimeSpan.FromMilliseconds(
-                        delay.TotalMilliseconds * Math.Pow(2, attempt) +
-                        new Random().Next(0, 1000)); // Add jitter up to 1 second
+                        delay.TotalMilliseconds * Math.Pow(2, attempt) + jitter);
 
                     _logger.Info($"Waiting {waitTime.TotalSeconds:F1} seconds before retry attempt {attempt + 2}");
                     await Task.Delay(waitTime);

@@ -15,12 +15,14 @@ namespace GsPlugin {
         private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
         private static readonly string _nextApiBaseUrl = "https://gamescrobbler.com";
 
-        private readonly HttpClient _httpClient;
+        // Reuse a single HttpClient instance across all API client instances
+        // This prevents socket exhaustion and improves performance
+        private static readonly HttpClient _sharedHttpClient = new HttpClient(new SentryHttpMessageHandler());
+
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly GsCircuitBreaker _circuitBreaker;
 
         public GsApiClient() {
-            _httpClient = new HttpClient(new SentryHttpMessageHandler());
             _jsonOptions = new JsonSerializerOptions {
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 PropertyNameCaseInsensitive = true
@@ -312,7 +314,7 @@ namespace GsPlugin {
                 string responseBody = null;
 
                 try {
-                    response = await _httpClient.PostAsync(url, content).ConfigureAwait(false);
+                    response = await _sharedHttpClient.PostAsync(url, content).ConfigureAwait(false);
                     responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                     GsLogger.ShowHTTPDebugBox(

@@ -49,10 +49,11 @@ namespace GsPlugin {
 #endif
 
                     // Set sample rates to 0 if user opted out of Sentry
+                    // Note: null means "use default", 0.0f means "disable completely"
                     options.SendDefaultPii = false;
-                    options.SampleRate = disableSentryFlag ? (float?)null : 1.0f;
-                    options.TracesSampleRate = disableSentryFlag ? (float?)null : 1.0f;
-                    options.ProfilesSampleRate = disableSentryFlag ? (float?)null : 1.0f;
+                    options.SampleRate = disableSentryFlag ? 0.0f : 1.0f;
+                    options.TracesSampleRate = disableSentryFlag ? 0.0f : 1.0f;
+                    options.ProfilesSampleRate = disableSentryFlag ? 0.0f : 1.0f;
                     options.AutoSessionTracking = !disableSentryFlag;
                     options.CaptureFailedRequests = !disableSentryFlag;
                     options.FailedRequestStatusCodes.Add((400, 499));
@@ -74,7 +75,9 @@ namespace GsPlugin {
                         }
                     });
                 }
-                catch { /* best-effort */ }
+                catch (Exception ex) {
+                    _logger.Debug(ex, "Failed to configure Sentry scope (non-critical)");
+                }
 
                 // Hook global exception handlers to prevent UnobservedTaskException crashes and capture in Sentry
                 AppDomain.CurrentDomain.UnhandledException += (s, e) => {
@@ -88,7 +91,10 @@ namespace GsPlugin {
                             _logger.Error("Unhandled exception (non-Exception type) captured in AppDomain.CurrentDomain.UnhandledException");
                         }
                     }
-                    catch { /* no-throw */ }
+                    catch (Exception handlerEx) {
+                        // Last resort: log to Playnite but don't throw from exception handler
+                        try { _logger.Debug(handlerEx, "Exception in UnhandledException handler"); } catch { }
+                    }
                 };
 
                 System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => {
@@ -115,7 +121,10 @@ namespace GsPlugin {
 
                         e.SetObserved();
                     }
-                    catch { /* no-throw */ }
+                    catch (Exception handlerEx) {
+                        // Last resort: log to Playnite but don't throw from exception handler
+                        try { _logger.Debug(handlerEx, "Exception in UnobservedTaskException handler"); } catch { }
+                    }
                 };
 
                 _logger.Info($"Sentry initialized. Tracking enabled: {!disableSentryFlag}");
