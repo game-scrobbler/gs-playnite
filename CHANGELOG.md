@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.10.0...GsPlugin-v0.10.1) (2025-10-24)
+
+
+### Bug Fixes
+
+* **ci:** automate installer_manifest.yaml updates and add missing versions ([0c8f750](https://github.com/game-scrobbler/gs-playnite/commit/0c8f7501da61fc23f4647bbe15096a330c3b2441))
+* improve performance and error handling across multiple components ([1168593](https://github.com/game-scrobbler/gs-playnite/commit/116859303d2003b3c18d0884e7b8dea9011457df))
+
 ## [0.10.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.9.0...GsPlugin-v0.10.0) (2025-10-16)
 
 
