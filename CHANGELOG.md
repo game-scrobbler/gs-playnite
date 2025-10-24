@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.10.2...GsPlugin-v0.10.3) (2025-10-24)
+
+
+### Bug Fixes
+
+* **ci:** improve PowerShell script to handle changelog parsing edge cases ([e4405a6](https://github.com/game-scrobbler/gs-playnite/commit/e4405a6c3685bc2788b11a5cf1e90c9a50665dfa))
+
 ## [0.10.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.10.1...GsPlugin-v0.10.2) (2025-10-24)
 
 
