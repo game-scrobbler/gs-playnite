@@ -1,6 +1,12 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 0.10.3
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-10-24
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.3/GsPlugin-v0.10.3.pext
+    Changelog:
+      - "**ci:** improve PowerShell script to handle changelog parsing edge cases"
   - Version: 0.10.2
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-24
@@ -19,26 +25,21 @@ Packages:
     ReleaseDate: 2025-10-16
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.0/GsPlugin-v0.10.0.pext
     Changelog:
-      - sentry: add user control for error reporting and scrobbling tracking
   - Version: 0.9.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-16
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.9.0/GsPlugin-v0.9.0.pext
     Changelog:
-      - ci: integrate Sentry release management in GitHub Actions
   - Version: 0.8.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-15
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.8.0/GsPlugin-v0.8.0.pext
     Changelog:
-      - api: add support for asynchronous operations
   - Version: 0.7.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-12
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.7.0/GsPlugin-v0.7.0.pext
     Changelog:
-      - api: add support for Git operations and API URLs
-      - git-hooks: enhance hooks and add automated versioning
       - "BREAKING: Commit messages must now follow Conventional Commits specification"
   - Version: 0.6.0
     RequiredApiVersion: 6.12.0
