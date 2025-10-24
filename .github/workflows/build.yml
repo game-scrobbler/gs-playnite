@@ -83,3 +83,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: gh release upload ${{ steps.release.outputs.tag_name }} .\${{ steps.release.outputs.tag_name }}.pext
+
+      - name: Update Installer Manifest
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          $version = "${{ steps.release.outputs.tag_name }}".Replace("GsPlugin-v", "")
+          Write-Host "Updating installer manifest for version $version"
+          powershell -ExecutionPolicy Bypass -File "$Env:GITHUB_WORKSPACE\update-installer-manifest.ps1" -Version $version -TagName "${{ steps.release.outputs.tag_name }}"
+
+      - name: Commit and Push Manifest Changes
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add installer_manifest.yaml
+          git diff --cached --quiet || git commit -m "chore: update installer_manifest.yaml for ${{ steps.release.outputs.tag_name }}"
+          git push
