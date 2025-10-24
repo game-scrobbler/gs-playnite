@@ -100,13 +100,38 @@ foreach ($package in $manifest.Packages) {
     $yamlLines += "    PackageUrl: $($package.PackageUrl)"
     $yamlLines += "    Changelog:"
 
-    # Handle changelog entries
-    foreach ($entry in $package.Changelog) {
-        # Escape quotes and special characters in changelog entries
-        $escapedEntry = $entry
+    # Handle changelog entries - ensure we have an array
+    $changelogEntries = @()
+    if ($package.Changelog -is [System.Collections.IEnumerable] -and $package.Changelog -isnot [string]) {
+        # It's already an array or list
+        $changelogEntries = @($package.Changelog)
+    } elseif ($package.Changelog) {
+        # It's a single item or unknown type, wrap in array
+        $changelogEntries = @($package.Changelog)
+    }
+
+    foreach ($entry in $changelogEntries) {
+        # Skip if entry is null, empty, or a hashtable/object
+        if (-not $entry -or $entry -is [hashtable] -or $entry -is [System.Collections.IDictionary]) {
+            continue
+        }
+
+        # Convert to string if it's not already
+        $entryStr = $entry.ToString()
+
+        # Skip empty strings
+        if ([string]::IsNullOrWhiteSpace($entryStr)) {
+            continue
+        }
+
+        # Remove trailing " ()" artifacts from changelog parsing
+        $entryStr = $entryStr -replace '\s*\(\)\s*$', ''
+
+        # Escape quotes in the entry
+        $escapedEntry = $entryStr -replace '"', '\"'
+
+        # Quote entries that contain special YAML characters
         if ($escapedEntry -match '[:\[\]{}@&*#?|<>%`]|^-|\s+$') {
-            # If entry contains special YAML characters, quote it
-            $escapedEntry = $escapedEntry -replace '"', '\"'
             $yamlLines += "      - `"$escapedEntry`""
         } else {
             $yamlLines += "      - $escapedEntry"
