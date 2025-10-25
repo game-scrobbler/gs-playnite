@@ -1,6 +1,14 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 0.11.0
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-10-25
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.11.0/GsPlugin-v0.11.0.pext
+    Changelog:
+      - Library sync now sends all game data as-is without filtering image URLs. Previously attempted to filter out local paths and keep only web URLs, but this caused issues with Playnite UI display and was not needed for the API integration.
+      - simplify library sync by removing image URL enrichment
+      - "**ui:** update plugin icon and sidebar icon with new brand design"
   - Version: 0.10.3
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-24
