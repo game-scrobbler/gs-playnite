@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.11.0...GsPlugin-v1.0.0) (2025-10-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* This marks the first stable release of GsPlugin with all core features tested and production-ready. The plugin now has stable scrobbling, library sync, and account linking functionality.
+
+### Features
+
+* mark plugin as stable for 1.0.0 release ([b95f93e](https://github.com/game-scrobbler/gs-playnite/commit/b95f93ef241fdc7954dba8f0b4cfeae05c902c83))
+
 ## [0.11.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.10.3...GsPlugin-v0.11.0) (2025-10-25)
 
 
