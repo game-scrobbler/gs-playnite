@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.10.3...GsPlugin-v0.11.0) (2025-10-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* Library sync now sends all game data as-is without filtering image URLs. Previously attempted to filter out local paths and keep only web URLs, but this caused issues with Playnite UI display and was not needed for the API integration.
+
+### Features
+
+* simplify library sync by removing image URL enrichment ([0ffb20f](https://github.com/game-scrobbler/gs-playnite/commit/0ffb20f486338f3416b666256f5e2c6a45f9b2ed))
+* **ui:** update plugin icon and sidebar icon with new brand design ([944659b](https://github.com/game-scrobbler/gs-playnite/commit/944659bedb54c130a28d887fd72d10af2d4ead09))
+
 ## [0.10.3](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.10.2...GsPlugin-v0.10.3) (2025-10-24)
 
 
