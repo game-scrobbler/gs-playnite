@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 
@@ -199,21 +198,15 @@ namespace GsPlugin {
 
         /// <summary>
         /// Synchronizes the Playnite library with the external API.
-        /// Enriches games with web URL metadata before syncing.
         /// </summary>
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
         public async Task<bool> SyncLibraryAsync(IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
                 _logger.Info("Starting library sync with GameScrobbler API");
                 var library = playniteDatabaseGames.ToList();
-
-                // Enrich games with web URL data
-                var enrichedGames = EnrichGamesWithWebUrls(library);
-                _logger.Info($"Enriched {enrichedGames.Count} games with web URL metadata");
-
                 var syncResponse = await _apiClient.SyncLibrary(new GsApiClient.LibrarySyncReq {
                     user_id = GsDataManager.Data.InstallID,
-                    library = enrichedGames,
+                    library = library,
                     flags = GsDataManager.Data.Flags.ToArray()
                 }, useAsync: true);
                 if (syncResponse != null) {
@@ -229,109 +222,6 @@ namespace GsPlugin {
                 _logger.Error(ex, "Error synchronizing library with GameScrobbler API");
                 return false;
             }
-        }
-
-        /// <summary>
-        /// Enriches games with web URL metadata by filtering image URLs.
-        /// Only includes HTTP/HTTPS URLs, excludes resources:// and pack:// URIs.
-        /// </summary>
-        /// <param name="games">List of games to enrich</param>
-        /// <returns>List of enriched games with web URLs only</returns>
-        private static List<Playnite.SDK.Models.Game> EnrichGamesWithWebUrls(List<Playnite.SDK.Models.Game> games) {
-            int webUrlCount = 0;
-            int resourceUrlCount = 0;
-            int localPathCount = 0;
-
-            foreach (var game in games) {
-                // Process Icon
-                if (!string.IsNullOrEmpty(game.Icon)) {
-                    if (IsWebUrl(game.Icon)) {
-                        webUrlCount++;
-                        // Keep the web URL as-is
-                    }
-                    else if (IsResourceUrl(game.Icon)) {
-                        resourceUrlCount++;
-                        // Clear resources:// and pack:// URIs as they're not web URLs
-                        game.Icon = null;
-                    }
-                    else {
-                        localPathCount++;
-                        // Clear local paths/database IDs as they're not web URLs
-                        game.Icon = null;
-                    }
-                }
-
-                // Process CoverImage
-                if (!string.IsNullOrEmpty(game.CoverImage)) {
-                    if (IsWebUrl(game.CoverImage)) {
-                        webUrlCount++;
-                        // Keep the web URL as-is
-                    }
-                    else if (IsResourceUrl(game.CoverImage)) {
-                        resourceUrlCount++;
-                        game.CoverImage = null;
-                    }
-                    else {
-                        localPathCount++;
-                        game.CoverImage = null;
-                    }
-                }
-
-                // Process BackgroundImage
-                if (!string.IsNullOrEmpty(game.BackgroundImage)) {
-                    if (IsWebUrl(game.BackgroundImage)) {
-                        webUrlCount++;
-                        // Keep the web URL as-is
-                    }
-                    else if (IsResourceUrl(game.BackgroundImage)) {
-                        resourceUrlCount++;
-                        game.BackgroundImage = null;
-                    }
-                    else {
-                        localPathCount++;
-                        game.BackgroundImage = null;
-                    }
-                }
-            }
-
-            _logger.Info($"Image URL processing: {webUrlCount} web URLs kept, {resourceUrlCount} resource URLs filtered, {localPathCount} local paths filtered");
-
-#if DEBUG
-            // Debug alert for enrichment statistics
-            MessageBox.Show(
-                $"Total Games: {games.Count}\n" +
-                $"Web URLs Kept: {webUrlCount}\n" +
-                $"Resource URLs Filtered: {resourceUrlCount}\n" +
-                $"Local Paths Filtered: {localPathCount}",
-                "Game Enrichment Complete",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information
-            );
-#endif
-
-            return games;
-        }
-
-        /// <summary>
-        /// Checks if a source is a web URL (HTTP/HTTPS only).
-        /// </summary>
-        private static bool IsWebUrl(string source) {
-            if (string.IsNullOrEmpty(source))
-                return false;
-
-            return source.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                   source.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// Checks if a source is a WPF resource URL.
-        /// </summary>
-        private static bool IsResourceUrl(string source) {
-            if (string.IsNullOrEmpty(source))
-                return false;
-
-            return source.StartsWith("resources:", StringComparison.OrdinalIgnoreCase) ||
-                   source.StartsWith("pack://", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
