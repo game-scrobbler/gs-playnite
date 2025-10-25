@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 using MySidebarPlugin;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -192,18 +194,21 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>A collection of SidebarItem objects to be displayed in the sidebar.</returns>
         public override IEnumerable<SidebarItem> GetSidebarItems() {
-            // Return one or more SidebarItem objects
+            // Load the icon from the plugin directory
+            var iconPath = Path.Combine(Path.GetDirectoryName(GetType().Assembly.Location), "icon.png");
+            var iconImage = new Image {
+                Source = new BitmapImage(new Uri(iconPath))
+            };
+
             yield return new SidebarItem {
                 Type = (SiderbarItemType)1,
-                Title = "Show My Data",
-                Icon = new TextBlock { Text = "📋" }, // or a path to an image icon
+                Title = "Game Spectrum",
+                Icon = iconImage,
                 Opened = () => {
                     // Return a new instance of your custom UserControl (WPF)
                     return new MySidebarView(GsSentry.GetPluginVersion());
                 },
             };
-            // If you want a simple *action* instead of a custom panel, you can
-            // return an item with Type = SidebarItemType.Action, plus an OpenCommand.
         }
     }
 
