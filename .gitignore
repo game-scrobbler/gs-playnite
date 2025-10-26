@@ -261,3 +261,4 @@ paket-files/
 .vscode/
 /qodana.yaml
 /.sentryclirc
+.claude/settings.local.json
