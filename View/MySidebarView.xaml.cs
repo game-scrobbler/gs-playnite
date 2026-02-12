@@ -25,7 +25,8 @@ namespace MySidebarPlugin {
             string theme = Uri.EscapeDataString(GsDataManager.Data.Theme.ToLower());
             bool isScrobblingDisabled = GsDataManager.Data.Flags.Contains("no-scrobble");
             bool isSentryDisabled = GsDataManager.Data.Flags.Contains("no-sentry");
-            string url = $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}";
+            bool newDashboard = GsDataManager.Data.NewDashboardExperience;
+            string url = $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}&new_dashboard={newDashboard.ToString().ToLower()}";
 
             // Navigate to the URL
             MyWebView2.CoreWebView2.Navigate(url);

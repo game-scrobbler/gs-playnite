@@ -14,6 +14,9 @@ namespace GsPlugin {
         public string Theme { get; set; } = "Dark";
         public List<string> Flags { get; set; } = new List<string>();
         public string LinkedUserId { get; set; } = null;
+        public bool NewDashboardExperience { get; set; } = false;
+        public List<string> AllowedPlugins { get; set; } = new List<string>();
+        public DateTime? AllowedPluginsLastFetched { get; set; }
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling) {
             Flags.Clear();

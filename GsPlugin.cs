@@ -111,6 +111,14 @@ namespace GsPlugin {
         /// </summary>
         public override async void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             try {
+                // Refresh allowed plugins before syncing library (best-effort, don't block on failure)
+                try {
+                    await _scrobblingService.RefreshAllowedPluginsAsync();
+                }
+                catch (Exception ex) {
+                    _logger.Warn(ex, "Plugin refresh failed, continuing with cached/hardcoded list");
+                }
+
                 await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
             }
             catch (Exception ex) {

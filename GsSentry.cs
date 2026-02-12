@@ -84,8 +84,15 @@ namespace GsPlugin {
                     try {
                         var ex = e.ExceptionObject as Exception;
                         if (ex != null) {
-                            _logger.Error(ex, "Unhandled exception (AppDomain.CurrentDomain.UnhandledException)");
-                            CaptureException(ex, "AppDomain.CurrentDomain.UnhandledException");
+                            // Filter: only capture if exception originates from our plugin to avoid reporting other extensions' errors
+                            bool fromUs = IsExceptionFromOurPlugin(ex);
+                            if (fromUs) {
+                                _logger.Error(ex, "Unhandled exception (AppDomain.CurrentDomain.UnhandledException)");
+                                CaptureException(ex, "AppDomain.CurrentDomain.UnhandledException");
+                            }
+                            else {
+                                _logger.Debug("Unhandled exception not from our plugin; skipping capture.");
+                            }
                         }
                         else {
                             _logger.Error("Unhandled exception (non-Exception type) captured in AppDomain.CurrentDomain.UnhandledException");
@@ -99,24 +106,15 @@ namespace GsPlugin {
 
                 System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => {
                     try {
-                        // Filter: only capture if stack trace points to our plugin to avoid reporting other extensions' errors
-                        bool fromUs = false;
-                        Exception ex = e.Exception;
-                        while (ex != null && !fromUs) {
-                            var stack = ex.StackTrace;
-                            if (!string.IsNullOrEmpty(stack) && stack.Contains("GsPlugin")) {
-                                fromUs = true;
-                                break;
-                            }
-                            ex = ex.InnerException;
-                        }
+                        // Filter: only capture if exception originates from our plugin assembly to avoid reporting other extensions' errors
+                        bool fromUs = IsExceptionFromOurPlugin(e.Exception);
 
                         if (fromUs) {
                             _logger.Error(e.Exception, "UnobservedTaskException captured (from GsPlugin)");
                             CaptureException(e.Exception, "TaskScheduler.UnobservedTaskException");
                         }
                         else {
-                            _logger.Warn("UnobservedTaskException not from our plugin; marking observed without capture.");
+                            _logger.Debug("UnobservedTaskException not from our plugin; marking observed without capture.");
                         }
 
                         e.SetObserved();
@@ -131,6 +129,57 @@ namespace GsPlugin {
             }
             catch (Exception ex) {
                 _logger.Error(ex, "Failed to initialize Sentry");
+            }
+        }
+
+        /// <summary>
+        /// Determines if an exception originated from this plugin by checking the assembly of stack frames.
+        /// </summary>
+        /// <param name="exception">The exception to check.</param>
+        /// <returns>True if the exception originated from GsPlugin, false otherwise.</returns>
+        private static bool IsExceptionFromOurPlugin(Exception exception) {
+            if (exception == null) {
+                return false;
+            }
+
+            try {
+                // Get our plugin's assembly name for comparison
+                var ourAssembly = Assembly.GetExecutingAssembly();
+                var ourAssemblyName = ourAssembly.GetName().Name;
+
+                // Check the exception's source assembly
+                if (!string.IsNullOrEmpty(exception.Source) && exception.Source.Contains(ourAssemblyName)) {
+                    return true;
+                }
+
+                // Check stack trace frames for our assembly
+                var stackTrace = new System.Diagnostics.StackTrace(exception, true);
+                for (int i = 0; i < stackTrace.FrameCount; i++) {
+                    var frame = stackTrace.GetFrame(i);
+                    if (frame == null) continue;
+
+                    var method = frame.GetMethod();
+                    if (method == null) continue;
+
+                    var declaringType = method.DeclaringType;
+                    if (declaringType == null) continue;
+
+                    var frameAssembly = declaringType.Assembly;
+                    if (frameAssembly == ourAssembly || frameAssembly.GetName().Name == ourAssemblyName) {
+                        return true;
+                    }
+                }
+
+                // Check inner exceptions recursively
+                if (exception.InnerException != null) {
+                    return IsExceptionFromOurPlugin(exception.InnerException);
+                }
+
+                return false;
+            }
+            catch {
+                // If we can't determine, err on the side of not capturing to avoid false positives
+                return false;
             }
         }
 

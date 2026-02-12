@@ -39,6 +39,8 @@ namespace GsPlugin {
             public string user_id { get; set; }
             public string game_name { get; set; }
             public string game_id { get; set; }
+            public string plugin_id { get; set; }
+            public string external_game_id { get; set; }
             public object metadata { get; set; }
             public string started_at { get; set; }
         }
@@ -114,6 +116,8 @@ namespace GsPlugin {
             public string user_id { get; set; }
             public string game_name { get; set; }
             public string game_id { get; set; }
+            public string plugin_id { get; set; }
+            public string external_game_id { get; set; }
             public object metadata { get; set; }
             public string finished_at { get; set; }
             public string session_id { get; set; }
@@ -244,6 +248,28 @@ namespace GsPlugin {
 
         #endregion
 
+        #region Allowed Plugins
+
+        public class AllowedPluginsRes {
+            public List<AllowedPluginEntry> plugins { get; set; }
+            public string source { get; set; }
+        }
+
+        public class AllowedPluginEntry {
+            public string pluginId { get; set; }
+            public string libraryName { get; set; }
+            public string sourceSlug { get; set; }
+            public string status { get; set; }
+        }
+
+        public async Task<AllowedPluginsRes> GetAllowedPlugins() {
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await GetJsonAsync<AllowedPluginsRes>($"{_apiBaseUrl}/api/playnite/allowed-plugins");
+            }, maxRetries: 1);
+        }
+
+        #endregion
+
         #region Token Verification
 
         public class TokenVerificationReq {
@@ -306,6 +332,45 @@ namespace GsPlugin {
             GsSentry.CaptureMessage(contextMessage, level);
         }
 
+        private async Task<TResponse> GetJsonAsync<TResponse>(string url) where TResponse : class {
+            try {
+                var response = await _sharedHttpClient.GetAsync(url).ConfigureAwait(false);
+                var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                GsLogger.ShowHTTPDebugBox(
+                    requestData: $"URL: {url}\nMethod: GET",
+                    responseData: $"Status: {response.StatusCode}\nBody: {responseBody}");
+
+                if (!response.IsSuccessStatusCode) {
+                    _logger.Warn($"GET {url} returned {(int)response.StatusCode} ({response.StatusCode})");
+                    return null;
+                }
+
+                if (string.IsNullOrWhiteSpace(responseBody)) {
+                    _logger.Warn($"Received empty response body from GET {url}");
+                    return null;
+                }
+
+                try {
+                    return JsonSerializer.Deserialize<TResponse>(responseBody, _jsonOptions);
+                }
+                catch (JsonException jsonEx) {
+                    _logger.Error(jsonEx, $"Failed to deserialize JSON response from GET {url}. Response: {responseBody}");
+                    GsSentry.CaptureException(jsonEx, $"JSON deserialization failed for GET {url}");
+                    return null;
+                }
+            }
+            catch (Exception ex) {
+                GsLogger.ShowHTTPDebugBox(
+                    requestData: $"URL: {url}\nMethod: GET",
+                    responseData: $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}",
+                    isError: true);
+
+                CaptureHttpException(ex, url, null);
+                return null;
+            }
+        }
+
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
             where TResponse : class {
             string jsonData = JsonSerializer.Serialize(payload, _jsonOptions);
@@ -336,7 +401,7 @@ namespace GsPlugin {
                     }
 
                     try {
-                        var deserializedResponse = JsonSerializer.Deserialize<TResponse>(responseBody);
+                        var deserializedResponse = JsonSerializer.Deserialize<TResponse>(responseBody, _jsonOptions);
                         if (deserializedResponse == null) {
                             _logger.Warn($"Deserialization returned null for {url}. Response: {responseBody}");
                         }

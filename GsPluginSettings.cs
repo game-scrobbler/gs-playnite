@@ -34,6 +34,15 @@ namespace GsPlugin {
             }
         }
 
+        private bool _newDashboardExperience = false;
+        public bool NewDashboardExperience {
+            get => _newDashboardExperience;
+            set {
+                _newDashboardExperience = value;
+                OnPropertyChanged();
+            }
+        }
+
         private string _linkToken = "";
         public string LinkToken {
             get => _linkToken;
@@ -100,7 +109,7 @@ namespace GsPlugin {
             // Store plugin reference for save/load operations
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
             _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
-            AvailableThemes = new List<string> { "Dark", "Light" };
+            AvailableThemes = new List<string> { "Dark", "Light", "System" };
 
             InitializeSettings();
         }
@@ -128,16 +137,20 @@ namespace GsPlugin {
         private void LoadExistingSettings(GsPluginSettings savedSettings) {
             Settings = savedSettings;
 
+            // Sync settings to GsDataManager
+            GsDataManager.Data.NewDashboardExperience = savedSettings.NewDashboardExperience;
+
             // Log successful load for debugging
             GsSentry.AddBreadcrumb(
                 message: "Successfully loaded plugin settings",
                 category: "settings",
                 data: new Dictionary<string, string> {
-                    { "Theme", savedSettings.Theme }
+                    { "Theme", savedSettings.Theme },
+                    { "NewDashboard", savedSettings.NewDashboardExperience.ToString() }
                 }
             );
 
-            GsLogger.ShowDebugInfoBox($"Loaded saved settings:\nTheme: {savedSettings.Theme}", "Debug - Settings Loaded");
+            GsLogger.ShowDebugInfoBox($"Loaded saved settings:\nTheme: {savedSettings.Theme}\nNew Dashboard: {savedSettings.NewDashboardExperience}", "Debug - Settings Loaded");
         }
 
         /// <summary>
@@ -186,9 +199,10 @@ namespace GsPlugin {
             // Update global data manager
             GsDataManager.Data.Theme = Settings.Theme;
             GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling);
+            GsDataManager.Data.NewDashboardExperience = Settings.NewDashboardExperience;
             GsDataManager.Save();
 
-            GsLogger.ShowDebugInfoBox($"Settings saved:\nTheme: {Settings.Theme}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}", "Debug - Settings Saved");
+            GsLogger.ShowDebugInfoBox($"Settings saved:\nTheme: {Settings.Theme}\nNew Dashboard: {Settings.NewDashboardExperience}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}", "Debug - Settings Saved");
         }
 
         public bool VerifySettings(out List<string> errors) {
