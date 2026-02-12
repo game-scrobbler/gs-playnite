@@ -103,6 +103,14 @@
                    Margin="0,0,0,10"
                    TextWrapping="Wrap"/>
 
+        <!-- Experimental Features Section -->
+        <TextBlock Text="Experimental Features" Style="{StaticResource SectionHeaderStyle}"/>
+
+        <CheckBox Content="New Dashboard Experience (Beta)"
+                  Margin="0,5,0,5"
+                  ToolTip="Enable the new dashboard experience with enhanced features"
+                  IsChecked="{Binding Settings.NewDashboardExperience, Mode=TwoWay}"/>
+
         <!-- Privacy Controls Section -->
         <TextBlock Text="Privacy Controls" Style="{StaticResource SectionHeaderStyle}"/>
 
@@ -111,10 +119,28 @@
                   ToolTip="Prevents sending crash reports and diagnostic data to improve the plugin"
                   IsChecked="{Binding Settings.DisableSentry, Mode=TwoWay}"/>
 
-        <CheckBox Content="Disable game activity tracking (Scrobbling)"
+        <CheckBox x:Name="DisableScrobblingCheckBox"
+                  Content="Disable game activity tracking (Scrobbling)"
                   Margin="0,5,0,5"
                   ToolTip="Prevents scrobbling of your game playing activity"
                   IsChecked="{Binding Settings.DisableScrobbling, Mode=TwoWay}"/>
+
+        <!-- Warning message when scrobbling is disabled -->
+        <StackPanel Orientation="Horizontal"
+                    Margin="20,5,0,5"
+                    Visibility="{Binding Settings.DisableScrobbling, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="⚠"
+                       Foreground="#FFA500"
+                       FontSize="14"
+                       Margin="0,0,8,0"
+                       VerticalAlignment="Center"/>
+            <TextBlock Text="{DynamicResource LOCGsPluginScrobblingDisabledWarning}"
+                       Foreground="#FFA500"
+                       FontSize="12"
+                       FontStyle="Italic"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"/>
+        </StackPanel>
 
     </StackPanel>
 </UserControl>
