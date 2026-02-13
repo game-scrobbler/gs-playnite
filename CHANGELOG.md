@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v1.0.0...GsPlugin-v1.1.0) (2026-02-13)
+
+
+### Features
+
+* add dynamic client-side plugin filtering for library sync and scrobbling ([d58910b](https://github.com/game-scrobbler/gs-playnite/commit/d58910b9522a6597f465a78127d02950f414e581))
+* add new dashboard toggle and scrobbling disabled warning to settings UI ([dc6703a](https://github.com/game-scrobbler/gs-playnite/commit/dc6703abe85e9dbaaec70c171b42fb0b0daa8518))
+
 ## [1.0.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v0.11.0...GsPlugin-v1.0.0) (2025-10-25)
 
 
