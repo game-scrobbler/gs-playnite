@@ -1,0 +1,11 @@
+#!/bin/sh
+# Git hook wrapper that calls the PowerShell script for commit message validation
+
+# Get the commit message file path
+COMMIT_MSG_FILE="$1"
+
+# Call the PowerShell script
+powershell.exe -ExecutionPolicy Bypass -File "$(dirname "$0")/commit-msg.ps1" "$COMMIT_MSG_FILE"
+
+# Return the exit code from PowerShell
+exit $?

@@ -6,6 +6,10 @@ on:
 
 name: Release Build
 
+env:
+  PLAYNITE_VERSION: "10.34"
+  PLAYNITE_ZIP: "Playnite1034.zip"
+
 jobs:
   build:
     runs-on: windows-2022
@@ -22,6 +26,9 @@ jobs:
           repository: cloudbase/powershell-yaml
           path: powershell-yaml
 
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
       - name: NuGet Restore
         run: nuget restore .\GsPlugin.sln
 
@@ -32,13 +39,14 @@ jobs:
         continue-on-error: false
 
       - name: Build Entire Solution (.NET Framework 4.6.2)
-        run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\"
-          .\MSBuild.exe $Env:GITHUB_WORKSPACE\GsPlugin.sln -p:Configuration=Release -restore -clp:ErrorsOnly
+        run: msbuild $Env:GITHUB_WORKSPACE\GsPlugin.sln -p:Configuration=Release -restore -clp:ErrorsOnly
+
+      - name: Run Tests
+        run: dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal
 
       - name: Setup Playnite
         run: |
-          Invoke-WebRequest -Uri "https://github.com/JosefNemec/Playnite/releases/download/10.34/Playnite1034.zip" -OutFile "$Env:GITHUB_WORKSPACE\Playnite.zip"
+          Invoke-WebRequest -Uri "https://github.com/JosefNemec/Playnite/releases/download/${{ env.PLAYNITE_VERSION }}/${{ env.PLAYNITE_ZIP }}" -OutFile "$Env:GITHUB_WORKSPACE\Playnite.zip"
           Expand-Archive "$Env:GITHUB_WORKSPACE\Playnite.zip" -DestinationPath "$Env:GITHUB_WORKSPACE\Playnite"
 
       - name: Pack with Playnite
@@ -73,7 +81,7 @@ jobs:
           sentry-cli releases finalize "GsPlugin@$version"
 
       - name: Rename Packed File Name to Release Tag
-        if: github.ref == 'refs/heads/main'
+        if: ${{ steps.release.outputs.release_created }}
         id: rename
         run: |
           Get-ChildItem "$Env:GITHUB_WORKSPACE" -Filter *.pext | Rename-Item -NewName ("${{ steps.release.outputs.tag_name }}".Replace("/", "_") + ".pext")

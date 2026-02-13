@@ -18,26 +18,37 @@ Game Spectrum (GS) is a Playnite plugin that integrates with GameScrobbler to pr
 - **Setup hooks**: `powershell -ExecutionPolicy Bypass -File setup-hooks.ps1`
 - **Manual formatting**: `powershell -ExecutionPolicy Bypass -File format-code.ps1`
 
-### Testing & Packaging
+### Testing
+- **Run tests**: `dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal`
+- Note: Build the solution with MSBuild first, then run tests with `--no-build`
+
+### Packaging
 The project uses Playnite's Toolbox for packaging:
 - **Pack plugin**: `Playnite\Toolbox.exe pack "bin\Release" "PackingOutput"`
 
 ## Architecture Overview
 
 ### Core Plugin Structure
-- **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events
-- **GsApiClient.cs** - HTTP API communication layer with circuit breaker protection and retry logic
+- **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events (implements IDisposable)
+- **IGsApiClient.cs** - Interface for API client (enables testing and dependency injection)
+- **GsApiClient.cs** - HTTP API communication layer with circuit breaker protection, retry logic, and TLS 1.2 enforcement
+- **ApiResult.cs** - Generic result wrapper for API responses with success/failure status
 - **GsCircuitBreaker.cs** - Implements circuit breaker pattern with exponential backoff for API resilience
-- **GsScrobblingService.cs** - Handles game session tracking (start/stop events)
-- **GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler
-- **GsUriHandler.cs** - Processes deep links for automatic account linking
-- **GsData.cs** - Persistent data models and state management
-- **GsPluginSettings.cs** - Plugin settings with UI binding support
+- **GsScrobblingService.cs** - Handles game session tracking (start/stop events) with dynamic plugin filtering
+- **GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler with token validation
+- **GsUriHandler.cs** - Processes deep links for automatic account linking (tokens redacted in logs)
+- **GsData.cs** - Thread-safe persistent data models and state management (GsDataManager with locking)
+- **GsPluginSettings.cs** - Plugin settings with UI binding support and theme validation
 
 ### UI Components
 - **View/GsPluginSettingsView.xaml/.cs** - Main settings interface with account linking UI
 - **View/MySidebarView.xaml/.cs** - Sidebar integration displaying user statistics via WebView2
 - **Localization/en_US.xaml** - English language resources
+
+### Test Project
+- **GsPlugin.Tests/** - xUnit test project targeting .NET Framework 4.6.2
+- Tests cover: GsCircuitBreaker, GsData, ValidateToken, LinkingResult, ApiResult
+- References main project via ProjectReference; requires `System.Text.Json` NuGet package
 
 ### Utilities & Cross-cutting Concerns
 - **GsLogger.cs** - Centralized logging with debug UI feedback and HTTP request/response logging
@@ -61,6 +72,7 @@ The project uses Playnite's Toolbox for packaging:
 - **manifest.yaml** - Plugin manifest for Playnite extension system
 - **app.config** - .NET Framework application configuration
 - **packages.config** - NuGet package dependencies
+- **global.json** - Pins .NET SDK version
 
 ## Development Environment
 
@@ -72,18 +84,24 @@ The project uses Playnite's Toolbox for packaging:
 - **Playnite SDK 6.12.0** - Main plugin framework
 - **Microsoft.Web.WebView2** - For embedded web views
 - **Sentry 5.15.1** - Error tracking and monitoring
-- **System.Text.Json 9.0.9** - JSON serialization
+- **System.Text.Json 6.0.10** - JSON serialization
 
 ### Build Environment
-- Targets .NET Framework 4.6.2
-- Uses MSBuild for compilation
+- Targets .NET Framework 4.6.2 (old-style .csproj — requires Visual Studio MSBuild, not `dotnet build`)
+- Uses MSBuild for compilation (XAML code-gen requires VS Build Tools or full VS install)
 - Windows-only development (PowerShell scripts for tooling)
 - GitHub Actions for CI/CD with Windows 2022 runners
+- Test project uses SDK-style .csproj and can be built/run with `dotnet test`
 
 ## Important Notes
 
 ### Code Formatting
-All code must be formatted using `dotnet format` before commits. The pre-commit hooks enforce this automatically.
+All code must be formatted using `dotnet format` before commits. The pre-commit hook checks formatting with `--verify-no-changes` and fails the commit if code is unformatted. Run `powershell -ExecutionPolicy Bypass -File format-code.ps1` to fix formatting.
+
+### Git Hooks
+Hook scripts live in `hooks/` and are installed to `.git/hooks/` via `setup-hooks.ps1`:
+- **pre-commit**: Verifies code formatting on staged `.cs` files
+- **commit-msg**: Validates conventional commit message format
 
 ### Error Handling
 The codebase emphasizes robust error handling with circuit breakers, comprehensive logging, and Sentry integration. When modifying API calls, ensure proper error handling and logging context.
@@ -99,4 +117,4 @@ Automatic release tracking is configured for comprehensive error monitoring:
 - **Troubleshooting**: "Project not found" errors indicate missing Sentry project or invalid auth token; "Invalid value 'portable'" means wrong type (should be `portablepdb`)
 
 ### UI Development
-Settings UI uses two-way data binding with GsPluginSettings. The sidebar uses WebView2 for displaying GameScrobbler statistics.
+Settings UI uses two-way data binding with GsPluginSettings. The sidebar uses WebView2 for displaying GameScrobbler statistics. WebView2 navigation is restricted to `gamescrobbler.com` domains, and external links are opened in the system browser (https only).
