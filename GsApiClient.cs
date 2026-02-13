@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Sentry;
 
 namespace GsPlugin {
-    public class GsApiClient {
+    public class GsApiClient : IGsApiClient {
         private static readonly ILogger _logger = LogManager.GetLogger();
 
         private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
@@ -17,14 +17,22 @@ namespace GsPlugin {
 
         // Reuse a single HttpClient instance across all API client instances
         // This prevents socket exhaustion and improves performance
-        private static readonly HttpClient _sharedHttpClient = new HttpClient(new SentryHttpMessageHandler());
+        private static readonly HttpClient _sharedHttpClient;
+
+        static GsApiClient() {
+            // Enforce TLS 1.2+ to avoid negotiating insecure protocol versions on .NET Framework 4.6.2
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
+            _sharedHttpClient = new HttpClient(new SentryHttpMessageHandler()) {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+        }
 
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly GsCircuitBreaker _circuitBreaker;
 
         public GsApiClient() {
             _jsonOptions = new JsonSerializerOptions {
-                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 PropertyNameCaseInsensitive = true
             };
             _circuitBreaker = new GsCircuitBreaker(

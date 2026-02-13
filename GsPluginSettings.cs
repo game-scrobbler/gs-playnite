@@ -88,15 +88,16 @@ namespace GsPlugin {
         }
 
         public List<string> AvailableThemes { get; set; }
-        public static bool IsLinked => !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
+        public static bool IsLinked => GsDataManager.IsAccountLinked;
         public static string ConnectionStatus => IsLinked
             ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
             : "Disconnected";
         public static bool ShowLinkingControls => !IsLinked;
 
-        public static event EventHandler LinkingStatusChanged;
+        // Linking status change notifications are consolidated on GsAccountLinkingService.LinkingStatusChanged.
+        // This forwarding method is kept for convenience from within the view model.
         public static void OnLinkingStatusChanged() {
-            LinkingStatusChanged?.Invoke(null, EventArgs.Empty);
+            GsAccountLinkingService.OnLinkingStatusChanged();
         }
 
         #region Constructor
@@ -206,11 +207,13 @@ namespace GsPlugin {
         }
 
         public bool VerifySettings(out List<string> errors) {
-            // Code execute when user decides to confirm changes made since BeginEdit was called.
-            // Executed before EndEdit is called and EndEdit is not called if false is returned.
-            // List of errors is presented to user if verification fails.
             errors = new List<string>();
-            return true;
+
+            if (string.IsNullOrEmpty(Settings.Theme) || !AvailableThemes.Contains(Settings.Theme)) {
+                errors.Add($"Invalid theme. Valid options: {string.Join(", ", AvailableThemes)}");
+            }
+
+            return errors.Count == 0;
         }
 
         #endregion
@@ -221,8 +224,14 @@ namespace GsPlugin {
         /// Performs account linking with the provided token.
         /// </summary>
         public async void LinkAccount() {
-            if (!ValidateLinkToken()) return;
-            await PerformLinking();
+            try {
+                if (!ValidateLinkToken()) return;
+                await PerformLinking();
+            }
+            catch (Exception ex) {
+                GsLogger.Error("Unhandled exception in LinkAccount", ex);
+                GsSentry.CaptureException(ex, "Unhandled exception in LinkAccount");
+            }
         }
 
         /// <summary>
@@ -249,7 +258,7 @@ namespace GsPlugin {
 
                 if (result.Success) {
                     Settings.LinkStatusMessage = "Successfully linked account!";
-                    OnLinkingStatusChanged();
+                    // Note: OnLinkingStatusChanged() is already called inside LinkAccountAsync
                 }
                 else {
                     Settings.LinkStatusMessage = result.ErrorMessage;

@@ -12,7 +12,7 @@ namespace GsPlugin {
     /// </summary>
     public class GsScrobblingService {
         private static readonly ILogger _logger = LogManager.GetLogger();
-        private readonly GsApiClient _apiClient;
+        private readonly IGsApiClient _apiClient;
 
         /// <summary>
         /// Hardcoded fallback list of official Playnite library plugin IDs.
@@ -28,9 +28,9 @@ namespace GsPlugin {
             Guid.Parse("00000001-EBB2-4EEC-ABCB-7C89937A42BB"), // itch.io
             Guid.Parse("96E8C4BC-EC5C-4C8B-87E7-18EE5A690626"), // Humble
             Guid.Parse("402674CD-4AF6-4886-B6EC-0E695BFA0688"), // Amazon Games
-            Guid.Parse("85DD7072-2F20-4E76-A007-41035E390724"), // Origin (deprecated)
-            Guid.Parse("0E2E793E-E0DD-4447-835C-C44A1FD506EC"), // Bethesda (deprecated)
-            Guid.Parse("E2A7D494-C138-489D-BB3F-1D786BEEB675"), // Twitch (deprecated)
+            Guid.Parse("85DD7072-2F20-4E76-A007-41035E390724"), // Origin (deprecated, kept for legacy game scrobbling)
+            Guid.Parse("0E2E793E-E0DD-4447-835C-C44A1FD506EC"), // Bethesda (deprecated, kept for legacy game scrobbling)
+            Guid.Parse("E2A7D494-C138-489D-BB3F-1D786BEEB675"), // Twitch (deprecated, kept for legacy game scrobbling)
             Guid.Parse("E4AC81CB-1B1A-4EC9-8639-9A9633989A71"), // PlayStation
         };
 
@@ -68,7 +68,7 @@ namespace GsPlugin {
         /// Initializes a new instance of the GsScrobblingService.
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
-        public GsScrobblingService(GsApiClient apiClient) {
+        public GsScrobblingService(IGsApiClient apiClient) {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
         }
 
@@ -103,11 +103,11 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="userId">The linked user ID, or null if not linked</param>
         private static void SetLinkedUser(string userId = null) {
-            bool oldLinked = !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
+            bool oldLinked = GsDataManager.IsAccountLinked;
             var oldId = GsDataManager.Data.LinkedUserId;
 
-            // Only set LinkedUserId if it's a valid ID (not "not_linked")
-            if (userId == "not_linked" || string.IsNullOrEmpty(userId)) {
+            // Only set LinkedUserId if it's a valid ID (not the sentinel value)
+            if (userId == GsData.NotLinkedValue || string.IsNullOrEmpty(userId)) {
                 GsDataManager.Data.LinkedUserId = null;
             }
             else {
@@ -116,7 +116,7 @@ namespace GsPlugin {
             GsDataManager.Save();
 
             // Log state changes
-            bool newLinked = !string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) && GsDataManager.Data.LinkedUserId != "not_linked";
+            bool newLinked = GsDataManager.IsAccountLinked;
             if (oldLinked != newLinked) {
                 _logger.Info($"User link status changed: {oldLinked} -> {newLinked}");
             }

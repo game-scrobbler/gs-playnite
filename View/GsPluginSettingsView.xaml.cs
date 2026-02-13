@@ -29,8 +29,8 @@ namespace GsPlugin {
             Loaded += GsPluginSettingsView_Loaded;
             Unloaded += GsPluginSettingsView_Unloaded;
 
-            // Subscribe to static linking status changes
-            GsPluginSettingsViewModel.LinkingStatusChanged += OnLinkingStatusChanged;
+            // Subscribe to static linking status changes (single source of truth)
+            GsAccountLinkingService.LinkingStatusChanged += OnLinkingStatusChanged;
         }
         #endregion
 
@@ -44,7 +44,7 @@ namespace GsPlugin {
         /// </summary>
         private void GsPluginSettingsView_Unloaded(object sender, RoutedEventArgs e) {
             // Unsubscribe from events to prevent memory leaks
-            GsPluginSettingsViewModel.LinkingStatusChanged -= OnLinkingStatusChanged;
+            GsAccountLinkingService.LinkingStatusChanged -= OnLinkingStatusChanged;
 
             if (_viewModel != null) {
                 _viewModel.PropertyChanged -= ViewModel_PropertyChanged;

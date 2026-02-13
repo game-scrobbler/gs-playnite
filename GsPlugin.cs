@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
-using MySidebarPlugin;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
+using Sentry;
 
 namespace GsPlugin {
 
@@ -17,7 +17,10 @@ namespace GsPlugin {
         private GsAccountLinkingService _linkingService;
         private GsUriHandler _uriHandler;
         private GsScrobblingService _scrobblingService;
+        private bool _disposed;
+        /// <summary>
         /// Unique identifier for the plugin itself.
+        /// </summary>
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
 
         /// <summary>
@@ -217,6 +220,29 @@ namespace GsPlugin {
                     return new MySidebarView(GsSentry.GetPluginVersion());
                 },
             };
+        }
+
+        /// <summary>
+        /// Releases resources used by the plugin.
+        /// </summary>
+        public override void Dispose() {
+            if (!_disposed) {
+                _disposed = true;
+
+                try {
+                    SentrySdk.Close();
+                }
+                catch (Exception ex) {
+                    _logger.Error(ex, "Error closing Sentry");
+                }
+
+                _apiClient = null;
+                _linkingService = null;
+                _uriHandler = null;
+                _scrobblingService = null;
+            }
+
+            base.Dispose();
         }
     }
 

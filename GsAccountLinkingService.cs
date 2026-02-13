@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using Playnite.SDK;
@@ -48,7 +49,7 @@ namespace GsPlugin {
     /// </summary>
     public class GsAccountLinkingService {
         private static readonly ILogger _logger = LogManager.GetLogger();
-        private readonly GsApiClient _apiClient;
+        private readonly IGsApiClient _apiClient;
         private readonly IPlayniteAPI _playniteApi;
 
         /// <summary>
@@ -61,7 +62,7 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
         /// <param name="playniteApi">The Playnite API instance for UI interactions.</param>
-        public GsAccountLinkingService(GsApiClient apiClient, IPlayniteAPI playniteApi) {
+        public GsAccountLinkingService(IGsApiClient apiClient, IPlayniteAPI playniteApi) {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             _playniteApi = playniteApi ?? throw new ArgumentNullException(nameof(playniteApi));
         }
@@ -101,8 +102,13 @@ namespace GsPlugin {
                 }
 
                 if (response.success) {
-                    if (response.userId == "not_linked") {
+                    if (response.userId == GsData.NotLinkedValue) {
                         GsDataManager.Data.LinkedUserId = null;
+                    }
+                    else if (string.IsNullOrWhiteSpace(response.userId) || response.userId.Length > 256) {
+                        string errorMessage = "Invalid user ID format received from server";
+                        GsLogger.Error($"{context} linking failed: {errorMessage}");
+                        return LinkingResult.CreateError(errorMessage, context);
                     }
                     else {
                         GsDataManager.Data.LinkedUserId = response.userId;
@@ -147,7 +153,11 @@ namespace GsPlugin {
         /// <param name="token">The token to validate</param>
         /// <returns>True if token is valid, false otherwise</returns>
         public static bool ValidateToken(string token) {
-            return !string.IsNullOrWhiteSpace(token);
+            if (string.IsNullOrWhiteSpace(token)) return false;
+            if (token.Length > 512) return false;
+            // Allow alphanumeric, hyphens, underscores, dots, plus, equals, slashes (covers JWT/base64 tokens)
+            if (!Regex.IsMatch(token, @"^[a-zA-Z0-9\-_\.+=\/]+$")) return false;
+            return true;
         }
 
         /// <summary>
@@ -155,7 +165,7 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>True if the user wants to proceed, false otherwise</returns>
         public bool ShouldProceedWithRelinking() {
-            if (string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId) || GsDataManager.Data.LinkedUserId == "not_linked") {
+            if (!GsDataManager.IsAccountLinked) {
                 return true;
             }
 
