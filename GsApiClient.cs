@@ -215,9 +215,26 @@ namespace GsPlugin {
 
         #region Library Synchronization
 
+        public class GameSyncDto {
+            public string game_id { get; set; }
+            public string plugin_id { get; set; }
+            public string game_name { get; set; }
+            public string playnite_id { get; set; }
+            public long playtime_seconds { get; set; }
+            public int play_count { get; set; }
+            public DateTime? last_activity { get; set; }
+            public bool is_installed { get; set; }
+            public string completion_status_id { get; set; }
+            public string completion_status_name { get; set; }
+            // Populated from SuccessStory plugin (cebe6d32-...) via reflection if installed.
+            // null when SuccessStory is absent or the game has no achievement data.
+            public int? achievement_count_unlocked { get; set; }
+            public int? achievement_count_total { get; set; }
+        }
+
         public class LibrarySyncReq {
             public string user_id { get; set; }
-            public List<Playnite.SDK.Models.Game> library { get; set; }
+            public List<GameSyncDto> library { get; set; }
             public string[] flags { get; set; }
         }
 
@@ -247,11 +264,11 @@ namespace GsPlugin {
 
             if (librarySyncReq.library == null) {
                 _logger.Warn("SyncLibrary called with null library, treating as empty");
-                librarySyncReq.library = new List<Playnite.SDK.Models.Game>();
+                librarySyncReq.library = new List<GameSyncDto>();
             }
 
             // Build URL with async query parameter if needed
-            string url = $"{_apiBaseUrl}/api/playnite/sync";
+            string url = $"{_apiBaseUrl}/api/playnite/v2/sync";
             if (useAsync) {
                 url += "?async=true";
             }

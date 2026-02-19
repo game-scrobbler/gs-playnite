@@ -13,6 +13,7 @@ namespace GsPlugin {
     public class GsScrobblingService {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private readonly IGsApiClient _apiClient;
+        private readonly GsSuccessStoryHelper _achievementHelper;
 
         /// <summary>
         /// Hardcoded fallback list of official Playnite library plugin IDs.
@@ -68,8 +69,10 @@ namespace GsPlugin {
         /// Initializes a new instance of the GsScrobblingService.
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
-        public GsScrobblingService(IGsApiClient apiClient) {
+        /// <param name="achievementHelper">Helper for reading achievement data from the SuccessStory plugin.</param>
+        public GsScrobblingService(IGsApiClient apiClient, GsSuccessStoryHelper achievementHelper) {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
+            _achievementHelper = achievementHelper ?? throw new ArgumentNullException(nameof(achievementHelper));
         }
 
         /// <summary>
@@ -356,14 +359,36 @@ namespace GsPlugin {
                 var allGames = playniteDatabaseGames.ToList();
 
                 // Filter to only supported platform plugins before sending
-                var library = allGames
+                var filteredGames = allGames
                     .Where(g => g.PluginId != Guid.Empty && AllowedPluginIds.Contains(g.PluginId))
                     .ToList();
 
-                var filteredCount = allGames.Count - library.Count;
+                var filteredCount = allGames.Count - filteredGames.Count;
                 if (filteredCount > 0) {
-                    _logger.Info($"Filtered {filteredCount} games from unsupported plugins (sending {library.Count}/{allGames.Count})");
+                    _logger.Info($"Filtered {filteredCount} games from unsupported plugins (sending {filteredGames.Count}/{allGames.Count})");
                 }
+
+                // Map Playnite Game objects to DTO — avoids leaking internal SDK types to the API layer
+                var library = filteredGames.Select(g => new GsApiClient.GameSyncDto {
+                    game_id = g.GameId,
+                    plugin_id = g.PluginId.ToString(),
+                    game_name = g.Name,
+                    playnite_id = g.Id.ToString(),
+                    playtime_seconds = (long)g.Playtime,
+                    play_count = (int)g.PlayCount,
+                    last_activity = g.LastActivity,
+                    is_installed = g.IsInstalled,
+                    completion_status_id = g.CompletionStatusId != Guid.Empty
+                        ? g.CompletionStatusId.ToString()
+                        : null,
+                    completion_status_name = g.CompletionStatus?.Name,
+                    achievement_count_unlocked = GsDataManager.Data.SyncAchievements
+                        ? _achievementHelper.GetUnlockedCount(g.Id)
+                        : null,
+                    achievement_count_total = GsDataManager.Data.SyncAchievements
+                        ? _achievementHelper.GetTotalCount(g.Id)
+                        : null
+                }).ToList();
 
                 var syncResponse = await _apiClient.SyncLibrary(new GsApiClient.LibrarySyncReq {
                     user_id = GsDataManager.Data.InstallID,

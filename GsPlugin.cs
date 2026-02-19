@@ -17,6 +17,7 @@ namespace GsPlugin {
         private GsAccountLinkingService _linkingService;
         private GsUriHandler _uriHandler;
         private GsScrobblingService _scrobblingService;
+        private GsSuccessStoryHelper _achievementHelper;
         private bool _disposed;
         /// <summary>
         /// Unique identifier for the plugin itself.
@@ -48,8 +49,11 @@ namespace GsPlugin {
             };
 
 
+            // Initialize achievement helper (reads from SuccessStory plugin if installed)
+            _achievementHelper = new GsSuccessStoryHelper(api);
+
             // Initialize scrobbling services
-            _scrobblingService = new GsScrobblingService(_apiClient);
+            _scrobblingService = new GsScrobblingService(_apiClient, _achievementHelper);
 
             // Initialize and register URI handler for automatic account linking
             _uriHandler = new GsUriHandler(api, _linkingService);

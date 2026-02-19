@@ -43,6 +43,15 @@ namespace GsPlugin {
             }
         }
 
+        private bool _syncAchievements = true;
+        public bool SyncAchievements {
+            get => _syncAchievements;
+            set {
+                _syncAchievements = value;
+                OnPropertyChanged();
+            }
+        }
+
         private string _linkToken = "";
         public string LinkToken {
             get => _linkToken;
@@ -140,6 +149,7 @@ namespace GsPlugin {
 
             // Sync settings to GsDataManager
             GsDataManager.Data.NewDashboardExperience = savedSettings.NewDashboardExperience;
+            GsDataManager.Data.SyncAchievements = savedSettings.SyncAchievements;
 
             // Log successful load for debugging
             GsSentry.AddBreadcrumb(
@@ -201,6 +211,7 @@ namespace GsPlugin {
             GsDataManager.Data.Theme = Settings.Theme;
             GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling);
             GsDataManager.Data.NewDashboardExperience = Settings.NewDashboardExperience;
+            GsDataManager.Data.SyncAchievements = Settings.SyncAchievements;
             GsDataManager.Save();
 
             GsLogger.ShowDebugInfoBox($"Settings saved:\nTheme: {Settings.Theme}\nNew Dashboard: {Settings.NewDashboardExperience}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}", "Debug - Settings Saved");

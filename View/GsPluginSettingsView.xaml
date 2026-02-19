@@ -111,6 +111,24 @@
                   ToolTip="Enable the new dashboard experience with enhanced features"
                   IsChecked="{Binding Settings.NewDashboardExperience, Mode=TwoWay}"/>
 
+        <!-- Achievement sync toggle -->
+        <StackPanel Margin="0,5,0,0">
+            <CheckBox ToolTip="{DynamicResource LOCGsPluginSyncAchievementsTooltip}"
+                      IsChecked="{Binding Settings.SyncAchievements, Mode=TwoWay}">
+                <CheckBox.Content>
+                    <TextBlock>
+                        <Run Text="{DynamicResource LOCGsPluginSyncAchievementsLabel}"/>
+                        <Run Text=" "/>
+                        <Hyperlink NavigateUri="https://playnite.link/addons.html#Success_Story_Addon"
+                                   RequestNavigate="Hyperlink_RequestNavigate"
+                                   Foreground="CornflowerBlue">
+                            <Run Text="(get SuccessStory)"/>
+                        </Hyperlink>
+                    </TextBlock>
+                </CheckBox.Content>
+            </CheckBox>
+        </StackPanel>
+
         <!-- Privacy Controls Section -->
         <TextBlock Text="Privacy Controls" Style="{StaticResource SectionHeaderStyle}"/>
 

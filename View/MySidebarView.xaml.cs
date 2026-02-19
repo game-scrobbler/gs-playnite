@@ -66,7 +66,8 @@ namespace GsPlugin {
                 bool isScrobblingDisabled = GsDataManager.Data.Flags.Contains("no-scrobble");
                 bool isSentryDisabled = GsDataManager.Data.Flags.Contains("no-sentry");
                 bool newDashboard = GsDataManager.Data.NewDashboardExperience;
-                string url = $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}&new_dashboard={newDashboard.ToString().ToLower()}";
+                bool syncAchievements = GsDataManager.Data.SyncAchievements;
+                string url = $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}&new_dashboard={newDashboard.ToString().ToLower()}&sync_achievements={syncAchievements.ToString().ToLower()}";
 
                 // Navigate to the URL
                 MyWebView2.CoreWebView2.Navigate(url);

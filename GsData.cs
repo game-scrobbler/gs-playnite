@@ -30,6 +30,7 @@ namespace GsPlugin {
         public List<string> Flags { get; set; } = new List<string>();
         public string LinkedUserId { get; set; } = null;
         public bool NewDashboardExperience { get; set; } = false;
+        public bool SyncAchievements { get; set; } = true;
         public List<string> AllowedPlugins { get; set; } = new List<string>();
         public DateTime? AllowedPluginsLastFetched { get; set; }
         public List<PendingScrobble> PendingScrobbles { get; set; } = new List<PendingScrobble>();
