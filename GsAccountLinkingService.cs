@@ -24,6 +24,11 @@ namespace GsPlugin {
         public string ErrorMessage { get; set; }
         public Exception Exception { get; set; }
         public LinkingContext Context { get; set; }
+        /// <summary>
+        /// True when the failure was caused by a network/connectivity problem rather than
+        /// a server-side token rejection. Callers can use this to offer a retry action.
+        /// </summary>
+        public bool IsNetworkError { get; set; }
 
         public static LinkingResult CreateSuccess(string userId, LinkingContext context) {
             return new LinkingResult {
@@ -33,12 +38,13 @@ namespace GsPlugin {
             };
         }
 
-        public static LinkingResult CreateError(string errorMessage, LinkingContext context, Exception exception = null) {
+        public static LinkingResult CreateError(string errorMessage, LinkingContext context, Exception exception = null, bool isNetworkError = false) {
             return new LinkingResult {
                 Success = false,
                 ErrorMessage = errorMessage,
                 Context = context,
-                Exception = exception
+                Exception = exception,
+                IsNetworkError = isNetworkError
             };
         }
     }
@@ -96,9 +102,9 @@ namespace GsPlugin {
                 var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
 
                 if (response == null) {
-                    string errorMessage = "Failed to verify token - no response from server";
+                    string errorMessage = "Network error — could not reach the server. Please check your connection and try again.";
                     GsLogger.Error($"{context} linking failed: {errorMessage}");
-                    return LinkingResult.CreateError(errorMessage, context);
+                    return LinkingResult.CreateError(errorMessage, context, isNetworkError: true);
                 }
 
                 if (response.success) {
@@ -143,7 +149,7 @@ namespace GsPlugin {
             catch (Exception ex) {
                 GsLogger.Error($"Exception during {context} linking", ex);
                 GsSentry.CaptureException(ex, $"Exception during {context} linking");
-                return LinkingResult.CreateError($"Error during linking: {ex.Message}", context, ex);
+                return LinkingResult.CreateError($"Error during linking: {ex.Message}", context, ex, isNetworkError: true);
             }
         }
 

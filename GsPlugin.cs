@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -18,6 +19,7 @@ namespace GsPlugin {
         private GsUriHandler _uriHandler;
         private GsScrobblingService _scrobblingService;
         private GsSuccessStoryHelper _achievementHelper;
+        private GsUpdateChecker _updateChecker;
         private bool _disposed;
         /// <summary>
         /// Unique identifier for the plugin itself.
@@ -42,15 +44,14 @@ namespace GsPlugin {
             // Initialize centralized account linking service
             _linkingService = new GsAccountLinkingService(_apiClient, api);
 
-            // Create settings with linking service dependency
-            _settings = new GsPluginSettingsViewModel(this, _linkingService);
+            // Initialize achievement helper (reads from SuccessStory plugin if installed)
+            _achievementHelper = new GsSuccessStoryHelper(api);
+
+            // Create settings with linking service and achievement helper dependencies
+            _settings = new GsPluginSettingsViewModel(this, _linkingService, _achievementHelper);
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
-
-
-            // Initialize achievement helper (reads from SuccessStory plugin if installed)
-            _achievementHelper = new GsSuccessStoryHelper(api);
 
             // Initialize scrobbling services
             _scrobblingService = new GsScrobblingService(_apiClient, _achievementHelper);
@@ -58,6 +59,9 @@ namespace GsPlugin {
             // Initialize and register URI handler for automatic account linking
             _uriHandler = new GsUriHandler(api, _linkingService);
             _uriHandler.RegisterUriHandler();
+
+            // Initialize update checker
+            _updateChecker = new GsUpdateChecker(api);
         }
 
         /// <summary>
@@ -124,6 +128,14 @@ namespace GsPlugin {
                 }
                 catch (Exception ex) {
                     _logger.Warn(ex, "Plugin refresh failed, continuing with cached/hardcoded list");
+                }
+
+                // Check for plugin updates and notify user if a newer version is available
+                try {
+                    await _updateChecker.CheckForUpdateAsync();
+                }
+                catch (Exception ex) {
+                    _logger.Warn(ex, "Update check failed");
                 }
 
                 // Flush any scrobbles that were queued during a previous session when the API was unavailable
@@ -226,6 +238,51 @@ namespace GsPlugin {
                     // Return a new instance of your custom UserControl (WPF)
                     return new MySidebarView(GsSentry.GetPluginVersion());
                 },
+            };
+        }
+
+        /// <summary>
+        /// Gets main menu items provided by this plugin.
+        /// Called by Playnite when building the Extensions top-level menu.
+        /// </summary>
+        /// <returns>A collection of MainMenuItem objects to be displayed under Extensions → Game Spectrum.</returns>
+        public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args) {
+            yield return new MainMenuItem {
+                Description = "Open Dashboard",
+                MenuSection = "@Game Spectrum",
+                Action = _ => {
+                    string userId = Uri.EscapeDataString(GsDataManager.Data.InstallID);
+                    string theme = Uri.EscapeDataString((GsDataManager.Data.Theme ?? "Dark").ToLower());
+                    bool newDashboard = GsDataManager.Data.NewDashboardExperience;
+                    string version = Uri.EscapeDataString(GsSentry.GetPluginVersion());
+                    string url =
+                        $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={version}&theme={theme}&new_dashboard={newDashboard.ToString().ToLower()}";
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                }
+            };
+
+            yield return new MainMenuItem {
+                Description = "Sync Library Now",
+                MenuSection = "@Game Spectrum",
+                Action = async _ => {
+                    try {
+                        var success = await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                        PlayniteApi.Dialogs.ShowMessage(
+                            success ? "Library sync completed." : "Library sync failed. Check logs for details.",
+                            "Game Spectrum");
+                    }
+                    catch (Exception ex) {
+                        _logger.Error(ex, "Error in Sync Library Now menu action");
+                        GsSentry.CaptureException(ex, "Error in Sync Library Now menu action");
+                        PlayniteApi.Dialogs.ShowMessage("Library sync encountered an error.", "Game Spectrum");
+                    }
+                }
+            };
+
+            yield return new MainMenuItem {
+                Description = "Open Settings",
+                MenuSection = "@Game Spectrum",
+                Action = _ => PlayniteApi.MainView.OpenPluginSettings(Id)
             };
         }
 

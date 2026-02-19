@@ -120,6 +120,7 @@
     <Compile Include="GsSuccessStoryHelper.cs" />
     <Compile Include="GsAccountLinkingService.cs" />
     <Compile Include="GsSentry.cs" />
+    <Compile Include="GsUpdateChecker.cs" />
     <Compile Include="GsUriHandler.cs" />
     <Compile Include="View\GsPluginSettingsView.xaml.cs">
       <DependentUpon>GsPluginSettingsView.xaml</DependentUpon>

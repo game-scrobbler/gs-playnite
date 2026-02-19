@@ -27,6 +27,23 @@ namespace GsPlugin {
 
         public int? GetTotalCount(Guid gameId) => GetAchievementCounts(gameId)?.total;
 
+        public bool IsInstalled => GetSuccessStoryPlugin() != null;
+
+        public string GetVersion() {
+            try {
+                var plugin = GetSuccessStoryPlugin();
+                if (plugin == null)
+                    return null;
+                return plugin.GetType().Assembly.GetName().Version?.ToString(3);
+            }
+            catch (Exception ex) {
+                GsLogger.Warn(
+                    $"[GsSuccessStoryHelper] Version lookup failed: {ex.Message}"
+                );
+                return null;
+            }
+        }
+
         private (int unlocked, int total)? GetAchievementCounts(Guid gameId) {
             try {
                 var plugin = GetSuccessStoryPlugin();

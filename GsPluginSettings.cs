@@ -85,6 +85,7 @@ namespace GsPlugin {
     public class GsPluginSettingsViewModel : ObservableObject, ISettings {
         private readonly GsPlugin _plugin;
         private readonly GsAccountLinkingService _linkingService;
+        private readonly GsSuccessStoryHelper _achievementHelper;
         private GsPluginSettings _editingClone;
         private GsPluginSettings _settings;
 
@@ -97,6 +98,31 @@ namespace GsPlugin {
         }
 
         public List<string> AvailableThemes { get; set; }
+
+        private bool? _isSuccessStoryInstalled;
+        public bool IsSuccessStoryInstalled {
+            get {
+                if (!_isSuccessStoryInstalled.HasValue)
+                    _isSuccessStoryInstalled = _achievementHelper.IsInstalled;
+                return _isSuccessStoryInstalled.Value;
+            }
+        }
+
+        public bool IsSuccessStoryMissing => !IsSuccessStoryInstalled;
+
+        private string _successStoryStatusText;
+        public string SuccessStoryStatusText {
+            get {
+                if (_successStoryStatusText == null) {
+                    var version = _achievementHelper.GetVersion();
+                    _successStoryStatusText = version != null
+                        ? $"SuccessStory detected (v{version})"
+                        : "SuccessStory detected";
+                }
+                return _successStoryStatusText;
+            }
+        }
+
         public static bool IsLinked => GsDataManager.IsAccountLinked;
         public static string ConnectionStatus => IsLinked
             ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
@@ -115,10 +141,17 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="plugin">The plugin instance for settings persistence.</param>
         /// <param name="linkingService">The account linking service.</param>
-        public GsPluginSettingsViewModel(GsPlugin plugin, GsAccountLinkingService linkingService) {
+        /// <param name="achievementHelper">The SuccessStory achievement helper for detection status.</param>
+        public GsPluginSettingsViewModel(
+            GsPlugin plugin,
+            GsAccountLinkingService linkingService,
+            GsSuccessStoryHelper achievementHelper
+        ) {
             // Store plugin reference for save/load operations
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
             _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
+            _achievementHelper =
+                achievementHelper ?? throw new ArgumentNullException(nameof(achievementHelper));
             AvailableThemes = new List<string> { "Dark", "Light", "System" };
 
             InitializeSettings();
@@ -271,16 +304,22 @@ namespace GsPlugin {
                     Settings.LinkStatusMessage = "Successfully linked account!";
                     // Note: OnLinkingStatusChanged() is already called inside LinkAccountAsync
                 }
+                else if (result.IsNetworkError) {
+                    Settings.LinkStatusMessage = $"{result.ErrorMessage} Click \"Link Account\" to retry.";
+                }
                 else {
                     Settings.LinkStatusMessage = result.ErrorMessage;
                 }
             }
             catch (Exception ex) {
-                Settings.LinkStatusMessage = $"Error: {ex.Message}";
+                Settings.LinkStatusMessage = $"Error: {ex.Message} Click \"Link Account\" to retry.";
             }
             finally {
                 Settings.IsLinking = false;
-                Settings.LinkToken = "";
+                // Preserve the token on network errors so the user can retry without re-entering it
+                if (Settings.LinkStatusMessage?.IndexOf("retry", System.StringComparison.OrdinalIgnoreCase) < 0) {
+                    Settings.LinkToken = "";
+                }
             }
         }
 

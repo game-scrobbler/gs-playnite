@@ -34,6 +34,7 @@ namespace GsPlugin {
         public List<string> AllowedPlugins { get; set; } = new List<string>();
         public DateTime? AllowedPluginsLastFetched { get; set; }
         public List<PendingScrobble> PendingScrobbles { get; set; } = new List<PendingScrobble>();
+        public string LastNotifiedVersion { get; set; } = null;
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling) {
             Flags.Clear();

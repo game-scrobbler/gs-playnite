@@ -344,6 +344,9 @@ namespace GsPlugin {
             public bool success { get; set; }
             public string message { get; set; }
             public string userId { get; set; }
+            // Error fields returned on non-2xx responses
+            public string error { get; set; }
+            public string errorCode { get; set; }
         }
 
         public async Task<TokenVerificationRes> VerifyToken(string token, string playniteId) {
@@ -364,8 +367,15 @@ namespace GsPlugin {
             };
 
             return await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<TokenVerificationRes>(
+                var res = await PostJsonAsync<TokenVerificationRes>(
                     $"{_nextApiBaseUrl}/api/auth/playnite/verify", payload);
+
+                // Promote the error field to message so callers always read result.message
+                if (res != null && !res.success && string.IsNullOrEmpty(res.message) && !string.IsNullOrEmpty(res.error)) {
+                    res.message = res.error;
+                }
+
+                return res;
             }, maxRetries: 1); // Token verification is less critical, only retry once
         }
 

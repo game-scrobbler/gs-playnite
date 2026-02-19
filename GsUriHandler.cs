@@ -101,6 +101,16 @@ namespace GsPlugin {
                     _playniteApi?.Dialogs?.ShowMessage($"Account successfully linked!\nUser ID: {result.UserId}", "Account Linking Success", MessageBoxButton.OK, MessageBoxImage.Information
                     );
                 }
+                else if (result.IsNetworkError) {
+                    var retry = _playniteApi?.Dialogs?.ShowMessage(
+                        $"Account linking failed due to a network error:\n{result.ErrorMessage}\n\nWould you like to retry?",
+                        "Account Linking Failed — Retry?",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+                    if (retry == MessageBoxResult.Yes) {
+                        await ProcessAutomaticLinking(token);
+                    }
+                }
                 else {
                     _playniteApi?.Dialogs?.ShowMessage($"Account linking failed: {result.ErrorMessage}", "Account Linking Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
