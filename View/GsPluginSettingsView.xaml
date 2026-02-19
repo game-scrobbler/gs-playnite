@@ -72,6 +72,22 @@
                    FontSize="14"
                    Margin="0,5,0,10"/>
 
+        <!-- Open website to initiate linking -->
+        <Button x:Name="OpenWebsiteToLinkButton"
+                Content="Link Account on Website"
+                HorizontalAlignment="Left"
+                Margin="0,0,0,8"
+                Padding="10,3"
+                MinWidth="160"
+                Click="OpenWebsiteToLink_Click"
+                ToolTip="Opens gamescrobbler.com in your browser to link your account automatically"/>
+
+        <TextBlock x:Name="ManualTokenSeparator"
+                   FontSize="11"
+                   Foreground="Gray"
+                   Margin="0,0,0,5"
+                   Text="— or enter your token manually —"/>
+
         <!-- Linking Controls -->
         <Grid x:Name="LinkingControlsGrid" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>

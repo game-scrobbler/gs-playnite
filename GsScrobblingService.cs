@@ -387,6 +387,30 @@ namespace GsPlugin {
                         : null,
                     achievement_count_total = GsDataManager.Data.SyncAchievements
                         ? _achievementHelper.GetTotalCount(g.Id)
+                        : null,
+                    genres = g.Genres != null && g.Genres.Count > 0
+                        ? g.Genres.Select(x => x.Name).ToList()
+                        : null,
+                    platforms = g.Platforms != null && g.Platforms.Count > 0
+                        ? g.Platforms.Select(x => x.Name).ToList()
+                        : null,
+                    developers = g.Developers != null && g.Developers.Count > 0
+                        ? g.Developers.Select(x => x.Name).ToList()
+                        : null,
+                    publishers = g.Publishers != null && g.Publishers.Count > 0
+                        ? g.Publishers.Select(x => x.Name).ToList()
+                        : null,
+                    tags = g.Tags != null && g.Tags.Count > 0
+                        ? g.Tags.Select(x => x.Name).ToList()
+                        : null,
+                    features = g.Features != null && g.Features.Count > 0
+                        ? g.Features.Select(x => x.Name).ToList()
+                        : null,
+                    categories = g.Categories != null && g.Categories.Count > 0
+                        ? g.Categories.Select(x => x.Name).ToList()
+                        : null,
+                    series = g.Series != null && g.Series.Count > 0
+                        ? g.Series.Select(x => x.Name).ToList()
                         : null
                 }).ToList();
 

@@ -141,9 +141,12 @@ namespace GsPlugin {
                 : new SolidColorBrush(Colors.Red);
 
             // Show/hide linking controls based on connection status
-            LinkingControlsGrid.Visibility = GsPluginSettingsViewModel.ShowLinkingControls
+            var linkingVisibility = GsPluginSettingsViewModel.ShowLinkingControls
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            OpenWebsiteToLinkButton.Visibility = linkingVisibility;
+            ManualTokenSeparator.Visibility = linkingVisibility;
+            LinkingControlsGrid.Visibility = linkingVisibility;
         }
 
         /// <summary>
@@ -180,6 +183,27 @@ namespace GsPlugin {
         /// </summary>
         private void LinkAccount_Click(object sender, RoutedEventArgs e) {
             _viewModel?.LinkAccount();
+        }
+
+        /// <summary>
+        /// Opens the gamescrobbler.com account linking page with the InstallID pre-filled.
+        /// </summary>
+        private void OpenWebsiteToLink_Click(object sender, RoutedEventArgs e) {
+            try {
+                var installId = GsDataManager.Data.InstallID;
+                var url = $"https://gamescrobbler.com/link?install_id={installId}";
+                Process.Start(new ProcessStartInfo {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex) {
+                MessageBox.Show(
+                    $"Failed to open URL: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         /// <summary>

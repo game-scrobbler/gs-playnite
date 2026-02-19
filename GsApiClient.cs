@@ -230,6 +230,15 @@ namespace GsPlugin {
             // null when SuccessStory is absent or the game has no achievement data.
             public int? achievement_count_unlocked { get; set; }
             public int? achievement_count_total { get; set; }
+            // null when the collection is empty/not set in Playnite.
+            public List<string> genres { get; set; }
+            public List<string> platforms { get; set; }
+            public List<string> developers { get; set; }
+            public List<string> publishers { get; set; }
+            public List<string> tags { get; set; }
+            public List<string> features { get; set; }
+            public List<string> categories { get; set; }
+            public List<string> series { get; set; }
         }
 
         public class LibrarySyncReq {
