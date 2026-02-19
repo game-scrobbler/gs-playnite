@@ -31,13 +31,14 @@ The project uses Playnite's Toolbox for packaging:
 ### Core Plugin Structure
 - **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events (implements IDisposable)
 - **IGsApiClient.cs** - Interface for API client (enables testing and dependency injection)
-- **GsApiClient.cs** - HTTP API communication layer with circuit breaker protection, retry logic, and TLS 1.2 enforcement
+- **GsApiClient.cs** - HTTP API communication layer with circuit breaker protection, retry logic, and TLS 1.2 enforcement; defines `GameSyncDto` (snake_case) — the library sync payload sent to `POST /api/playnite/v2/sync`
 - **ApiResult.cs** - Generic result wrapper for API responses with success/failure status
 - **GsCircuitBreaker.cs** - Implements circuit breaker pattern with exponential backoff for API resilience
-- **GsScrobblingService.cs** - Handles game session tracking (start/stop events) with dynamic plugin filtering
+- **GsScrobblingService.cs** - Handles game session tracking (start/stop events) and library sync; maps `Playnite.SDK.Models.Game` → `GameSyncDto` (including completion status and achievement counts) before sending to the API
+- **GsSuccessStoryHelper.cs** - Retrieves per-game achievement counts from the SuccessStory addon (GUID `cebe6d32-8c46-4459-b993-5a5189d60788`) via reflection; returns `null` gracefully when SuccessStory is absent or a game has no data
 - **GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler with token validation
 - **GsUriHandler.cs** - Processes deep links for automatic account linking (tokens redacted in logs)
-- **GsData.cs** - Thread-safe persistent data models and state management (GsDataManager with locking)
+- **GsData.cs** - Thread-safe persistent data models and state management (GsDataManager with locking); `SyncAchievements` bool (default `true`) gates achievement lookups at runtime
 - **GsPluginSettings.cs** - Plugin settings with UI binding support and theme validation
 
 ### UI Components
@@ -57,6 +58,7 @@ The project uses Playnite's Toolbox for packaging:
 ### Service Dependencies
 - GsPlugin → GsAccountLinkingService → GsApiClient → GsCircuitBreaker
 - GsPlugin → GsScrobblingService → GsApiClient
+- GsPlugin → GsScrobblingService → GsSuccessStoryHelper (achievement counts, optional)
 - GsPlugin → GsUriHandler → GsAccountLinkingService
 - All services use GsDataManager for persistent state
 
@@ -103,6 +105,8 @@ Hook scripts live in `hooks/` and are installed to `.git/hooks/` via `setup-hook
 - **pre-commit**: Verifies code formatting on staged `.cs` files
 - **commit-msg**: Validates conventional commit message format
 
+**Never use `--no-verify` when pushing or committing.** Git hooks enforce formatting and commit message standards; bypassing them with `--no-verify` is not allowed.
+
 ### Error Handling
 The codebase emphasizes robust error handling with circuit breakers, comprehensive logging, and Sentry integration. When modifying API calls, ensure proper error handling and logging context.
 
@@ -118,3 +122,10 @@ Automatic release tracking is configured for comprehensive error monitoring:
 
 ### UI Development
 Settings UI uses two-way data binding with GsPluginSettings. The sidebar uses WebView2 for displaying GameScrobbler statistics. WebView2 navigation is restricted to `gamescrobbler.com` domains, and external links are opened in the system browser (https only).
+
+### Playnite SDK Type Gotchas
+- `Game.Playtime` and `Game.PlayCount` are `ulong` — cast explicitly to `long`/`int` when assigning to DTO fields (no implicit conversion).
+- `Game.CompletionStatusId` defaults to `Guid.Empty` (not `null`) when unset — guard with `g.CompletionStatusId != Guid.Empty` before calling `.ToString()`.
+- `Game.CompletionStatus` is a user-defined named object (not an enum) with a `.Name` string property; access null-safely (`g.CompletionStatus?.Name`).
+- Adding a new `.cs` file requires a `<Compile Include="FileName.cs" />` entry in `GsPlugin.csproj` (old-style non-SDK project — files are not auto-included).
+- New `.cs` files written with LF line endings will fail `dotnet format --verify-no-changes`; run `dotnet format` to auto-correct to CRLF.

@@ -11,6 +11,7 @@ Game Spectrum is a Playnite plugin that provides game session tracking and stati
 
 - ✨ **Playtime Insights**: See where your gaming hours go with beautiful charts and graphs.
 - ⏳ **Achievement Visualization**: Track your milestones and spot patterns in your game play.
+- 🏆 **Achievement Sync**: Sync per-game achievement counts via the [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) (optional, installed separately).
 - 🔗 **Data Ownership**: Own and persist your data via the help of Game Scrobbler
 - 📊 **Game Session Tracking**: Automatic scrobbling of game start/stop events
 - 🛡️ **Robust Error Handling**: Advanced fault tolerance with circuit breaker pattern and retry logic
@@ -19,8 +20,9 @@ Game Spectrum is a Playnite plugin that provides game session tracking and stati
 ## Services
 
 - **GsPlugin** acts as the central orchestrator with comprehensive exception handling, receiving events from Playnite SDK and delegating to appropriate services
-- **GsScrobblingService** communicates with **GsApiClient** for session start/stop operations with enhanced null safety and logging
-- **GsApiClient** provides fault-tolerant HTTP communication using **GsCircuitBreaker** for resilience and retry logic
+- **GsScrobblingService** communicates with **GsApiClient** for session start/stop operations and library sync; maps `Game` objects to `GameSyncDto` (snake_case) before sending to the API
+- **GsSuccessStoryHelper** retrieves per-game achievement counts from the SuccessStory addon via reflection; returns `null` gracefully when SuccessStory is not installed
+- **GsApiClient** provides fault-tolerant HTTP communication using **GsCircuitBreaker** for resilience and retry logic; library sync uses the `POST /api/playnite/v2/sync` endpoint with `GameSyncDto` payloads
 - **GsCircuitBreaker** implements circuit breaker pattern with exponential backoff for API call protection
 - **GsAccountLinkingService** uses **GsApiClient** for token verification and user validation
 - **GsUriHandler** delegates account linking to **GsAccountLinkingService** when processing deep links
@@ -35,10 +37,13 @@ Game Spectrum is a Playnite plugin that provides game session tracking and stati
 gs-playnite/
 ├── GsPlugin.cs                       # Main plugin entry point
 ├── GsData.cs                         # Persistent data models and manager
-├── GsApiClient.cs                    # HTTP API communication layer
+├── IGsApiClient.cs                   # API client interface (enables DI and testing)
+├── GsApiClient.cs                    # HTTP API communication layer; defines GameSyncDto
+├── ApiResult.cs                      # Generic result wrapper for API responses
 ├── GsCircuitBreaker.cs               # Circuit breaker pattern with retry logic
 ├── GsPluginSettings.cs               # Plugin settings data model
-├── GsScrobblingService.cs            # Game session tracking
+├── GsScrobblingService.cs            # Game session tracking and library sync
+├── GsSuccessStoryHelper.cs           # Achievement counts via SuccessStory addon (reflection)
 ├── GsAccountLinkingService.cs        # Account linking functionality
 ├── GsUriHandler.cs                   # Deep link handling
 │
@@ -64,10 +69,13 @@ gs-playnite/
 ## Core Services
 
 - **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events with comprehensive exception handling
-- **GsApiClient.cs** - HTTP API layer for GameScrobbler communication with circuit breaker protection, input validation, and retry logic
+- **IGsApiClient.cs** - Interface for the API client, enabling dependency injection and testability
+- **GsApiClient.cs** - HTTP API layer for GameScrobbler communication with circuit breaker protection, input validation, and retry logic; defines `GameSyncDto` (snake_case) for library sync payloads sent to `POST /api/playnite/v2/sync`
+- **ApiResult.cs** - Generic result wrapper for API responses with success/failure status
 - **GsCircuitBreaker.cs** - Implements circuit breaker pattern with exponential backoff retry logic for API resilience
 - **GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler
-- **GsScrobblingService.cs** - Tracks game sessions (start/stop events) with enhanced logging and null safety checks
+- **GsScrobblingService.cs** - Tracks game sessions (start/stop events); during library sync maps each `Playnite.SDK.Models.Game` to a `GameSyncDto` including completion status and (optionally) achievement counts
+- **GsSuccessStoryHelper.cs** - Retrieves per-game achievement counts (`unlocked` / `total`) from the [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) via reflection; returns `null` for both fields when SuccessStory is not installed or the game has no achievement data
 - **GsUriHandler.cs** - Processes deep links (`playnite://gamescrobbler/...`) for automatic account linking
 
 ## Data Management
@@ -79,6 +87,23 @@ gs-playnite/
 
 - **GsPluginSettingsView.xaml/.cs** - Main settings interface with account linking UI and two-way data binding
 - **MySidebarView.xaml/.cs** - Sidebar integration displaying web view with user statistics
+
+## Achievement Sync
+
+The plugin can sync per-game achievement progress during library sync if the optional [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) is installed.
+
+### How it works
+
+1. During library sync `GsScrobblingService` builds a `GameSyncDto` for each game.
+2. `GsSuccessStoryHelper` is called for each game; it locates the SuccessStory plugin by its well-known GUID (`cebe6d32-8c46-4459-b993-5a5189d60788`) via `IPlayniteAPI.Addons.Plugins`, then reads achievement data through reflection (`PluginDatabase.Get(gameId).Unlocked` / `.Items.Count`).
+3. If SuccessStory is not installed or a game has no achievement data, both `achievement_count_unlocked` and `achievement_count_total` are sent as `null` — the backend treats `null` as "unknown", not zero.
+4. The populated `GameSyncDto` list is sent to `POST /api/playnite/v2/sync` (snake_case payload).
+
+### Settings toggle
+
+**Sync achievement data (requires SuccessStory addon)** — enabled by default. When disabled, achievement fields are omitted from the sync payload. The toggle is in the plugin settings under the Experimental Features section.
+
+The current `sync_achievements` state is also forwarded to the Game Spectrum dashboard via a URL parameter on the sidebar iframe.
 
 ## Utilities
 
@@ -115,15 +140,15 @@ The plugin includes advanced fault tolerance mechanisms to ensure stable operati
 The project includes automated validation via Git hooks:
 
 #### 1. Pre-commit Hook (Code Formatting)
-- **setup-hooks.ps1** - Configures the Git hooks system for Windows
-- **.git/hooks/pre-commit.ps1** - PowerShell pre-commit hook for code formatting validation
+- **hooks/pre-commit** + **hooks/pre-commit.ps1** - Source hook scripts (checked into repo)
 - **format-code.ps1** - Manual code formatting script for developers
+- **setup-hooks.ps1** - Installs hooks from `hooks/` into `.git/hooks/` (run once after cloning)
 
 #### 2. Commit-msg Hook (Conventional Commits)
-- **.git/hooks/commit-msg.ps1** - PowerShell hook that validates commit messages
-- **.git/hooks/commit-msg** - Shell wrapper for Git integration
+- **hooks/commit-msg** + **hooks/commit-msg.ps1** - Source hook scripts (checked into repo)
 - Enforces [Conventional Commits](https://www.conventionalcommits.org/) format
 - Ensures Release Please can properly auto-version the project
+- **Note**: Commits will be rejected if the message format is invalid — run `setup-hooks.ps1` first
 
 **Setup Instructions:**
 ```powershell
@@ -249,14 +274,20 @@ Release Please automatically updates:
 
 ## Commands
 
+- `MSBuild.exe .\GsPlugin.sln -p:Configuration=Release -restore` - Build solution
+- `dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` - Run tests (build first)
 - `dotnet format .\GsPlugin.sln` - Format code
 - `dotnet format .\GsPlugin.sln --verify-no-changes` - Verify formatting
+- `Playnite\Toolbox.exe pack "bin\Release" "PackingOutput"` - Package plugin as `.pext`
 
 ## Contributions
 
-We welcome all contributions! If you have an idea for a new feature or have found a bug, feel free to open an issue or submit a pull request.
+We welcome all contributions! If you have an idea for a new feature or have found a bug, feel free to open an [issue](https://github.com/game-scrobbler/gs-playnite/issues) or submit a pull request.
 
-To ensure consistency, please format your code with `dotnet format GsPlugin.sln` before submitting a PR.
+To ensure consistency:
+- Format your code with `dotnet format GsPlugin.sln` before submitting a PR
+- All commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) format (enforced by the commit-msg hook — see the Git Hooks section above)
+- Run `powershell -ExecutionPolicy Bypass -File setup-hooks.ps1` once after cloning to install the hooks locally
 
 ## More
 
