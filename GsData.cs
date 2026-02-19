@@ -6,6 +6,16 @@ using Sentry;
 
 namespace GsPlugin {
     /// <summary>
+    /// Represents a scrobble request that failed to send and is waiting to be retried.
+    /// </summary>
+    public class PendingScrobble {
+        public string Type { get; set; }
+        public GsApiClient.ScrobbleStartReq StartData { get; set; }
+        public GsApiClient.ScrobbleFinishReq FinishData { get; set; }
+        public DateTime QueuedAt { get; set; }
+    }
+
+    /// <summary>
     /// Holds custom persistent data.
     /// </summary>
     public class GsData {
@@ -22,6 +32,7 @@ namespace GsPlugin {
         public bool NewDashboardExperience { get; set; } = false;
         public List<string> AllowedPlugins { get; set; } = new List<string>();
         public DateTime? AllowedPluginsLastFetched { get; set; }
+        public List<PendingScrobble> PendingScrobbles { get; set; } = new List<PendingScrobble>();
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling) {
             Flags.Clear();
@@ -152,5 +163,27 @@ namespace GsPlugin {
         /// </summary>
         public static bool IsAccountLinked =>
             !string.IsNullOrEmpty(Data?.LinkedUserId) && Data.LinkedUserId != GsData.NotLinkedValue;
+
+        /// <summary>
+        /// Adds a pending scrobble to the queue and persists it. Thread-safe.
+        /// </summary>
+        public static void EnqueuePendingScrobble(PendingScrobble item) {
+            lock (_lock) {
+                _data.PendingScrobbles.Add(item);
+                SaveInternal();
+            }
+        }
+
+        /// <summary>
+        /// Atomically removes and returns all pending scrobbles from the queue. Thread-safe.
+        /// </summary>
+        public static List<PendingScrobble> DequeuePendingScrobbles() {
+            lock (_lock) {
+                var snapshot = new List<PendingScrobble>(_data.PendingScrobbles);
+                _data.PendingScrobbles.Clear();
+                SaveInternal();
+                return snapshot;
+            }
+        }
     }
 }

@@ -39,6 +39,7 @@ namespace GsPlugin {
                 failureThreshold: 3,
                 timeout: TimeSpan.FromMinutes(2),
                 retryDelay: TimeSpan.FromSeconds(10));
+            _circuitBreaker.OnCircuitClosed += () => _ = FlushPendingScrobblesAsync();
         }
 
         #region Game Session Management
@@ -179,6 +180,34 @@ namespace GsPlugin {
                 return await _circuitBreaker.ExecuteAsync(async () => {
                     return await PostJsonAsync<ScrobbleFinishRes>(url, endData, true);
                 }, maxRetries: 2);
+            }
+        }
+
+        /// <summary>
+        /// Flushes all pending scrobbles that were queued when the API was unavailable.
+        /// Called on circuit breaker recovery and on application startup.
+        /// </summary>
+        public async Task FlushPendingScrobblesAsync() {
+            var pending = GsDataManager.DequeuePendingScrobbles();
+            if (pending == null || pending.Count == 0) {
+                return;
+            }
+
+            _logger.Info($"Flushing {pending.Count} pending scrobble(s)");
+            foreach (var item in pending) {
+                try {
+                    if (item.Type == "start" && item.StartData != null) {
+                        await StartGameSession(item.StartData, useAsync: true);
+                    }
+                    else if (item.Type == "finish" && item.FinishData != null) {
+                        await FinishGameSession(item.FinishData, useAsync: true);
+                    }
+                }
+                catch (Exception ex) {
+                    // Log and drop — do not re-enqueue to avoid infinite loops.
+                    // If the circuit opens again during flush, new failures will be re-queued normally.
+                    _logger.Error(ex, $"Failed to flush pending scrobble (type={item.Type}, queued={item.QueuedAt:O})");
+                }
             }
         }
 

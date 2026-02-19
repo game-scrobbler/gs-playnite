@@ -12,5 +12,6 @@ namespace GsPlugin {
         Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq, bool useAsync = false);
         Task<AllowedPluginsRes> GetAllowedPlugins();
         Task<TokenVerificationRes> VerifyToken(string token, string playniteId);
+        Task FlushPendingScrobblesAsync();
     }
 }

@@ -21,6 +21,12 @@ namespace GsPlugin {
             HalfOpen    // Testing if service has recovered
         }
 
+        /// <summary>
+        /// Raised when the circuit breaker transitions from HalfOpen to Closed (i.e., the API has recovered).
+        /// Subscribers should use this to flush any queued operations.
+        /// </summary>
+        public event Action OnCircuitClosed;
+
         private readonly int _failureThreshold;
         private readonly TimeSpan _timeout;
         private readonly TimeSpan _retryDelay;
@@ -124,12 +130,17 @@ namespace GsPlugin {
         }
 
         private void OnSuccess() {
+            bool recovered = false;
             lock (_lock) {
                 _failureCount = 0;
                 if (_state == CircuitState.HalfOpen) {
                     _state = CircuitState.Closed;
                     _logger.Info("Circuit breaker moving from HalfOpen to Closed state");
+                    recovered = true;
                 }
+            }
+            if (recovered) {
+                OnCircuitClosed?.Invoke();
             }
         }
 

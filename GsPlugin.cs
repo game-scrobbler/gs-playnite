@@ -122,6 +122,9 @@ namespace GsPlugin {
                     _logger.Warn(ex, "Plugin refresh failed, continuing with cached/hardcoded list");
                 }
 
+                // Flush any scrobbles that were queued during a previous session when the API was unavailable
+                await _apiClient.FlushPendingScrobblesAsync();
+
                 await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
             }
             catch (Exception ex) {

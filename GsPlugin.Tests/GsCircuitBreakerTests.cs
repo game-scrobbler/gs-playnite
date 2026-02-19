@@ -304,5 +304,53 @@ namespace GsPlugin.Tests {
                 retryDelay: TimeSpan.FromSeconds(10));
             Assert.Equal(GsCircuitBreaker.CircuitState.Closed, breaker.State);
         }
+
+        [Fact]
+        public async Task OnCircuitClosed_FiredOnHalfOpenToClosedTransition() {
+            var timeout = TimeSpan.FromMilliseconds(50);
+            var breaker = new GsCircuitBreaker(failureThreshold: 1, timeout: timeout, retryDelay: TimeSpan.FromMilliseconds(1));
+            int firedCount = 0;
+            breaker.OnCircuitClosed += () => firedCount++;
+
+            // Open the circuit
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                breaker.ExecuteAsync<int>(async () => {
+                    await Task.CompletedTask;
+                    throw new InvalidOperationException("test failure");
+                }, maxRetries: 0));
+
+            Assert.Equal(GsCircuitBreaker.CircuitState.Open, breaker.State);
+            Assert.Equal(0, firedCount); // not fired yet
+
+            // Wait for timeout to allow HalfOpen
+            await Task.Delay(100);
+
+            // Successful probe — transitions HalfOpen → Closed
+            await breaker.ExecuteAsync(async () => {
+                await Task.CompletedTask;
+                return 42;
+            }, maxRetries: 0);
+
+            Assert.Equal(GsCircuitBreaker.CircuitState.Closed, breaker.State);
+            Assert.Equal(1, firedCount); // fired exactly once
+        }
+
+        [Fact]
+        public async Task OnCircuitClosed_NotFiredOnNormalClosedSuccess() {
+            var breaker = new GsCircuitBreaker(failureThreshold: 5);
+            int firedCount = 0;
+            breaker.OnCircuitClosed += () => firedCount++;
+
+            // Several successful calls while circuit stays closed
+            for (int i = 0; i < 3; i++) {
+                await breaker.ExecuteAsync(async () => {
+                    await Task.CompletedTask;
+                    return i;
+                }, maxRetries: 0);
+            }
+
+            Assert.Equal(GsCircuitBreaker.CircuitState.Closed, breaker.State);
+            Assert.Equal(0, firedCount); // never fired
+        }
     }
 }

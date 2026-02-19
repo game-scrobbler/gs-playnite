@@ -167,7 +167,20 @@ namespace GsPlugin {
                     _logger.Info($"Successfully started scrobble session with ID: {sessionData.session_id}");
                 }
                 else {
-                    _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id})");
+                    _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id}). Queuing for retry.");
+                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                        Type = "start",
+                        StartData = new GsApiClient.ScrobbleStartReq {
+                            user_id = GsDataManager.Data.InstallID,
+                            game_name = startedGame.Name,
+                            game_id = startedGame.Id.ToString(),
+                            plugin_id = startedGame.PluginId.ToString(),
+                            external_game_id = startedGame.GameId,
+                            metadata = new { PluginId = startedGame.PluginId.ToString() },
+                            started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                        },
+                        QueuedAt = localDate
+                    });
                 }
             }
             catch (Exception ex) {
@@ -222,7 +235,22 @@ namespace GsPlugin {
                     _logger.Info($"Successfully finished scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
                 }
                 else {
-                    _logger.Error($"Failed to finish game session for {stoppedGame.Name} (ID: {stoppedGame.Id})");
+                    _logger.Error($"Failed to finish game session for {stoppedGame.Name} (ID: {stoppedGame.Id}). Queuing for retry.");
+                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                        Type = "finish",
+                        FinishData = new GsApiClient.ScrobbleFinishReq {
+                            user_id = GsDataManager.Data.InstallID,
+                            game_name = stoppedGame.Name,
+                            game_id = stoppedGame.Id.ToString(),
+                            plugin_id = stoppedGame.PluginId.ToString(),
+                            external_game_id = stoppedGame.GameId,
+                            session_id = GsDataManager.Data.ActiveSessionId,
+                            metadata = new { PluginId = stoppedGame.PluginId.ToString() },
+                            finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                        },
+                        QueuedAt = localDate
+                    });
+                    // Leave ActiveSessionId in place so a manual retry still has the session ID
                 }
             }
             catch (Exception ex) {
@@ -258,7 +286,17 @@ namespace GsPlugin {
                     _logger.Info("Successfully cleaned up active session on application stop");
                 }
                 else {
-                    _logger.Error("Failed to finish active session on application stop");
+                    _logger.Error("Failed to finish active session on application stop. Queuing for retry.");
+                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                        Type = "finish",
+                        FinishData = new GsApiClient.ScrobbleFinishReq {
+                            user_id = GsDataManager.Data.InstallID,
+                            session_id = GsDataManager.Data.ActiveSessionId,
+                            metadata = new { reason = "application_stopped" },
+                            finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                        },
+                        QueuedAt = localDate
+                    });
                 }
             }
             catch (Exception ex) {

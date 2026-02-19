@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using Xunit;
@@ -155,6 +156,51 @@ namespace GsPlugin.Tests {
             Assert.NotNull(deserialized.AllowedPluginsLastFetched);
             // Compare with tolerance since JSON serialization may lose some precision
             Assert.True((now - deserialized.AllowedPluginsLastFetched.Value).TotalSeconds < 1);
+        }
+
+        [Fact]
+        public void PendingScrobbles_DefaultsToEmpty() {
+            var data = new GsData();
+            Assert.NotNull(data.PendingScrobbles);
+            Assert.Empty(data.PendingScrobbles);
+        }
+
+        [Fact]
+        public void PendingScrobbles_SerializationRoundtrip() {
+            var data = new GsData {
+                PendingScrobbles = new List<PendingScrobble> {
+                    new PendingScrobble {
+                        Type = "start",
+                        StartData = new GsApiClient.ScrobbleStartReq {
+                            user_id = "user-1",
+                            game_name = "Test Game",
+                            game_id = "game-guid-1",
+                            plugin_id = "plugin-guid-1",
+                            external_game_id = "ext-123",
+                            started_at = "2025-01-01T10:00:00+00:00"
+                        },
+                        QueuedAt = new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc)
+                    },
+                    new PendingScrobble {
+                        Type = "finish",
+                        FinishData = new GsApiClient.ScrobbleFinishReq {
+                            user_id = "user-1",
+                            session_id = "session-abc",
+                            finished_at = "2025-01-01T11:00:00+00:00"
+                        },
+                        QueuedAt = new DateTime(2025, 1, 1, 11, 0, 0, DateTimeKind.Utc)
+                    }
+                }
+            };
+
+            var json = JsonSerializer.Serialize(data);
+            var deserialized = JsonSerializer.Deserialize<GsData>(json);
+
+            Assert.Equal(2, deserialized.PendingScrobbles.Count);
+            Assert.Equal("start", deserialized.PendingScrobbles[0].Type);
+            Assert.Equal("Test Game", deserialized.PendingScrobbles[0].StartData.game_name);
+            Assert.Equal("finish", deserialized.PendingScrobbles[1].Type);
+            Assert.Equal("session-abc", deserialized.PendingScrobbles[1].FinishData.session_id);
         }
     }
 }
