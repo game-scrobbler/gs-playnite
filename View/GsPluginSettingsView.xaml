@@ -129,20 +129,48 @@
 
         <!-- Achievement sync toggle -->
         <StackPanel Margin="0,5,0,0">
-            <CheckBox ToolTip="{DynamicResource LOCGsPluginSyncAchievementsTooltip}"
-                      IsChecked="{Binding Settings.SyncAchievements, Mode=TwoWay}">
-                <CheckBox.Content>
-                    <TextBlock>
-                        <Run Text="{DynamicResource LOCGsPluginSyncAchievementsLabel}"/>
-                        <Run Text=" "/>
-                        <Hyperlink NavigateUri="https://playnite.link/addons.html#Success_Story_Addon"
-                                   RequestNavigate="Hyperlink_RequestNavigate"
-                                   Foreground="CornflowerBlue">
-                            <Run Text="(get SuccessStory)"/>
-                        </Hyperlink>
-                    </TextBlock>
-                </CheckBox.Content>
-            </CheckBox>
+            <CheckBox Content="{DynamicResource LOCGsPluginSyncAchievementsLabel}"
+                      ToolTip="{DynamicResource LOCGsPluginSyncAchievementsTooltip}"
+                      IsChecked="{Binding Settings.SyncAchievements, Mode=TwoWay}"/>
+
+            <!-- Status: SuccessStory IS installed -->
+            <StackPanel Orientation="Horizontal"
+                        Margin="20,4,0,0"
+                        Visibility="{Binding IsSuccessStoryInstalled,
+                            Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="✓"
+                           Foreground="#4CAF50"
+                           FontSize="13"
+                           Margin="0,0,6,0"
+                           VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding SuccessStoryStatusText}"
+                           Foreground="#4CAF50"
+                           FontSize="12"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Status: SuccessStory is NOT installed -->
+            <StackPanel Orientation="Horizontal"
+                        Margin="20,4,0,0"
+                        Visibility="{Binding IsSuccessStoryMissing,
+                            Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="⚠"
+                           Foreground="#FFA500"
+                           FontSize="13"
+                           Margin="0,0,6,0"
+                           VerticalAlignment="Center"/>
+                <TextBlock Foreground="#FFA500"
+                           FontSize="12"
+                           VerticalAlignment="Center">
+                    <Run Text="{DynamicResource LOCGsPluginSuccessStoryMissingWarning}"/>
+                    <Run Text=" "/>
+                    <Hyperlink NavigateUri="https://playnite.link/addons.html#Success_Story_Addon"
+                               RequestNavigate="Hyperlink_RequestNavigate"
+                               Foreground="CornflowerBlue">
+                        <Run Text="{DynamicResource LOCGsPluginSuccessStoryInstallLink}"/>
+                    </Hyperlink>
+                </TextBlock>
+            </StackPanel>
         </StackPanel>
 
         <!-- Privacy Controls Section -->
