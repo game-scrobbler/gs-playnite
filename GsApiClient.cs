@@ -209,6 +209,18 @@ namespace GsPlugin {
             public List<string> features { get; set; }
             public List<string> categories { get; set; }
             public List<string> series { get; set; }
+            // Scores: null when not set in Playnite metadata.
+            public int? user_score { get; set; }
+            public int? critic_score { get; set; }
+            public int? community_score { get; set; }
+            // Release year only (Playnite's ReleaseDate is a partial struct; month/day are optional).
+            public int? release_year { get; set; }
+            // Date the game was added to the Playnite library.
+            public DateTime? date_added { get; set; }
+            public bool is_favorite { get; set; }
+            public bool is_hidden { get; set; }
+            // Library source name (e.g. "Steam", "GOG") — distinct from plugin_id.
+            public string source_name { get; set; }
         }
 
         public class LibrarySyncReq {

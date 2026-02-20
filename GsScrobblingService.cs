@@ -452,7 +452,15 @@ namespace GsPlugin {
                             : null,
                         series = g.Series != null && g.Series.Count > 0
                             ? g.Series.Select(x => x.Name).ToList()
-                            : null
+                            : null,
+                        user_score = g.UserScore,
+                        critic_score = g.CriticScore,
+                        community_score = g.CommunityScore,
+                        release_year = g.ReleaseDate?.Year,
+                        date_added = g.Added,
+                        is_favorite = g.Favorite,
+                        is_hidden = g.Hidden,
+                        source_name = g.Source?.Name
                     }).ToList();
 
                     return (dtos, ComputeLibraryHash(dtos), filtered);
