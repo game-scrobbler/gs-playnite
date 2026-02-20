@@ -173,6 +173,12 @@
             </StackPanel>
         </StackPanel>
 
+        <!-- Library Sync Status -->
+        <TextBlock Text="{Binding LastSyncStatus}"
+                   Foreground="Gray"
+                   FontSize="12"
+                   Margin="0,10,0,0"/>
+
         <!-- Privacy Controls Section -->
         <TextBlock Text="Privacy Controls" Style="{StaticResource SectionHeaderStyle}"/>
 

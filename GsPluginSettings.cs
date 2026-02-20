@@ -129,6 +129,28 @@ namespace GsPlugin {
             : "Disconnected";
         public static bool ShowLinkingControls => !IsLinked;
 
+        public static string LastSyncStatus {
+            get {
+                var syncAt = GsDataManager.Data.LastSyncAt;
+                var count = GsDataManager.Data.LastSyncGameCount;
+                if (syncAt == null || count == null)
+                    return "Never synced";
+
+                var elapsed = DateTime.UtcNow - syncAt.Value;
+                string ago;
+                if (elapsed.TotalMinutes < 1)
+                    ago = "just now";
+                else if (elapsed.TotalHours < 1)
+                    ago = $"{(int)elapsed.TotalMinutes} minute{((int)elapsed.TotalMinutes == 1 ? "" : "s")} ago";
+                else if (elapsed.TotalDays < 1)
+                    ago = $"{(int)elapsed.TotalHours} hour{((int)elapsed.TotalHours == 1 ? "" : "s")} ago";
+                else
+                    ago = $"{(int)elapsed.TotalDays} day{((int)elapsed.TotalDays == 1 ? "" : "s")} ago";
+
+                return $"Last synced: {count:N0} games · {ago}";
+            }
+        }
+
         // Linking status change notifications are consolidated on GsAccountLinkingService.LinkingStatusChanged.
         // This forwarding method is kept for convenience from within the view model.
         public static void OnLinkingStatusChanged() {

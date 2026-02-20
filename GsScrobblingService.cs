@@ -421,6 +421,9 @@ namespace GsPlugin {
                 }, useAsync: true);
                 if (syncResponse != null) {
                     _logger.Info("Library sync request queued successfully.");
+                    GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
+                    GsDataManager.Data.LastSyncGameCount = filteredGames.Count;
+                    GsDataManager.Save();
                     return true;
                 }
                 else {
