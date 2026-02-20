@@ -18,6 +18,8 @@ namespace GsPlugin.Tests {
             Assert.NotNull(data.AllowedPlugins);
             Assert.Empty(data.AllowedPlugins);
             Assert.Null(data.AllowedPluginsLastFetched);
+            Assert.Null(data.LastSyncAt);
+            Assert.Null(data.LastSyncGameCount);
         }
 
         [Fact]
@@ -163,6 +165,53 @@ namespace GsPlugin.Tests {
             var data = new GsData();
             Assert.NotNull(data.PendingScrobbles);
             Assert.Empty(data.PendingScrobbles);
+        }
+
+        [Fact]
+        public void LastSyncAt_RoundtripsCorrectly() {
+            var syncTime = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc);
+            var data = new GsData { LastSyncAt = syncTime };
+
+            var json = JsonSerializer.Serialize(data);
+            var deserialized = JsonSerializer.Deserialize<GsData>(json);
+
+            Assert.NotNull(deserialized.LastSyncAt);
+            Assert.True((syncTime - deserialized.LastSyncAt.Value).TotalSeconds < 1);
+        }
+
+        [Fact]
+        public void LastSyncGameCount_RoundtripsCorrectly() {
+            var data = new GsData { LastSyncGameCount = 42 };
+
+            var json = JsonSerializer.Serialize(data);
+            var deserialized = JsonSerializer.Deserialize<GsData>(json);
+
+            Assert.Equal(42, deserialized.LastSyncGameCount);
+        }
+
+        [Fact]
+        public void LastSyncFields_NullRoundtripsCorrectly() {
+            var data = new GsData { LastSyncAt = null, LastSyncGameCount = null };
+
+            var json = JsonSerializer.Serialize(data);
+            var deserialized = JsonSerializer.Deserialize<GsData>(json);
+
+            Assert.Null(deserialized.LastSyncAt);
+            Assert.Null(deserialized.LastSyncGameCount);
+        }
+
+        [Fact]
+        public void SerializationRoundtrip_IncludesLastSyncFields() {
+            var original = new GsData {
+                LastSyncAt = new DateTime(2025, 3, 10, 8, 30, 0, DateTimeKind.Utc),
+                LastSyncGameCount = 1234
+            };
+
+            var json = JsonSerializer.Serialize(original);
+            var deserialized = JsonSerializer.Deserialize<GsData>(json);
+
+            Assert.Equal(original.LastSyncGameCount, deserialized.LastSyncGameCount);
+            Assert.Equal(original.LastSyncAt, deserialized.LastSyncAt);
         }
 
         [Fact]
