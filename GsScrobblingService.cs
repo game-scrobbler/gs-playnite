@@ -418,7 +418,7 @@ namespace GsPlugin {
                     user_id = GsDataManager.Data.InstallID,
                     library = library,
                     flags = GsDataManager.Data.Flags.ToArray()
-                }, useAsync: true);
+                });
                 if (syncResponse != null) {
                     _logger.Info("Library sync request queued successfully.");
                     GsDataManager.Data.LastSyncAt = DateTime.UtcNow;

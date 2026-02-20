@@ -25,6 +25,7 @@
         </Style>
     </UserControl.Resources>
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="20">
 
         <!-- Installation ID Section -->
@@ -211,4 +212,5 @@
         </StackPanel>
 
     </StackPanel>
+    </ScrollViewer>
 </UserControl>

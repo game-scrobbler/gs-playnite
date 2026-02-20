@@ -259,7 +259,7 @@ namespace GsPlugin {
             public int updated { get; set; }
         }
 
-        public async Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq, bool useAsync = false) {
+        public async Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq) {
             // Validate input before making API call
             if (librarySyncReq == null) {
                 _logger.Error("SyncLibrary called with null librarySyncReq");
@@ -276,36 +276,23 @@ namespace GsPlugin {
                 librarySyncReq.library = new List<GameSyncDto>();
             }
 
-            // Build URL with async query parameter if needed
             string url = $"{_apiBaseUrl}/api/playnite/v2/sync";
-            if (useAsync) {
-                url += "?async=true";
-            }
 
-            // If async mode, we expect AsyncQueuedResponse, otherwise LibrarySyncRes
-            if (useAsync) {
-                var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
-                    return await PostJsonAsync<AsyncQueuedResponse>(url, librarySyncReq, true);
-                }, maxRetries: 1);
+            var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<AsyncQueuedResponse>(url, librarySyncReq, true);
+            }, maxRetries: 1);
 
-                if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
-                    _logger.Info($"Library sync queued with ID: {asyncResponse.queueId}");
-                    // Return a placeholder response for async mode
-                    return new LibrarySyncRes {
-                        status = "queued",
-                        result = new LibrarySyncDetails { added = 0, updated = 0 },
-                        userId = null
-                    };
-                }
-                else {
-                    GsLogger.Error("Failed to queue library sync request");
-                    return null;
-                }
+            if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
+                _logger.Info($"Library sync queued with ID: {asyncResponse.queueId}");
+                return new LibrarySyncRes {
+                    status = "queued",
+                    result = new LibrarySyncDetails { added = 0, updated = 0 },
+                    userId = null
+                };
             }
             else {
-                return await _circuitBreaker.ExecuteAsync(async () => {
-                    return await PostJsonAsync<LibrarySyncRes>(url, librarySyncReq, true);
-                }, maxRetries: 1); // Library sync is less critical, only retry once
+                GsLogger.Error("Failed to queue library sync request");
+                return null;
             }
         }
 
