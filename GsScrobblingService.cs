@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -352,12 +354,39 @@ namespace GsPlugin {
         public enum SyncLibraryResult {
             Success,
             Cooldown,
+            Skipped,
             Error
+        }
+
+        /// <summary>
+        /// Computes a SHA-256 hex digest of the library for change detection.
+        /// Uses the same fields and algorithm as the backend's <c>createLibraryHash</c> in playniteUtils.ts:
+        /// each game produces a key <c>"{playnite_id}:{playtime_seconds}:{play_count}:{last_activity}"</c>,
+        /// the keys are sorted lexicographically, then fed incrementally into SHA-256 separated by <c>|</c>.
+        /// </summary>
+        public static string ComputeLibraryHash(List<GsApiClient.GameSyncDto> library) {
+            var keys = library
+                .Select(g =>
+                    $"{g.playnite_id ?? ""}:{g.playtime_seconds}:{g.play_count}:{g.last_activity?.ToString("o") ?? ""}")
+                .OrderBy(k => k, StringComparer.Ordinal)
+                .ToArray();
+
+            var separator = new byte[] { (byte)'|' };
+            using (var sha256 = SHA256.Create()) {
+                foreach (var key in keys) {
+                    var bytes = Encoding.UTF8.GetBytes(key);
+                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
+                    sha256.TransformBlock(separator, 0, 1, null, 0);
+                }
+                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
+            }
         }
 
         /// <summary>
         /// Synchronizes the Playnite library with the external API.
         /// Returns <see cref="SyncLibraryResult.Cooldown"/> when the server enforces the 24-hour sync limit.
+        /// Returns <see cref="SyncLibraryResult.Skipped"/> when the library hash matches the last sent hash.
         /// </summary>
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
         public async Task<SyncLibraryResult> SyncLibraryAsync(IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
@@ -371,62 +400,74 @@ namespace GsPlugin {
 
                 _logger.Info("Starting library sync with GameScrobbler API");
                 var allGames = playniteDatabaseGames.ToList();
+                var syncAchievements = GsDataManager.Data.SyncAchievements;
 
-                // Filter to only supported platform plugins before sending
-                var filteredGames = allGames
-                    .Where(g => g.PluginId != Guid.Empty && AllowedPluginIds.Contains(g.PluginId))
-                    .ToList();
+                // Build the DTO list and compute the library hash on a background thread.
+                // This avoids blocking the main/UI thread for large libraries (10,000+ games),
+                // since the LINQ mapping and achievement lookups are CPU-bound.
+                var (library, libraryHash, filteredGames) = await Task.Run(() => {
+                    var filtered = allGames
+                        .Where(g => g.PluginId != Guid.Empty && AllowedPluginIds.Contains(g.PluginId))
+                        .ToList();
+
+                    var dtos = filtered.Select(g => new GsApiClient.GameSyncDto {
+                        game_id = g.GameId,
+                        plugin_id = g.PluginId.ToString(),
+                        game_name = g.Name,
+                        playnite_id = g.Id.ToString(),
+                        playtime_seconds = (long)g.Playtime,
+                        play_count = (int)g.PlayCount,
+                        last_activity = g.LastActivity,
+                        is_installed = g.IsInstalled,
+                        completion_status_id = g.CompletionStatusId != Guid.Empty
+                            ? g.CompletionStatusId.ToString()
+                            : null,
+                        completion_status_name = g.CompletionStatus?.Name,
+                        achievement_count_unlocked = syncAchievements
+                            ? _achievementHelper.GetUnlockedCount(g.Id)
+                            : null,
+                        achievement_count_total = syncAchievements
+                            ? _achievementHelper.GetTotalCount(g.Id)
+                            : null,
+                        genres = g.Genres != null && g.Genres.Count > 0
+                            ? g.Genres.Select(x => x.Name).ToList()
+                            : null,
+                        platforms = g.Platforms != null && g.Platforms.Count > 0
+                            ? g.Platforms.Select(x => x.Name).ToList()
+                            : null,
+                        developers = g.Developers != null && g.Developers.Count > 0
+                            ? g.Developers.Select(x => x.Name).ToList()
+                            : null,
+                        publishers = g.Publishers != null && g.Publishers.Count > 0
+                            ? g.Publishers.Select(x => x.Name).ToList()
+                            : null,
+                        tags = g.Tags != null && g.Tags.Count > 0
+                            ? g.Tags.Select(x => x.Name).ToList()
+                            : null,
+                        features = g.Features != null && g.Features.Count > 0
+                            ? g.Features.Select(x => x.Name).ToList()
+                            : null,
+                        categories = g.Categories != null && g.Categories.Count > 0
+                            ? g.Categories.Select(x => x.Name).ToList()
+                            : null,
+                        series = g.Series != null && g.Series.Count > 0
+                            ? g.Series.Select(x => x.Name).ToList()
+                            : null
+                    }).ToList();
+
+                    return (dtos, ComputeLibraryHash(dtos), filtered);
+                });
 
                 var filteredCount = allGames.Count - filteredGames.Count;
                 if (filteredCount > 0) {
                     _logger.Info($"Filtered {filteredCount} games from unsupported plugins (sending {filteredGames.Count}/{allGames.Count})");
                 }
 
-                // Map Playnite Game objects to DTO — avoids leaking internal SDK types to the API layer
-                var library = filteredGames.Select(g => new GsApiClient.GameSyncDto {
-                    game_id = g.GameId,
-                    plugin_id = g.PluginId.ToString(),
-                    game_name = g.Name,
-                    playnite_id = g.Id.ToString(),
-                    playtime_seconds = (long)g.Playtime,
-                    play_count = (int)g.PlayCount,
-                    last_activity = g.LastActivity,
-                    is_installed = g.IsInstalled,
-                    completion_status_id = g.CompletionStatusId != Guid.Empty
-                        ? g.CompletionStatusId.ToString()
-                        : null,
-                    completion_status_name = g.CompletionStatus?.Name,
-                    achievement_count_unlocked = GsDataManager.Data.SyncAchievements
-                        ? _achievementHelper.GetUnlockedCount(g.Id)
-                        : null,
-                    achievement_count_total = GsDataManager.Data.SyncAchievements
-                        ? _achievementHelper.GetTotalCount(g.Id)
-                        : null,
-                    genres = g.Genres != null && g.Genres.Count > 0
-                        ? g.Genres.Select(x => x.Name).ToList()
-                        : null,
-                    platforms = g.Platforms != null && g.Platforms.Count > 0
-                        ? g.Platforms.Select(x => x.Name).ToList()
-                        : null,
-                    developers = g.Developers != null && g.Developers.Count > 0
-                        ? g.Developers.Select(x => x.Name).ToList()
-                        : null,
-                    publishers = g.Publishers != null && g.Publishers.Count > 0
-                        ? g.Publishers.Select(x => x.Name).ToList()
-                        : null,
-                    tags = g.Tags != null && g.Tags.Count > 0
-                        ? g.Tags.Select(x => x.Name).ToList()
-                        : null,
-                    features = g.Features != null && g.Features.Count > 0
-                        ? g.Features.Select(x => x.Name).ToList()
-                        : null,
-                    categories = g.Categories != null && g.Categories.Count > 0
-                        ? g.Categories.Select(x => x.Name).ToList()
-                        : null,
-                    series = g.Series != null && g.Series.Count > 0
-                        ? g.Series.Select(x => x.Name).ToList()
-                        : null
-                }).ToList();
+                // Client-side hash guard: skip the API call if the library hasn't changed since the last sync.
+                if (libraryHash == GsDataManager.Data.LastLibraryHash) {
+                    _logger.Info("Library hash unchanged since last sync — skipping.");
+                    return SyncLibraryResult.Skipped;
+                }
 
                 var syncResponse = await _apiClient.SyncLibrary(new GsApiClient.LibrarySyncReq {
                     user_id = GsDataManager.Data.InstallID,
@@ -446,6 +487,8 @@ namespace GsPlugin {
                     _logger.Info("Library sync request queued successfully.");
                     GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                     GsDataManager.Data.LastSyncGameCount = filteredGames.Count;
+                    // Store hash so the next sync can skip if the library hasn't changed
+                    GsDataManager.Data.LastLibraryHash = libraryHash;
                     // Sync succeeded — clear any stale cooldown
                     GsDataManager.Data.SyncCooldownExpiresAt = null;
                     GsDataManager.Save();
