@@ -6,211 +6,439 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:GsPlugin"
              mc:Ignorable="d"
-             d:DesignHeight="400" d:DesignWidth="600">
+             d:DesignHeight="620" d:DesignWidth="620">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
-        <!-- Styles for consistent UI -->
-        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Margin" Value="0,20,0,10"/>
+        <!-- Brand accent color — intentionally fixed, not theme-driven -->
+        <SolidColorBrush x:Key="AccentBrush" Color="#5B9CF6"/>
+
+        <!-- Card container — uses Playnite's popup/panel background so it follows the active theme -->
+        <Style x:Key="CardBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource GridItemBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource NormalBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
         </Style>
 
-        <Style x:Key="SubHeaderStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Margin" Value="0,10,0,5"/>
+        <!-- Section header label -->
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+
+        <!-- Muted helper text -->
+        <Style x:Key="MutedTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrushDarker}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <!-- TextBox that inherits Playnite theme -->
+        <Style x:Key="DarkTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource NormalBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}"/>
+        </Style>
+
+        <!-- Primary accent button — brand color is intentional -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinWidth" Value="110"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#7DB3F8"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{DynamicResource NormalBorderBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextBrushDarker}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Secondary outline button -->
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinWidth" Value="160"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource GridItemBackgroundBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- CheckBox inherits Playnite theme text color -->
+        <Style x:Key="CheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <!-- Left accent bar for section headers — brand color, always fixed -->
+        <Style x:Key="AccentBarStyle" TargetType="Rectangle">
+            <Setter Property="Width" Value="3"/>
+            <Setter Property="RadiusX" Value="1.5"/>
+            <Setter Property="RadiusY" Value="1.5"/>
+            <Setter Property="Fill" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+        </Style>
+
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="20">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="20,16,20,20">
 
-        <!-- Installation ID Section -->
-        <TextBlock Text="Your Installation ID" Style="{StaticResource SectionHeaderStyle}"/>
-        <TextBlock x:Name="IDTextBlock"
-                   Foreground="White"
-                   Background="#FF464141"
-                   Height="25"
-                   FontSize="14"
-                   Margin="0,5,0,0"
-                   Padding="5"
-                   Cursor="Hand"
-                   ToolTip="Click to copy ID to clipboard"
-                   MouseLeftButtonUp="TextBlock_MouseLeftButtonUp"/>
+            <!-- ─────────────────────────────────────────
+                 SECTION 1 — INSTALLATION ID
+            ───────────────────────────────────────── -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
 
-        <!-- Theme Selection Section -->
-        <TextBlock Text="Theme Selection" Style="{StaticResource SectionHeaderStyle}"/>
-        <ComboBox x:Name="ThemeComboBox"
-                  Width="150"
-                  HorizontalAlignment="Left"
-                  Margin="0,5,0,0"
-                  ItemsSource="{Binding AvailableThemes}"
-                  SelectedItem="{Binding Settings.Theme, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
+                        <TextBlock Text="Installation ID" Style="{StaticResource SectionTitleStyle}"/>
+                    </StackPanel>
 
-        <!-- Account Linking Section -->
-        <TextBlock Text="Account Linking" Style="{StaticResource SectionHeaderStyle}"/>
+                    <TextBlock Style="{StaticResource MutedTextStyle}"
+                               Margin="0,0,0,8"
+                               Text="Your unique plugin installation identifier, used to link your account."/>
 
-        <!-- Hint Text -->
-        <TextBlock FontSize="12"
-                   FontStyle="Italic"
-                   Margin="0,0,0,10"
-                   TextWrapping="Wrap">
-            <Run Text="Tip: To own and persist your GS data, link your plugin installation to your GS account via "
-                 Foreground="LightBlue"/>
-            <Hyperlink NavigateUri="https://gamescrobbler.com?utm_source=playnite_plugin&amp;utm_medium=settings_page&amp;utm_campaign=account_linking&amp;utm_content=hint_text"
-                       RequestNavigate="Hyperlink_RequestNavigate"
-                       Foreground="CornflowerBlue">
-                <Run Text="gamescrobbler.com"/>
-            </Hyperlink>
-        </TextBlock>
+                    <!-- Code-block styled ID display -->
+                    <Border Background="{DynamicResource TextBoxBackgroundBrush}"
+                            BorderBrush="{DynamicResource NormalBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="10,8">
+                        <TextBlock x:Name="IDTextBlock"
+                                   FontFamily="Consolas, Courier New"
+                                   FontSize="13"
+                                   Foreground="{DynamicResource TextBrush}"
+                                   Cursor="Hand"
+                                   ToolTip="Click to copy ID to clipboard"
+                                   MouseLeftButtonUp="TextBlock_MouseLeftButtonUp"/>
+                    </Border>
 
-        <!-- Connection Status -->
-        <TextBlock x:Name="ConnectionStatusTextBlock"
-                   FontWeight="Bold"
-                   FontSize="14"
-                   Margin="0,5,0,10"/>
+                    <TextBlock Style="{StaticResource MutedTextStyle}"
+                               Margin="0,5,0,0"
+                               Text="Click the ID above to copy it to your clipboard."/>
 
-        <!-- Open website to initiate linking -->
-        <Button x:Name="OpenWebsiteToLinkButton"
-                Content="Link Account on Website"
-                HorizontalAlignment="Left"
-                Margin="0,0,0,8"
-                Padding="10,3"
-                MinWidth="160"
-                Click="OpenWebsiteToLink_Click"
-                ToolTip="Opens gamescrobbler.com in your browser to link your account automatically"/>
+                </StackPanel>
+            </Border>
 
-        <TextBlock x:Name="ManualTokenSeparator"
-                   FontSize="11"
-                   Foreground="Gray"
-                   Margin="0,0,0,5"
-                   Text="— or enter your token manually —"/>
+            <!-- ─────────────────────────────────────────
+                 SECTION 2 — THEME SELECTION
+            ───────────────────────────────────────── -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
 
-        <!-- Linking Controls -->
-        <Grid x:Name="LinkingControlsGrid" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
+                        <TextBlock Text="Theme" Style="{StaticResource SectionTitleStyle}"/>
+                    </StackPanel>
 
-            <TextBox Grid.Column="0"
-                     x:Name="TokenTextBox"
-                     Text="{Binding Settings.LinkToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     Margin="0,0,10,0"
-                     Padding="5"
-                     Height="25"
-                     VerticalContentAlignment="Center"
-                     ToolTip="Enter your account linking token here"/>
+                    <TextBlock Style="{StaticResource MutedTextStyle}"
+                               Margin="0,0,0,8"
+                               Text="Controls the visual theme applied to the Game Spectrum sidebar and views."/>
 
-            <Button Grid.Column="1"
-                    x:Name="LinkAccountButton"
-                    Content="Link Account"
-                    Click="LinkAccount_Click"
-                    Padding="10,3"
-                    MinWidth="100"/>
-        </Grid>
+                    <ComboBox x:Name="ThemeComboBox"
+                              Width="180"
+                              HorizontalAlignment="Left"
+                              Background="{DynamicResource ComboboxBackgroundBrush}"
+                              Foreground="{DynamicResource TextBrush}"
+                              BorderBrush="{DynamicResource NormalBorderBrush}"
+                              BorderThickness="1"
+                              Padding="8,5"
+                              FontSize="12"
+                              ItemsSource="{Binding AvailableThemes}"
+                              SelectedItem="{Binding Settings.Theme, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-        <!-- Link Status Message -->
-        <TextBlock x:Name="LinkStatusTextBlock"
-                   Foreground="Yellow"
-                   FontSize="12"
-                   Margin="0,0,0,10"
-                   TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
 
-        <!-- Experimental Features Section -->
-        <TextBlock Text="Experimental Features" Style="{StaticResource SectionHeaderStyle}"/>
+            <!-- ─────────────────────────────────────────
+                 SECTION 3 — ACCOUNT LINKING
+            ───────────────────────────────────────── -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
 
-        <CheckBox Content="New Dashboard Experience (Beta)"
-                  Margin="0,5,0,5"
-                  ToolTip="Enable the new dashboard experience with enhanced features"
-                  IsChecked="{Binding Settings.NewDashboardExperience, Mode=TwoWay}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
+                        <TextBlock Text="Account Linking" Style="{StaticResource SectionTitleStyle}"/>
+                    </StackPanel>
 
-        <!-- Achievement sync toggle -->
-        <StackPanel Margin="0,5,0,0">
-            <CheckBox Content="{DynamicResource LOCGsPluginSyncAchievementsLabel}"
-                      ToolTip="{DynamicResource LOCGsPluginSyncAchievementsTooltip}"
-                      IsChecked="{Binding Settings.SyncAchievements, Mode=TwoWay}"/>
+                    <!-- Hint with hyperlink -->
+                    <TextBlock FontSize="12"
+                               Foreground="{DynamicResource TextBrushDarker}"
+                               Margin="0,0,0,12"
+                               TextWrapping="Wrap">
+                        <Run Text="Link your plugin to your GS account to own and persist your data. Visit "/>
+                        <Hyperlink NavigateUri="https://gamescrobbler.com?utm_source=playnite_plugin&amp;utm_medium=settings_page&amp;utm_campaign=account_linking&amp;utm_content=hint_text"
+                                   RequestNavigate="Hyperlink_RequestNavigate"
+                                   Foreground="{StaticResource AccentBrush}">
+                            <Run Text="gamescrobbler.com"/>
+                        </Hyperlink>
+                        <Run Text=" to get started."/>
+                    </TextBlock>
 
-            <!-- Status: SuccessStory IS installed -->
-            <StackPanel Orientation="Horizontal"
-                        Margin="20,4,0,0"
-                        Visibility="{Binding IsSuccessStoryInstalled,
-                            Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="✓"
-                           Foreground="#4CAF50"
-                           FontSize="13"
-                           Margin="0,0,6,0"
-                           VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding SuccessStoryStatusText}"
-                           Foreground="#4CAF50"
-                           FontSize="12"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
+                    <!-- Connection status badge -->
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,0,0,12"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="Status:"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextBrushDarker}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <Border Background="{DynamicResource TextBoxBackgroundBrush}"
+                                BorderBrush="{DynamicResource NormalBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="10,4">
+                            <TextBlock x:Name="ConnectionStatusTextBlock"
+                                       FontWeight="SemiBold"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
 
-            <!-- Status: SuccessStory is NOT installed -->
-            <StackPanel Orientation="Horizontal"
-                        Margin="20,4,0,0"
-                        Visibility="{Binding IsSuccessStoryMissing,
-                            Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="⚠"
-                           Foreground="#FFA500"
-                           FontSize="13"
-                           Margin="0,0,6,0"
-                           VerticalAlignment="Center"/>
-                <TextBlock Foreground="#FFA500"
-                           FontSize="12"
-                           VerticalAlignment="Center">
-                    <Run Text="{DynamicResource LOCGsPluginSuccessStoryMissingWarning}"/>
-                    <Run Text=" "/>
-                    <Hyperlink NavigateUri="https://playnite.link/addons.html#Success_Story_Addon"
-                               RequestNavigate="Hyperlink_RequestNavigate"
-                               Foreground="CornflowerBlue">
-                        <Run Text="{DynamicResource LOCGsPluginSuccessStoryInstallLink}"/>
-                    </Hyperlink>
-                </TextBlock>
-            </StackPanel>
+                    <!-- Open website button -->
+                    <Button x:Name="OpenWebsiteToLinkButton"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Content="Link Account on Website"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,0,12"
+                            Click="OpenWebsiteToLink_Click"
+                            ToolTip="Opens gamescrobbler.com in your browser to link your account automatically"/>
+
+                    <!-- Separator: lines + label -->
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0"
+                                Height="1"
+                                Background="{DynamicResource NormalBorderBrush}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <TextBlock x:Name="ManualTokenSeparator"
+                                   Grid.Column="1"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextBrushDarker}"
+                                   VerticalAlignment="Center"
+                                   Text="or enter your token manually"/>
+                        <Border Grid.Column="2"
+                                Height="1"
+                                Background="{DynamicResource NormalBorderBrush}"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0"/>
+                    </Grid>
+
+                    <!-- Token input row -->
+                    <Grid x:Name="LinkingControlsGrid" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox Grid.Column="0"
+                                 x:Name="TokenTextBox"
+                                 Style="{StaticResource DarkTextBoxStyle}"
+                                 Text="{Binding Settings.LinkToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,8,0"
+                                 ToolTip="Enter your account linking token here"/>
+
+                        <Button Grid.Column="1"
+                                x:Name="LinkAccountButton"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Content="Link Account"
+                                Click="LinkAccount_Click"/>
+                    </Grid>
+
+                    <!-- Link status message (Visibility driven by code-behind) -->
+                    <TextBlock x:Name="LinkStatusTextBlock"
+                               Foreground="#FFA500"
+                               FontSize="12"
+                               Visibility="Collapsed"
+                               TextWrapping="Wrap"/>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ─────────────────────────────────────────
+                 SECTION 4 — EXPERIMENTAL FEATURES
+            ───────────────────────────────────────── -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
+                        <TextBlock Text="Experimental Features" Style="{StaticResource SectionTitleStyle}"/>
+                        <Border Background="{DynamicResource TextBoxBackgroundBrush}"
+                                BorderBrush="{StaticResource AccentBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="6,2"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center">
+                            <TextBlock Text="BETA"
+                                       FontSize="10"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- New Dashboard -->
+                    <CheckBox Style="{StaticResource CheckBoxStyle}"
+                              Content="New Dashboard Experience"
+                              ToolTip="Enable the new dashboard experience with enhanced features"
+                              IsChecked="{Binding Settings.NewDashboardExperience, Mode=TwoWay}"/>
+
+                    <!-- Achievement sync -->
+                    <StackPanel Margin="0,0,0,4">
+                        <CheckBox Style="{StaticResource CheckBoxStyle}"
+                                  Content="{DynamicResource LOCGsPluginSyncAchievementsLabel}"
+                                  ToolTip="{DynamicResource LOCGsPluginSyncAchievementsTooltip}"
+                                  IsChecked="{Binding Settings.SyncAchievements, Mode=TwoWay}"
+                                  Margin="0,0,0,6"/>
+
+                        <!-- SuccessStory installed -->
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="20,0,0,4"
+                                    Visibility="{Binding IsSuccessStoryInstalled,
+                                        Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="✓"
+                                       Foreground="#4CAF50"
+                                       FontSize="12"
+                                       Margin="0,0,6,0"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SuccessStoryStatusText}"
+                                       Foreground="#4CAF50"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- SuccessStory missing -->
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="20,0,0,0"
+                                    Visibility="{Binding IsSuccessStoryMissing,
+                                        Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="⚠"
+                                       Foreground="#FFA500"
+                                       FontSize="12"
+                                       Margin="0,0,6,0"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Foreground="#FFA500"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="Wrap">
+                                <Run Text="{DynamicResource LOCGsPluginSuccessStoryMissingWarning}"/>
+                                <Run Text=" "/>
+                                <Hyperlink NavigateUri="https://playnite.link/addons.html#Success_Story_Addon"
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource AccentBrush}">
+                                    <Run Text="{DynamicResource LOCGsPluginSuccessStoryInstallLink}"/>
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Library sync status -->
+                    <Border Background="{DynamicResource TextBoxBackgroundBrush}"
+                            BorderBrush="{DynamicResource NormalBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="10,6"
+                            Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Library Sync:"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextBrushDarker}"
+                                       Margin="0,0,6,0"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding LastSyncStatus}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextBrushDark}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ─────────────────────────────────────────
+                 SECTION 5 — PRIVACY CONTROLS
+            ───────────────────────────────────────── -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
+                        <TextBlock Text="Privacy Controls" Style="{StaticResource SectionTitleStyle}"/>
+                    </StackPanel>
+
+                    <CheckBox Style="{StaticResource CheckBoxStyle}"
+                              Content="Disable error reporting (Sentry)"
+                              ToolTip="Prevents sending crash reports and diagnostic data to improve the plugin"
+                              IsChecked="{Binding Settings.DisableSentry, Mode=TwoWay}"/>
+
+                    <CheckBox x:Name="DisableScrobblingCheckBox"
+                              Style="{StaticResource CheckBoxStyle}"
+                              Content="Disable game activity tracking (Scrobbling)"
+                              ToolTip="Prevents scrobbling of your game playing activity"
+                              Margin="0,0,0,6"
+                              IsChecked="{Binding Settings.DisableScrobbling, Mode=TwoWay}"/>
+
+                    <!-- Warning when scrobbling is disabled -->
+                    <StackPanel Orientation="Horizontal"
+                                Margin="20,0,0,0"
+                                Visibility="{Binding Settings.DisableScrobbling,
+                                    Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="⚠"
+                                   Foreground="#FFA500"
+                                   FontSize="13"
+                                   Margin="0,0,8,0"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{DynamicResource LOCGsPluginScrobblingDisabledWarning}"
+                                   Foreground="#FFA500"
+                                   FontSize="11"
+                                   FontStyle="Italic"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </Border>
+
         </StackPanel>
-
-        <!-- Library Sync Status -->
-        <TextBlock Text="{Binding LastSyncStatus}"
-                   Foreground="Gray"
-                   FontSize="12"
-                   Margin="0,10,0,0"/>
-
-        <!-- Privacy Controls Section -->
-        <TextBlock Text="Privacy Controls" Style="{StaticResource SectionHeaderStyle}"/>
-
-        <CheckBox Content="Disable error reporting (Sentry)"
-                  Margin="0,5,0,5"
-                  ToolTip="Prevents sending crash reports and diagnostic data to improve the plugin"
-                  IsChecked="{Binding Settings.DisableSentry, Mode=TwoWay}"/>
-
-        <CheckBox x:Name="DisableScrobblingCheckBox"
-                  Content="Disable game activity tracking (Scrobbling)"
-                  Margin="0,5,0,5"
-                  ToolTip="Prevents scrobbling of your game playing activity"
-                  IsChecked="{Binding Settings.DisableScrobbling, Mode=TwoWay}"/>
-
-        <!-- Warning message when scrobbling is disabled -->
-        <StackPanel Orientation="Horizontal"
-                    Margin="20,5,0,5"
-                    Visibility="{Binding Settings.DisableScrobbling, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <TextBlock Text="⚠"
-                       Foreground="#FFA500"
-                       FontSize="14"
-                       Margin="0,0,8,0"
-                       VerticalAlignment="Center"/>
-            <TextBlock Text="{DynamicResource LOCGsPluginScrobblingDisabledWarning}"
-                       Foreground="#FFA500"
-                       FontSize="12"
-                       FontStyle="Italic"
-                       TextWrapping="Wrap"
-                       VerticalAlignment="Center"/>
-        </StackPanel>
-
-    </StackPanel>
     </ScrollViewer>
 </UserControl>
