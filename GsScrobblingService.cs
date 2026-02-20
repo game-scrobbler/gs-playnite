@@ -164,7 +164,7 @@ namespace GsPlugin {
                     external_game_id = startedGame.GameId,
                     metadata = new { PluginId = startedGame.PluginId.ToString() },
                     started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                }, useAsync: true);
+                });
                 if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
                     SetActiveSession(sessionData.session_id);
                     _logger.Info($"Successfully started scrobble session with ID: {sessionData.session_id}");
@@ -231,7 +231,7 @@ namespace GsPlugin {
                     session_id = GsDataManager.Data.ActiveSessionId,
                     metadata = new { PluginId = stoppedGame.PluginId.ToString() },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                }, useAsync: true);
+                });
                 if (finishResponse != null) {
                     // Only clear the session ID if the request was successful
                     ClearActiveSession();
@@ -283,7 +283,7 @@ namespace GsPlugin {
                     session_id = GsDataManager.Data.ActiveSessionId,
                     metadata = new { reason = "application_stopped" },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                }, useAsync: true);
+                });
                 if (finishResponse != null) {
                     ClearActiveSession();
                     _logger.Info("Successfully cleaned up active session on application stop");

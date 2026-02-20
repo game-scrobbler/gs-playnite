@@ -67,7 +67,7 @@ namespace GsPlugin {
             public string estimatedProcessingTime { get; set; }
         }
 
-        public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData, bool useAsync = false) {
+        public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) {
             // Validate input before making API call
             if (startData == null) {
                 _logger.Error("StartGameSession called with null startData");
@@ -83,41 +83,20 @@ namespace GsPlugin {
                 _logger.Warn("StartGameSession called with null or empty game_name");
             }
 
-            // Build URL with async query parameter if needed
-            string url = $"{_apiBaseUrl}/api/playnite/scrobble/start";
-            if (useAsync) {
-                url += "?async=true";
-            }
+            string url = $"{_apiBaseUrl}/api/playnite/v2/scrobble/start";
 
-            // If async mode, we expect AsyncQueuedResponse, otherwise ScrobbleStartRes
-            if (useAsync) {
-                var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
-                    return await PostJsonAsync<AsyncQueuedResponse>(url, startData);
-                }, maxRetries: 2);
+            var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<AsyncQueuedResponse>(url, startData);
+            }, maxRetries: 2);
 
-                if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
-                    _logger.Info($"Scrobble start queued with ID: {asyncResponse.queueId}");
-                    // Return a placeholder response for async mode
-                    // Session ID will be created on the backend
-                    return new ScrobbleStartRes { session_id = "queued" };
-                }
-                else {
-                    GsLogger.Error("Failed to queue scrobble start request");
-                    CaptureSentryMessage("Failed to queue scrobble start", SentryLevel.Error, startData.game_name, startData.user_id);
-                    return null;
-                }
+            if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
+                _logger.Info($"Scrobble start queued with ID: {asyncResponse.queueId}");
+                return new ScrobbleStartRes { session_id = "queued" };
             }
             else {
-                var response = await _circuitBreaker.ExecuteAsync(async () => {
-                    return await PostJsonAsync<ScrobbleStartRes>(url, startData);
-                }, maxRetries: 2);
-
-                if (response == null || string.IsNullOrEmpty(response.session_id)) {
-                    GsLogger.Error("Failed to get valid session ID from start session response");
-                    CaptureSentryMessage("Invalid session response", SentryLevel.Error, startData.game_name, startData.user_id);
-                }
-
-                return response;
+                GsLogger.Error("Failed to queue scrobble start request");
+                CaptureSentryMessage("Failed to queue scrobble start", SentryLevel.Error, startData.game_name, startData.user_id);
+                return null;
             }
         }
 
@@ -136,7 +115,7 @@ namespace GsPlugin {
             public string status { get; set; }
         }
 
-        public async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData, bool useAsync = false) {
+        public async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData) {
             // Validate input before making API call
             if (endData == null) {
                 _logger.Error("FinishGameSession called with null endData");
@@ -154,32 +133,19 @@ namespace GsPlugin {
                 return null;
             }
 
-            // Build URL with async query parameter if needed
-            string url = $"{_apiBaseUrl}/api/playnite/scrobble/finish";
-            if (useAsync) {
-                url += "?async=true";
-            }
+            string url = $"{_apiBaseUrl}/api/playnite/v2/scrobble/finish";
 
-            // If async mode, we expect AsyncQueuedResponse, otherwise ScrobbleFinishRes
-            if (useAsync) {
-                var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
-                    return await PostJsonAsync<AsyncQueuedResponse>(url, endData, true);
-                }, maxRetries: 2);
+            var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<AsyncQueuedResponse>(url, endData, true);
+            }, maxRetries: 2);
 
-                if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
-                    _logger.Info($"Scrobble finish queued with ID: {asyncResponse.queueId}");
-                    // Return a success response for async mode
-                    return new ScrobbleFinishRes { status = "queued" };
-                }
-                else {
-                    GsLogger.Error("Failed to queue scrobble finish request");
-                    return null;
-                }
+            if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
+                _logger.Info($"Scrobble finish queued with ID: {asyncResponse.queueId}");
+                return new ScrobbleFinishRes { status = "queued" };
             }
             else {
-                return await _circuitBreaker.ExecuteAsync(async () => {
-                    return await PostJsonAsync<ScrobbleFinishRes>(url, endData, true);
-                }, maxRetries: 2);
+                GsLogger.Error("Failed to queue scrobble finish request");
+                return null;
             }
         }
 
@@ -197,10 +163,10 @@ namespace GsPlugin {
             foreach (var item in pending) {
                 try {
                     if (item.Type == "start" && item.StartData != null) {
-                        await StartGameSession(item.StartData, useAsync: true);
+                        await StartGameSession(item.StartData);
                     }
                     else if (item.Type == "finish" && item.FinishData != null) {
-                        await FinishGameSession(item.FinishData, useAsync: true);
+                        await FinishGameSession(item.FinishData);
                     }
                 }
                 catch (Exception ex) {

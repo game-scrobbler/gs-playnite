@@ -7,8 +7,8 @@ namespace GsPlugin {
     /// Enables unit testing with mock implementations.
     /// </summary>
     public interface IGsApiClient {
-        Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData, bool useAsync = false);
-        Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData, bool useAsync = false);
+        Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData);
+        Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData);
         Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq);
         Task<AllowedPluginsRes> GetAllowedPlugins();
         Task<TokenVerificationRes> VerifyToken(string token, string playniteId);
