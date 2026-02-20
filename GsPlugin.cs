@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -141,7 +140,10 @@ namespace GsPlugin {
                 // Flush any scrobbles that were queued during a previous session when the API was unavailable
                 await _apiClient.FlushPendingScrobblesAsync();
 
-                await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                var startupSyncResult = await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                if (startupSyncResult == GsScrobblingService.SyncLibraryResult.Cooldown) {
+                    _logger.Info("Startup library sync skipped: sync cooldown is still active.");
+                }
             }
             catch (Exception ex) {
                 _logger.Error(ex, "Unhandled exception in OnApplicationStarted");
@@ -173,7 +175,10 @@ namespace GsPlugin {
         /// </summary>
         public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
             try {
-                await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                var librarySyncResult = await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                if (librarySyncResult == GsScrobblingService.SyncLibraryResult.Cooldown) {
+                    _logger.Info("Library updated sync skipped: sync cooldown is still active.");
+                }
             }
             catch (Exception ex) {
                 _logger.Error(ex, "Unhandled exception in OnLibraryUpdated");
@@ -251,13 +256,18 @@ namespace GsPlugin {
                 Description = "Open Dashboard",
                 MenuSection = "@Game Spectrum",
                 Action = _ => {
-                    string userId = Uri.EscapeDataString(GsDataManager.Data.InstallID);
-                    string theme = Uri.EscapeDataString((GsDataManager.Data.Theme ?? "Dark").ToLower());
-                    bool newDashboard = GsDataManager.Data.NewDashboardExperience;
-                    string version = Uri.EscapeDataString(GsSentry.GetPluginVersion());
-                    string url =
-                        $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={version}&theme={theme}&new_dashboard={newDashboard.ToString().ToLower()}";
-                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                    var window = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions {
+                        ShowMinimizeButton = true,
+                        ShowMaximizeButton = true,
+                        ShowCloseButton = true
+                    });
+                    window.Title = "Game Spectrum Dashboard";
+                    window.Width = 1200;
+                    window.Height = 800;
+                    window.Content = new MySidebarView(GsSentry.GetPluginVersion());
+                    window.Owner = PlayniteApi.Dialogs.GetCurrentAppWindow();
+                    window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
+                    window.ShowDialog();
                 }
             };
 
@@ -266,10 +276,25 @@ namespace GsPlugin {
                 MenuSection = "@Game Spectrum",
                 Action = async _ => {
                     try {
-                        var success = await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
-                        PlayniteApi.Dialogs.ShowMessage(
-                            success ? "Library sync completed." : "Library sync failed. Check logs for details.",
-                            "Game Spectrum");
+                        var result = await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                        string message;
+                        if (result == GsScrobblingService.SyncLibraryResult.Success) {
+                            message = "Library sync completed.";
+                        }
+                        else if (result == GsScrobblingService.SyncLibraryResult.Cooldown) {
+                            var expiry = GsDataManager.Data.SyncCooldownExpiresAt;
+                            if (expiry.HasValue) {
+                                var timeLeft = GsTime.FormatRemaining(expiry.Value - DateTime.UtcNow);
+                                message = $"Library was already synced recently. Try again in {timeLeft}.";
+                            }
+                            else {
+                                message = "Library was already synced recently. Please try again later.";
+                            }
+                        }
+                        else {
+                            message = "Library sync failed. Check logs for details.";
+                        }
+                        PlayniteApi.Dialogs.ShowMessage(message, "Game Spectrum");
                     }
                     catch (Exception ex) {
                         _logger.Error(ex, "Error in Sync Library Now menu action");

@@ -65,6 +65,10 @@ namespace GsPlugin {
             public string message { get; set; }
             public string timestamp { get; set; }
             public string estimatedProcessingTime { get; set; }
+            // Populated on cooldown responses (status == "skipped", reason starts with "cooldown_")
+            public string reason { get; set; }
+            public string cooldownExpiresAt { get; set; }
+            public string lastSyncAt { get; set; }
         }
 
         public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) {
@@ -218,6 +222,9 @@ namespace GsPlugin {
             public LibrarySyncDetails result { get; set; }
             // If account not linked yet it will be "not_linked"
             public string userId { get; set; }
+            // Set when the server skipped the sync due to the 24-hour cooldown
+            public bool isCooldown { get; set; }
+            public DateTime? cooldownExpiresAt { get; set; }
         }
 
         public class LibrarySyncDetails {
@@ -254,6 +261,21 @@ namespace GsPlugin {
                     status = "queued",
                     result = new LibrarySyncDetails { added = 0, updated = 0 },
                     userId = null
+                };
+            }
+            else if (asyncResponse != null && asyncResponse.status == "skipped"
+                     && asyncResponse.reason != null && asyncResponse.reason.StartsWith("cooldown_")) {
+                DateTime? expiresAt = null;
+                if (!string.IsNullOrEmpty(asyncResponse.cooldownExpiresAt)
+                    && DateTime.TryParse(asyncResponse.cooldownExpiresAt, null,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)) {
+                    expiresAt = parsed.ToUniversalTime();
+                }
+                _logger.Info($"Library sync skipped by server cooldown. Expires: {expiresAt?.ToString("O") ?? "unknown"}");
+                return new LibrarySyncRes {
+                    status = "skipped",
+                    isCooldown = true,
+                    cooldownExpiresAt = expiresAt
                 };
             }
             else {

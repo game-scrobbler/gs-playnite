@@ -37,11 +37,53 @@ namespace GsPlugin {
         public string LastNotifiedVersion { get; set; } = null;
         public DateTime? LastSyncAt { get; set; } = null;
         public int? LastSyncGameCount { get; set; } = null;
+        // UTC time until which the server has asked us not to sync again (24-hour cooldown).
+        public DateTime? SyncCooldownExpiresAt { get; set; } = null;
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling) {
             Flags.Clear();
             if (disableSentry) Flags.Add("no-sentry");
             if (disableScrobbling) Flags.Add("no-scrobble");
+        }
+    }
+
+    /// <summary>
+    /// Utility methods for formatting time spans as human-readable strings.
+    /// </summary>
+    public static class GsTime {
+        /// <summary>
+        /// Formats an elapsed <see cref="TimeSpan"/> as a past-tense string, e.g. "just now", "5 minutes ago", "2 hours ago", "3 days ago".
+        /// </summary>
+        public static string FormatElapsed(TimeSpan elapsed) {
+            if (elapsed.TotalMinutes < 1)
+                return "just now";
+            if (elapsed.TotalHours < 1) {
+                int mins = (int)elapsed.TotalMinutes;
+                return $"{mins} minute{(mins == 1 ? "" : "s")} ago";
+            }
+            if (elapsed.TotalDays < 1) {
+                int hours = (int)elapsed.TotalHours;
+                return $"{hours} hour{(hours == 1 ? "" : "s")} ago";
+            }
+            int days = (int)elapsed.TotalDays;
+            return $"{days} day{(days == 1 ? "" : "s")} ago";
+        }
+
+        /// <summary>
+        /// Formats a remaining <see cref="TimeSpan"/> as a future-tense string, e.g. "less than a minute", "45 minutes", "2 hours", "1 hour 30 minutes".
+        /// </summary>
+        public static string FormatRemaining(TimeSpan remaining) {
+            if (remaining.TotalMinutes < 1)
+                return "less than a minute";
+            if (remaining.TotalHours < 1) {
+                int mins = (int)remaining.TotalMinutes;
+                return $"{mins} minute{(mins == 1 ? "" : "s")}";
+            }
+            int hours = (int)remaining.TotalHours;
+            int remMins = remaining.Minutes;
+            return remMins > 0
+                ? $"{hours} hour{(hours == 1 ? "" : "s")} {remMins} minute{(remMins == 1 ? "" : "s")}"
+                : $"{hours} hour{(hours == 1 ? "" : "s")}";
         }
     }
 

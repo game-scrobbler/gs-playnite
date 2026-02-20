@@ -349,12 +349,26 @@ namespace GsPlugin {
             }
         }
 
+        public enum SyncLibraryResult {
+            Success,
+            Cooldown,
+            Error
+        }
+
         /// <summary>
         /// Synchronizes the Playnite library with the external API.
+        /// Returns <see cref="SyncLibraryResult.Cooldown"/> when the server enforces the 24-hour sync limit.
         /// </summary>
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
-        public async Task<bool> SyncLibraryAsync(IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+        public async Task<SyncLibraryResult> SyncLibraryAsync(IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
+                // Client-side cooldown guard: skip the API call if the server told us to wait
+                var cooldownExpiry = GsDataManager.Data.SyncCooldownExpiresAt;
+                if (cooldownExpiry.HasValue && DateTime.UtcNow < cooldownExpiry.Value) {
+                    _logger.Info($"Library sync skipped: client-side cooldown active until {cooldownExpiry.Value:O}");
+                    return SyncLibraryResult.Cooldown;
+                }
+
                 _logger.Info("Starting library sync with GameScrobbler API");
                 var allGames = playniteDatabaseGames.ToList();
 
@@ -419,21 +433,32 @@ namespace GsPlugin {
                     library = library,
                     flags = GsDataManager.Data.Flags.ToArray()
                 });
-                if (syncResponse != null) {
+                if (syncResponse != null && syncResponse.isCooldown) {
+                    // Server enforced cooldown — persist the expiry so we don't hammer the API
+                    if (syncResponse.cooldownExpiresAt.HasValue) {
+                        GsDataManager.Data.SyncCooldownExpiresAt = syncResponse.cooldownExpiresAt.Value;
+                        GsDataManager.Save();
+                    }
+                    _logger.Info($"Library sync skipped by server cooldown. Next sync allowed after {syncResponse.cooldownExpiresAt?.ToString("O") ?? "unknown"}.");
+                    return SyncLibraryResult.Cooldown;
+                }
+                else if (syncResponse != null) {
                     _logger.Info("Library sync request queued successfully.");
                     GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                     GsDataManager.Data.LastSyncGameCount = filteredGames.Count;
+                    // Sync succeeded — clear any stale cooldown
+                    GsDataManager.Data.SyncCooldownExpiresAt = null;
                     GsDataManager.Save();
-                    return true;
+                    return SyncLibraryResult.Success;
                 }
                 else {
                     _logger.Error("Failed to synchronize library with the external API.");
-                    return false;
+                    return SyncLibraryResult.Error;
                 }
             }
             catch (Exception ex) {
                 _logger.Error(ex, "Error synchronizing library with GameScrobbler API");
-                return false;
+                return SyncLibraryResult.Error;
             }
         }
     }
