@@ -385,7 +385,7 @@
                                        Foreground="{DynamicResource TextBrushDarker}"
                                        Margin="0,0,6,0"
                                        VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding LastSyncStatus}"
+                            <TextBlock x:Name="LastSyncStatusTextBlock"
                                        FontSize="11"
                                        Foreground="{DynamicResource TextBrushDark}"
                                        VerticalAlignment="Center"/>

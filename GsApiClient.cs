@@ -154,8 +154,15 @@ namespace GsPlugin {
         }
 
         /// <summary>
+        /// Maximum number of flush attempts before a pending scrobble is permanently dropped.
+        /// Prevents infinite re-queue loops when the server consistently rejects a request.
+        /// </summary>
+        private const int MaxFlushAttempts = 5;
+
+        /// <summary>
         /// Flushes all pending scrobbles that were queued when the API was unavailable.
         /// Called on circuit breaker recovery and on application startup.
+        /// Failed items are re-queued (up to <see cref="MaxFlushAttempts"/> times) so they survive transient failures.
         /// </summary>
         public async Task FlushPendingScrobblesAsync() {
             var pending = GsDataManager.DequeuePendingScrobbles();
@@ -164,19 +171,44 @@ namespace GsPlugin {
             }
 
             _logger.Info($"Flushing {pending.Count} pending scrobble(s)");
+            var failed = new List<PendingScrobble>();
+
             foreach (var item in pending) {
+                bool success = false;
                 try {
                     if (item.Type == "start" && item.StartData != null) {
-                        await StartGameSession(item.StartData);
+                        var res = await StartGameSession(item.StartData);
+                        success = res != null;
                     }
                     else if (item.Type == "finish" && item.FinishData != null) {
-                        await FinishGameSession(item.FinishData);
+                        var res = await FinishGameSession(item.FinishData);
+                        success = res != null;
+                    }
+                    else {
+                        _logger.Warn($"Dropping invalid pending scrobble (type={item.Type})");
+                        continue;
                     }
                 }
                 catch (Exception ex) {
-                    // Log and drop — do not re-enqueue to avoid infinite loops.
-                    // If the circuit opens again during flush, new failures will be re-queued normally.
-                    _logger.Error(ex, $"Failed to flush pending scrobble (type={item.Type}, queued={item.QueuedAt:O})");
+                    _logger.Error(ex, $"Exception flushing pending scrobble (type={item.Type}, queued={item.QueuedAt:O})");
+                }
+
+                if (!success) {
+                    item.FlushAttempts++;
+                    if (item.FlushAttempts >= MaxFlushAttempts) {
+                        _logger.Warn($"Dropping pending scrobble after {item.FlushAttempts} failed flush attempts (type={item.Type}, queued={item.QueuedAt:O})");
+                    }
+                    else {
+                        failed.Add(item);
+                    }
+                }
+            }
+
+            // Re-queue items that failed but haven't exhausted their retry budget
+            if (failed.Count > 0) {
+                _logger.Info($"Re-queuing {failed.Count} pending scrobble(s) for later retry");
+                foreach (var item in failed) {
+                    GsDataManager.EnqueuePendingScrobble(item);
                 }
             }
         }

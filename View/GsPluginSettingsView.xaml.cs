@@ -69,6 +69,8 @@ namespace GsPlugin {
         private void InitializeViewData() {
             // Display the installation ID
             IDTextBlock.Text = GsDataManager.Data.InstallID;
+            // Display last sync status (static property — cannot use XAML {Binding})
+            LastSyncStatusTextBlock.Text = GsPluginSettingsViewModel.LastSyncStatus;
         }
 
         /// <summary>

@@ -169,10 +169,16 @@ namespace GsPlugin {
                 });
                 if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
                     SetActiveSession(sessionData.session_id);
+                    // Clear any stale pending-start marker so the stop handler uses the
+                    // normal active-session path instead of the queued-pair branch.
+                    if (GsDataManager.Data.PendingStartGameId != null) {
+                        GsDataManager.Data.PendingStartGameId = null;
+                        GsDataManager.Save();
+                    }
                     _logger.Info($"Successfully started scrobble session with ID: {sessionData.session_id}");
                 }
                 else {
-                    _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id}). Queuing for retry.");
+                    _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id}). Queuing start for retry.");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "start",
                         StartData = new GsApiClient.ScrobbleStartReq {
@@ -186,6 +192,10 @@ namespace GsPlugin {
                         },
                         QueuedAt = localDate
                     });
+                    // Mark that this game has a queued start so OnGameStoppedAsync can pair it
+                    // with a finish even though there is no ActiveSessionId.
+                    GsDataManager.Data.PendingStartGameId = startedGame.Id.ToString();
+                    GsDataManager.Save();
                 }
             }
             catch (Exception ex) {
@@ -203,10 +213,6 @@ namespace GsPlugin {
                     _logger.Info("Scrobbling disabled, skipping game stop tracking");
                     return;
                 }
-                if (string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
-                    _logger.Warn("No active session ID found when stopping game");
-                    return;
-                }
                 if (args?.Game == null) {
                     _logger.Warn("OnGameStoppedAsync called with null game; skipping.");
                     return;
@@ -214,6 +220,35 @@ namespace GsPlugin {
 
                 DateTime localDate = DateTime.Now;
                 var stoppedGame = args.Game;
+
+                // If the start was queued (failed to send), queue a matching finish so the
+                // replay produces a paired session. No API call is needed here.
+                var pendingStartGameId = GsDataManager.Data.PendingStartGameId;
+                if (!string.IsNullOrEmpty(pendingStartGameId) && pendingStartGameId == stoppedGame.Id.ToString()) {
+                    _logger.Info($"Queuing finish to pair with pending start for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
+                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                        Type = "finish",
+                        FinishData = new GsApiClient.ScrobbleFinishReq {
+                            user_id = GsDataManager.Data.InstallID,
+                            game_name = stoppedGame.Name,
+                            game_id = stoppedGame.Id.ToString(),
+                            plugin_id = stoppedGame.PluginId.ToString(),
+                            external_game_id = stoppedGame.GameId,
+                            session_id = "queued",
+                            metadata = new { PluginId = stoppedGame.PluginId.ToString() },
+                            finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                        },
+                        QueuedAt = localDate
+                    });
+                    GsDataManager.Data.PendingStartGameId = null;
+                    GsDataManager.Save();
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
+                    _logger.Warn("No active session ID found when stopping game");
+                    return;
+                }
 
                 // Skip scrobbling for unsupported plugins
                 if (stoppedGame.PluginId == Guid.Empty || !AllowedPluginIds.Contains(stoppedGame.PluginId)) {

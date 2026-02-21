@@ -13,6 +13,11 @@ namespace GsPlugin {
         public GsApiClient.ScrobbleStartReq StartData { get; set; }
         public GsApiClient.ScrobbleFinishReq FinishData { get; set; }
         public DateTime QueuedAt { get; set; }
+        /// <summary>
+        /// Number of times this item has been through FlushPendingScrobblesAsync without success.
+        /// Items are permanently dropped once this reaches the max flush attempts threshold.
+        /// </summary>
+        public int FlushAttempts { get; set; }
     }
 
     /// <summary>
@@ -26,6 +31,12 @@ namespace GsPlugin {
 
         public string InstallID { get; set; } = null;
         public string ActiveSessionId { get; set; } = null;
+        /// <summary>
+        /// Game ID whose start scrobble was queued (failed to send).
+        /// Used by OnGameStoppedAsync to pair a finish with the pending start.
+        /// Cleared once the finish is queued or when the start succeeds.
+        /// </summary>
+        public string PendingStartGameId { get; set; } = null;
         public string Theme { get; set; } = "Dark";
         public List<string> Flags { get; set; } = new List<string>();
         public string LinkedUserId { get; set; } = null;
