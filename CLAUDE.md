@@ -8,12 +8,12 @@ Game Spectrum (GS) is a Playnite plugin that integrates with GameScrobbler to pr
 
 ## Build & Development Commands
 
-- **Build solution**: `MSBuild.exe .\GsPlugin.sln -p:Configuration=Release -restore`
-- **Restore NuGet packages**: `nuget restore .\GsPlugin.sln`
-- **Format code**: `dotnet format .\GsPlugin.sln`
-- **Verify formatting**: `dotnet format .\GsPlugin.sln --verify-no-changes`
-- **Run all tests**: `dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` (build with MSBuild first)
-- **Run a single test**: `dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~ClassName.MethodName"`
+- **Build solution**: `MSBuild.exe GsPlugin.sln -p:Configuration=Release -restore`
+- **Restore NuGet packages**: `nuget restore GsPlugin.sln`
+- **Format code**: `dotnet format GsPlugin.sln`
+- **Verify formatting**: `dotnet format GsPlugin.sln --verify-no-changes`
+- **Run all tests**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` (build with MSBuild first)
+- **Run a single test**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~ClassName.MethodName"`
 - **Setup git hooks**: `powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1`
 - **Manual formatting**: `powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1`
 - **Pack plugin**: `Playnite\Toolbox.exe pack "bin\Release" "PackingOutput"`
@@ -70,7 +70,7 @@ GsPlugin (entry point, IDisposable)
 
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
-- Test classes: `GsCircuitBreakerTests`, `GsDataTests`, `GsDataManagerTests`, `GsTimeTests`, `GsMetadataHashTests`, `GsSnapshotTests`, `GsScrobblingServiceHashTests`, `ValidateTokenTests`, `LinkingResultTests`, `ApiResultTests`, `GsPluginSettingsViewModelTests`, `GsApiClientValidationTests`
+- Test classes: `ApiResultTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `ValidateTokenTests`
 
 ## Build Environment
 

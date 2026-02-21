@@ -264,27 +264,6 @@ namespace GsPlugin.Api {
             public List<string> regions { get; set; }
         }
 
-        public class LibrarySyncReq {
-            public string user_id { get; set; }
-            public List<GameSyncDto> library { get; set; }
-            public string[] flags { get; set; }
-        }
-
-        public class LibrarySyncRes {
-            public string status { get; set; }
-            public LibrarySyncDetails result { get; set; }
-            // If account not linked yet it will be "not_linked"
-            public string userId { get; set; }
-            // Set when the server skipped the sync due to the 24-hour cooldown
-            public bool isCooldown { get; set; }
-            public DateTime? cooldownExpiresAt { get; set; }
-        }
-
-        public class LibrarySyncDetails {
-            public int added { get; set; }
-            public int updated { get; set; }
-        }
-
         // --- v2 Library sync DTOs ---
 
         public class LibraryFullSyncReq {
@@ -336,58 +315,6 @@ namespace GsPlugin.Api {
             public string reason { get; set; }
             public string message { get; set; }
             public string timestamp { get; set; }
-        }
-
-        public async Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq) {
-            // Validate input before making API call
-            if (librarySyncReq == null) {
-                _logger.Error("SyncLibrary called with null librarySyncReq");
-                return null;
-            }
-
-            if (string.IsNullOrEmpty(librarySyncReq.user_id)) {
-                _logger.Error("SyncLibrary called with null or empty user_id");
-                return null;
-            }
-
-            if (librarySyncReq.library == null) {
-                _logger.Warn("SyncLibrary called with null library, treating as empty");
-                librarySyncReq.library = new List<GameSyncDto>();
-            }
-
-            string url = $"{_apiBaseUrl}/api/playnite/v2/sync";
-
-            var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<AsyncQueuedResponse>(url, librarySyncReq, true);
-            }, maxRetries: 1);
-
-            if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
-                _logger.Info($"Library sync queued with ID: {asyncResponse.queueId}");
-                return new LibrarySyncRes {
-                    status = "queued",
-                    result = new LibrarySyncDetails { added = 0, updated = 0 },
-                    userId = null
-                };
-            }
-            else if (asyncResponse != null && asyncResponse.status == "skipped"
-                     && asyncResponse.reason != null && asyncResponse.reason.StartsWith("cooldown_")) {
-                DateTime? expiresAt = null;
-                if (!string.IsNullOrEmpty(asyncResponse.cooldownExpiresAt)
-                    && DateTime.TryParse(asyncResponse.cooldownExpiresAt, null,
-                        System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)) {
-                    expiresAt = parsed.ToUniversalTime();
-                }
-                _logger.Info($"Library sync skipped by server cooldown. Expires: {expiresAt?.ToString("O") ?? "unknown"}");
-                return new LibrarySyncRes {
-                    status = "skipped",
-                    isCooldown = true,
-                    cooldownExpiresAt = expiresAt
-                };
-            }
-            else {
-                GsLogger.Error("Failed to queue library sync request");
-                return null;
-            }
         }
 
         public async Task<AsyncQueuedResponse> SyncLibraryFull(LibraryFullSyncReq req) {
@@ -472,7 +399,7 @@ namespace GsPlugin.Api {
 
         public async Task<AllowedPluginsRes> GetAllowedPlugins() {
             return await _circuitBreaker.ExecuteAsync(async () => {
-                return await GetJsonAsync<AllowedPluginsRes>($"{_apiBaseUrl}/api/playnite/allowed-plugins");
+                return await GetJsonAsync<AllowedPluginsRes>($"{_apiBaseUrl}/api/playnite/v2/allowed-plugins");
             }, maxRetries: 1);
         }
 

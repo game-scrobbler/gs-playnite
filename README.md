@@ -25,7 +25,7 @@ Game Spectrum is a Playnite plugin that provides game session tracking and stati
 - **GsScrobblingService** communicates with **GsApiClient** for session start/stop operations and library sync; maps `Game` objects to `GameSyncDto` (snake_case) before sending to the API; uses **GsSnapshotManager** to diff against previous sync state and only send changes
 - **GsSnapshotManager** manages diff-based sync state via `gs_snapshot.json`; stores library and achievement baselines to enable incremental sync
 - **GsSuccessStoryHelper** retrieves per-game achievement counts from the SuccessStory addon via reflection; returns `null` gracefully when SuccessStory is not installed
-- **GsApiClient** provides fault-tolerant HTTP communication using **GsCircuitBreaker** for resilience and retry logic; library sync uses the `POST /api/playnite/v2/sync` endpoint with `GameSyncDto` payloads; handles server-driven sync cooldown
+- **GsApiClient** provides fault-tolerant HTTP communication using **GsCircuitBreaker** for resilience and retry logic; library sync uses v2 endpoints (`/v2/library/sync-full`, `/v2/library/sync-diff`) with `GameSyncDto` payloads; handles server-driven sync cooldown
 - **GsCircuitBreaker** implements circuit breaker pattern with exponential backoff for API call protection
 - **GsAccountLinkingService** uses **GsApiClient** for token verification and user validation
 - **GsUriHandler** delegates account linking to **GsAccountLinkingService** when processing deep links
@@ -83,30 +83,6 @@ gs-playnite/
 └── packages.config                   # NuGet package dependencies
 ```
 
-## Core Services
-
-- **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events with comprehensive exception handling
-- **Api/IGsApiClient.cs** - Interface for the API client, enabling dependency injection and testability
-- **Api/GsApiClient.cs** - HTTP API layer for GameScrobbler communication with circuit breaker protection, input validation, and retry logic; defines `GameSyncDto` (snake_case, includes scores, release year, dates, and user flags) for library sync payloads sent to `POST /api/playnite/v2/sync`; handles server-driven sync cooldown
-- **Api/ApiResult.cs** - Generic result wrapper for API responses with success/failure status
-- **Api/GsCircuitBreaker.cs** - Implements circuit breaker pattern with exponential backoff retry logic for API resilience
-- **Models/GsSnapshot.cs** - Diff-based sync state management via `GsSnapshotManager` (static, thread-safe); stores library and achievement baselines in `gs_snapshot.json` to enable incremental sync — only changed games are sent to the server
-- **Services/GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler
-- **Services/GsScrobblingService.cs** - Tracks game sessions (start/stop events); during library sync maps each `Playnite.SDK.Models.Game` to a `GameSyncDto` including completion status and (optionally) achievement counts; skips sync when the library hash is unchanged
-- **Services/GsSuccessStoryHelper.cs** - Retrieves per-game achievement counts (`unlocked` / `total`) from the [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) via reflection; returns `null` for both fields when SuccessStory is not installed or the game has no achievement data
-- **Services/GsUriHandler.cs** - Processes deep links (`playnite://gamescrobbler/...`) for automatic account linking
-- **Services/GsUpdateChecker.cs** - Checks for plugin updates on startup
-
-## Data Management
-
-- **Models/GsData.cs** - Persistent data models and manager, handles installation ID and session state
-- **Models/GsPluginSettings.cs** - Plugin settings data model with UI binding support
-
-## UI Components
-
-- **View/GsPluginSettingsView.xaml/.cs** - Main settings interface with account linking UI and two-way data binding
-- **View/MySidebarView.xaml/.cs** - Sidebar integration displaying web view with user statistics
-
 ## Achievement Sync
 
 The plugin can sync per-game achievement progress during library sync if the optional [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) is installed.
@@ -116,18 +92,13 @@ The plugin can sync per-game achievement progress during library sync if the opt
 1. During library sync `GsScrobblingService` builds a `GameSyncDto` for each game.
 2. `GsSuccessStoryHelper` is called for each game; it locates the SuccessStory plugin by its well-known GUID (`cebe6d32-8c46-4459-b993-5a5189d60788`) via `IPlayniteAPI.Addons.Plugins`, then reads achievement data through reflection (`PluginDatabase.Get(gameId).Unlocked` / `.Items.Count`).
 3. If SuccessStory is not installed or a game has no achievement data, both `achievement_count_unlocked` and `achievement_count_total` are sent as `null` — the backend treats `null` as "unknown", not zero.
-4. The populated `GameSyncDto` list is sent to `POST /api/playnite/v2/sync` (snake_case payload).
+4. The populated `GameSyncDto` list is sent to the v2 library sync endpoints (snake_case payload).
 
 ### Settings toggle
 
 **Sync achievement data (requires SuccessStory addon)** — enabled by default. When disabled, achievement fields are omitted from the sync payload. The toggle is in the plugin settings under the Experimental Features section.
 
 The current `sync_achievements` state is also forwarded to the Game Spectrum dashboard via a URL parameter on the sidebar iframe.
-
-## Utilities
-
-- **Infrastructure/GsLogger.cs** - Centralized logging with debug UI feedback, HTTP request/response logging, and enhanced context
-- **Infrastructure/GsSentry.cs** - Advanced error tracking with global exception handlers, UnobservedTaskException protection, and contextual information
 
 ## Reliability & Error Handling
 
@@ -212,13 +183,6 @@ feat!: redesign API interface (breaking change)
 
 The hooks provide fast local validation, while the CI pipeline handles comprehensive verification.
 
-## Configuration Files
-
-- **extension.yaml** - Plugin metadata including ID, name, version, and author information
-- **manifest.yaml** - Plugin manifest information for the Playnite extension system
-- **app.config** - Application configuration file for .NET Framework settings
-- **packages.config** - NuGet package dependencies and version specifications
-
 ## Release Management
 
 ### Version Bumping
@@ -290,16 +254,6 @@ Release Please automatically updates:
 - `extension.yaml` - Plugin metadata version
 - `Properties/AssemblyInfo.cs` - Assembly version attributes
 - `GsPlugin.csproj` - Project version property
-
-## Commands
-
-> **Note:** This project targets .NET Framework 4.6.2 with an old-style `.csproj`. The full `MSBuild.exe` from Visual Studio Build Tools (or a full VS install) is required to build — `dotnet build` / `dotnet msbuild` cannot run the WPF XAML code-gen (`PresentationBuildTasks`) needed for the View layer.
-
-- `MSBuild.exe .\GsPlugin.sln -p:Configuration=Release -restore` - Build solution
-- `dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` - Run tests (build first)
-- `dotnet format .\GsPlugin.sln` - Format code
-- `dotnet format .\GsPlugin.sln --verify-no-changes` - Verify formatting
-- `Playnite\Toolbox.exe pack "bin\Release" "PackingOutput"` - Package plugin as `.pext`
 
 ## Contributions
 

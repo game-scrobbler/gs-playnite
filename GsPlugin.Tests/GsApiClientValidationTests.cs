@@ -395,11 +395,10 @@ namespace GsPlugin.Tests {
             Assert.Null(res.reason);
         }
 
-        // --- Legacy LibrarySyncReq test ---
-
+        // LibraryFullSyncReq uses the same shape as the old LibrarySyncReq
         [Fact]
-        public void LibrarySyncReq_CanBeConstructed() {
-            var req = new LibrarySyncReq {
+        public void LibraryFullSyncReq_CanBeConstructed() {
+            var req = new LibraryFullSyncReq {
                 user_id = "user-123",
                 library = new List<GameSyncDto> {
                     new GameSyncDto { game_id = "g1", game_name = "Game 1" }
@@ -437,9 +436,6 @@ namespace GsPlugin.Tests {
                 return Task.FromResult<ScrobbleFinishRes>(null);
             return Task.FromResult(new ScrobbleFinishRes { status = "queued" });
         }
-
-        public Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq) =>
-            Task.FromResult(new LibrarySyncRes { status = "queued" });
 
         public Task<AsyncQueuedResponse> SyncLibraryFull(LibraryFullSyncReq req) =>
             Task.FromResult(new AsyncQueuedResponse { success = true, status = "queued" });
