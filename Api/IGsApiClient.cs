@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
-using static GsPlugin.GsApiClient;
+using static GsPlugin.Api.GsApiClient;
 
-namespace GsPlugin {
+namespace GsPlugin.Api {
     /// <summary>
     /// Interface for API communication with GameScrobbler.
     /// Enables unit testing with mock implementations.

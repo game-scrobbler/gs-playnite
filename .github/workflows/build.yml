@@ -97,7 +97,7 @@ jobs:
         run: |
           $version = "${{ steps.release.outputs.tag_name }}".Replace("GsPlugin-v", "")
           Write-Host "Updating installer manifest for version $version"
-          powershell -ExecutionPolicy Bypass -File "$Env:GITHUB_WORKSPACE\update-installer-manifest.ps1" -Version $version -TagName "${{ steps.release.outputs.tag_name }}"
+          powershell -ExecutionPolicy Bypass -File "$Env:GITHUB_WORKSPACE\scripts\update-installer-manifest.ps1" -Version $version -TagName "${{ steps.release.outputs.tag_name }}"
 
       - name: Commit and Push Manifest Changes
         if: ${{ steps.release.outputs.release_created }}

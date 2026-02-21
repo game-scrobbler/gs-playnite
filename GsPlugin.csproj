@@ -108,21 +108,26 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ApiResult.cs" />
-    <Compile Include="GsLogger.cs" />
-    <Compile Include="GsApiClient.cs" />
-    <Compile Include="IGsApiClient.cs" />
-    <Compile Include="GsCircuitBreaker.cs" />
-    <Compile Include="GsData.cs" />
+    <!-- Infrastructure -->
+    <Compile Include="Infrastructure\GsLogger.cs" />
+    <Compile Include="Infrastructure\GsSentry.cs" />
+    <!-- Api -->
+    <Compile Include="Api\ApiResult.cs" />
+    <Compile Include="Api\GsApiClient.cs" />
+    <Compile Include="Api\IGsApiClient.cs" />
+    <Compile Include="Api\GsCircuitBreaker.cs" />
+    <!-- Models -->
+    <Compile Include="Models\GsData.cs" />
+    <Compile Include="Models\GsSnapshot.cs" />
+    <Compile Include="Models\GsPluginSettings.cs" />
+    <!-- Services -->
+    <Compile Include="Services\GsScrobblingService.cs" />
+    <Compile Include="Services\GsAccountLinkingService.cs" />
+    <Compile Include="Services\GsSuccessStoryHelper.cs" />
+    <Compile Include="Services\GsUpdateChecker.cs" />
+    <Compile Include="Services\GsUriHandler.cs" />
+    <!-- Root -->
     <Compile Include="GsPlugin.cs" />
-    <Compile Include="GsPluginSettings.cs" />
-    <Compile Include="GsScrobblingService.cs" />
-    <Compile Include="GsSnapshot.cs" />
-    <Compile Include="GsSuccessStoryHelper.cs" />
-    <Compile Include="GsAccountLinkingService.cs" />
-    <Compile Include="GsSentry.cs" />
-    <Compile Include="GsUpdateChecker.cs" />
-    <Compile Include="GsUriHandler.cs" />
     <Compile Include="View\GsPluginSettingsView.xaml.cs">
       <DependentUpon>GsPluginSettingsView.xaml</DependentUpon>
     </Compile>

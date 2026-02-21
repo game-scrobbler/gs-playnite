@@ -4,8 +4,9 @@ using System.Linq;
 using System.Reflection;
 using Playnite.SDK;
 using Sentry;
+using GsPlugin.Models;
 
-namespace GsPlugin {
+namespace GsPlugin.Infrastructure {
     /// <summary>
     /// Service responsible for initializing and managing Sentry error tracking.
     /// Handles configuration, opt-out behavior, and release information.

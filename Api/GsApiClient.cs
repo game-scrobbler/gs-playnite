@@ -7,8 +7,10 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Sentry;
+using GsPlugin.Infrastructure;
+using GsPlugin.Models;
 
-namespace GsPlugin {
+namespace GsPlugin.Api {
     public class GsApiClient : IGsApiClient {
         private static readonly ILogger _logger = LogManager.GetLogger();
 

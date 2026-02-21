@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using Xunit;
-using static GsPlugin.GsApiClient;
+using GsPlugin.Api;
+using GsPlugin.Models;
+using static GsPlugin.Api.GsApiClient;
 
 namespace GsPlugin.Tests {
     /// <summary>

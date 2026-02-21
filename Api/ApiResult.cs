@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace GsPlugin {
+namespace GsPlugin.Api {
     /// <summary>
     /// Wraps an API response with success/failure status and error details.
     /// Provides richer error information than returning null on failure.

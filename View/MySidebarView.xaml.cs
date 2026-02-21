@@ -2,8 +2,10 @@ using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using GsPlugin.Infrastructure;
+using GsPlugin.Models;
 
-namespace GsPlugin {
+namespace GsPlugin.View {
     public partial class MySidebarView : UserControl {
 
         private string viewPluginVer { get; set; }

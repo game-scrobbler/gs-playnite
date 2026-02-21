@@ -5,8 +5,10 @@ using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Playnite.SDK;
+using GsPlugin.Infrastructure;
+using GsPlugin.Models;
 
-namespace GsPlugin {
+namespace GsPlugin.Services {
     internal class GsUpdateChecker {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private const string ReleasesApiUrl =

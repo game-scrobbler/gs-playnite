@@ -63,7 +63,7 @@ Write-Host "" -ForegroundColor White
 Write-Host "Installed hooks:" -ForegroundColor White
 Write-Host "  1. Pre-commit hook:" -ForegroundColor Cyan
 Write-Host "     - Verifies C# formatting before commit (does NOT auto-stage)" -ForegroundColor Gray
-Write-Host "     - Run 'format-code.ps1' to fix formatting issues" -ForegroundColor Gray
+Write-Host "     - Run 'scripts/format-code.ps1' to fix formatting issues" -ForegroundColor Gray
 Write-Host "" -ForegroundColor White
 Write-Host "  2. Commit-msg hook:" -ForegroundColor Cyan
 Write-Host "     - Validates commit messages follow Conventional Commits" -ForegroundColor Gray

@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playnite.SDK;
 
-namespace GsPlugin {
+namespace GsPlugin.Api {
     /// <summary>
     /// Circuit breaker pattern implementation for API calls with exponential backoff retry logic.
     /// Helps prevent cascading failures and provides resilience against temporary service outages.

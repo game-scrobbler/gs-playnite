@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Xunit;
+using GsPlugin.Api;
 
 namespace GsPlugin.Tests {
     public class GsCircuitBreakerTests {

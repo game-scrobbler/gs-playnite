@@ -5,8 +5,9 @@ using System.Linq;
 using System.Reflection;
 using Playnite.SDK;
 using Playnite.SDK.Plugins;
+using GsPlugin.Infrastructure;
 
-namespace GsPlugin {
+namespace GsPlugin.Services {
     /// <summary>
     /// Retrieves per-game achievement data from the SuccessStory plugin via reflection.
     /// All methods return null if SuccessStory is not installed or an error occurs.

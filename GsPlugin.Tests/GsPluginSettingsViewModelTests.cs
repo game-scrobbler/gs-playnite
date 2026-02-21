@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Xunit;
+using GsPlugin.Models;
 
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]

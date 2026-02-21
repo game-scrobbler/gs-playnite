@@ -14,11 +14,47 @@ Game Spectrum (GS) is a Playnite plugin that integrates with GameScrobbler to pr
 - **Verify formatting**: `dotnet format .\GsPlugin.sln --verify-no-changes`
 - **Run all tests**: `dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` (build with MSBuild first)
 - **Run a single test**: `dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~ClassName.MethodName"`
-- **Setup git hooks**: `powershell -ExecutionPolicy Bypass -File setup-hooks.ps1`
-- **Manual formatting**: `powershell -ExecutionPolicy Bypass -File format-code.ps1`
+- **Setup git hooks**: `powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1`
+- **Manual formatting**: `powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1`
 - **Pack plugin**: `Playnite\Toolbox.exe pack "bin\Release" "PackingOutput"`
 
 ## Architecture Overview
+
+### Project Structure
+```
+GsPlugin.cs              — Entry point (namespace: GsPlugin)
+│
+├── Api/                 — namespace: GsPlugin.Api
+│   ├── ApiResult.cs         — Generic API result wrapper
+│   ├── GsApiClient.cs       — HTTP API client; defines GameSyncDto and all DTOs
+│   ├── IGsApiClient.cs      — API client interface
+│   └── GsCircuitBreaker.cs  — Circuit breaker with exponential backoff
+│
+├── Services/            — namespace: GsPlugin.Services
+│   ├── GsScrobblingService.cs       — Game session tracking and library sync
+│   ├── GsAccountLinkingService.cs   — Account linking operations
+│   ├── GsUriHandler.cs              — Deep link processing
+│   ├── GsUpdateChecker.cs           — Plugin update checking
+│   └── GsSuccessStoryHelper.cs      — Achievement counts via reflection
+│
+├── Models/              — namespace: GsPlugin.Models
+│   ├── GsData.cs            — Persistent data (GsDataManager, GsTime, PendingScrobble)
+│   ├── GsSnapshot.cs        — Diff-based sync state (GsSnapshotManager)
+│   └── GsPluginSettings.cs  — Settings data model and view model
+│
+├── Infrastructure/      — namespace: GsPlugin.Infrastructure
+│   ├── GsLogger.cs          — Logging wrapper
+│   └── GsSentry.cs          — Sentry error tracking
+│
+├── View/                — namespace: GsPlugin.View
+│   ├── GsPluginSettingsView.xaml/.cs — Settings UI
+│   └── MySidebarView.xaml/.cs        — Sidebar with WebView2
+│
+├── scripts/             — PowerShell build/dev scripts
+├── hooks/               — Git hook scripts
+├── GsPlugin.Tests/      — xUnit test project (net462)
+└── Properties/          — AssemblyInfo.cs
+```
 
 ### Service Dependency Graph
 ```
@@ -32,21 +68,6 @@ GsPlugin (entry point, IDisposable)
 └── All services use GsDataManager for persistent state
 ```
 
-### Core Components
-- **GsPlugin.cs** — Main plugin entry point, orchestrates all services and handles Playnite lifecycle events
-- **GsApiClient.cs** / **IGsApiClient.cs** — HTTP API communication with circuit breaker, retry logic, and TLS 1.2 enforcement; defines `GameSyncDto` (snake_case) sent to `POST /api/playnite/v2/sync`
-- **GsScrobblingService.cs** — Game session tracking (start/stop events) and library sync; maps `Playnite.SDK.Models.Game` → `GameSyncDto` (including completion status and achievement counts)
-- **GsSnapshot.cs** — Diff-based sync state management via `GsSnapshotManager` (static, thread-safe); stores library and achievement baselines in `gs_snapshot.json` separate from `gs_data.json`
-- **GsData.cs** — Thread-safe persistent data models (`GsDataManager` with locking); `SyncAchievements` bool (default `true`) gates achievement lookups
-- **GsCircuitBreaker.cs** — Circuit breaker pattern with exponential backoff and jitter
-- **GsSuccessStoryHelper.cs** — Retrieves per-game achievement counts from SuccessStory addon (GUID `cebe6d32-8c46-4459-b993-5a5189d60788`) via reflection; returns `null` gracefully when absent
-- **GsAccountLinkingService.cs** / **GsUriHandler.cs** — Account linking and deep link processing (tokens redacted in logs)
-- **GsUpdateChecker.cs** — Plugin update checking
-
-### UI Components
-- **View/GsPluginSettingsView.xaml/.cs** — Settings UI with two-way data binding via `GsPluginSettings`
-- **View/MySidebarView.xaml/.cs** — Sidebar displaying user statistics via WebView2 (navigation restricted to `gamescrobbler.com`; external links open in system browser, https only)
-
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
 - Test classes: `GsCircuitBreakerTests`, `GsDataTests`, `GsDataManagerTests`, `GsTimeTests`, `GsMetadataHashTests`, `GsSnapshotTests`, `GsScrobblingServiceHashTests`, `ValidateTokenTests`, `LinkingResultTests`, `ApiResultTests`, `GsPluginSettingsViewModelTests`, `GsApiClientValidationTests`
@@ -54,7 +75,7 @@ GsPlugin (entry point, IDisposable)
 ## Build Environment
 
 - Targets .NET Framework 4.6.2 (old-style .csproj — requires Visual Studio MSBuild, not `dotnet build`)
-- XAML code-gen requires VS Build Tools or full VS install
+- XAML code-gen (WPF `PresentationBuildTasks`) requires the full `MSBuild.exe` from VS Build Tools or a full VS install; `dotnet msbuild` does **not** generate `.g.cs` files for old-style WPF projects, so View code-behind will fail to compile without it
 - Test project uses SDK-style .csproj and can be built/run with `dotnet test`
 - API endpoints: Debug → `api.stage.gamescrobbler.com`, Release → `api.gamescrobbler.com`
 
@@ -64,7 +85,7 @@ GsPlugin (entry point, IDisposable)
 All code must be formatted with `dotnet format` before commits. The pre-commit hook checks with `--verify-no-changes` and fails if unformatted.
 
 ### Git Hooks
-Hook scripts in `hooks/` are installed to `.git/hooks/` via `setup-hooks.ps1`:
+Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks.ps1`:
 - **pre-commit**: Verifies code formatting on staged `.cs` files
 - **commit-msg**: Validates conventional commit message format (`feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert`)
 
@@ -74,7 +95,7 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `setup-hooks.ps1`:
 - `Game.Playtime` and `Game.PlayCount` are `ulong` — cast explicitly to `long`/`int` when assigning to DTO fields (no implicit conversion).
 - `Game.CompletionStatusId` defaults to `Guid.Empty` (not `null`) when unset — guard with `g.CompletionStatusId != Guid.Empty` before calling `.ToString()`.
 - `Game.CompletionStatus` is a user-defined named object (not an enum) with a `.Name` string property; access null-safely (`g.CompletionStatus?.Name`).
-- Adding a new `.cs` file requires a `<Compile Include="FileName.cs" />` entry in `GsPlugin.csproj` (old-style non-SDK project — files are not auto-included).
+- Adding a new `.cs` file requires a `<Compile Include="Folder\FileName.cs" />` entry in `GsPlugin.csproj` (old-style non-SDK project — files are not auto-included). Place files in the appropriate namespace folder (`Api/`, `Services/`, `Models/`, `Infrastructure/`, `View/`).
 - New `.cs` files written with LF line endings will fail `dotnet format --verify-no-changes`; run `dotnet format` to auto-correct to CRLF.
 
 ### Sentry Release Management

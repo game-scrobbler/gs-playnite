@@ -9,6 +9,11 @@ using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
 using Sentry;
+using GsPlugin.Api;
+using GsPlugin.Infrastructure;
+using GsPlugin.Models;
+using GsPlugin.Services;
+using GsPlugin.View;
 
 namespace GsPlugin {
 

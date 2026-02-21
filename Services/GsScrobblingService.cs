@@ -6,8 +6,10 @@ using System.Text;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Events;
+using GsPlugin.Api;
+using GsPlugin.Models;
 
-namespace GsPlugin {
+namespace GsPlugin.Services {
     /// <summary>
     /// Service responsible for handling game scrobbling functionality.
     /// Tracks game sessions by recording start/stop events and communicating with the API.

@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Sentry;
+using GsPlugin.Api;
+using GsPlugin.Infrastructure;
 
-namespace GsPlugin {
+namespace GsPlugin.Models {
     /// <summary>
     /// Represents a scrobble request that failed to send and is waiting to be retried.
     /// </summary>

@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using GsPlugin.Infrastructure;
 
-namespace GsPlugin {
+namespace GsPlugin.Models {
     public class GameSnapshot {
         public string playnite_id { get; set; }
         public string game_id { get; set; }

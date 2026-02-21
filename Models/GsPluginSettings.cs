@@ -4,8 +4,11 @@ using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Data;
 using Sentry;
+using GsPlugin.Infrastructure;
+using GsPlugin.Services;
+using PluginClass = GsPlugin.GsPlugin;
 
-namespace GsPlugin {
+namespace GsPlugin.Models {
     /// <summary>
     /// Represents the settings data model for the GS Plugin.
     /// Contains all user-configurable options and runtime state.
@@ -83,7 +86,7 @@ namespace GsPlugin {
     /// Handles settings persistence, validation, and account linking operations.
     /// </summary>
     public class GsPluginSettingsViewModel : ObservableObject, ISettings {
-        private readonly GsPlugin _plugin;
+        private readonly PluginClass _plugin;
         private readonly GsAccountLinkingService _linkingService;
         private readonly GsSuccessStoryHelper _achievementHelper;
         private GsPluginSettings _editingClone;
@@ -155,7 +158,7 @@ namespace GsPlugin {
         /// <param name="linkingService">The account linking service.</param>
         /// <param name="achievementHelper">The SuccessStory achievement helper for detection status.</param>
         public GsPluginSettingsViewModel(
-            GsPlugin plugin,
+            PluginClass plugin,
             GsAccountLinkingService linkingService,
             GsSuccessStoryHelper achievementHelper
         ) {

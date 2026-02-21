@@ -39,45 +39,42 @@ Game Spectrum is a Playnite plugin that provides game session tracking and stati
 
 ```md
 gs-playnite/
-├── GsPlugin.cs                       # Main plugin entry point
-├── GsData.cs                         # Persistent data models and manager
-├── IGsApiClient.cs                   # API client interface (enables DI and testing)
-├── GsApiClient.cs                    # HTTP API communication layer; defines GameSyncDto
-├── ApiResult.cs                      # Generic result wrapper for API responses
-├── GsCircuitBreaker.cs               # Circuit breaker pattern with retry logic
-├── GsSnapshot.cs                     # Diff-based sync state (GsSnapshotManager)
-├── GsPluginSettings.cs               # Plugin settings data model
-├── GsScrobblingService.cs            # Game session tracking and library sync
-├── GsSuccessStoryHelper.cs           # Achievement counts via SuccessStory addon (reflection)
-├── GsAccountLinkingService.cs        # Account linking functionality
-├── GsUriHandler.cs                   # Deep link handling
-├── GsUpdateChecker.cs                # Plugin update checking
+├── GsPlugin.cs                       # Main plugin entry point (namespace: GsPlugin)
 │
-├── GsLogger.cs                       # Custom logging utilities
-├── GsSentry.cs                       # Error tracking and reporting
+├── Api/                              # namespace: GsPlugin.Api
+│   ├── ApiResult.cs                  # Generic result wrapper for API responses
+│   ├── GsApiClient.cs               # HTTP API communication; defines GameSyncDto and all DTOs
+│   ├── IGsApiClient.cs              # API client interface (enables DI and testing)
+│   └── GsCircuitBreaker.cs          # Circuit breaker pattern with retry logic
 │
-├── View/
-│   ├── GsPluginSettingsView.xaml     # Settings UI layout
-│   ├── GsPluginSettingsView.xaml.cs  # Settings UI code-behind
-│   ├── MySidebarView.xaml            # Sidebar layout
-│   └── MySidebarView.xaml.cs         # Sidebar code-behind
+├── Services/                         # namespace: GsPlugin.Services
+│   ├── GsScrobblingService.cs       # Game session tracking and library sync
+│   ├── GsAccountLinkingService.cs   # Account linking functionality
+│   ├── GsUriHandler.cs              # Deep link handling
+│   ├── GsUpdateChecker.cs           # Plugin update checking
+│   └── GsSuccessStoryHelper.cs      # Achievement counts via SuccessStory addon (reflection)
 │
-├── Localization/
-│   └── en_US.xaml                    # English language resources
+├── Models/                           # namespace: GsPlugin.Models
+│   ├── GsData.cs                    # Persistent data models and manager
+│   ├── GsSnapshot.cs               # Diff-based sync state (GsSnapshotManager)
+│   └── GsPluginSettings.cs         # Plugin settings data model and view model
 │
+├── Infrastructure/                   # namespace: GsPlugin.Infrastructure
+│   ├── GsLogger.cs                  # Custom logging utilities
+│   └── GsSentry.cs                  # Error tracking and reporting
+│
+├── View/                             # namespace: GsPlugin.View
+│   ├── GsPluginSettingsView.xaml/.cs # Settings UI
+│   └── MySidebarView.xaml/.cs        # Sidebar with WebView2
+│
+├── scripts/                          # PowerShell build/dev scripts
+│   ├── format-code.ps1              # Manual code formatting
+│   ├── setup-hooks.ps1              # Git hooks installer
+│   └── update-installer-manifest.ps1
+│
+├── hooks/                            # Git hook source scripts
+├── Localization/                     # Language resources
 ├── GsPlugin.Tests/                   # xUnit test project (SDK-style, net462)
-│   ├── GsCircuitBreakerTests.cs      # Circuit breaker state transitions and retry logic
-│   ├── GsDataTests.cs                # Data model defaults and serialization round-trips
-│   ├── GsDataManagerTests.cs         # IsAccountLinked, enqueue/dequeue, persistence
-│   ├── GsTimeTests.cs                # FormatElapsed and FormatRemaining formatting
-│   ├── GsMetadataHashTests.cs        # Per-field change detection in metadata hash
-│   ├── GsSnapshotTests.cs            # Snapshot baselines, diffs, and persistence
-│   ├── GsScrobblingServiceHashTests.cs # Library hash consistency and change detection
-│   ├── ValidateTokenTests.cs         # Token validation rules
-│   ├── LinkingResultTests.cs         # LinkingResult factory methods and IsNetworkError
-│   ├── ApiResultTests.cs             # ApiResult Ok/Fail factory methods
-│   ├── GsPluginSettingsViewModelTests.cs # LastSyncStatus time bucketing
-│   └── GsApiClientValidationTests.cs # DTO construction and interface contract
 │
 │                       # Configuration:
 ├── extension.yaml                    # Plugin metadata
@@ -89,26 +86,26 @@ gs-playnite/
 ## Core Services
 
 - **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events with comprehensive exception handling
-- **IGsApiClient.cs** - Interface for the API client, enabling dependency injection and testability
-- **GsApiClient.cs** - HTTP API layer for GameScrobbler communication with circuit breaker protection, input validation, and retry logic; defines `GameSyncDto` (snake_case, includes scores, release year, dates, and user flags) for library sync payloads sent to `POST /api/playnite/v2/sync`; handles server-driven sync cooldown
-- **ApiResult.cs** - Generic result wrapper for API responses with success/failure status
-- **GsCircuitBreaker.cs** - Implements circuit breaker pattern with exponential backoff retry logic for API resilience
-- **GsSnapshot.cs** - Diff-based sync state management via `GsSnapshotManager` (static, thread-safe); stores library and achievement baselines in `gs_snapshot.json` to enable incremental sync — only changed games are sent to the server
-- **GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler
-- **GsScrobblingService.cs** - Tracks game sessions (start/stop events); during library sync maps each `Playnite.SDK.Models.Game` to a `GameSyncDto` including completion status and (optionally) achievement counts; skips sync when the library hash is unchanged
-- **GsSuccessStoryHelper.cs** - Retrieves per-game achievement counts (`unlocked` / `total`) from the [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) via reflection; returns `null` for both fields when SuccessStory is not installed or the game has no achievement data
-- **GsUriHandler.cs** - Processes deep links (`playnite://gamescrobbler/...`) for automatic account linking
-- **GsUpdateChecker.cs** - Checks for plugin updates on startup
+- **Api/IGsApiClient.cs** - Interface for the API client, enabling dependency injection and testability
+- **Api/GsApiClient.cs** - HTTP API layer for GameScrobbler communication with circuit breaker protection, input validation, and retry logic; defines `GameSyncDto` (snake_case, includes scores, release year, dates, and user flags) for library sync payloads sent to `POST /api/playnite/v2/sync`; handles server-driven sync cooldown
+- **Api/ApiResult.cs** - Generic result wrapper for API responses with success/failure status
+- **Api/GsCircuitBreaker.cs** - Implements circuit breaker pattern with exponential backoff retry logic for API resilience
+- **Models/GsSnapshot.cs** - Diff-based sync state management via `GsSnapshotManager` (static, thread-safe); stores library and achievement baselines in `gs_snapshot.json` to enable incremental sync — only changed games are sent to the server
+- **Services/GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler
+- **Services/GsScrobblingService.cs** - Tracks game sessions (start/stop events); during library sync maps each `Playnite.SDK.Models.Game` to a `GameSyncDto` including completion status and (optionally) achievement counts; skips sync when the library hash is unchanged
+- **Services/GsSuccessStoryHelper.cs** - Retrieves per-game achievement counts (`unlocked` / `total`) from the [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) via reflection; returns `null` for both fields when SuccessStory is not installed or the game has no achievement data
+- **Services/GsUriHandler.cs** - Processes deep links (`playnite://gamescrobbler/...`) for automatic account linking
+- **Services/GsUpdateChecker.cs** - Checks for plugin updates on startup
 
 ## Data Management
 
-- **GsData.cs** - Persistent data models and manager, handles installation ID and session state
-- **GsPluginSettings.cs** - Plugin settings data model with UI binding support
+- **Models/GsData.cs** - Persistent data models and manager, handles installation ID and session state
+- **Models/GsPluginSettings.cs** - Plugin settings data model with UI binding support
 
 ## UI Components
 
-- **GsPluginSettingsView.xaml/.cs** - Main settings interface with account linking UI and two-way data binding
-- **MySidebarView.xaml/.cs** - Sidebar integration displaying web view with user statistics
+- **View/GsPluginSettingsView.xaml/.cs** - Main settings interface with account linking UI and two-way data binding
+- **View/MySidebarView.xaml/.cs** - Sidebar integration displaying web view with user statistics
 
 ## Achievement Sync
 
@@ -129,8 +126,8 @@ The current `sync_achievements` state is also forwarded to the Game Spectrum das
 
 ## Utilities
 
-- **GsLogger.cs** - Centralized logging with debug UI feedback, HTTP request/response logging, and enhanced context
-- **GsSentry.cs** - Advanced error tracking with global exception handlers, UnobservedTaskException protection, and contextual information
+- **Infrastructure/GsLogger.cs** - Centralized logging with debug UI feedback, HTTP request/response logging, and enhanced context
+- **Infrastructure/GsSentry.cs** - Advanced error tracking with global exception handlers, UnobservedTaskException protection, and contextual information
 
 ## Reliability & Error Handling
 
@@ -163,22 +160,22 @@ The project includes automated validation via Git hooks:
 
 #### 1. Pre-commit Hook (Code Formatting)
 - **hooks/pre-commit** + **hooks/pre-commit.ps1** - Source hook scripts (checked into repo)
-- **format-code.ps1** - Manual code formatting script for developers
-- **setup-hooks.ps1** - Installs hooks from `hooks/` into `.git/hooks/` (run once after cloning)
+- **scripts/format-code.ps1** - Manual code formatting script for developers
+- **scripts/setup-hooks.ps1** - Installs hooks from `hooks/` into `.git/hooks/` (run once after cloning)
 
 #### 2. Commit-msg Hook (Conventional Commits)
 - **hooks/commit-msg** + **hooks/commit-msg.ps1** - Source hook scripts (checked into repo)
 - Enforces [Conventional Commits](https://www.conventionalcommits.org/) format
 - Ensures Release Please can properly auto-version the project
-- **Note**: Commits will be rejected if the message format is invalid — run `setup-hooks.ps1` first
+- **Note**: Commits will be rejected if the message format is invalid — run `scripts/setup-hooks.ps1` first
 
 **Setup Instructions:**
 ```powershell
 # Run once to setup all Git hooks
-powershell -ExecutionPolicy Bypass -File setup-hooks.ps1
+powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1
 
 # Manual formatting when needed
-powershell -ExecutionPolicy Bypass -File format-code.ps1
+powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1
 ```
 
 **Commit Message Format:**
@@ -296,6 +293,8 @@ Release Please automatically updates:
 
 ## Commands
 
+> **Note:** This project targets .NET Framework 4.6.2 with an old-style `.csproj`. The full `MSBuild.exe` from Visual Studio Build Tools (or a full VS install) is required to build — `dotnet build` / `dotnet msbuild` cannot run the WPF XAML code-gen (`PresentationBuildTasks`) needed for the View layer.
+
 - `MSBuild.exe .\GsPlugin.sln -p:Configuration=Release -restore` - Build solution
 - `dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` - Run tests (build first)
 - `dotnet format .\GsPlugin.sln` - Format code
@@ -309,7 +308,7 @@ We welcome all contributions! If you have an idea for a new feature or have foun
 To ensure consistency:
 - Format your code with `dotnet format GsPlugin.sln` before submitting a PR
 - All commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) format (enforced by the commit-msg hook — see the Git Hooks section above)
-- Run `powershell -ExecutionPolicy Bypass -File setup-hooks.ps1` once after cloning to install the hooks locally
+- Run `powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1` once after cloning to install the hooks locally
 
 ## More
 

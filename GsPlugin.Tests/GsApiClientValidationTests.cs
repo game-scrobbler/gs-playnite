@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Xunit;
-using static GsPlugin.GsApiClient;
+using GsPlugin.Api;
+using static GsPlugin.Api.GsApiClient;
 
 namespace GsPlugin.Tests {
     /// <summary>

@@ -23,7 +23,7 @@ else
     if [ $? -ne 0 ]; then
         echo ""
         echo "ERROR: Code formatting issues detected!"
-        echo "Run 'powershell -File format-code.ps1' to fix formatting, then stage and commit again."
+        echo "Run 'powershell -File scripts/format-code.ps1' to fix formatting, then stage and commit again."
         exit 1
     fi
 

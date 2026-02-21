@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Xunit;
+using GsPlugin.Api;
+using GsPlugin.Services;
 
 namespace GsPlugin.Tests {
     public class GsMetadataHashTests {

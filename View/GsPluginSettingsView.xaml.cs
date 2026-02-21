@@ -6,8 +6,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Navigation;
+using GsPlugin.Models;
+using GsPlugin.Services;
 
-namespace GsPlugin {
+namespace GsPlugin.View {
     /// <summary>
     /// Interaction logic for GsPluginSettingsView.xaml
     /// </summary>

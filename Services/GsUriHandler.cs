@@ -4,8 +4,10 @@ using System.Windows;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Sentry;
+using GsPlugin.Infrastructure;
+using GsPlugin.Models;
 
-namespace GsPlugin {
+namespace GsPlugin.Services {
     /// <summary>
     /// Handles URI requests for automatic account linking functionality.
     /// This service manages deep link processing from web applications.

@@ -1,5 +1,6 @@
 using System.Net;
 using Xunit;
+using GsPlugin.Api;
 
 namespace GsPlugin.Tests {
     public class DummyResponse {

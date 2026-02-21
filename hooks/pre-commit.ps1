@@ -36,7 +36,7 @@ if ($formatExitCode -ne 0) {
     Write-Host "============================================" -ForegroundColor Red
     Write-Host "" -ForegroundColor White
     Write-Host "Please fix formatting before committing:" -ForegroundColor Yellow
-    Write-Host "  powershell -ExecutionPolicy Bypass -File format-code.ps1" -ForegroundColor Gray
+    Write-Host "  powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1" -ForegroundColor Gray
     Write-Host "" -ForegroundColor White
     Write-Host "Then review the changes, stage them, and commit again." -ForegroundColor Yellow
     Write-Host "" -ForegroundColor White

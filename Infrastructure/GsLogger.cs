@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Playnite.SDK;
 
-namespace GsPlugin {
+namespace GsPlugin.Infrastructure {
     public static class GsLogger {
         private static readonly ILogger _logger = LogManager.GetLogger();
 

@@ -5,8 +5,11 @@ using System.Threading.Tasks;
 using System.Windows;
 using Playnite.SDK;
 using Sentry;
+using GsPlugin.Api;
+using GsPlugin.Infrastructure;
+using GsPlugin.Models;
 
-namespace GsPlugin {
+namespace GsPlugin.Services {
     /// <summary>
     /// Represents the context in which account linking is being performed.
     /// </summary>
