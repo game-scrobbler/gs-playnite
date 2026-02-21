@@ -1,5 +1,42 @@
 # Changelog
 
+## [2.0.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v1.1.0...GsPlugin-v2.0.0) (2026-02-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* All public types have moved to sub-namespaces. Code referencing GsPlugin.GsApiClient must now use GsPlugin.Api.GsApiClient, GsPlugin.GsData must use GsPlugin.Models.GsData, etc.
+
+### Features
+
+* add 'Link Account on Website' button to settings UI ([6637801](https://github.com/game-scrobbler/gs-playnite/commit/6637801727dc922657883f5a4398e333db5f5a33))
+* add achievement hash tracking, remove legacy v1 sync, and update docs ([c649b54](https://github.com/game-scrobbler/gs-playnite/commit/c649b54c2626d7c326fde43c1d26eb148efc732a))
+* add achievement sync via SuccessStory plugin and v2/sync endpoint ([2b44254](https://github.com/game-scrobbler/gs-playnite/commit/2b4425444e1d8bfb94f585972d81258af41a7a3e))
+* add diff-based library and achievement sync with snapshot state ([c7d6a6b](https://github.com/game-scrobbler/gs-playnite/commit/c7d6a6b1accef10335009c3f873cb3ab953e98b8))
+* add Extensions top-menu with Open Dashboard, Sync Library Now, and Open Settings ([88920fa](https://github.com/game-scrobbler/gs-playnite/commit/88920faa37681f702b03c88cf58c178479a5f929))
+* add in-app update notification via GitHub releases API ([7f3de64](https://github.com/game-scrobbler/gs-playnite/commit/7f3de641276c73707597c385db743ccaed38966b))
+* add offline queue with retry on circuit breaker recovery ([7cba211](https://github.com/game-scrobbler/gs-playnite/commit/7cba2114db1b557f5754f52a4f7310d6e7cab280))
+* extend GameSyncDto with scores, release year, dates, and user flags ([aa7f2ee](https://github.com/game-scrobbler/gs-playnite/commit/aa7f2eee6dc427f8a851a5f958f8da5e5f9e72d9))
+* handle sync cooldown from server and enforce client-side guard ([53392bf](https://github.com/game-scrobbler/gs-playnite/commit/53392bff1642e6da29c49e070a720d36491a6457))
+* show last sync status in settings UI ([943a342](https://github.com/game-scrobbler/gs-playnite/commit/943a3422bef2aef0e7f4df738fc17a2e6ce9f995))
+* show SuccessStory install status in settings UI ([467036a](https://github.com/game-scrobbler/gs-playnite/commit/467036acffde7cabeefd49a1273dfa525cf7c182))
+
+
+### Bug Fixes
+
+* re-queue failed pending scrobbles, pair orphaned sessions, and resolve static binding ([699ca0c](https://github.com/game-scrobbler/gs-playnite/commit/699ca0c68d5ab9f88251b08ff48590f75d55142e))
+* remove duplicate LibraryFullSyncReq_CanBeConstructed test method ([2642e50](https://github.com/game-scrobbler/gs-playnite/commit/2642e50af00ffb3964e82f92e9e34f150c561f52))
+
+
+### Performance Improvements
+
+* skip sync when library hash is unchanged between sessions ([24dc390](https://github.com/game-scrobbler/gs-playnite/commit/24dc390a9fc1f838bd4a7dad96cb6d6ebdb4fc5e))
+
+
+### Code Refactoring
+
+* reorganize root files into Api, Services, Models, Infrastructure subfolders ([059c6d5](https://github.com/game-scrobbler/gs-playnite/commit/059c6d572e08c6735949ad66440e870e719b70b8))
+
 ## [1.1.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v1.0.0...GsPlugin-v1.1.0) (2026-02-13)
 
 
