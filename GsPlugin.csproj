@@ -117,6 +117,7 @@
     <Compile Include="GsPlugin.cs" />
     <Compile Include="GsPluginSettings.cs" />
     <Compile Include="GsScrobblingService.cs" />
+    <Compile Include="GsSnapshot.cs" />
     <Compile Include="GsSuccessStoryHelper.cs" />
     <Compile Include="GsAccountLinkingService.cs" />
     <Compile Include="GsSentry.cs" />

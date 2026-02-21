@@ -104,14 +104,68 @@ namespace GsPlugin.Tests {
                 GsScrobblingService.ComputeLibraryHash(two));
         }
 
+        [Fact]
+        public void ComputeLibraryHash_MetadataOnlyChange_ProducesDifferentHash() {
+            // Validates that metadata-only changes (e.g., game_name rename, genre edit)
+            // are detected by ComputeLibraryHash even when activity fields are identical.
+            var before = new List<GsApiClient.GameSyncDto> {
+                new GsApiClient.GameSyncDto {
+                    playnite_id = "aaaaaaaa-0000-0000-0000-000000000001",
+                    playtime_seconds = 100,
+                    play_count = 1,
+                    last_activity = null,
+                    game_name = "Old Name"
+                }
+            };
+            var after = new List<GsApiClient.GameSyncDto> {
+                new GsApiClient.GameSyncDto {
+                    playnite_id = "aaaaaaaa-0000-0000-0000-000000000001",
+                    playtime_seconds = 100,
+                    play_count = 1,
+                    last_activity = null,
+                    game_name = "New Name"
+                }
+            };
+
+            Assert.NotEqual(
+                GsScrobblingService.ComputeLibraryHash(before),
+                GsScrobblingService.ComputeLibraryHash(after));
+        }
+
+        [Fact]
+        public void ComputeLibraryHash_GenreChange_ProducesDifferentHash() {
+            var before = new List<GsApiClient.GameSyncDto> {
+                new GsApiClient.GameSyncDto {
+                    playnite_id = "aaaaaaaa-0000-0000-0000-000000000001",
+                    playtime_seconds = 100,
+                    play_count = 1,
+                    last_activity = null,
+                    genres = new List<string> { "Action" }
+                }
+            };
+            var after = new List<GsApiClient.GameSyncDto> {
+                new GsApiClient.GameSyncDto {
+                    playnite_id = "aaaaaaaa-0000-0000-0000-000000000001",
+                    playtime_seconds = 100,
+                    play_count = 1,
+                    last_activity = null,
+                    genres = new List<string> { "Action", "RPG" }
+                }
+            };
+
+            Assert.NotEqual(
+                GsScrobblingService.ComputeLibraryHash(before),
+                GsScrobblingService.ComputeLibraryHash(after));
+        }
+
         /// <summary>
         /// Validates the exact SHA-256 output against a known value.
-        /// The expected hash was computed independently using the same algorithm as the backend
-        /// (playniteUtils.ts createLibraryHash): keys sorted, each key + "|" fed to SHA-256 incrementally.
+        /// The library hash key format is "{playnite_id}:{playtime_seconds}:{play_count}:{last_activity}:{metadata_hash}".
+        /// Keys are sorted, each key + "|" fed to SHA-256 incrementally.
         ///
-        /// Input: one game with playnite_id="abc", playtime_seconds=0, play_count=0, last_activity=null
-        /// Key: "abc:0:0:"
-        /// SHA-256("abc:0:0:" + "|") = verified against Node.js reference implementation.
+        /// Input: one game with playnite_id="abc", playtime_seconds=0, play_count=0, last_activity=null, all metadata defaults
+        /// Metadata hash includes all DTO fields (26 fields pipe-separated); booleans default to "0".
+        /// Verified against Node.js reference implementation.
         /// </summary>
         [Fact]
         public void ComputeLibraryHash_KnownInput_MatchesExpectedHash() {
@@ -124,9 +178,7 @@ namespace GsPlugin.Tests {
                 }
             };
 
-            // Expected: SHA-256 of UTF-8 bytes of "abc:0:0:" followed by "|"
-            // Computed reference: node -e "const c=require('crypto');const h=c.createHash('sha256');h.update('abc:0:0:');h.update('|');console.log(h.digest('hex'))"
-            const string expected = "22cc6270f991e00a640c34e5ed6c1f31fa20a84cef195f110a328cac421a2c2d";
+            const string expected = "262c8283df39850de9ee82fd42c57d55a9a6aed42029808e1400dc33c4655e8d";
             Assert.Equal(expected, GsScrobblingService.ComputeLibraryHash(library));
         }
     }

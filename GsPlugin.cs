@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using Playnite.SDK;
@@ -20,6 +22,7 @@ namespace GsPlugin {
         private GsSuccessStoryHelper _achievementHelper;
         private GsUpdateChecker _updateChecker;
         private bool _disposed;
+        private int _achievementSyncInFlight;
         /// <summary>
         /// Unique identifier for the plugin itself.
         /// </summary>
@@ -33,6 +36,9 @@ namespace GsPlugin {
 
             // Initialize GsDataManager
             GsDataManager.Initialize(GetPluginUserDataPath(), null);
+
+            // Initialize snapshot manager for diff-based sync
+            GsSnapshotManager.Initialize(GetPluginUserDataPath());
 
             // Initialize Sentry for error tracking
             GsSentry.Initialize();
@@ -140,9 +146,16 @@ namespace GsPlugin {
                 // Flush any scrobbles that were queued during a previous session when the API was unavailable
                 await _apiClient.FlushPendingScrobblesAsync();
 
-                var startupSyncResult = await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                var startupSyncResult = await SyncLibraryWithDiffAsync();
                 if (startupSyncResult == GsScrobblingService.SyncLibraryResult.Cooldown) {
                     _logger.Info("Startup library sync skipped: sync cooldown is still active.");
+                }
+
+                // Run achievement sync unless library sync errored.
+                // Cooldown/Skipped mean library items already exist in the DB,
+                // so achievement FK references are valid.
+                if (startupSyncResult != GsScrobblingService.SyncLibraryResult.Error) {
+                    _ = SyncAchievementsWithDiffAsync();
                 }
             }
             catch (Exception ex) {
@@ -175,9 +188,13 @@ namespace GsPlugin {
         /// </summary>
         public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
             try {
-                var librarySyncResult = await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                var librarySyncResult = await SyncLibraryWithDiffAsync();
                 if (librarySyncResult == GsScrobblingService.SyncLibraryResult.Cooldown) {
                     _logger.Info("Library updated sync skipped: sync cooldown is still active.");
+                }
+
+                if (librarySyncResult != GsScrobblingService.SyncLibraryResult.Error) {
+                    _ = SyncAchievementsWithDiffAsync();
                 }
             }
             catch (Exception ex) {
@@ -274,15 +291,19 @@ namespace GsPlugin {
             yield return new MainMenuItem {
                 Description = "Sync Library Now",
                 MenuSection = "@Game Spectrum",
-                Action = async _ => {
+                Action = async menuArgs => {
                     try {
-                        var result = await _scrobblingService.SyncLibraryAsync(PlayniteApi.Database.Games);
+                        var result = await SyncLibraryWithDiffAsync();
                         string message;
                         if (result == GsScrobblingService.SyncLibraryResult.Success) {
                             message = "Library sync completed.";
                         }
+                        else if (result == GsScrobblingService.SyncLibraryResult.Skipped) {
+                            message = "Library is already up to date.";
+                        }
                         else if (result == GsScrobblingService.SyncLibraryResult.Cooldown) {
-                            var expiry = GsDataManager.Data.SyncCooldownExpiresAt;
+                            var expiry = GsDataManager.Data.SyncCooldownExpiresAt
+                                ?? GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt;
                             if (expiry.HasValue) {
                                 var timeLeft = GsTime.FormatRemaining(expiry.Value - DateTime.UtcNow);
                                 message = $"Library was already synced recently. Try again in {timeLeft}.";
@@ -293,6 +314,10 @@ namespace GsPlugin {
                         }
                         else {
                             message = "Library sync failed. Check logs for details.";
+                        }
+
+                        if (result != GsScrobblingService.SyncLibraryResult.Error) {
+                            _ = SyncAchievementsWithDiffAsync();
                         }
                         PlayniteApi.Dialogs.ShowMessage(message, "Game Spectrum");
                     }
@@ -309,6 +334,42 @@ namespace GsPlugin {
                 MenuSection = "@Game Spectrum",
                 Action = _ => PlayniteApi.MainView.OpenPluginSettings(Id)
             };
+        }
+
+        /// <summary>
+        /// Runs a library sync using full or diff based on whether a snapshot baseline exists.
+        /// </summary>
+        private async Task<GsScrobblingService.SyncLibraryResult> SyncLibraryWithDiffAsync() {
+            if (GsSnapshotManager.HasLibraryBaseline) {
+                return await _scrobblingService.SyncLibraryDiffAsync(PlayniteApi.Database.Games);
+            }
+            return await _scrobblingService.SyncLibraryFullAsync(PlayniteApi.Database.Games);
+        }
+
+        /// <summary>
+        /// Runs an achievements sync using full or diff based on whether a snapshot baseline exists.
+        /// Guarded against concurrent execution — overlapping calls are skipped.
+        /// </summary>
+        private async Task SyncAchievementsWithDiffAsync() {
+            if (Interlocked.CompareExchange(ref _achievementSyncInFlight, 1, 0) != 0) {
+                _logger.Info("Achievement sync already in flight — skipping.");
+                return;
+            }
+            try {
+                if (GsSnapshotManager.HasAchievementsBaseline) {
+                    await _scrobblingService.SyncAchievementsDiffAsync(PlayniteApi.Database.Games);
+                }
+                else {
+                    await _scrobblingService.SyncAchievementsFullAsync(PlayniteApi.Database.Games);
+                }
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Achievement sync failed");
+                GsSentry.CaptureException(ex, "Achievement sync failed");
+            }
+            finally {
+                Interlocked.Exchange(ref _achievementSyncInFlight, 0);
+            }
         }
 
         /// <summary>

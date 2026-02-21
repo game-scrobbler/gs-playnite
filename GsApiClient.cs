@@ -221,6 +221,13 @@ namespace GsPlugin {
             public bool is_hidden { get; set; }
             // Library source name (e.g. "Steam", "GOG") — distinct from plugin_id.
             public string source_name { get; set; }
+            // Full release date string: "YYYY-MM-DD" when day/month known, "YYYY" when year-only, null if unknown.
+            public string release_date { get; set; }
+            // When the game entry was last modified in Playnite.
+            public DateTime? modified { get; set; }
+            // null when the collection is empty/not set in Playnite.
+            public List<string> age_ratings { get; set; }
+            public List<string> regions { get; set; }
         }
 
         public class LibrarySyncReq {
@@ -242,6 +249,59 @@ namespace GsPlugin {
         public class LibrarySyncDetails {
             public int added { get; set; }
             public int updated { get; set; }
+        }
+
+        // --- v2 Library sync DTOs ---
+
+        public class LibraryFullSyncReq {
+            public string user_id { get; set; }
+            public List<GameSyncDto> library { get; set; }
+            public string[] flags { get; set; }
+        }
+
+        public class LibraryDiffSyncReq {
+            public string user_id { get; set; }
+            public List<GameSyncDto> added { get; set; }
+            public List<GameSyncDto> updated { get; set; }
+            public List<string> removed { get; set; }
+            public string base_snapshot_hash { get; set; }
+            public string[] flags { get; set; }
+        }
+
+        // --- v2 Achievement DTOs ---
+
+        public class AchievementItemDto {
+            public string name { get; set; }
+            public string description { get; set; }
+            public DateTime? date_unlocked { get; set; }
+            public bool is_unlocked { get; set; }
+            public float? rarity_percent { get; set; }
+        }
+
+        public class GameAchievementsDto {
+            public string playnite_id { get; set; }
+            public string game_id { get; set; }
+            public string plugin_id { get; set; }
+            public List<AchievementItemDto> achievements { get; set; }
+        }
+
+        public class AchievementsFullSyncReq {
+            public string user_id { get; set; }
+            public List<GameAchievementsDto> games { get; set; }
+        }
+
+        public class AchievementsDiffSyncReq {
+            public string user_id { get; set; }
+            public List<GameAchievementsDto> changed { get; set; }
+            public string base_snapshot_hash { get; set; }
+        }
+
+        public class AchievementSyncRes {
+            public bool success { get; set; }
+            public string status { get; set; }
+            public string reason { get; set; }
+            public string message { get; set; }
+            public string timestamp { get; set; }
         }
 
         public async Task<LibrarySyncRes> SyncLibrary(LibrarySyncReq librarySyncReq) {
@@ -294,6 +354,70 @@ namespace GsPlugin {
                 GsLogger.Error("Failed to queue library sync request");
                 return null;
             }
+        }
+
+        public async Task<AsyncQueuedResponse> SyncLibraryFull(LibraryFullSyncReq req) {
+            if (req == null) {
+                _logger.Error("SyncLibraryFull called with null request");
+                return null;
+            }
+            if (string.IsNullOrEmpty(req.user_id)) {
+                _logger.Error("SyncLibraryFull called with null or empty user_id");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/library/sync-full";
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<AsyncQueuedResponse>(url, req, true);
+            }, maxRetries: 1);
+        }
+
+        public async Task<AsyncQueuedResponse> SyncLibraryDiff(LibraryDiffSyncReq req) {
+            if (req == null) {
+                _logger.Error("SyncLibraryDiff called with null request");
+                return null;
+            }
+            if (string.IsNullOrEmpty(req.user_id)) {
+                _logger.Error("SyncLibraryDiff called with null or empty user_id");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/library/sync-diff";
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<AsyncQueuedResponse>(url, req, true);
+            }, maxRetries: 1);
+        }
+
+        public async Task<AsyncQueuedResponse> SyncAchievementsFull(AchievementsFullSyncReq req) {
+            if (req == null) {
+                _logger.Error("SyncAchievementsFull called with null request");
+                return null;
+            }
+            if (string.IsNullOrEmpty(req.user_id)) {
+                _logger.Error("SyncAchievementsFull called with null or empty user_id");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/achievements/sync-full";
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<AsyncQueuedResponse>(url, req, true);
+            }, maxRetries: 1);
+        }
+
+        public async Task<AsyncQueuedResponse> SyncAchievementsDiff(AchievementsDiffSyncReq req) {
+            if (req == null) {
+                _logger.Error("SyncAchievementsDiff called with null request");
+                return null;
+            }
+            if (string.IsNullOrEmpty(req.user_id)) {
+                _logger.Error("SyncAchievementsDiff called with null or empty user_id");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/achievements/sync-diff";
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<AsyncQueuedResponse>(url, req, true);
+            }, maxRetries: 1);
         }
 
         #endregion

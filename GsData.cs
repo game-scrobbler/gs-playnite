@@ -42,6 +42,8 @@ namespace GsPlugin {
         // SHA-256 hex hash of the last library payload sent to the server.
         // Used to skip syncs when the library hasn't changed between sessions.
         public string LastLibraryHash { get; set; } = null;
+        // UTC time until which the server has asked us not to send library diffs.
+        public DateTime? LibraryDiffSyncCooldownExpiresAt { get; set; } = null;
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling) {
             Flags.Clear();

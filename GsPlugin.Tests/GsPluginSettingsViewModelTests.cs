@@ -3,6 +3,7 @@ using System.IO;
 using Xunit;
 
 namespace GsPlugin.Tests {
+    [Collection("StaticManagerTests")]
     public class GsPluginSettingsViewModelTests : IDisposable {
         private readonly string _tempDir;
 

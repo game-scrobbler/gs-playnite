@@ -76,5 +76,23 @@ namespace GsPlugin.Tests {
             var result = LinkingResult.CreateError("fail", LinkingContext.ManualSettings);
             Assert.Null(result.UserId);
         }
+
+        [Fact]
+        public void CreateError_WithIsNetworkError_SetsIsNetworkErrorTrue() {
+            var result = LinkingResult.CreateError("Network timeout", LinkingContext.ManualSettings, isNetworkError: true);
+            Assert.True(result.IsNetworkError);
+        }
+
+        [Fact]
+        public void CreateError_Default_IsNetworkErrorIsFalse() {
+            var result = LinkingResult.CreateError("Token expired", LinkingContext.ManualSettings);
+            Assert.False(result.IsNetworkError);
+        }
+
+        [Fact]
+        public void CreateSuccess_IsNetworkErrorIsFalse() {
+            var result = LinkingResult.CreateSuccess("user-123", LinkingContext.ManualSettings);
+            Assert.False(result.IsNetworkError);
+        }
     }
 }

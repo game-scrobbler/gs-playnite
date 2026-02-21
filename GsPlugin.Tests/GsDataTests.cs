@@ -190,6 +190,41 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void DefaultValues_SyncAchievementsIsTrue() {
+            var data = new GsData();
+            Assert.True(data.SyncAchievements);
+        }
+
+        [Fact]
+        public void DefaultValues_CooldownAndHashFieldsAreNull() {
+            var data = new GsData();
+            Assert.Null(data.SyncCooldownExpiresAt);
+            Assert.Null(data.LastLibraryHash);
+            Assert.Null(data.LibraryDiffSyncCooldownExpiresAt);
+            Assert.Null(data.LastNotifiedVersion);
+        }
+
+        [Fact]
+        public void SerializationRoundtrip_IncludesCooldownAndHashFields() {
+            var cooldownExpiry = new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+            var diffCooldownExpiry = new DateTime(2025, 6, 2, 12, 0, 0, DateTimeKind.Utc);
+            var original = new GsData {
+                SyncCooldownExpiresAt = cooldownExpiry,
+                LastLibraryHash = "abc123def456",
+                LibraryDiffSyncCooldownExpiresAt = diffCooldownExpiry,
+                LastNotifiedVersion = "1.2.3"
+            };
+
+            var json = JsonSerializer.Serialize(original);
+            var deserialized = JsonSerializer.Deserialize<GsData>(json);
+
+            Assert.Equal(cooldownExpiry, deserialized.SyncCooldownExpiresAt);
+            Assert.Equal("abc123def456", deserialized.LastLibraryHash);
+            Assert.Equal(diffCooldownExpiry, deserialized.LibraryDiffSyncCooldownExpiresAt);
+            Assert.Equal("1.2.3", deserialized.LastNotifiedVersion);
+        }
+
+        [Fact]
         public void LastSyncFields_NullRoundtripsCorrectly() {
             var data = new GsData { LastSyncAt = null, LastSyncGameCount = null };
 

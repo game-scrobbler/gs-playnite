@@ -359,15 +359,27 @@ namespace GsPlugin {
         }
 
         /// <summary>
+        /// Builds an ISO 8601 date string from a Playnite ReleaseDate struct.
+        /// Returns "YYYY-MM-DD" when day and month are known, "YYYY" when only year is known, or null.
+        /// </summary>
+        private static string BuildReleaseDateString(Playnite.SDK.Models.ReleaseDate? rd) {
+            if (!rd.HasValue || rd.Value.Year == 0)
+                return null;
+            var v = rd.Value;
+            if (v.Month > 0 && v.Day > 0)
+                return $"{v.Year:D4}-{v.Month:D2}-{v.Day:D2}";
+            return v.Year.ToString("D4");
+        }
+
+        /// <summary>
         /// Computes a SHA-256 hex digest of the library for change detection.
-        /// Uses the same fields and algorithm as the backend's <c>createLibraryHash</c> in playniteUtils.ts:
-        /// each game produces a key <c>"{playnite_id}:{playtime_seconds}:{play_count}:{last_activity}"</c>,
-        /// the keys are sorted lexicographically, then fed incrementally into SHA-256 separated by <c>|</c>.
+        /// Includes both activity fields (playtime, play_count, last_activity) and a per-game
+        /// metadata hash so that metadata-only changes (renames, genre edits, etc.) are also detected.
         /// </summary>
         public static string ComputeLibraryHash(List<GsApiClient.GameSyncDto> library) {
             var keys = library
                 .Select(g =>
-                    $"{g.playnite_id ?? ""}:{g.playtime_seconds}:{g.play_count}:{g.last_activity?.ToString("o") ?? ""}")
+                    $"{g.playnite_id ?? ""}:{g.playtime_seconds}:{g.play_count}:{g.last_activity?.ToString("o") ?? ""}:{ComputeGameMetadataHash(g)}")
                 .OrderBy(k => k, StringComparer.Ordinal)
                 .ToArray();
 
@@ -410,58 +422,7 @@ namespace GsPlugin {
                         .Where(g => g.PluginId != Guid.Empty && AllowedPluginIds.Contains(g.PluginId))
                         .ToList();
 
-                    var dtos = filtered.Select(g => new GsApiClient.GameSyncDto {
-                        game_id = g.GameId,
-                        plugin_id = g.PluginId.ToString(),
-                        game_name = g.Name,
-                        playnite_id = g.Id.ToString(),
-                        playtime_seconds = (long)g.Playtime,
-                        play_count = (int)g.PlayCount,
-                        last_activity = g.LastActivity,
-                        is_installed = g.IsInstalled,
-                        completion_status_id = g.CompletionStatusId != Guid.Empty
-                            ? g.CompletionStatusId.ToString()
-                            : null,
-                        completion_status_name = g.CompletionStatus?.Name,
-                        achievement_count_unlocked = syncAchievements
-                            ? _achievementHelper.GetUnlockedCount(g.Id)
-                            : null,
-                        achievement_count_total = syncAchievements
-                            ? _achievementHelper.GetTotalCount(g.Id)
-                            : null,
-                        genres = g.Genres != null && g.Genres.Count > 0
-                            ? g.Genres.Select(x => x.Name).ToList()
-                            : null,
-                        platforms = g.Platforms != null && g.Platforms.Count > 0
-                            ? g.Platforms.Select(x => x.Name).ToList()
-                            : null,
-                        developers = g.Developers != null && g.Developers.Count > 0
-                            ? g.Developers.Select(x => x.Name).ToList()
-                            : null,
-                        publishers = g.Publishers != null && g.Publishers.Count > 0
-                            ? g.Publishers.Select(x => x.Name).ToList()
-                            : null,
-                        tags = g.Tags != null && g.Tags.Count > 0
-                            ? g.Tags.Select(x => x.Name).ToList()
-                            : null,
-                        features = g.Features != null && g.Features.Count > 0
-                            ? g.Features.Select(x => x.Name).ToList()
-                            : null,
-                        categories = g.Categories != null && g.Categories.Count > 0
-                            ? g.Categories.Select(x => x.Name).ToList()
-                            : null,
-                        series = g.Series != null && g.Series.Count > 0
-                            ? g.Series.Select(x => x.Name).ToList()
-                            : null,
-                        user_score = g.UserScore,
-                        critic_score = g.CriticScore,
-                        community_score = g.CommunityScore,
-                        release_year = g.ReleaseDate?.Year,
-                        date_added = g.Added,
-                        is_favorite = g.Favorite,
-                        is_hidden = g.Hidden,
-                        source_name = g.Source?.Name
-                    }).ToList();
+                    var dtos = filtered.Select(g => MapGameToDto(g, syncAchievements)).ToList();
 
                     return (dtos, ComputeLibraryHash(dtos), filtered);
                 });
@@ -512,5 +473,648 @@ namespace GsPlugin {
                 return SyncLibraryResult.Error;
             }
         }
+
+        #region v2 Sync Methods
+
+        /// <summary>
+        /// Maps a Playnite Game to the API DTO. Shared by all sync paths.
+        /// </summary>
+        private GsApiClient.GameSyncDto MapGameToDto(Playnite.SDK.Models.Game g, bool syncAchievements) {
+            return new GsApiClient.GameSyncDto {
+                game_id = g.GameId,
+                plugin_id = g.PluginId.ToString(),
+                game_name = g.Name,
+                playnite_id = g.Id.ToString(),
+                playtime_seconds = (long)g.Playtime,
+                play_count = (int)g.PlayCount,
+                last_activity = g.LastActivity,
+                is_installed = g.IsInstalled,
+                completion_status_id = g.CompletionStatusId != Guid.Empty
+                    ? g.CompletionStatusId.ToString()
+                    : null,
+                completion_status_name = g.CompletionStatus?.Name,
+                achievement_count_unlocked = syncAchievements
+                    ? _achievementHelper.GetUnlockedCount(g.Id)
+                    : null,
+                achievement_count_total = syncAchievements
+                    ? _achievementHelper.GetTotalCount(g.Id)
+                    : null,
+                genres = g.Genres != null && g.Genres.Count > 0
+                    ? g.Genres.Select(x => x.Name).ToList()
+                    : null,
+                platforms = g.Platforms != null && g.Platforms.Count > 0
+                    ? g.Platforms.Select(x => x.Name).ToList()
+                    : null,
+                developers = g.Developers != null && g.Developers.Count > 0
+                    ? g.Developers.Select(x => x.Name).ToList()
+                    : null,
+                publishers = g.Publishers != null && g.Publishers.Count > 0
+                    ? g.Publishers.Select(x => x.Name).ToList()
+                    : null,
+                tags = g.Tags != null && g.Tags.Count > 0
+                    ? g.Tags.Select(x => x.Name).ToList()
+                    : null,
+                features = g.Features != null && g.Features.Count > 0
+                    ? g.Features.Select(x => x.Name).ToList()
+                    : null,
+                categories = g.Categories != null && g.Categories.Count > 0
+                    ? g.Categories.Select(x => x.Name).ToList()
+                    : null,
+                series = g.Series != null && g.Series.Count > 0
+                    ? g.Series.Select(x => x.Name).ToList()
+                    : null,
+                user_score = g.UserScore,
+                critic_score = g.CriticScore,
+                community_score = g.CommunityScore,
+                release_year = g.ReleaseDate?.Year,
+                date_added = g.Added,
+                is_favorite = g.Favorite,
+                is_hidden = g.Hidden,
+                source_name = g.Source?.Name,
+                release_date = BuildReleaseDateString(g.ReleaseDate),
+                modified = g.Modified,
+                age_ratings = g.AgeRatings != null && g.AgeRatings.Count > 0
+                    ? g.AgeRatings.Select(x => x.Name).ToList()
+                    : null,
+                regions = g.Regions != null && g.Regions.Count > 0
+                    ? g.Regions.Select(x => x.Name).ToList()
+                    : null
+            };
+        }
+
+        /// <summary>
+        /// Computes a SHA-256 hex digest of per-game metadata for diff detection.
+        /// Includes all DTO fields except activity fields (playtime, play_count, last_activity)
+        /// which are already covered by the library-level hash key.
+        /// </summary>
+        public static string ComputeGameMetadataHash(GsApiClient.GameSyncDto g) {
+            var sb = new StringBuilder();
+            sb.Append(g.game_name ?? "");
+            sb.Append('|');
+            sb.Append(g.completion_status_id ?? "");
+            sb.Append('|');
+            sb.Append(g.completion_status_name ?? "");
+            sb.Append('|');
+            sb.Append(g.is_installed ? "1" : "0");
+            sb.Append('|');
+            sb.Append(g.genres != null ? string.Join(",", g.genres) : "");
+            sb.Append('|');
+            sb.Append(g.platforms != null ? string.Join(",", g.platforms) : "");
+            sb.Append('|');
+            sb.Append(g.developers != null ? string.Join(",", g.developers) : "");
+            sb.Append('|');
+            sb.Append(g.publishers != null ? string.Join(",", g.publishers) : "");
+            sb.Append('|');
+            sb.Append(g.tags != null ? string.Join(",", g.tags) : "");
+            sb.Append('|');
+            sb.Append(g.features != null ? string.Join(",", g.features) : "");
+            sb.Append('|');
+            sb.Append(g.categories != null ? string.Join(",", g.categories) : "");
+            sb.Append('|');
+            sb.Append(g.series != null ? string.Join(",", g.series) : "");
+            sb.Append('|');
+            sb.Append(g.age_ratings != null ? string.Join(",", g.age_ratings) : "");
+            sb.Append('|');
+            sb.Append(g.regions != null ? string.Join(",", g.regions) : "");
+            sb.Append('|');
+            sb.Append(g.release_date ?? "");
+            sb.Append('|');
+            sb.Append(g.release_year?.ToString() ?? "");
+            sb.Append('|');
+            sb.Append(g.user_score?.ToString() ?? "");
+            sb.Append('|');
+            sb.Append(g.critic_score?.ToString() ?? "");
+            sb.Append('|');
+            sb.Append(g.community_score?.ToString() ?? "");
+            sb.Append('|');
+            sb.Append(g.source_name ?? "");
+            sb.Append('|');
+            sb.Append(g.is_favorite ? "1" : "0");
+            sb.Append('|');
+            sb.Append(g.is_hidden ? "1" : "0");
+            sb.Append('|');
+            sb.Append(g.date_added?.ToString("o") ?? "");
+            sb.Append('|');
+            sb.Append(g.modified?.ToString("o") ?? "");
+            sb.Append('|');
+            sb.Append(g.achievement_count_unlocked?.ToString() ?? "");
+            sb.Append('|');
+            sb.Append(g.achievement_count_total?.ToString() ?? "");
+
+            using (var sha256 = SHA256.Create()) {
+                var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+                var hash = sha256.ComputeHash(bytes);
+                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
+        /// Creates a GameSnapshot from a DTO for the local snapshot store.
+        /// </summary>
+        private static GameSnapshot BuildGameSnapshot(GsApiClient.GameSyncDto g) {
+            return new GameSnapshot {
+                playnite_id = g.playnite_id,
+                game_id = g.game_id,
+                plugin_id = g.plugin_id,
+                playtime_seconds = g.playtime_seconds,
+                play_count = g.play_count,
+                last_activity = g.last_activity?.ToString("o"),
+                metadata_hash = ComputeGameMetadataHash(g),
+                achievement_count_unlocked = g.achievement_count_unlocked,
+                achievement_count_total = g.achievement_count_total
+            };
+        }
+
+        /// <summary>
+        /// Computes the diff between the current library DTOs and the stored snapshot.
+        /// </summary>
+        private static (List<GsApiClient.GameSyncDto> added, List<GsApiClient.GameSyncDto> updated, List<string> removed)
+            ComputeLibraryDiff(List<GsApiClient.GameSyncDto> current, Dictionary<string, GameSnapshot> snapshot) {
+            var added = new List<GsApiClient.GameSyncDto>();
+            var updated = new List<GsApiClient.GameSyncDto>();
+
+            var currentIds = new HashSet<string>();
+            foreach (var g in current) {
+                currentIds.Add(g.playnite_id);
+
+                if (!snapshot.TryGetValue(g.playnite_id, out var prev)) {
+                    added.Add(g);
+                    continue;
+                }
+
+                // Check activity fields
+                if (g.playtime_seconds != prev.playtime_seconds
+                    || g.play_count != prev.play_count
+                    || (g.last_activity?.ToString("o") ?? "") != (prev.last_activity ?? "")) {
+                    updated.Add(g);
+                    continue;
+                }
+
+                // Check metadata hash
+                var currentMetaHash = ComputeGameMetadataHash(g);
+                if (currentMetaHash != prev.metadata_hash) {
+                    updated.Add(g);
+                }
+            }
+
+            var removed = snapshot.Keys
+                .Where(id => !currentIds.Contains(id))
+                .ToList();
+
+            return (added, updated, removed);
+        }
+
+        /// <summary>
+        /// Builds the filtered DTO list from Playnite games on a background thread.
+        /// Shared by full and diff sync paths.
+        /// </summary>
+        private async Task<(List<GsApiClient.GameSyncDto> library, string libraryHash, int totalCount, int filteredCount)>
+            BuildLibraryDtosAsync(IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+            var allGames = playniteDatabaseGames.ToList();
+            var syncAchievements = GsDataManager.Data.SyncAchievements;
+
+            var (library, libraryHash, filteredCount) = await Task.Run(() => {
+                var filtered = allGames
+                    .Where(g => g.PluginId != Guid.Empty && AllowedPluginIds.Contains(g.PluginId))
+                    .ToList();
+
+                var dtos = filtered.Select(g => MapGameToDto(g, syncAchievements)).ToList();
+
+                return (dtos, ComputeLibraryHash(dtos), allGames.Count - filtered.Count);
+            });
+
+            if (filteredCount > 0) {
+                _logger.Info($"Filtered {filteredCount} games from unsupported plugins (sending {library.Count}/{allGames.Count})");
+            }
+
+            return (library, libraryHash, allGames.Count, filteredCount);
+        }
+
+        /// <summary>
+        /// Sends the full library to the v2/library/sync-full endpoint and writes the snapshot.
+        /// </summary>
+        public async Task<SyncLibraryResult> SyncLibraryFullAsync(
+            IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+            try {
+                var cooldownExpiry = GsDataManager.Data.SyncCooldownExpiresAt;
+                if (cooldownExpiry.HasValue && DateTime.UtcNow < cooldownExpiry.Value) {
+                    _logger.Info($"Library full sync skipped: cooldown active until {cooldownExpiry.Value:O}");
+                    return SyncLibraryResult.Cooldown;
+                }
+
+                _logger.Info("Starting full library sync (v2)");
+                var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
+
+                // Only skip on hash match if a snapshot baseline exists.
+                // Without a baseline, we must proceed to write the snapshot even if the hash matches.
+                if (libraryHash == GsDataManager.Data.LastLibraryHash && GsSnapshotManager.HasLibraryBaseline) {
+                    _logger.Info("Library hash unchanged since last sync — skipping full sync.");
+                    return SyncLibraryResult.Skipped;
+                }
+
+                var response = await _apiClient.SyncLibraryFull(new GsApiClient.LibraryFullSyncReq {
+                    user_id = GsDataManager.Data.InstallID,
+                    library = library,
+                    flags = GsDataManager.Data.Flags.ToArray()
+                });
+
+                if (response == null) {
+                    _logger.Error("Failed to queue full library sync.");
+                    return SyncLibraryResult.Error;
+                }
+
+                if (response.status == "skipped" && response.reason != null && response.reason.StartsWith("cooldown_")) {
+                    HandleCooldownResponse(response);
+                    return SyncLibraryResult.Cooldown;
+                }
+
+                if (response.success && response.status == "queued") {
+                    _logger.Info($"Full library sync queued ({library.Count} games).");
+                    GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
+                    GsDataManager.Data.LastSyncGameCount = library.Count;
+                    GsDataManager.Data.LastLibraryHash = libraryHash;
+                    GsDataManager.Data.SyncCooldownExpiresAt = null;
+                    GsDataManager.Save();
+
+                    // Write full snapshot
+                    var snapshotDict = library.ToDictionary(
+                        g => g.playnite_id,
+                        g => BuildGameSnapshot(g));
+                    GsSnapshotManager.UpdateLibrarySnapshot(snapshotDict);
+
+                    return SyncLibraryResult.Success;
+                }
+
+                _logger.Error($"Unexpected response from full library sync: status={response.status}");
+                return SyncLibraryResult.Error;
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Error in SyncLibraryFullAsync");
+                return SyncLibraryResult.Error;
+            }
+        }
+
+        /// <summary>
+        /// Computes library diff against snapshot and sends to v2/library/sync-diff.
+        /// Falls back to full sync if the server requests it.
+        /// </summary>
+        public async Task<SyncLibraryResult> SyncLibraryDiffAsync(
+            IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+            try {
+                var cooldownExpiry = GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt;
+                if (cooldownExpiry.HasValue && DateTime.UtcNow < cooldownExpiry.Value) {
+                    _logger.Info($"Library diff sync skipped: cooldown active until {cooldownExpiry.Value:O}");
+                    return SyncLibraryResult.Cooldown;
+                }
+
+                _logger.Info("Starting diff library sync (v2)");
+                var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
+
+                if (libraryHash == GsDataManager.Data.LastLibraryHash) {
+                    _logger.Info("Library hash unchanged since last sync — skipping diff sync.");
+                    return SyncLibraryResult.Skipped;
+                }
+
+                var snapshot = GsSnapshotManager.GetLibrarySnapshot();
+                var (added, updated, removed) = await Task.Run(() =>
+                    ComputeLibraryDiff(library, snapshot));
+
+                if (added.Count == 0 && updated.Count == 0 && removed.Count == 0) {
+                    _logger.Info("Library diff is empty — skipping.");
+                    GsDataManager.Data.LastLibraryHash = libraryHash;
+                    GsDataManager.Save();
+                    return SyncLibraryResult.Skipped;
+                }
+
+                _logger.Info($"Library diff: {added.Count} added, {updated.Count} updated, {removed.Count} removed");
+
+                var response = await _apiClient.SyncLibraryDiff(new GsApiClient.LibraryDiffSyncReq {
+                    user_id = GsDataManager.Data.InstallID,
+                    added = added,
+                    updated = updated,
+                    removed = removed.ToList(),
+                    base_snapshot_hash = GsDataManager.Data.LastLibraryHash ?? "",
+                    flags = GsDataManager.Data.Flags.ToArray()
+                });
+
+                if (response == null) {
+                    _logger.Error("Failed to queue library diff sync.");
+                    return SyncLibraryResult.Error;
+                }
+
+                // Server requests a full sync instead
+                if (response.status == "force-full-sync") {
+                    _logger.Info($"Server requested full sync (reason: {response.reason}). Falling back.");
+                    GsSnapshotManager.ClearLibrarySnapshot();
+                    GsDataManager.Data.LastLibraryHash = null;
+                    GsDataManager.Save();
+                    return await SyncLibraryFullAsync(playniteDatabaseGames);
+                }
+
+                if (response.status == "skipped" && response.reason != null && response.reason.StartsWith("cooldown_")) {
+                    HandleCooldownResponse(response, isDiffSync: true);
+                    return SyncLibraryResult.Cooldown;
+                }
+
+                if (response.success && response.status == "queued") {
+                    _logger.Info("Library diff sync queued successfully.");
+                    GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
+                    GsDataManager.Data.LastSyncGameCount = library.Count;
+                    GsDataManager.Data.LastLibraryHash = libraryHash;
+                    GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt = null;
+                    GsDataManager.Save();
+
+                    // Update snapshot with diff
+                    var addedSnapshots = added.ToDictionary(g => g.playnite_id, g => BuildGameSnapshot(g));
+                    var updatedSnapshots = updated.ToDictionary(g => g.playnite_id, g => BuildGameSnapshot(g));
+                    GsSnapshotManager.ApplyLibraryDiff(addedSnapshots, updatedSnapshots, removed);
+
+                    return SyncLibraryResult.Success;
+                }
+
+                _logger.Error($"Unexpected response from library diff sync: status={response.status}");
+                return SyncLibraryResult.Error;
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Error in SyncLibraryDiffAsync");
+                return SyncLibraryResult.Error;
+            }
+        }
+
+        /// <summary>
+        /// Sends all per-achievement data to v2/achievements/sync-full and writes the achievement snapshot.
+        /// </summary>
+        public async Task<SyncLibraryResult> SyncAchievementsFullAsync(
+            IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+            try {
+                if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
+                    _logger.Info("Achievement sync skipped: disabled or SuccessStory not installed.");
+                    return SyncLibraryResult.Skipped;
+                }
+
+                _logger.Info("Starting full achievements sync (v2)");
+                var allGames = playniteDatabaseGames.ToList();
+
+                var games = await Task.Run(() => {
+                    return allGames
+                        .Where(g => g.PluginId != Guid.Empty && AllowedPluginIds.Contains(g.PluginId))
+                        .Select(g => {
+                            var achievements = _achievementHelper.GetAchievements(g.Id);
+                            if (achievements == null || achievements.Count == 0)
+                                return null;
+
+                            return new GsApiClient.GameAchievementsDto {
+                                playnite_id = g.Id.ToString(),
+                                game_id = g.GameId,
+                                plugin_id = g.PluginId.ToString(),
+                                achievements = achievements.Select(a => new GsApiClient.AchievementItemDto {
+                                    name = a.Name,
+                                    description = a.Description,
+                                    date_unlocked = a.DateUnlocked,
+                                    is_unlocked = a.IsUnlocked,
+                                    rarity_percent = a.RarityPercent
+                                }).ToList()
+                            };
+                        })
+                        .Where(x => x != null)
+                        .ToList();
+                });
+
+                if (games.Count == 0) {
+                    _logger.Info("No games with achievements found — setting empty baseline.");
+                    GsSnapshotManager.UpdateAchievementsSnapshot(new Dictionary<string, GameAchievementSnapshot>());
+                    return SyncLibraryResult.Skipped;
+                }
+
+                _logger.Info($"Sending full achievements for {games.Count} games.");
+                var response = await _apiClient.SyncAchievementsFull(new GsApiClient.AchievementsFullSyncReq {
+                    user_id = GsDataManager.Data.InstallID,
+                    games = games
+                });
+
+                if (response == null) {
+                    _logger.Error("Failed to queue full achievements sync.");
+                    return SyncLibraryResult.Error;
+                }
+
+                if (response.success && response.status == "queued") {
+                    _logger.Info("Full achievements sync queued successfully.");
+
+                    // Write achievement snapshot
+                    var snapshotDict = games.ToDictionary(
+                        g => g.playnite_id,
+                        g => new GameAchievementSnapshot {
+                            playnite_id = g.playnite_id,
+                            achievements = g.achievements.Select(a => new AchievementSnapshot {
+                                name = a.name,
+                                is_unlocked = a.is_unlocked,
+                                date_unlocked = a.date_unlocked?.ToString("o"),
+                                rarity_percent = a.rarity_percent
+                            }).ToList()
+                        });
+                    GsSnapshotManager.UpdateAchievementsSnapshot(snapshotDict);
+
+                    return SyncLibraryResult.Success;
+                }
+
+                _logger.Error($"Unexpected response from full achievements sync: status={response.status}");
+                return SyncLibraryResult.Error;
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Error in SyncAchievementsFullAsync");
+                return SyncLibraryResult.Error;
+            }
+        }
+
+        /// <summary>
+        /// Computes achievement diff against snapshot and sends to v2/achievements/sync-diff.
+        /// Falls back to full sync if the server requests it.
+        /// </summary>
+        public async Task<SyncLibraryResult> SyncAchievementsDiffAsync(
+            IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+            try {
+                if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
+                    _logger.Info("Achievement diff sync skipped: disabled or SuccessStory not installed.");
+                    return SyncLibraryResult.Skipped;
+                }
+
+                _logger.Info("Starting diff achievements sync (v2)");
+                var allGames = playniteDatabaseGames.ToList();
+                var achievementSnapshot = GsSnapshotManager.GetAchievementsSnapshot();
+
+                var (changed, clearedIds) = await Task.Run(() => {
+                    var result = new List<GsApiClient.GameAchievementsDto>();
+                    var currentGameIds = new HashSet<string>();
+
+                    foreach (var g in allGames) {
+                        if (g.PluginId == Guid.Empty || !AllowedPluginIds.Contains(g.PluginId))
+                            continue;
+
+                        var playniteId = g.Id.ToString();
+                        var achievements = _achievementHelper.GetAchievements(g.Id);
+
+                        // Game previously had achievements but now has none — send empty list to clear server-side
+                        if ((achievements == null || achievements.Count == 0)
+                            && achievementSnapshot.ContainsKey(playniteId)) {
+                            currentGameIds.Add(playniteId);
+                            result.Add(new GsApiClient.GameAchievementsDto {
+                                playnite_id = playniteId,
+                                game_id = g.GameId,
+                                plugin_id = g.PluginId.ToString(),
+                                achievements = new List<GsApiClient.AchievementItemDto>()
+                            });
+                            continue;
+                        }
+
+                        if (achievements == null || achievements.Count == 0)
+                            continue;
+
+                        currentGameIds.Add(playniteId);
+                        bool hasChanged = false;
+
+                        if (!achievementSnapshot.TryGetValue(playniteId, out var prevSnap)) {
+                            hasChanged = true;
+                        }
+                        else {
+                            // Compare: different count, new unlocks, rarity changes
+                            if (prevSnap.achievements == null || achievements.Count != prevSnap.achievements.Count) {
+                                hasChanged = true;
+                            }
+                            else {
+                                // Use a loop instead of ToDictionary to handle duplicate achievement names gracefully.
+                                // Last entry wins, matching the most recent snapshot state.
+                                var prevByName = new Dictionary<string, AchievementSnapshot>();
+                                foreach (var snap in prevSnap.achievements) {
+                                    prevByName[snap.name ?? ""] = snap;
+                                }
+                                foreach (var a in achievements) {
+                                    if (!prevByName.TryGetValue(a.Name ?? "", out var prev)) {
+                                        hasChanged = true;
+                                        break;
+                                    }
+                                    if (a.IsUnlocked != prev.is_unlocked
+                                        || a.RarityPercent != prev.rarity_percent) {
+                                        hasChanged = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (hasChanged) {
+                            result.Add(new GsApiClient.GameAchievementsDto {
+                                playnite_id = playniteId,
+                                game_id = g.GameId,
+                                plugin_id = g.PluginId.ToString(),
+                                achievements = achievements.Select(a => new GsApiClient.AchievementItemDto {
+                                    name = a.Name,
+                                    description = a.Description,
+                                    date_unlocked = a.DateUnlocked,
+                                    is_unlocked = a.IsUnlocked,
+                                    rarity_percent = a.RarityPercent
+                                }).ToList()
+                            });
+                        }
+                    }
+
+                    // IDs in snapshot but not in current library (game uninstalled/removed)
+                    var cleared = achievementSnapshot.Keys
+                        .Where(id => !currentGameIds.Contains(id))
+                        .ToList();
+
+                    return (result, cleared);
+                });
+
+                if (changed.Count == 0 && clearedIds.Count == 0) {
+                    _logger.Info("Achievement diff is empty — skipping.");
+                    return SyncLibraryResult.Skipped;
+                }
+
+                // Include removed-library games as empty-achievement entries so the server deletes them
+                foreach (var clearedId in clearedIds) {
+                    changed.Add(new GsApiClient.GameAchievementsDto {
+                        playnite_id = clearedId,
+                        achievements = new List<GsApiClient.AchievementItemDto>()
+                    });
+                }
+
+                _logger.Info($"Achievement diff: {changed.Count} games total ({clearedIds.Count} cleared).");
+                var response = await _apiClient.SyncAchievementsDiff(new GsApiClient.AchievementsDiffSyncReq {
+                    user_id = GsDataManager.Data.InstallID,
+                    changed = changed,
+                    base_snapshot_hash = ""
+                });
+
+                if (response == null) {
+                    _logger.Error("Failed to queue achievements diff sync.");
+                    return SyncLibraryResult.Error;
+                }
+
+                if (response.status == "force-full-sync") {
+                    _logger.Info($"Server requested full achievement sync (reason: {response.reason}). Falling back.");
+                    GsSnapshotManager.ClearAchievementsSnapshot();
+                    return await SyncAchievementsFullAsync(playniteDatabaseGames);
+                }
+
+                if (response.success && response.status == "queued") {
+                    _logger.Info("Achievement diff sync queued successfully.");
+
+                    // Update snapshot: upsert changed games (with achievements), remove cleared ones
+                    var changedSnapshots = changed
+                        .Where(g => g.achievements != null && g.achievements.Count > 0)
+                        .ToDictionary(
+                            g => g.playnite_id,
+                            g => new GameAchievementSnapshot {
+                                playnite_id = g.playnite_id,
+                                achievements = g.achievements.Select(a => new AchievementSnapshot {
+                                    name = a.name,
+                                    is_unlocked = a.is_unlocked,
+                                    date_unlocked = a.date_unlocked?.ToString("o"),
+                                    rarity_percent = a.rarity_percent
+                                }).ToList()
+                            });
+                    // Combine games sent with empty achievements and games removed from library
+                    var allCleared = changed
+                        .Where(g => g.achievements == null || g.achievements.Count == 0)
+                        .Select(g => g.playnite_id)
+                        .Concat(clearedIds)
+                        .ToList();
+                    GsSnapshotManager.ApplyAchievementsDiff(changedSnapshots, allCleared);
+
+                    return SyncLibraryResult.Success;
+                }
+
+                _logger.Error($"Unexpected response from achievements diff sync: status={response.status}");
+                return SyncLibraryResult.Error;
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "Error in SyncAchievementsDiffAsync");
+                return SyncLibraryResult.Error;
+            }
+        }
+
+        /// <summary>
+        /// Parses cooldown info from an AsyncQueuedResponse and persists it to the appropriate field.
+        /// </summary>
+        private static void HandleCooldownResponse(GsApiClient.AsyncQueuedResponse response, bool isDiffSync = false) {
+            DateTime? expiresAt = null;
+            if (!string.IsNullOrEmpty(response.cooldownExpiresAt)
+                && DateTime.TryParse(response.cooldownExpiresAt, null,
+                    System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)) {
+                expiresAt = parsed.ToUniversalTime();
+            }
+            _logger.Info($"Sync skipped by server cooldown. Expires: {expiresAt?.ToString("O") ?? "unknown"}");
+            if (expiresAt.HasValue) {
+                if (isDiffSync) {
+                    GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt = expiresAt.Value;
+                }
+                else {
+                    GsDataManager.Data.SyncCooldownExpiresAt = expiresAt.Value;
+                }
+                GsDataManager.Save();
+            }
+        }
+
+        #endregion
     }
 }

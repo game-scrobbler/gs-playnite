@@ -14,18 +14,22 @@ Game Spectrum is a Playnite plugin that provides game session tracking and stati
 - 🏆 **Achievement Sync**: Sync per-game achievement counts via the [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) (optional, installed separately).
 - 🔗 **Data Ownership**: Own and persist your data via the help of Game Scrobbler
 - 📊 **Game Session Tracking**: Automatic scrobbling of game start/stop events
+- ⚡ **Diff-Based Sync**: Only sends changed games to the server using snapshot-based diffing
+- 🕐 **Server-Driven Cooldown**: Respects sync cooldown periods returned by the API
 - 🛡️ **Robust Error Handling**: Advanced fault tolerance with circuit breaker pattern and retry logic
 - 🔍 **Comprehensive Logging**: Detailed logging with context for better debugging and monitoring
 
 ## Services
 
 - **GsPlugin** acts as the central orchestrator with comprehensive exception handling, receiving events from Playnite SDK and delegating to appropriate services
-- **GsScrobblingService** communicates with **GsApiClient** for session start/stop operations and library sync; maps `Game` objects to `GameSyncDto` (snake_case) before sending to the API
+- **GsScrobblingService** communicates with **GsApiClient** for session start/stop operations and library sync; maps `Game` objects to `GameSyncDto` (snake_case) before sending to the API; uses **GsSnapshotManager** to diff against previous sync state and only send changes
+- **GsSnapshotManager** manages diff-based sync state via `gs_snapshot.json`; stores library and achievement baselines to enable incremental sync
 - **GsSuccessStoryHelper** retrieves per-game achievement counts from the SuccessStory addon via reflection; returns `null` gracefully when SuccessStory is not installed
-- **GsApiClient** provides fault-tolerant HTTP communication using **GsCircuitBreaker** for resilience and retry logic; library sync uses the `POST /api/playnite/v2/sync` endpoint with `GameSyncDto` payloads
+- **GsApiClient** provides fault-tolerant HTTP communication using **GsCircuitBreaker** for resilience and retry logic; library sync uses the `POST /api/playnite/v2/sync` endpoint with `GameSyncDto` payloads; handles server-driven sync cooldown
 - **GsCircuitBreaker** implements circuit breaker pattern with exponential backoff for API call protection
 - **GsAccountLinkingService** uses **GsApiClient** for token verification and user validation
 - **GsUriHandler** delegates account linking to **GsAccountLinkingService** when processing deep links
+- **GsUpdateChecker** checks for plugin updates on startup
 - All services use **GsDataManager** for persistent state management
 - **GsLogger** and **GsSentry** provide cross-cutting logging, error tracking, and global exception protection
 - Settings UI components use two-way data binding with **GsPluginSettings**
@@ -41,11 +45,13 @@ gs-playnite/
 ├── GsApiClient.cs                    # HTTP API communication layer; defines GameSyncDto
 ├── ApiResult.cs                      # Generic result wrapper for API responses
 ├── GsCircuitBreaker.cs               # Circuit breaker pattern with retry logic
+├── GsSnapshot.cs                     # Diff-based sync state (GsSnapshotManager)
 ├── GsPluginSettings.cs               # Plugin settings data model
 ├── GsScrobblingService.cs            # Game session tracking and library sync
 ├── GsSuccessStoryHelper.cs           # Achievement counts via SuccessStory addon (reflection)
 ├── GsAccountLinkingService.cs        # Account linking functionality
 ├── GsUriHandler.cs                   # Deep link handling
+├── GsUpdateChecker.cs                # Plugin update checking
 │
 ├── GsLogger.cs                       # Custom logging utilities
 ├── GsSentry.cs                       # Error tracking and reporting
@@ -59,6 +65,20 @@ gs-playnite/
 ├── Localization/
 │   └── en_US.xaml                    # English language resources
 │
+├── GsPlugin.Tests/                   # xUnit test project (SDK-style, net462)
+│   ├── GsCircuitBreakerTests.cs      # Circuit breaker state transitions and retry logic
+│   ├── GsDataTests.cs                # Data model defaults and serialization round-trips
+│   ├── GsDataManagerTests.cs         # IsAccountLinked, enqueue/dequeue, persistence
+│   ├── GsTimeTests.cs                # FormatElapsed and FormatRemaining formatting
+│   ├── GsMetadataHashTests.cs        # Per-field change detection in metadata hash
+│   ├── GsSnapshotTests.cs            # Snapshot baselines, diffs, and persistence
+│   ├── GsScrobblingServiceHashTests.cs # Library hash consistency and change detection
+│   ├── ValidateTokenTests.cs         # Token validation rules
+│   ├── LinkingResultTests.cs         # LinkingResult factory methods and IsNetworkError
+│   ├── ApiResultTests.cs             # ApiResult Ok/Fail factory methods
+│   ├── GsPluginSettingsViewModelTests.cs # LastSyncStatus time bucketing
+│   └── GsApiClientValidationTests.cs # DTO construction and interface contract
+│
 │                       # Configuration:
 ├── extension.yaml                    # Plugin metadata
 ├── manifest.yaml                     # Plugin manifest
@@ -70,13 +90,15 @@ gs-playnite/
 
 - **GsPlugin.cs** - Main plugin entry point, orchestrates all services and handles Playnite lifecycle events with comprehensive exception handling
 - **IGsApiClient.cs** - Interface for the API client, enabling dependency injection and testability
-- **GsApiClient.cs** - HTTP API layer for GameScrobbler communication with circuit breaker protection, input validation, and retry logic; defines `GameSyncDto` (snake_case) for library sync payloads sent to `POST /api/playnite/v2/sync`
+- **GsApiClient.cs** - HTTP API layer for GameScrobbler communication with circuit breaker protection, input validation, and retry logic; defines `GameSyncDto` (snake_case, includes scores, release year, dates, and user flags) for library sync payloads sent to `POST /api/playnite/v2/sync`; handles server-driven sync cooldown
 - **ApiResult.cs** - Generic result wrapper for API responses with success/failure status
 - **GsCircuitBreaker.cs** - Implements circuit breaker pattern with exponential backoff retry logic for API resilience
+- **GsSnapshot.cs** - Diff-based sync state management via `GsSnapshotManager` (static, thread-safe); stores library and achievement baselines in `gs_snapshot.json` to enable incremental sync — only changed games are sent to the server
 - **GsAccountLinkingService.cs** - Manages account linking between Playnite and GameScrobbler
-- **GsScrobblingService.cs** - Tracks game sessions (start/stop events); during library sync maps each `Playnite.SDK.Models.Game` to a `GameSyncDto` including completion status and (optionally) achievement counts
+- **GsScrobblingService.cs** - Tracks game sessions (start/stop events); during library sync maps each `Playnite.SDK.Models.Game` to a `GameSyncDto` including completion status and (optionally) achievement counts; skips sync when the library hash is unchanged
 - **GsSuccessStoryHelper.cs** - Retrieves per-game achievement counts (`unlocked` / `total`) from the [SuccessStory addon](https://playnite.link/addons.html#Success_Story_Addon) via reflection; returns `null` for both fields when SuccessStory is not installed or the game has no achievement data
 - **GsUriHandler.cs** - Processes deep links (`playnite://gamescrobbler/...`) for automatic account linking
+- **GsUpdateChecker.cs** - Checks for plugin updates on startup
 
 ## Data Management
 
