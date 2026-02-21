@@ -395,21 +395,6 @@ namespace GsPlugin.Tests {
             Assert.Null(res.reason);
         }
 
-        // LibraryFullSyncReq uses the same shape as the old LibrarySyncReq
-        [Fact]
-        public void LibraryFullSyncReq_CanBeConstructed() {
-            var req = new LibraryFullSyncReq {
-                user_id = "user-123",
-                library = new List<GameSyncDto> {
-                    new GameSyncDto { game_id = "g1", game_name = "Game 1" }
-                },
-                flags = new[] { "no-sentry" }
-            };
-
-            Assert.Equal("user-123", req.user_id);
-            Assert.Single(req.library);
-            Assert.Single(req.flags);
-        }
     }
 
     /// <summary>
