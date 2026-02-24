@@ -1,6 +1,13 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.0.1
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-02-24
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.0.1/GsPlugin-v2.0.1.pext
+    Changelog:
+      - correct $PSScriptRoot paths in installer manifest script after move to scripts/
+      - prevent JSON crash on non-JSON responses, add gzip compression, and filter third-party Sentry errors
   - Version: 1.1.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-02-13
