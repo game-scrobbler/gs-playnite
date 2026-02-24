@@ -56,8 +56,9 @@ namespace GsPlugin.Services {
 
                 _playniteApi.Notifications.Add(new NotificationMessage(
                     NotificationId,
-                    $"Game Spectrum {latestVersion} is available. Open Add-ons to update.",
-                    NotificationType.Info));
+                    $"Game Spectrum {latestVersion} is available. Click to open Add-ons.",
+                    NotificationType.Info,
+                    () => _playniteApi.MainView.OpenPluginSettings(Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae"))));
 
                 GsDataManager.Data.LastNotifiedVersion = latestVersion;
                 GsDataManager.Save();
