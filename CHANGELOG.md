@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.0.0...GsPlugin-v2.0.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* correct $PSScriptRoot paths in installer manifest script after move to scripts/ ([e1ef7ce](https://github.com/game-scrobbler/gs-playnite/commit/e1ef7cec92e09738e924e62af8ba5f8e0071990a))
+* prevent JSON crash on non-JSON responses, add gzip compression, and filter third-party Sentry errors ([344a843](https://github.com/game-scrobbler/gs-playnite/commit/344a8439c1554aa7629ccf43af10c4fd528493ee))
+
 ## [2.0.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v1.1.0...GsPlugin-v2.0.0) (2026-02-21)
 
 
