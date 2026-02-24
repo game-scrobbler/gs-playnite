@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
@@ -19,6 +20,23 @@ namespace GsPlugin {
 
     public class GsPlugin : GenericPlugin {
         private static readonly ILogger _logger = LogManager.GetLogger();
+
+        /// <summary>
+        /// Resolves assembly version mismatches at runtime.
+        /// Playnite hosts plugins in its own AppDomain and does not honour plugin-level
+        /// binding redirects, so we redirect assemblies that ship with the plugin ourselves.
+        /// </summary>
+        static GsPlugin() {
+            var pluginDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            AppDomain.CurrentDomain.AssemblyResolve += (sender, args) => {
+                var name = new AssemblyName(args.Name);
+                var path = Path.Combine(pluginDir, name.Name + ".dll");
+                if (File.Exists(path)) {
+                    return Assembly.LoadFrom(path);
+                }
+                return null;
+            };
+        }
         private GsPluginSettingsViewModel _settings { get; set; }
         private GsApiClient _apiClient;
         private GsAccountLinkingService _linkingService;

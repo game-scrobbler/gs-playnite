@@ -225,6 +225,12 @@ namespace GsPlugin.Models {
         }
 
         /// <summary>
+        /// Gets the current custom data, or null if not yet initialized.
+        /// Use this in code paths that may run during initialization (e.g. Sentry).
+        /// </summary>
+        public static GsData DataOrNull => _data;
+
+        /// <summary>
         /// Returns true if an account is linked (LinkedUserId is set and not the "not_linked" sentinel).
         /// </summary>
         public static bool IsAccountLinked =>

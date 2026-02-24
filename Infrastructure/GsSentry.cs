@@ -239,14 +239,15 @@ namespace GsPlugin.Infrastructure {
         /// <param name="message">The message to capture.</param>
         /// <param name="level">The severity level of the message.</param>
         public static void CaptureMessage(string message, SentryLevel level = SentryLevel.Info) {
-            // Skip if Sentry is disabled
-            if (GsDataManager.Data.Flags.Contains("no-sentry")) {
-                return;
-            }
+            // Skip if Sentry is disabled or data not yet initialized
+            var data = GsDataManager.DataOrNull;
+            if (data == null) return;
+            if (data.Flags.Contains("no-sentry")) return;
+
             SentrySdk.CaptureMessage(message, scope => {
                 scope.Level = level;
-                scope.SetTag("installId", GsDataManager.Data.InstallID);
-                scope.SetTag("LinkedUserId", GsDataManager.Data.LinkedUserId);
+                scope.SetTag("installId", data.InstallID);
+                scope.SetTag("LinkedUserId", data.LinkedUserId);
             });
         }
 
@@ -256,14 +257,22 @@ namespace GsPlugin.Infrastructure {
         /// <param name="exception">The exception to capture.</param>
         /// <param name="message">An optional message describing the context of the exception.</param>
         public static void CaptureException(Exception exception, string message = null) {
-            // Skip if Sentry is disabled
-            if (GsDataManager.Data.Flags.Contains("no-sentry")) {
+            // Skip if Sentry is disabled or data not yet initialized
+            var data = GsDataManager.DataOrNull;
+            if (data == null) {
+                // Data not initialized yet — send without tags to avoid circular dependency
+                SentrySdk.CaptureException(exception, scope => {
+                    if (!string.IsNullOrEmpty(message)) {
+                        scope.SetExtra("contextMessage", message);
+                    }
+                });
                 return;
             }
+            if (data.Flags.Contains("no-sentry")) return;
 
             SentrySdk.CaptureException(exception, scope => {
-                scope.SetTag("installId", GsDataManager.Data.InstallID);
-                scope.SetTag("LinkedUserId", GsDataManager.Data.LinkedUserId);
+                scope.SetTag("installId", data.InstallID);
+                scope.SetTag("LinkedUserId", data.LinkedUserId);
 
                 if (!string.IsNullOrEmpty(message)) {
                     scope.SetExtra("contextMessage", message);
@@ -280,10 +289,10 @@ namespace GsPlugin.Infrastructure {
         /// <param name="data">Optional key-value data to attach.</param>
         /// <param name="level">The severity level of the breadcrumb.</param>
         public static void AddBreadcrumb(string message, string category = null, Dictionary<string, string> data = null, BreadcrumbLevel level = BreadcrumbLevel.Info) {
-            // Skip if Sentry is disabled
-            if (GsDataManager.Data.Flags.Contains("no-sentry")) {
-                return;
-            }
+            // Skip if Sentry is disabled or data not yet initialized
+            var gsData = GsDataManager.DataOrNull;
+            if (gsData == null) return;
+            if (gsData.Flags.Contains("no-sentry")) return;
 
             SentrySdk.AddBreadcrumb(message, category, null, data, level);
         }
