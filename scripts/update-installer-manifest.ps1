@@ -13,9 +13,9 @@ param(
 )
 
 # Import powershell-yaml module
-Import-Module "$PSScriptRoot\powershell-yaml\powershell-yaml.psd1" -Force
+Import-Module "$PSScriptRoot\..\powershell-yaml\powershell-yaml.psd1" -Force
 
-$manifestPath = "$PSScriptRoot\installer_manifest.yaml"
+$manifestPath = "$PSScriptRoot\..\installer_manifest.yaml"
 $releaseDate = Get-Date -Format "yyyy-MM-dd"
 $packageUrl = "https://github.com/game-scrobbler/gs-playnite/releases/download/$TagName/$TagName.pext"
 
