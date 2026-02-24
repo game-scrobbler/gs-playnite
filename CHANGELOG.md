@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.0.1...GsPlugin-v2.1.0) (2026-02-24)
+
+
+### Features
+
+* add Playnite Achievements plugin support alongside SuccessStory ([526b876](https://github.com/game-scrobbler/gs-playnite/commit/526b8761c9e4b92f1507fdccfe1990a6d65ebbc4))
+
 ## [2.0.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.0.0...GsPlugin-v2.0.1) (2026-02-24)
 
 
