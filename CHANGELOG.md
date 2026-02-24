@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.1.0...GsPlugin-v2.1.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* add click action to update notification to open plugin settings ([f9e8998](https://github.com/game-scrobbler/gs-playnite/commit/f9e899851517bbb5199c091e6dbd201fb7125e3d))
+
 ## [2.1.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.0.1...GsPlugin-v2.1.0) (2026-02-24)
 
 
