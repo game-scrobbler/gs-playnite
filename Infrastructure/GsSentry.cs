@@ -64,6 +64,40 @@ namespace GsPlugin.Infrastructure {
                     options.DiagnosticLevel = SentryLevel.Warning;
                     options.AttachStacktrace = true;
 
+                    // Filter out events that don't originate from our plugin.
+                    // Without this, Sentry's global hooks capture unhandled exceptions
+                    // from other Playnite plugins and Playnite core, polluting our dashboard.
+                    options.SetBeforeSend((sentryEvent, hint) => {
+                        // Always allow explicitly captured messages (our own CaptureMessage calls)
+                        if (sentryEvent.Exception == null) {
+                            return sentryEvent;
+                        }
+
+                        // Check if any exception in the chain originates from our assembly
+                        if (IsExceptionFromOurPlugin(sentryEvent.Exception)) {
+                            return sentryEvent;
+                        }
+
+                        // Also check SentryExceptions (populated from the event's exception list)
+                        if (sentryEvent.SentryExceptions != null) {
+                            var ourNamespace = "GsPlugin";
+                            foreach (var se in sentryEvent.SentryExceptions) {
+                                if (se.Module != null && se.Module.StartsWith(ourNamespace)) {
+                                    return sentryEvent;
+                                }
+                                if (se.Stacktrace?.Frames != null) {
+                                    foreach (var frame in se.Stacktrace.Frames) {
+                                        if (frame.Module != null && frame.Module.StartsWith(ourNamespace)) {
+                                            return sentryEvent;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Not from our plugin — drop the event
+                        return null;
+                    });
                 });
 
                 // Set global scope context/tags so any auto-captured events include our identifiers

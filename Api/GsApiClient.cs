@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -41,7 +44,13 @@ namespace GsPlugin.Api {
                 failureThreshold: 3,
                 timeout: TimeSpan.FromMinutes(2),
                 retryDelay: TimeSpan.FromSeconds(10));
-            _circuitBreaker.OnCircuitClosed += () => _ = FlushPendingScrobblesAsync();
+            _circuitBreaker.OnCircuitClosed += () => {
+                _ = FlushPendingScrobblesAsync().ContinueWith(t => {
+                    if (t.IsFaulted && t.Exception != null) {
+                        _logger.Error(t.Exception.GetBaseException(), "Unhandled exception in FlushPendingScrobblesAsync (circuit recovery)");
+                    }
+                }, TaskContinuationOptions.OnlyOnFaulted);
+            };
         }
 
         #region Game Session Management
@@ -516,10 +525,33 @@ namespace GsPlugin.Api {
             }
         }
 
+        /// <summary>
+        /// Minimum JSON payload size (in bytes) before gzip compression is applied.
+        /// Payloads below this threshold are sent uncompressed to avoid overhead.
+        /// </summary>
+        private const int GzipThresholdBytes = 4096;
+
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
             where TResponse : class {
             string jsonData = JsonSerializer.Serialize(payload, _jsonOptions);
-            using (var content = new StringContent(jsonData, Encoding.UTF8, "application/json")) {
+
+            HttpContent content;
+            byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonData);
+            if (jsonBytes.Length >= GzipThresholdBytes) {
+                var compressedStream = new MemoryStream();
+                using (var gzip = new GZipStream(compressedStream, CompressionLevel.Fastest, leaveOpen: true)) {
+                    gzip.Write(jsonBytes, 0, jsonBytes.Length);
+                }
+                compressedStream.Position = 0;
+                content = new StreamContent(compressedStream);
+                content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
+                content.Headers.ContentEncoding.Add("gzip");
+            }
+            else {
+                content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+            }
+
+            using (content) {
                 HttpResponseMessage response = null;
                 string responseBody = null;
 
@@ -531,11 +563,16 @@ namespace GsPlugin.Api {
                         requestData: $"URL: {url}\nPayload: {jsonData}",
                         responseData: $"Status: {response.StatusCode}\nBody: {responseBody}");
 
-                    if (ensureSuccess && !response.IsSuccessStatusCode) {
-                        var httpEx = new HttpRequestException(
-                            $"Request failed with status {(int)response.StatusCode} ({response.StatusCode}) for URL {url}");
+                    if (!response.IsSuccessStatusCode) {
+                        if (ensureSuccess) {
+                            var httpEx = new HttpRequestException(
+                                $"Request failed with status {(int)response.StatusCode} ({response.StatusCode}) for URL {url}");
 
-                        CaptureHttpException(httpEx, url, jsonData, response, responseBody);
+                            CaptureHttpException(httpEx, url, jsonData, response, responseBody);
+                        }
+                        else {
+                            _logger.Warn($"POST {url} returned {(int)response.StatusCode} ({response.StatusCode})");
+                        }
                         return null;
                     }
 
