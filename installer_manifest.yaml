@@ -1,6 +1,12 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.1.1
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-02-24
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.1.1/GsPlugin-v2.1.1.pext
+    Changelog:
+      - add click action to update notification to open plugin settings
   - Version: 2.1.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-02-24
