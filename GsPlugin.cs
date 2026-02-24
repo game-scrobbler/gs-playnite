@@ -24,7 +24,7 @@ namespace GsPlugin {
         private GsAccountLinkingService _linkingService;
         private GsUriHandler _uriHandler;
         private GsScrobblingService _scrobblingService;
-        private GsSuccessStoryHelper _achievementHelper;
+        private GsAchievementAggregator _achievementHelper;
         private GsUpdateChecker _updateChecker;
         private bool _disposed;
         private int _achievementSyncInFlight;
@@ -54,8 +54,10 @@ namespace GsPlugin {
             // Initialize centralized account linking service
             _linkingService = new GsAccountLinkingService(_apiClient, api);
 
-            // Initialize achievement helper (reads from SuccessStory plugin if installed)
-            _achievementHelper = new GsSuccessStoryHelper(api);
+            // Initialize achievement providers (SuccessStory and Playnite Achievements)
+            var successStoryHelper = new GsSuccessStoryHelper(api);
+            var playniteAchievementsHelper = new GsPlayniteAchievementsHelper(api);
+            _achievementHelper = new GsAchievementAggregator(successStoryHelper, playniteAchievementsHelper);
 
             // Create settings with linking service and achievement helper dependencies
             _settings = new GsPluginSettingsViewModel(this, _linkingService, _achievementHelper);

@@ -88,7 +88,7 @@ namespace GsPlugin.Models {
     public class GsPluginSettingsViewModel : ObservableObject, ISettings {
         private readonly PluginClass _plugin;
         private readonly GsAccountLinkingService _linkingService;
-        private readonly GsSuccessStoryHelper _achievementHelper;
+        private readonly GsAchievementAggregator _achievementHelper;
         private GsPluginSettings _editingClone;
         private GsPluginSettings _settings;
 
@@ -102,27 +102,34 @@ namespace GsPlugin.Models {
 
         public List<string> AvailableThemes { get; set; }
 
-        private bool? _isSuccessStoryInstalled;
-        public bool IsSuccessStoryInstalled {
+        private bool? _isAnyAchievementProviderInstalled;
+        public bool IsAnyAchievementProviderInstalled {
             get {
-                if (!_isSuccessStoryInstalled.HasValue)
-                    _isSuccessStoryInstalled = _achievementHelper.IsInstalled;
-                return _isSuccessStoryInstalled.Value;
+                if (!_isAnyAchievementProviderInstalled.HasValue)
+                    _isAnyAchievementProviderInstalled = _achievementHelper.IsInstalled;
+                return _isAnyAchievementProviderInstalled.Value;
             }
         }
 
-        public bool IsSuccessStoryMissing => !IsSuccessStoryInstalled;
+        public bool IsAllAchievementProvidersMissing => !IsAnyAchievementProviderInstalled;
 
-        private string _successStoryStatusText;
-        public string SuccessStoryStatusText {
+        private string _achievementProviderStatusText;
+        public string AchievementProviderStatusText {
             get {
-                if (_successStoryStatusText == null) {
-                    var version = _achievementHelper.GetVersion();
-                    _successStoryStatusText = version != null
-                        ? $"SuccessStory detected (v{version})"
-                        : "SuccessStory detected";
+                if (_achievementProviderStatusText == null) {
+                    var installed = _achievementHelper.GetInstalledProviders();
+                    var parts = new System.Collections.Generic.List<string>();
+                    foreach (var p in installed) {
+                        var version = p.GetVersion();
+                        parts.Add(version != null
+                            ? $"{p.ProviderName} (v{version})"
+                            : p.ProviderName);
+                    }
+                    _achievementProviderStatusText = parts.Count > 0
+                        ? string.Join(", ", parts) + " detected"
+                        : "";
                 }
-                return _successStoryStatusText;
+                return _achievementProviderStatusText;
             }
         }
 
@@ -156,11 +163,11 @@ namespace GsPlugin.Models {
         /// </summary>
         /// <param name="plugin">The plugin instance for settings persistence.</param>
         /// <param name="linkingService">The account linking service.</param>
-        /// <param name="achievementHelper">The SuccessStory achievement helper for detection status.</param>
+        /// <param name="achievementHelper">The aggregated achievement provider for detection status.</param>
         public GsPluginSettingsViewModel(
             PluginClass plugin,
             GsAccountLinkingService linkingService,
-            GsSuccessStoryHelper achievementHelper
+            GsAchievementAggregator achievementHelper
         ) {
             // Store plugin reference for save/load operations
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));

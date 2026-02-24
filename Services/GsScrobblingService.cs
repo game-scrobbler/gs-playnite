@@ -17,7 +17,7 @@ namespace GsPlugin.Services {
     public class GsScrobblingService {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private readonly IGsApiClient _apiClient;
-        private readonly GsSuccessStoryHelper _achievementHelper;
+        private readonly IAchievementProvider _achievementHelper;
 
         /// <summary>
         /// Hardcoded fallback list of official Playnite library plugin IDs.
@@ -74,7 +74,7 @@ namespace GsPlugin.Services {
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
         /// <param name="achievementHelper">Helper for reading achievement data from the SuccessStory plugin.</param>
-        public GsScrobblingService(IGsApiClient apiClient, GsSuccessStoryHelper achievementHelper) {
+        public GsScrobblingService(IGsApiClient apiClient, IAchievementProvider achievementHelper) {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             _achievementHelper = achievementHelper ?? throw new ArgumentNullException(nameof(achievementHelper));
         }
@@ -529,6 +529,10 @@ namespace GsPlugin.Services {
         /// Maps a Playnite Game to the API DTO. Shared by all sync paths.
         /// </summary>
         private GsApiClient.GameSyncDto MapGameToDto(Playnite.SDK.Models.Game g, bool syncAchievements) {
+            var achievementCounts = syncAchievements
+                ? _achievementHelper.GetCounts(g.Id)
+                : null;
+
             return new GsApiClient.GameSyncDto {
                 game_id = g.GameId,
                 plugin_id = g.PluginId.ToString(),
@@ -542,12 +546,8 @@ namespace GsPlugin.Services {
                     ? g.CompletionStatusId.ToString()
                     : null,
                 completion_status_name = g.CompletionStatus?.Name,
-                achievement_count_unlocked = syncAchievements
-                    ? _achievementHelper.GetUnlockedCount(g.Id)
-                    : null,
-                achievement_count_total = syncAchievements
-                    ? _achievementHelper.GetTotalCount(g.Id)
-                    : null,
+                achievement_count_unlocked = achievementCounts?.unlocked,
+                achievement_count_total = achievementCounts?.total,
                 genres = g.Genres != null && g.Genres.Count > 0
                     ? g.Genres.Select(x => x.Name).ToList()
                     : null,
@@ -940,7 +940,7 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
                 if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
-                    _logger.Info("Achievement sync skipped: disabled or SuccessStory not installed.");
+                    _logger.Info("Achievement sync skipped: disabled or no achievement provider installed.");
                     return SyncLibraryResult.Skipped;
                 }
 
@@ -1030,7 +1030,7 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
                 if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
-                    _logger.Info("Achievement diff sync skipped: disabled or SuccessStory not installed.");
+                    _logger.Info("Achievement diff sync skipped: disabled or no achievement provider installed.");
                     return SyncLibraryResult.Skipped;
                 }
 

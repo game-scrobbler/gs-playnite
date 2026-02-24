@@ -12,7 +12,7 @@ namespace GsPlugin.Services {
     /// Retrieves per-game achievement data from the SuccessStory plugin via reflection.
     /// All methods return null if SuccessStory is not installed or an error occurs.
     /// </summary>
-    public class GsSuccessStoryHelper {
+    public class GsSuccessStoryHelper : IAchievementProvider {
         private static readonly Guid SuccessStoryId = new Guid(
             "cebe6d32-8c46-4459-b993-5a5189d60788"
         );
@@ -25,13 +25,9 @@ namespace GsPlugin.Services {
             _api = api;
         }
 
-        public struct AchievementItem {
-            public string Name { get; set; }
-            public string Description { get; set; }
-            public DateTime? DateUnlocked { get; set; }
-            public bool IsUnlocked { get; set; }
-            public float? RarityPercent { get; set; }
-        }
+        public string ProviderName => "SuccessStory";
+
+        public (int unlocked, int total)? GetCounts(Guid gameId) => GetAchievementCounts(gameId);
 
         public int? GetUnlockedCount(Guid gameId) => GetAchievementCounts(gameId)?.unlocked;
 
@@ -155,7 +151,7 @@ namespace GsPlugin.Services {
                 var unlocked = (int?)gaType.GetProperty("Unlocked")?.GetValue(ga) ?? 0;
                 var items = gaType.GetProperty("Items")?.GetValue(ga) as ICollection;
                 var total = items?.Count ?? 0;
-                return (unlocked, total);
+                return total > 0 ? (unlocked, total) : ((int, int)?)null;
             }
             catch (Exception ex) {
                 GsLogger.Warn(

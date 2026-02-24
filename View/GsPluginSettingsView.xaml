@@ -331,26 +331,26 @@
                                   IsChecked="{Binding Settings.SyncAchievements, Mode=TwoWay}"
                                   Margin="0,0,0,6"/>
 
-                        <!-- SuccessStory installed -->
+                        <!-- Achievement provider(s) detected -->
                         <StackPanel Orientation="Horizontal"
                                     Margin="20,0,0,4"
-                                    Visibility="{Binding IsSuccessStoryInstalled,
+                                    Visibility="{Binding IsAnyAchievementProviderInstalled,
                                         Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Text="✓"
                                        Foreground="#4CAF50"
                                        FontSize="12"
                                        Margin="0,0,6,0"
                                        VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SuccessStoryStatusText}"
+                            <TextBlock Text="{Binding AchievementProviderStatusText}"
                                        Foreground="#4CAF50"
                                        FontSize="11"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
 
-                        <!-- SuccessStory missing -->
+                        <!-- No achievement provider installed -->
                         <StackPanel Orientation="Horizontal"
                                     Margin="20,0,0,0"
-                                    Visibility="{Binding IsSuccessStoryMissing,
+                                    Visibility="{Binding IsAllAchievementProvidersMissing,
                                         Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Text="⚠"
                                        Foreground="#FFA500"
@@ -361,12 +361,12 @@
                                        FontSize="11"
                                        VerticalAlignment="Center"
                                        TextWrapping="Wrap">
-                                <Run Text="{DynamicResource LOCGsPluginSuccessStoryMissingWarning}"/>
+                                <Run Text="{DynamicResource LOCGsPluginAchievementProviderMissingWarning}"/>
                                 <Run Text=" "/>
-                                <Hyperlink NavigateUri="https://playnite.link/addons.html#Success_Story_Addon"
+                                <Hyperlink NavigateUri="https://playnite.link/addons.html"
                                            RequestNavigate="Hyperlink_RequestNavigate"
                                            Foreground="{StaticResource AccentBrush}">
-                                    <Run Text="{DynamicResource LOCGsPluginSuccessStoryInstallLink}"/>
+                                    <Run Text="{DynamicResource LOCGsPluginAchievementProviderInstallLink}"/>
                                 </Hyperlink>
                             </TextBlock>
                         </StackPanel>

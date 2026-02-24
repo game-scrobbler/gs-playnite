@@ -4,9 +4,9 @@
 
     <!-- Settings UI strings -->
     <sys:String x:Key="LOCGsPluginScrobblingDisabledWarning">You will not be able to benefit from features that rely on session data</sys:String>
-    <sys:String x:Key="LOCGsPluginSyncAchievementsLabel">Sync achievement data (requires SuccessStory addon)</sys:String>
-    <sys:String x:Key="LOCGsPluginSyncAchievementsTooltip">Reads unlocked/total achievement counts from the SuccessStory addon during library sync. Has no effect if SuccessStory is not installed.</sys:String>
-    <sys:String x:Key="LOCGsPluginSuccessStoryMissingWarning">SuccessStory not found — achievement sync will be skipped.</sys:String>
-    <sys:String x:Key="LOCGsPluginSuccessStoryInstallLink">Install SuccessStory</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsLabel">Sync achievement data (requires SuccessStory or Playnite Achievements addon)</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsTooltip">Reads achievement data from SuccessStory or Playnite Achievements addon during library sync. Has no effect if neither is installed.</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderMissingWarning">No achievement addon found — achievement sync will be skipped.</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderInstallLink">Install an achievement addon</sys:String>
 
 </ResourceDictionary>
