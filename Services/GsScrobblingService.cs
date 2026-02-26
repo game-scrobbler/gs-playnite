@@ -955,17 +955,24 @@ namespace GsPlugin.Services {
                             if (achievements == null || achievements.Count == 0)
                                 return null;
 
-                            return new GsApiClient.GameAchievementsDto {
-                                playnite_id = g.Id.ToString(),
-                                game_id = g.GameId,
-                                plugin_id = g.PluginId.ToString(),
-                                achievements = achievements.Select(a => new GsApiClient.AchievementItemDto {
+                            // Deduplicate by achievement name — last entry wins.
+                            // Achievement providers may return duplicates; matches diff sync behavior.
+                            var dedupedByName = new Dictionary<string, GsApiClient.AchievementItemDto>();
+                            foreach (var a in achievements) {
+                                dedupedByName[a.Name ?? ""] = new GsApiClient.AchievementItemDto {
                                     name = a.Name,
                                     description = a.Description,
                                     date_unlocked = a.DateUnlocked,
                                     is_unlocked = a.IsUnlocked,
                                     rarity_percent = a.RarityPercent
-                                }).ToList()
+                                };
+                            }
+
+                            return new GsApiClient.GameAchievementsDto {
+                                playnite_id = g.Id.ToString(),
+                                game_id = g.GameId,
+                                plugin_id = g.PluginId.ToString(),
+                                achievements = dedupedByName.Values.ToList()
                             };
                         })
                         .Where(x => x != null)
