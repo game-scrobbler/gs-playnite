@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.1.1...GsPlugin-v2.1.2) (2026-02-28)
+
+
+### Bug Fixes
+
+* deduplicate achievements by name in full sync path ([a9ebc48](https://github.com/game-scrobbler/gs-playnite/commit/a9ebc487a0f52d828d84a701c42c5ed5ec6eeff3))
+
 ## [2.1.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.1.0...GsPlugin-v2.1.1) (2026-02-24)
 
 
