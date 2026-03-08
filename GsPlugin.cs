@@ -84,7 +84,8 @@ namespace GsPlugin {
             };
 
             // Initialize scrobbling services
-            _scrobblingService = new GsScrobblingService(_apiClient, _achievementHelper);
+            var integrationAccountReader = new GsIntegrationAccountReader(api);
+            _scrobblingService = new GsScrobblingService(_apiClient, _achievementHelper, integrationAccountReader);
 
             // Initialize and register URI handler for automatic account linking
             _uriHandler = new GsUriHandler(api, _linkingService);
@@ -279,7 +280,7 @@ namespace GsPlugin {
 
             yield return new SidebarItem {
                 Type = (SiderbarItemType)1,
-                Title = "Game Spectrum",
+                Title = "Game Scrobbler",
                 Icon = iconImage,
                 Opened = () => {
                     // Return a new instance of your custom UserControl (WPF)
@@ -292,18 +293,18 @@ namespace GsPlugin {
         /// Gets main menu items provided by this plugin.
         /// Called by Playnite when building the Extensions top-level menu.
         /// </summary>
-        /// <returns>A collection of MainMenuItem objects to be displayed under Extensions → Game Spectrum.</returns>
+        /// <returns>A collection of MainMenuItem objects to be displayed under Extensions → Game Scrobbler.</returns>
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args) {
             yield return new MainMenuItem {
                 Description = "Open Dashboard",
-                MenuSection = "@Game Spectrum",
+                MenuSection = "@Game Scrobbler",
                 Action = _ => {
                     var window = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions {
                         ShowMinimizeButton = true,
                         ShowMaximizeButton = true,
                         ShowCloseButton = true
                     });
-                    window.Title = "Game Spectrum Dashboard";
+                    window.Title = "Game Scrobbler Dashboard";
                     window.Width = 1200;
                     window.Height = 800;
                     window.Content = new MySidebarView(GsSentry.GetPluginVersion());
@@ -315,7 +316,7 @@ namespace GsPlugin {
 
             yield return new MainMenuItem {
                 Description = "Sync Library Now",
-                MenuSection = "@Game Spectrum",
+                MenuSection = "@Game Scrobbler",
                 Action = async menuArgs => {
                     try {
                         var result = await SyncLibraryWithDiffAsync();
@@ -344,19 +345,19 @@ namespace GsPlugin {
                         if (result != GsScrobblingService.SyncLibraryResult.Error) {
                             _ = SyncAchievementsWithDiffAsync();
                         }
-                        PlayniteApi.Dialogs.ShowMessage(message, "Game Spectrum");
+                        PlayniteApi.Dialogs.ShowMessage(message, "Game Scrobbler");
                     }
                     catch (Exception ex) {
                         _logger.Error(ex, "Error in Sync Library Now menu action");
                         GsSentry.CaptureException(ex, "Error in Sync Library Now menu action");
-                        PlayniteApi.Dialogs.ShowMessage("Library sync encountered an error.", "Game Spectrum");
+                        PlayniteApi.Dialogs.ShowMessage("Library sync encountered an error.", "Game Scrobbler");
                     }
                 }
             };
 
             yield return new MainMenuItem {
                 Description = "Open Settings",
-                MenuSection = "@Game Spectrum",
+                MenuSection = "@Game Scrobbler",
                 Action = _ => PlayniteApi.MainView.OpenPluginSettings(Id)
             };
         }

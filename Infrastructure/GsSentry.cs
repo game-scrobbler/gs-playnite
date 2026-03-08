@@ -244,11 +244,14 @@ namespace GsPlugin.Infrastructure {
             if (data == null) return;
             if (data.Flags.Contains("no-sentry")) return;
 
-            SentrySdk.CaptureMessage(message, scope => {
-                scope.Level = level;
-                scope.SetTag("installId", data.InstallID);
-                scope.SetTag("LinkedUserId", data.LinkedUserId);
-            });
+            try {
+                SentrySdk.CaptureMessage(message, scope => {
+                    scope.Level = level;
+                    scope.SetTag("installId", data.InstallID);
+                    scope.SetTag("LinkedUserId", data.LinkedUserId);
+                });
+            }
+            catch (Exception ex) { try { _logger.Debug(ex, "Sentry CaptureMessage failed (non-critical)"); } catch { } }
         }
 
         /// <summary>
@@ -261,23 +264,29 @@ namespace GsPlugin.Infrastructure {
             var data = GsDataManager.DataOrNull;
             if (data == null) {
                 // Data not initialized yet — send without tags to avoid circular dependency
-                SentrySdk.CaptureException(exception, scope => {
-                    if (!string.IsNullOrEmpty(message)) {
-                        scope.SetExtra("contextMessage", message);
-                    }
-                });
+                try {
+                    SentrySdk.CaptureException(exception, scope => {
+                        if (!string.IsNullOrEmpty(message)) {
+                            scope.SetExtra("contextMessage", message);
+                        }
+                    });
+                }
+                catch (Exception ex) { try { _logger.Debug(ex, "Sentry CaptureException failed (non-critical)"); } catch { } }
                 return;
             }
             if (data.Flags.Contains("no-sentry")) return;
 
-            SentrySdk.CaptureException(exception, scope => {
-                scope.SetTag("installId", data.InstallID);
-                scope.SetTag("LinkedUserId", data.LinkedUserId);
+            try {
+                SentrySdk.CaptureException(exception, scope => {
+                    scope.SetTag("installId", data.InstallID);
+                    scope.SetTag("LinkedUserId", data.LinkedUserId);
 
-                if (!string.IsNullOrEmpty(message)) {
-                    scope.SetExtra("contextMessage", message);
-                }
-            });
+                    if (!string.IsNullOrEmpty(message)) {
+                        scope.SetExtra("contextMessage", message);
+                    }
+                });
+            }
+            catch (Exception ex) { try { _logger.Debug(ex, "Sentry CaptureException failed (non-critical)"); } catch { } }
         }
 
         /// <summary>
@@ -294,7 +303,10 @@ namespace GsPlugin.Infrastructure {
             if (gsData == null) return;
             if (gsData.Flags.Contains("no-sentry")) return;
 
-            SentrySdk.AddBreadcrumb(message, category, null, data, level);
+            try {
+                SentrySdk.AddBreadcrumb(message, category, null, data, level);
+            }
+            catch (Exception ex) { try { _logger.Debug(ex, "Sentry AddBreadcrumb failed (non-critical)"); } catch { } }
         }
     }
 }

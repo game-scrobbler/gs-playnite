@@ -24,7 +24,7 @@ namespace GsPlugin.View {
 
                 if (MyWebView2?.CoreWebView2 == null) {
                     GsLogger.Error("WebView2 initialization failed: CoreWebView2 is null after initialization");
-                    ShowErrorMessage("Failed to load Game Spectrum dashboard. WebView2 runtime may not be installed.");
+                    ShowErrorMessage("Failed to load Game Scrobbler dashboard. WebView2 runtime may not be installed.");
                     return;
                 }
 
@@ -69,7 +69,7 @@ namespace GsPlugin.View {
                 bool isSentryDisabled = GsDataManager.Data.Flags.Contains("no-sentry");
                 bool newDashboard = GsDataManager.Data.NewDashboardExperience;
                 bool syncAchievements = GsDataManager.Data.SyncAchievements;
-                string url = $"https://gamescrobbler.com/game-spectrum?user_id={userId}&plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}&new_dashboard={newDashboard.ToString().ToLower()}&sync_achievements={syncAchievements.ToString().ToLower()}";
+                string url = $"https://gamescrobbler.com/dashboard/playnite?user_id={userId}&plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}&new_dashboard={newDashboard.ToString().ToLower()}&sync_achievements={syncAchievements.ToString().ToLower()}";
 
                 // Navigate to the URL
                 MyWebView2.CoreWebView2.Navigate(url);
@@ -77,7 +77,7 @@ namespace GsPlugin.View {
             catch (Exception ex) {
                 GsLogger.Error("Failed to initialize sidebar WebView2", ex);
                 GsSentry.CaptureException(ex, "Failed to initialize sidebar WebView2");
-                ShowErrorMessage("Failed to load Game Spectrum dashboard. Please check that WebView2 runtime is installed.");
+                ShowErrorMessage("Failed to load Game Scrobbler dashboard. Please check that WebView2 runtime is installed.");
             }
         }
 

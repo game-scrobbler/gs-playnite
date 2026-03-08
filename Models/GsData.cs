@@ -59,6 +59,9 @@ namespace GsPlugin.Models {
         public string LastAchievementHash { get; set; } = null;
         // UTC time until which the server has asked us not to send library diffs.
         public DateTime? LibraryDiffSyncCooldownExpiresAt { get; set; } = null;
+        // Hash of last-synced integration accounts (e.g. Steam UserId).
+        // Forces a sync when a user links/switches accounts even if the library is unchanged.
+        public string LastIntegrationAccountsHash { get; set; } = null;
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling) {
             Flags.Clear();

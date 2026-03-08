@@ -56,7 +56,7 @@ namespace GsPlugin.Services {
 
                 _playniteApi.Notifications.Add(new NotificationMessage(
                     NotificationId,
-                    $"Game Spectrum {latestVersion} is available. Click to open Add-ons.",
+                    $"Game Scrobbler {latestVersion} is available. Click to open Add-ons.",
                     NotificationType.Info,
                     () => _playniteApi.MainView.OpenPluginSettings(Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae"))));
 

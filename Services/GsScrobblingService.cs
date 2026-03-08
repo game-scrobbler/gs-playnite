@@ -18,6 +18,7 @@ namespace GsPlugin.Services {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private readonly IGsApiClient _apiClient;
         private readonly IAchievementProvider _achievementHelper;
+        private readonly GsIntegrationAccountReader _integrationAccountReader;
 
         /// <summary>
         /// Hardcoded fallback list of official Playnite library plugin IDs.
@@ -74,9 +75,11 @@ namespace GsPlugin.Services {
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
         /// <param name="achievementHelper">Helper for reading achievement data from the SuccessStory plugin.</param>
-        public GsScrobblingService(IGsApiClient apiClient, IAchievementProvider achievementHelper) {
+        /// <param name="integrationAccountReader">Reader for extracting integration account identities from library plugin configs.</param>
+        public GsScrobblingService(IGsApiClient apiClient, IAchievementProvider achievementHelper, GsIntegrationAccountReader integrationAccountReader) {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             _achievementHelper = achievementHelper ?? throw new ArgumentNullException(nameof(achievementHelper));
+            _integrationAccountReader = integrationAccountReader;
         }
 
         /// <summary>
@@ -477,8 +480,12 @@ namespace GsPlugin.Services {
                     _logger.Info($"Filtered {filteredCount} games from unsupported plugins (sending {filteredGames.Count}/{allGames.Count})");
                 }
 
+                var integrationAccounts = ReadIntegrationAccountsSafe();
+                var accountsHash = ComputeIntegrationAccountsHash(integrationAccounts);
+                var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
+
                 // Client-side hash guard: skip the API call if the library hasn't changed since the last sync.
-                if (libraryHash == GsDataManager.Data.LastLibraryHash) {
+                if (libraryHash == GsDataManager.Data.LastLibraryHash && !accountsChanged) {
                     _logger.Info("Library hash unchanged since last sync — skipping.");
                     return SyncLibraryResult.Skipped;
                 }
@@ -486,7 +493,8 @@ namespace GsPlugin.Services {
                 var syncResponse = await _apiClient.SyncLibraryFull(new GsApiClient.LibraryFullSyncReq {
                     user_id = GsDataManager.Data.InstallID,
                     library = library,
-                    flags = GsDataManager.Data.Flags.ToArray()
+                    flags = GsDataManager.Data.Flags.ToArray(),
+                    integration_accounts = integrationAccounts.Count > 0 ? integrationAccounts : null
                 });
 
                 if (syncResponse == null) {
@@ -506,8 +514,9 @@ namespace GsPlugin.Services {
                     _logger.Info("Library sync request queued successfully.");
                     GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                     GsDataManager.Data.LastSyncGameCount = filteredGames.Count;
-                    // Store hash so the next sync can skip if the library hasn't changed
+                    // Store hashes so the next sync can skip if nothing has changed
                     GsDataManager.Data.LastLibraryHash = libraryHash;
+                    GsDataManager.Data.LastIntegrationAccountsHash = accountsHash;
                     // Sync succeeded — clear any stale cooldown
                     GsDataManager.Data.SyncCooldownExpiresAt = null;
                     GsDataManager.Save();
@@ -775,6 +784,46 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
+        /// Reads integration account identities from library plugin configs.
+        /// Returns an empty list on failure — never blocks sync.
+        /// </summary>
+        private List<IntegrationAccountDto> ReadIntegrationAccountsSafe() {
+            if (_integrationAccountReader == null) {
+                return new List<IntegrationAccountDto>();
+            }
+            try {
+                var accounts = _integrationAccountReader.ReadAll();
+                if (accounts.Count > 0) {
+                    _logger.Info($"Discovered {accounts.Count} integration account(s): {string.Join(", ", accounts.Select(a => a.provider_id))}");
+                }
+                return accounts;
+            }
+            catch (Exception ex) {
+                _logger.Warn($"Failed to read integration accounts: {ex.Message}");
+                return new List<IntegrationAccountDto>();
+            }
+        }
+
+        /// <summary>
+        /// Computes a stable hash of integration account identities so we can detect
+        /// when accounts change even if the library itself hasn't.
+        /// </summary>
+        private static string ComputeIntegrationAccountsHash(List<IntegrationAccountDto> accounts) {
+            if (accounts == null || accounts.Count == 0) {
+                return "";
+            }
+            var sorted = accounts.OrderBy(a => a.provider_id).ThenBy(a => a.account_id);
+            var sb = new StringBuilder();
+            foreach (var a in sorted) {
+                sb.Append(a.provider_id).Append(':').Append(a.account_id).Append(';');
+            }
+            using (var sha = SHA256.Create()) {
+                var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
+                return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
         /// Sends the full library to the v2/library/sync-full endpoint and writes the snapshot.
         /// </summary>
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
@@ -793,9 +842,14 @@ namespace GsPlugin.Services {
                 _logger.Info("Starting full library sync (v2)");
                 var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
 
+                var integrationAccounts = ReadIntegrationAccountsSafe();
+                var accountsHash = ComputeIntegrationAccountsHash(integrationAccounts);
+                var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
+
                 // Only skip on hash match if a snapshot baseline exists.
                 // Without a baseline, we must proceed to write the snapshot even if the hash matches.
-                if (libraryHash == GsDataManager.Data.LastLibraryHash && GsSnapshotManager.HasLibraryBaseline) {
+                // Also force a sync when integration accounts have changed (e.g. user linked a new Steam account).
+                if (libraryHash == GsDataManager.Data.LastLibraryHash && GsSnapshotManager.HasLibraryBaseline && !accountsChanged) {
                     _logger.Info("Library hash unchanged since last sync — skipping full sync.");
                     return SyncLibraryResult.Skipped;
                 }
@@ -803,7 +857,8 @@ namespace GsPlugin.Services {
                 var response = await _apiClient.SyncLibraryFull(new GsApiClient.LibraryFullSyncReq {
                     user_id = GsDataManager.Data.InstallID,
                     library = library,
-                    flags = GsDataManager.Data.Flags.ToArray()
+                    flags = GsDataManager.Data.Flags.ToArray(),
+                    integration_accounts = integrationAccounts.Count > 0 ? integrationAccounts : null
                 });
 
                 if (response == null) {
@@ -821,6 +876,7 @@ namespace GsPlugin.Services {
                     GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                     GsDataManager.Data.LastSyncGameCount = library.Count;
                     GsDataManager.Data.LastLibraryHash = libraryHash;
+                    GsDataManager.Data.LastIntegrationAccountsHash = accountsHash;
                     GsDataManager.Data.SyncCooldownExpiresAt = null;
                     GsDataManager.Save();
 
@@ -858,7 +914,11 @@ namespace GsPlugin.Services {
                 _logger.Info("Starting diff library sync (v2)");
                 var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
 
-                if (libraryHash == GsDataManager.Data.LastLibraryHash) {
+                var integrationAccounts = ReadIntegrationAccountsSafe();
+                var accountsHash = ComputeIntegrationAccountsHash(integrationAccounts);
+                var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
+
+                if (libraryHash == GsDataManager.Data.LastLibraryHash && !accountsChanged) {
                     _logger.Info("Library hash unchanged since last sync — skipping diff sync.");
                     return SyncLibraryResult.Skipped;
                 }
@@ -867,14 +927,17 @@ namespace GsPlugin.Services {
                 var (added, updated, removed) = await Task.Run(() =>
                     ComputeLibraryDiff(library, snapshot));
 
-                if (added.Count == 0 && updated.Count == 0 && removed.Count == 0) {
+                // If only integration accounts changed (no library diff), still send the request
+                // with empty diff so the backend can process the new accounts.
+                if (added.Count == 0 && updated.Count == 0 && removed.Count == 0 && !accountsChanged) {
                     _logger.Info("Library diff is empty — skipping.");
                     GsDataManager.Data.LastLibraryHash = libraryHash;
                     GsDataManager.Save();
                     return SyncLibraryResult.Skipped;
                 }
 
-                _logger.Info($"Library diff: {added.Count} added, {updated.Count} updated, {removed.Count} removed");
+                _logger.Info($"Library diff: {added.Count} added, {updated.Count} updated, {removed.Count} removed" +
+                    (accountsChanged ? " (integration accounts also changed)" : ""));
 
                 var response = await _apiClient.SyncLibraryDiff(new GsApiClient.LibraryDiffSyncReq {
                     user_id = GsDataManager.Data.InstallID,
@@ -882,7 +945,8 @@ namespace GsPlugin.Services {
                     updated = updated,
                     removed = removed.ToList(),
                     base_snapshot_hash = GsDataManager.Data.LastLibraryHash ?? "",
-                    flags = GsDataManager.Data.Flags.ToArray()
+                    flags = GsDataManager.Data.Flags.ToArray(),
+                    integration_accounts = integrationAccounts.Count > 0 ? integrationAccounts : null
                 });
 
                 if (response == null) {
@@ -911,6 +975,7 @@ namespace GsPlugin.Services {
                     GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                     GsDataManager.Data.LastSyncGameCount = library.Count;
                     GsDataManager.Data.LastLibraryHash = libraryHash;
+                    GsDataManager.Data.LastIntegrationAccountsHash = accountsHash;
                     GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt = null;
                     GsDataManager.Save();
 

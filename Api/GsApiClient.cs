@@ -28,9 +28,17 @@ namespace GsPlugin.Api {
             // Enforce TLS 1.2+ to avoid negotiating insecure protocol versions on .NET Framework 4.6.2
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-            _sharedHttpClient = new HttpClient(new SentryHttpMessageHandler()) {
-                Timeout = TimeSpan.FromSeconds(30)
-            };
+            try {
+                _sharedHttpClient = new HttpClient(new SentryHttpMessageHandler()) {
+                    Timeout = TimeSpan.FromSeconds(30)
+                };
+            }
+            catch {
+                // Fallback to plain HttpClient if Sentry SDK is unavailable (e.g. expired account)
+                _sharedHttpClient = new HttpClient() {
+                    Timeout = TimeSpan.FromSeconds(30)
+                };
+            }
         }
 
         private readonly JsonSerializerOptions _jsonOptions;
@@ -279,6 +287,7 @@ namespace GsPlugin.Api {
             public string user_id { get; set; }
             public List<GameSyncDto> library { get; set; }
             public string[] flags { get; set; }
+            public List<Services.IntegrationAccountDto> integration_accounts { get; set; }
         }
 
         public class LibraryDiffSyncReq {
@@ -288,6 +297,7 @@ namespace GsPlugin.Api {
             public List<string> removed { get; set; }
             public string base_snapshot_hash { get; set; }
             public string[] flags { get; set; }
+            public List<Services.IntegrationAccountDto> integration_accounts { get; set; }
         }
 
         // --- v2 Achievement DTOs ---
