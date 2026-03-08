@@ -165,7 +165,7 @@
 
                     <TextBlock Style="{StaticResource MutedTextStyle}"
                                Margin="0,0,0,8"
-                               Text="Controls the visual theme applied to the Game Spectrum sidebar and views."/>
+                               Text="Controls the visual theme applied to the Game Scrobbler sidebar and views."/>
 
                     <ComboBox x:Name="ThemeComboBox"
                               Width="180"
