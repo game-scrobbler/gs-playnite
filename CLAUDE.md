@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Game Spectrum (GS) is a Playnite plugin that integrates with GameScrobbler to provide game session tracking and statistics visualization. It's built as a .NET Framework 4.6.2 C# project using the Playnite SDK.
+Game Scrobbler is a Playnite plugin that tracks game sessions and provides statistics visualization. It's the official Playnite plugin for GameScrobbler. It's built as a .NET Framework 4.6.2 C# project using the Playnite SDK.
 
 ## Build & Development Commands
 
@@ -31,11 +31,14 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │   └── GsCircuitBreaker.cs  — Circuit breaker with exponential backoff
 │
 ├── Services/            — namespace: GsPlugin.Services
-│   ├── GsScrobblingService.cs       — Game session tracking and library sync
+│   ├── GsScrobblingService.cs       — Game session tracking and library/achievement sync
+│   ├── IAchievementProvider.cs      — Achievement provider interface
+│   ├── GsAchievementAggregator.cs   — Multi-provider achievement aggregation
+│   ├── GsSuccessStoryHelper.cs      — SuccessStory addon integration (reflection)
+│   ├── GsPlayniteAchievementsHelper.cs — Playnite Achievements addon integration (reflection)
 │   ├── GsAccountLinkingService.cs   — Account linking operations
 │   ├── GsUriHandler.cs              — Deep link processing
-│   ├── GsUpdateChecker.cs           — Plugin update checking
-│   └── GsSuccessStoryHelper.cs      — Achievement counts via reflection
+│   └── GsUpdateChecker.cs           — Plugin update checking
 │
 ├── Models/              — namespace: GsPlugin.Models
 │   ├── GsData.cs            — Persistent data (GsDataManager, GsTime, PendingScrobble)
@@ -60,7 +63,8 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 ```
 GsPlugin (entry point, IDisposable)
 ├── GsScrobblingService → GsApiClient → GsCircuitBreaker
-│                       → GsSuccessStoryHelper (optional, achievement counts via reflection)
+│                       → GsAchievementAggregator → GsSuccessStoryHelper (reflection)
+│                       │                         → GsPlayniteAchievementsHelper (reflection)
 │                       → GsSnapshotManager (diff-based sync state)
 ├── GsAccountLinkingService → GsApiClient
 ├── GsUriHandler → GsAccountLinkingService
@@ -68,9 +72,16 @@ GsPlugin (entry point, IDisposable)
 └── All services use GsDataManager for persistent state
 ```
 
+### Achievement Provider Architecture
+Achievement data comes from two optional addons via an aggregator pattern:
+- `IAchievementProvider` — common interface (`GetCounts`, `GetAchievements`, `IsInstalled`)
+- `GsSuccessStoryHelper` — reads from SuccessStory addon via reflection (priority 1)
+- `GsPlayniteAchievementsHelper` — reads from Playnite Achievements addon via reflection (priority 2)
+- `GsAchievementAggregator` — iterates providers in order; first with data wins. Skips `(0, 0)` results to allow fallback.
+
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
-- Test classes: `ApiResultTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `ValidateTokenTests`
+- Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `ValidateTokenTests`
 
 ## Build Environment
 
@@ -97,6 +108,7 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks
 - When upgrading a NuGet package version, the plugin's dependencies (e.g., Sentry) may still reference the old assembly version. The `AssemblyResolve` handler in `GsPlugin.cs` handles this by loading whatever DLL version exists in the plugin's output directory.
 - After building, the extension folder in `%APPDATA%\Playnite\Extensions\<plugin-guid>\` must contain the updated DLLs. Stale DLLs from a previous version will cause `FileNotFoundException` at runtime.
 - `GsSentry` methods (`CaptureException`, `CaptureMessage`, `AddBreadcrumb`) use `GsDataManager.DataOrNull` instead of `GsDataManager.Data` to avoid a circular crash when called during `GsDataManager.Initialize()` before `_data` is assigned.
+- All `SentrySdk` calls are wrapped in try/catch so the plugin continues working if the Sentry SDK is unavailable (e.g., expired account). `GsApiClient` similarly falls back to a plain `HttpClient` if `SentryHttpMessageHandler` throws.
 
 ### Playnite SDK Type Gotchas
 - `Game.Playtime` and `Game.PlayCount` are `ulong` — cast explicitly to `long`/`int` when assigning to DTO fields (no implicit conversion).
