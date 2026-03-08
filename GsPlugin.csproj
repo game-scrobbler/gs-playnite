@@ -127,6 +127,7 @@
     <Compile Include="Services\GsSuccessStoryHelper.cs" />
     <Compile Include="Services\GsPlayniteAchievementsHelper.cs" />
     <Compile Include="Services\GsAchievementAggregator.cs" />
+    <Compile Include="Services\GsIntegrationAccountReader.cs" />
     <Compile Include="Services\GsUpdateChecker.cs" />
     <Compile Include="Services\GsUriHandler.cs" />
     <!-- Root -->
