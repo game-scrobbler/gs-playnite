@@ -63,10 +63,11 @@ namespace GsPlugin.Models {
         // Forces a sync when a user links/switches accounts even if the library is unchanged.
         public string LastIntegrationAccountsHash { get; set; } = null;
 
-        public void UpdateFlags(bool disableSentry, bool disableScrobbling) {
+        public void UpdateFlags(bool disableSentry, bool disableScrobbling, bool disablePostHog = false) {
             Flags.Clear();
             if (disableSentry) Flags.Add("no-sentry");
             if (disableScrobbling) Flags.Add("no-scrobble");
+            if (disablePostHog) Flags.Add("no-posthog");
         }
     }
 
@@ -204,6 +205,10 @@ namespace GsPlugin.Models {
         /// </summary>
         private static void SaveInternal() {
             try {
+                var dir = Path.GetDirectoryName(_filePath);
+                if (!Directory.Exists(dir)) {
+                    Directory.CreateDirectory(dir);
+                }
                 var json = JsonSerializer.Serialize(_data, jsonOptions);
                 GsLogger.Info("Saving plugin data to disk");
                 File.WriteAllText(_filePath, json);

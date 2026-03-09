@@ -37,6 +37,15 @@ namespace GsPlugin.Models {
             }
         }
 
+        private bool _disablePostHog = false;
+        public bool DisablePostHog {
+            get => _disablePostHog;
+            set {
+                _disablePostHog = value;
+                OnPropertyChanged();
+            }
+        }
+
         private bool _newDashboardExperience = false;
         public bool NewDashboardExperience {
             get => _newDashboardExperience;
@@ -264,7 +273,7 @@ namespace GsPlugin.Models {
 
             // Update global data manager
             GsDataManager.Data.Theme = Settings.Theme;
-            GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling);
+            GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling, Settings.DisablePostHog);
             GsDataManager.Data.NewDashboardExperience = Settings.NewDashboardExperience;
             GsDataManager.Data.SyncAchievements = Settings.SyncAchievements;
             GsDataManager.Save();

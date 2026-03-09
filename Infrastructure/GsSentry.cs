@@ -178,34 +178,38 @@ namespace GsPlugin.Infrastructure {
             }
 
             try {
-                // Get our plugin's assembly name for comparison
-                var ourAssembly = Assembly.GetExecutingAssembly();
-                var ourAssemblyName = ourAssembly.GetName().Name;
+                // For AggregateException, check each inner exception independently
+                if (exception is System.AggregateException aggEx) {
+                    foreach (var inner in aggEx.Flatten().InnerExceptions) {
+                        if (IsExceptionFromOurPlugin(inner)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
 
-                // Check the exception's source assembly
-                if (!string.IsNullOrEmpty(exception.Source) && exception.Source.Contains(ourAssemblyName)) {
+                var ourAssemblyName = Assembly.GetExecutingAssembly().GetName().Name;
+
+                // Check the exception's Source property (set to the assembly that threw it)
+                if (!string.IsNullOrEmpty(exception.Source) && exception.Source == ourAssemblyName) {
                     return true;
                 }
 
-                // Check stack trace frames for our assembly
+                // Check only the throw-site frame (deepest frame) to avoid matching
+                // our global handler's own call stack which appears in every exception.
                 var stackTrace = new System.Diagnostics.StackTrace(exception, true);
-                for (int i = 0; i < stackTrace.FrameCount; i++) {
-                    var frame = stackTrace.GetFrame(i);
-                    if (frame == null) continue;
-
-                    var method = frame.GetMethod();
-                    if (method == null) continue;
-
-                    var declaringType = method.DeclaringType;
-                    if (declaringType == null) continue;
-
-                    var frameAssembly = declaringType.Assembly;
-                    if (frameAssembly == ourAssembly || frameAssembly.GetName().Name == ourAssemblyName) {
-                        return true;
+                if (stackTrace.FrameCount > 0) {
+                    var throwFrame = stackTrace.GetFrame(0);
+                    if (throwFrame != null) {
+                        var method = throwFrame.GetMethod();
+                        var declaringType = method?.DeclaringType;
+                        if (declaringType != null && declaringType.Assembly.GetName().Name == ourAssemblyName) {
+                            return true;
+                        }
                     }
                 }
 
-                // Check inner exceptions recursively
+                // Check direct inner exception only (not recursive — AggregateException handled above)
                 if (exception.InnerException != null) {
                     return IsExceptionFromOurPlugin(exception.InnerException);
                 }

@@ -66,6 +66,9 @@ namespace GsPlugin {
             // Initialize Sentry for error tracking
             GsSentry.Initialize();
 
+            // Initialize PostHog for product analytics
+            GsPostHog.Initialize();
+
             // Initialize API client
             _apiClient = new GsApiClient();
 
@@ -114,6 +117,9 @@ namespace GsPlugin {
         /// </summary>
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
             try {
+                GsPostHog.Capture("game_session_started", new Dictionary<string, object> {
+                    { "platform_id", args.Game?.PluginId.ToString() ?? "unknown" }
+                });
                 await _scrobblingService.OnGameStartAsync(args);
             }
             catch (Exception ex) {
@@ -130,6 +136,10 @@ namespace GsPlugin {
         /// </summary>
         public override async void OnGameStopped(OnGameStoppedEventArgs args) {
             try {
+                GsPostHog.Capture("game_session_ended", new Dictionary<string, object> {
+                    { "elapsed_seconds", args.ElapsedSeconds },
+                    { "platform_id", args.Game?.PluginId.ToString() ?? "unknown" }
+                });
                 await _scrobblingService.OnGameStoppedAsync(args);
             }
             catch (Exception ex) {
@@ -153,6 +163,11 @@ namespace GsPlugin {
         /// </summary>
         public override async void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             try {
+                GsPostHog.Capture("plugin_started", new Dictionary<string, object> {
+                    { "version", GsSentry.GetPluginVersion() },
+                    { "linked", !string.IsNullOrEmpty(GsDataManager.DataOrNull?.LinkedUserId) }
+                });
+
                 // Refresh allowed plugins before syncing library (best-effort, don't block on failure)
                 try {
                     await _scrobblingService.RefreshAllowedPluginsAsync();
@@ -198,6 +213,7 @@ namespace GsPlugin {
         /// </summary>
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
             try {
+                GsPostHog.Capture("plugin_stopped");
                 await _scrobblingService.OnApplicationStoppedAsync();
             }
             catch (Exception ex) {
@@ -214,6 +230,9 @@ namespace GsPlugin {
         /// </summary>
         public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
             try {
+                GsPostHog.Capture("library_synced", new Dictionary<string, object> {
+                    { "game_count", PlayniteApi.Database.Games?.Count ?? 0 }
+                });
                 var librarySyncResult = await SyncLibraryWithDiffAsync();
                 if (librarySyncResult == GsScrobblingService.SyncLibraryResult.Cooldown) {
                     _logger.Info("Library updated sync skipped: sync cooldown is still active.");
@@ -404,6 +423,13 @@ namespace GsPlugin {
         public override void Dispose() {
             if (!_disposed) {
                 _disposed = true;
+
+                try {
+                    GsPostHog.Shutdown();
+                }
+                catch (Exception ex) {
+                    _logger.Error(ex, "Error closing PostHog");
+                }
 
                 try {
                     SentrySdk.Close();

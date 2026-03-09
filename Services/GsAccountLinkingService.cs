@@ -137,6 +137,10 @@ namespace GsPlugin.Services {
                         }
                     );
 
+                    GsPostHog.Capture("account_linked", new Dictionary<string, object> {
+                        { "context", context.ToString() }
+                    });
+
                     return LinkingResult.CreateSuccess(response.userId, context);
                 }
                 else {
