@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.2.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.1.1...GsPlugin-v2.2.0) (2026-03-10)
+
+
+### Features
+
+* add PostHog analytics alongside Sentry ([82b0090](https://github.com/game-scrobbler/gs-playnite/commit/82b00902e901ce194828f4e2a1c1b39420571d6a))
+* embed YouTube video in README.md ([748fb2d](https://github.com/game-scrobbler/gs-playnite/commit/748fb2dab6a5c3e9e152f9db8d18f7dde5d12149))
+* send integration account identities during library sync ([43bdf5a](https://github.com/game-scrobbler/gs-playnite/commit/43bdf5a5c54742b9b9c472207efa3c42ecd12be8))
+
+
+### Bug Fixes
+
+* deduplicate achievements by name in diff sync path ([043f163](https://github.com/game-scrobbler/gs-playnite/commit/043f163f9f2e8690db8430b0c15d7926ccabd0fe))
+* deduplicate achievements by name in full sync path ([a9ebc48](https://github.com/game-scrobbler/gs-playnite/commit/a9ebc487a0f52d828d84a701c42c5ed5ec6eeff3))
+* improve Sentry exception filtering and handle missing data directory ([45ab138](https://github.com/game-scrobbler/gs-playnite/commit/45ab1384d60130ca99b9d1e50e785473959305db))
+* wrap all SentrySdk calls in try/catch for graceful fallback ([063aa19](https://github.com/game-scrobbler/gs-playnite/commit/063aa19d00eaa4f06ef7b81724cf120ce3776527))
+
 ## [2.1.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.1.0...GsPlugin-v2.1.1) (2026-02-24)
 
 
