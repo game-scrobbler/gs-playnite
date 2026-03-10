@@ -260,6 +260,14 @@ paket-files/
 
 # Visual Studio Code stuff
 .vscode/
+
+# macOS
+.DS_Store
+
+# Plugin packing output
+PackingOutput/
+
+# Tool config
 /qodana.yaml
 /.sentryclirc
 .claude/settings.local.json
