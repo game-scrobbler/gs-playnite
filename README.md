@@ -6,6 +6,12 @@ GameScrobbler is a Playnite plugin for tracking, analyzing, and visualizing your
 
 Instead of a static list of games, your library becomes a living profile of how you actually play.
 
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=aIkQVpO8NoA">
+    <img src="screenshots/demo.gif" alt="GameScrobbler Demo" width="100%">
+  </a>
+</p>
+
 ---
 
 ## Install
