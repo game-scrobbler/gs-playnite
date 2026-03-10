@@ -1,6 +1,18 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.2.0
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-03-10
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.2.0/GsPlugin-v2.2.0.pext
+    Changelog:
+      - add PostHog analytics alongside Sentry
+      - embed YouTube video in README.md
+      - send integration account identities during library sync
+      - deduplicate achievements by name in diff sync path
+      - deduplicate achievements by name in full sync path
+      - improve Sentry exception filtering and handle missing data directory
+      - wrap all SentrySdk calls in try/catch for graceful fallback
   - Version: 2.1.1
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-02-24
