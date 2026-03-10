@@ -66,6 +66,16 @@ jobs:
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
+      - name: Inject Marketing Note into CHANGELOG
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          $marketing = "> Try our new **Chat with your library** and **Timeline** features in your dashboard!`n"
+          $tag = "${{ steps.release.outputs.tag_name }}"
+          $content = Get-Content CHANGELOG.md -Raw
+          # Find the line with the new version header and insert marketing note after it + its trailing blank line
+          $content = $content -replace "(?m)(## \[$tag[^\]]*\][^\n]*\n\n)", "`$1$marketing`n"
+          Set-Content CHANGELOG.md $content -NoNewline
+
       - name: Create Sentry Release
         if: ${{ steps.release.outputs.release_created }}
         env:
@@ -106,6 +116,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add installer_manifest.yaml
-          git diff --cached --quiet || git commit -m "chore: update installer_manifest.yaml for ${{ steps.release.outputs.tag_name }}"
+          git add installer_manifest.yaml CHANGELOG.md
+          git diff --cached --quiet || git commit -m "chore: update installer_manifest.yaml and CHANGELOG for ${{ steps.release.outputs.tag_name }}"
           git push
