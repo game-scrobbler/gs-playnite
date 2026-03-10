@@ -411,6 +411,11 @@
                               ToolTip="Prevents sending crash reports and diagnostic data to improve the plugin"
                               IsChecked="{Binding Settings.DisableSentry, Mode=TwoWay}"/>
 
+                    <CheckBox Style="{StaticResource CheckBoxStyle}"
+                              Content="Disable analytics (PostHog)"
+                              ToolTip="Prevents sending anonymous usage analytics to help improve the plugin"
+                              IsChecked="{Binding Settings.DisablePostHog, Mode=TwoWay}"/>
+
                     <CheckBox x:Name="DisableScrobblingCheckBox"
                               Style="{StaticResource CheckBoxStyle}"
                               Content="Disable game activity tracking (Scrobbling)"
