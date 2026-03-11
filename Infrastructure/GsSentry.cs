@@ -21,8 +21,9 @@ namespace GsPlugin.Infrastructure {
             try {
                 _logger.Info("Initializing Sentry error tracking");
 
-                // Set sampling rates based on user preference
-                bool disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry");
+                // Set sampling rates based on user preference or opt-out
+                bool disableSentryFlag = GsDataManager.Data.Flags.Contains("no-sentry")
+                    || GsDataManager.IsOptedOut;
 
                 SentrySdk.Init(options => {
                     // A Sentry Data Source Name (DSN) is required.
@@ -101,14 +102,17 @@ namespace GsPlugin.Infrastructure {
                 });
 
                 // Set global scope context/tags so any auto-captured events include our identifiers
+                // Skip when opted out — no user identifiers should be sent
                 try {
-                    SentrySdk.ConfigureScope(scope => {
-                        scope.SetTag("plugin", "GsPlugin");
-                        scope.SetTag("installId", GsDataManager.Data.InstallID);
-                        if (!string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId)) {
-                            scope.SetTag("LinkedUserId", GsDataManager.Data.LinkedUserId);
-                        }
-                    });
+                    if (!disableSentryFlag) {
+                        SentrySdk.ConfigureScope(scope => {
+                            scope.SetTag("plugin", "GsPlugin");
+                            scope.SetTag("installId", GsDataManager.Data.InstallID);
+                            if (!string.IsNullOrEmpty(GsDataManager.Data.LinkedUserId)) {
+                                scope.SetTag("LinkedUserId", GsDataManager.Data.LinkedUserId);
+                            }
+                        });
+                    }
                 }
                 catch (Exception ex) {
                     _logger.Debug(ex, "Failed to configure Sentry scope (non-critical)");
@@ -243,10 +247,10 @@ namespace GsPlugin.Infrastructure {
         /// <param name="message">The message to capture.</param>
         /// <param name="level">The severity level of the message.</param>
         public static void CaptureMessage(string message, SentryLevel level = SentryLevel.Info) {
-            // Skip if Sentry is disabled or data not yet initialized
+            // Skip if Sentry is disabled, data not yet initialized, or user opted out
             var data = GsDataManager.DataOrNull;
             if (data == null) return;
-            if (data.Flags.Contains("no-sentry")) return;
+            if (data.Flags.Contains("no-sentry") || data.OptedOut) return;
 
             try {
                 SentrySdk.CaptureMessage(message, scope => {
@@ -278,7 +282,7 @@ namespace GsPlugin.Infrastructure {
                 catch (Exception ex) { try { _logger.Debug(ex, "Sentry CaptureException failed (non-critical)"); } catch { } }
                 return;
             }
-            if (data.Flags.Contains("no-sentry")) return;
+            if (data.Flags.Contains("no-sentry") || data.OptedOut) return;
 
             try {
                 SentrySdk.CaptureException(exception, scope => {
@@ -305,7 +309,7 @@ namespace GsPlugin.Infrastructure {
             // Skip if Sentry is disabled or data not yet initialized
             var gsData = GsDataManager.DataOrNull;
             if (gsData == null) return;
-            if (gsData.Flags.Contains("no-sentry")) return;
+            if (gsData.Flags.Contains("no-sentry") || gsData.OptedOut) return;
 
             try {
                 SentrySdk.AddBreadcrumb(message, category, null, data, level);

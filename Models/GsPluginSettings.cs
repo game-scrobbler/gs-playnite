@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Data;
 using Sentry;
+using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Services;
 using PluginClass = GsPlugin.GsPlugin;
@@ -88,6 +89,23 @@ namespace GsPlugin.Models {
                 OnPropertyChanged();
             }
         }
+
+        private bool _isDeleting = false;
+        public bool IsDeleting {
+            get => _isDeleting;
+            set {
+                _isDeleting = value;
+                OnPropertyChanged();
+            }
+        }
+        private string _deleteStatusMessage = "";
+        public string DeleteStatusMessage {
+            get => _deleteStatusMessage;
+            set {
+                _deleteStatusMessage = value;
+                OnPropertyChanged();
+            }
+        }
     }
 
     /// <summary>
@@ -98,6 +116,7 @@ namespace GsPlugin.Models {
         private readonly PluginClass _plugin;
         private readonly GsAccountLinkingService _linkingService;
         private readonly GsAchievementAggregator _achievementHelper;
+        private readonly IGsApiClient _apiClient;
         private GsPluginSettings _editingClone;
         private GsPluginSettings _settings;
 
@@ -173,16 +192,19 @@ namespace GsPlugin.Models {
         /// <param name="plugin">The plugin instance for settings persistence.</param>
         /// <param name="linkingService">The account linking service.</param>
         /// <param name="achievementHelper">The aggregated achievement provider for detection status.</param>
+        /// <param name="apiClient">The API client for server communication.</param>
         public GsPluginSettingsViewModel(
             PluginClass plugin,
             GsAccountLinkingService linkingService,
-            GsAchievementAggregator achievementHelper
+            GsAchievementAggregator achievementHelper,
+            IGsApiClient apiClient
         ) {
             // Store plugin reference for save/load operations
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
             _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
             _achievementHelper =
                 achievementHelper ?? throw new ArgumentNullException(nameof(achievementHelper));
+            _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             AvailableThemes = new List<string> { "Dark", "Light", "System" };
 
             InitializeSettings();
@@ -352,6 +374,54 @@ namespace GsPlugin.Models {
                     Settings.LinkToken = "";
                 }
             }
+        }
+
+        #endregion
+
+        #region Data Deletion
+
+        /// <summary>
+        /// Requests data deletion from the server and transitions the plugin to opted-out state.
+        /// </summary>
+        public async void DeleteMyData() {
+            try {
+                Settings.IsDeleting = true;
+                Settings.DeleteStatusMessage = "Requesting data deletion...";
+
+                var result = await _apiClient.RequestDeleteMyData(new GsApiClient.DeleteDataReq {
+                    user_id = GsDataManager.Data.InstallID
+                });
+
+                if (result != null && result.success) {
+                    // Capture analytics before opt-out disables telemetry
+                    GsPostHog.Capture("data_deletion_requested");
+                    GsDataManager.PerformOptOut();
+                    GsSnapshotManager.ClearAll();
+                    Settings.DeleteStatusMessage = "Your data has been deleted. The plugin is now disabled.";
+                    // Notify UI to refresh connection status and button visibility
+                    OnLinkingStatusChanged();
+                }
+                else {
+                    Settings.DeleteStatusMessage = "Failed to request data deletion. Please try again later.";
+                }
+            }
+            catch (Exception ex) {
+                Settings.DeleteStatusMessage = "An error occurred. Please try again later.";
+                GsLogger.Error("Error requesting data deletion", ex);
+                GsSentry.CaptureException(ex, "Error requesting data deletion");
+            }
+            finally {
+                Settings.IsDeleting = false;
+            }
+        }
+
+        /// <summary>
+        /// Re-enables the plugin after a previous opt-out / data deletion.
+        /// </summary>
+        public void OptBackIn() {
+            GsDataManager.PerformOptIn();
+            Settings.DeleteStatusMessage = "Plugin re-enabled. Please restart Playnite to resume syncing.";
+            OnLinkingStatusChanged();
         }
 
         #endregion

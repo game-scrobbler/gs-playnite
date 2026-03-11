@@ -81,7 +81,7 @@ namespace GsPlugin {
             _achievementHelper = new GsAchievementAggregator(successStoryHelper, playniteAchievementsHelper);
 
             // Create settings with linking service and achievement helper dependencies
-            _settings = new GsPluginSettingsViewModel(this, _linkingService, _achievementHelper);
+            _settings = new GsPluginSettingsViewModel(this, _linkingService, _achievementHelper, _apiClient);
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
@@ -116,6 +116,7 @@ namespace GsPlugin {
         /// Called before a game is started. This happens when the user clicks Play but before the game actually launches.
         /// </summary>
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
+            if (GsDataManager.IsOptedOut) { base.OnGameStarting(args); return; }
             try {
                 GsPostHog.Capture("game_session_started", new Dictionary<string, object> {
                     { "platform_id", args.Game?.PluginId.ToString() ?? "unknown" }
@@ -135,6 +136,7 @@ namespace GsPlugin {
         /// Called when a game stops running. This happens when the game process exits.
         /// </summary>
         public override async void OnGameStopped(OnGameStoppedEventArgs args) {
+            if (GsDataManager.IsOptedOut) { base.OnGameStopped(args); return; }
             try {
                 GsPostHog.Capture("game_session_ended", new Dictionary<string, object> {
                     { "elapsed_seconds", args.ElapsedSeconds },
@@ -162,6 +164,7 @@ namespace GsPlugin {
         /// Called when the application is started and initialized. This is a good place for one-time initialization tasks.
         /// </summary>
         public override async void OnApplicationStarted(OnApplicationStartedEventArgs args) {
+            if (GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
             try {
                 GsPostHog.Capture("plugin_started", new Dictionary<string, object> {
                     { "version", GsSentry.GetPluginVersion() },
@@ -175,6 +178,9 @@ namespace GsPlugin {
                 catch (Exception ex) {
                     _logger.Warn(ex, "Plugin refresh failed, continuing with cached/hardcoded list");
                 }
+
+                // Re-check opt-out after async refresh (user may have opted out during startup)
+                if (GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
 
                 // Check for plugin updates and notify user if a newer version is available
                 try {
@@ -212,6 +218,7 @@ namespace GsPlugin {
         /// Called when the application is shutting down. This is the place to clean up resources.
         /// </summary>
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
+            if (GsDataManager.IsOptedOut) { base.OnApplicationStopped(args); return; }
             try {
                 GsPostHog.Capture("plugin_stopped");
                 await _scrobblingService.OnApplicationStoppedAsync();
@@ -229,6 +236,7 @@ namespace GsPlugin {
         /// Called when a library update has been finished. This happens after games are imported or metadata is updated.
         /// </summary>
         public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
+            if (GsDataManager.IsOptedOut) { base.OnLibraryUpdated(args); return; }
             try {
                 GsPostHog.Capture("library_synced", new Dictionary<string, object> {
                     { "game_count", PlayniteApi.Database.Games?.Count ?? 0 }
@@ -291,6 +299,7 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>A collection of SidebarItem objects to be displayed in the sidebar.</returns>
         public override IEnumerable<SidebarItem> GetSidebarItems() {
+            if (GsDataManager.IsOptedOut) yield break;
             // Load the icon from the plugin directory
             var iconPath = Path.Combine(Path.GetDirectoryName(GetType().Assembly.Location), "icon.png");
             var iconImage = new Image {
@@ -314,6 +323,14 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>A collection of MainMenuItem objects to be displayed under Extensions → Game Scrobbler.</returns>
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args) {
+            if (GsDataManager.IsOptedOut) {
+                yield return new MainMenuItem {
+                    Description = "Open Settings",
+                    MenuSection = "@Game Scrobbler",
+                    Action = _ => PlayniteApi.MainView.OpenPluginSettings(Id)
+                };
+                yield break;
+            }
             yield return new MainMenuItem {
                 Description = "Open Dashboard",
                 MenuSection = "@Game Scrobbler",

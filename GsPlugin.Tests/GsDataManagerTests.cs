@@ -184,5 +184,96 @@ namespace GsPlugin.Tests {
                 Directory.Delete(tempDir, true);
             }
         }
+        [Fact]
+        public void IsOptedOut_DefaultsFalse() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+
+                Assert.False(GsDataManager.IsOptedOut);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void PerformOptOut_SetsOptedOutAndClearsState() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Data.LinkedUserId = "user-123";
+                GsDataManager.Data.ActiveSessionId = "session-1";
+                GsDataManager.Data.LastLibraryHash = "abc";
+                GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble { Type = "start", QueuedAt = DateTime.UtcNow });
+
+                GsDataManager.PerformOptOut();
+
+                Assert.True(GsDataManager.IsOptedOut);
+                Assert.True(GsDataManager.Data.OptedOut);
+                Assert.Null(GsDataManager.Data.LinkedUserId);
+                Assert.Null(GsDataManager.Data.ActiveSessionId);
+                Assert.Null(GsDataManager.Data.LastLibraryHash);
+                Assert.Null(GsDataManager.Data.LastSyncAt);
+                Assert.Empty(GsDataManager.Data.PendingScrobbles);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void PerformOptOut_PersistsToDisk() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.PerformOptOut();
+
+                // Re-initialize from disk
+                GsDataManager.Initialize(tempDir, null);
+
+                Assert.True(GsDataManager.IsOptedOut);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void PerformOptIn_ClearsOptedOut() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.PerformOptOut();
+                Assert.True(GsDataManager.IsOptedOut);
+
+                GsDataManager.PerformOptIn();
+
+                Assert.False(GsDataManager.IsOptedOut);
+                Assert.False(GsDataManager.Data.OptedOut);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void PerformOptIn_PersistsToDisk() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.PerformOptOut();
+                GsDataManager.PerformOptIn();
+
+                // Re-initialize from disk
+                GsDataManager.Initialize(tempDir, null);
+
+                Assert.False(GsDataManager.IsOptedOut);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
     }
 }

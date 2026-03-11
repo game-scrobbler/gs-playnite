@@ -202,6 +202,16 @@ namespace GsPlugin.Models {
         }
 
         /// <summary>
+        /// Clears both library and achievements snapshots entirely. Called on data deletion opt-out.
+        /// </summary>
+        public static void ClearAll() {
+            lock (_lock) {
+                _snapshot = new GsSnapshot();
+                SaveInternal();
+            }
+        }
+
+        /// <summary>
         /// Clears the library snapshot. Called when the server requests a force-full-sync.
         /// </summary>
         public static void ClearLibrarySnapshot() {

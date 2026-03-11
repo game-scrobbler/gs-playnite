@@ -142,6 +142,8 @@ namespace GsPlugin.Services {
         /// <param name="args">Event arguments containing game information.</param>
         public async Task OnGameStartAsync(OnGameStartingEventArgs args) {
             try {
+                if (GsDataManager.IsOptedOut) return;
+
                 // Skip scrobbling if disabled
                 if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
                     _logger.Info("Scrobbling disabled, skipping game start tracking");
@@ -163,6 +165,10 @@ namespace GsPlugin.Services {
                 }
 
                 _logger.Info($"Starting scrobble session for game: {startedGame.Name} (ID: {startedGame.Id})");
+
+                // Re-check opt-out before sending data (user may have opted out mid-flight)
+                if (GsDataManager.IsOptedOut) return;
+
                 var sessionData = await _apiClient.StartGameSession(new GsApiClient.ScrobbleStartReq {
                     user_id = GsDataManager.Data.InstallID,
                     game_name = startedGame.Name,
@@ -214,6 +220,8 @@ namespace GsPlugin.Services {
         /// <param name="args">Event arguments containing game information.</param>
         public async Task OnGameStoppedAsync(OnGameStoppedEventArgs args) {
             try {
+                if (GsDataManager.IsOptedOut) return;
+
                 if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
                     _logger.Info("Scrobbling disabled, skipping game stop tracking");
                     return;
@@ -264,6 +272,10 @@ namespace GsPlugin.Services {
                 }
 
                 _logger.Info($"Stopping scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
+
+                // Re-check opt-out before sending data (user may have opted out mid-flight)
+                if (GsDataManager.IsOptedOut) return;
+
                 var finishResponse = await _apiClient.FinishGameSession(new GsApiClient.ScrobbleFinishReq {
                     user_id = GsDataManager.Data.InstallID,
                     game_name = stoppedGame.Name,
@@ -309,6 +321,8 @@ namespace GsPlugin.Services {
         /// </summary>
         public async Task OnApplicationStoppedAsync() {
             try {
+                if (GsDataManager.IsOptedOut) return;
+
                 if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
                     _logger.Info("Scrobbling disabled, skipping application stop cleanup");
                     return;
@@ -319,6 +333,10 @@ namespace GsPlugin.Services {
                 }
 
                 _logger.Info("Application stopping with active session, finishing scrobble session");
+
+                // Re-check opt-out before sending data (user may have opted out mid-flight)
+                if (GsDataManager.IsOptedOut) return;
+
                 DateTime localDate = DateTime.Now;
                 var finishResponse = await _apiClient.FinishGameSession(new GsApiClient.ScrobbleFinishReq {
                     user_id = GsDataManager.Data.InstallID,
@@ -451,6 +469,8 @@ namespace GsPlugin.Services {
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
         public async Task<SyncLibraryResult> SyncLibraryAsync(IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+
                 // Client-side cooldown guard: skip the API call if the server told us to wait
                 var cooldownExpiry = GsDataManager.Data.SyncCooldownExpiresAt;
                 if (cooldownExpiry.HasValue && DateTime.UtcNow < cooldownExpiry.Value) {
@@ -489,6 +509,9 @@ namespace GsPlugin.Services {
                     _logger.Info("Library hash unchanged since last sync — skipping.");
                     return SyncLibraryResult.Skipped;
                 }
+
+                // Re-check opt-out before sending data (user may have opted out mid-flight)
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
                 var syncResponse = await _apiClient.SyncLibraryFull(new GsApiClient.LibraryFullSyncReq {
                     user_id = GsDataManager.Data.InstallID,
@@ -831,6 +854,8 @@ namespace GsPlugin.Services {
         public async Task<SyncLibraryResult> SyncLibraryFullAsync(
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+
                 if (!bypassCooldown) {
                     var cooldownExpiry = GsDataManager.Data.SyncCooldownExpiresAt;
                     if (cooldownExpiry.HasValue && DateTime.UtcNow < cooldownExpiry.Value) {
@@ -853,6 +878,9 @@ namespace GsPlugin.Services {
                     _logger.Info("Library hash unchanged since last sync — skipping full sync.");
                     return SyncLibraryResult.Skipped;
                 }
+
+                // Re-check opt-out before sending data (user may have opted out mid-flight)
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
                 var response = await _apiClient.SyncLibraryFull(new GsApiClient.LibraryFullSyncReq {
                     user_id = GsDataManager.Data.InstallID,
@@ -905,6 +933,8 @@ namespace GsPlugin.Services {
         public async Task<SyncLibraryResult> SyncLibraryDiffAsync(
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+
                 var cooldownExpiry = GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt;
                 if (cooldownExpiry.HasValue && DateTime.UtcNow < cooldownExpiry.Value) {
                     _logger.Info($"Library diff sync skipped: cooldown active until {cooldownExpiry.Value:O}");
@@ -938,6 +968,9 @@ namespace GsPlugin.Services {
 
                 _logger.Info($"Library diff: {added.Count} added, {updated.Count} updated, {removed.Count} removed" +
                     (accountsChanged ? " (integration accounts also changed)" : ""));
+
+                // Re-check opt-out before sending data (user may have opted out mid-flight)
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
                 var response = await _apiClient.SyncLibraryDiff(new GsApiClient.LibraryDiffSyncReq {
                     user_id = GsDataManager.Data.InstallID,
@@ -1004,6 +1037,8 @@ namespace GsPlugin.Services {
         public async Task<SyncLibraryResult> SyncAchievementsFullAsync(
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+
                 if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
                     _logger.Info("Achievement sync skipped: disabled or no achievement provider installed.");
                     return SyncLibraryResult.Skipped;
@@ -1051,6 +1086,10 @@ namespace GsPlugin.Services {
                 }
 
                 _logger.Info($"Sending full achievements for {games.Count} games.");
+
+                // Re-check opt-out before sending data (user may have opted out mid-flight)
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+
                 var response = await _apiClient.SyncAchievementsFull(new GsApiClient.AchievementsFullSyncReq {
                     user_id = GsDataManager.Data.InstallID,
                     games = games
@@ -1101,6 +1140,8 @@ namespace GsPlugin.Services {
         public async Task<SyncLibraryResult> SyncAchievementsDiffAsync(
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+
                 if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
                     _logger.Info("Achievement diff sync skipped: disabled or no achievement provider installed.");
                     return SyncLibraryResult.Skipped;
@@ -1214,6 +1255,10 @@ namespace GsPlugin.Services {
                 }
 
                 _logger.Info($"Achievement diff: {changed.Count} games total ({clearedIds.Count} cleared).");
+
+                // Re-check opt-out before sending data (user may have opted out mid-flight)
+                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+
                 var response = await _apiClient.SyncAchievementsDiff(new GsApiClient.AchievementsDiffSyncReq {
                     user_id = GsDataManager.Data.InstallID,
                     changed = changed,
