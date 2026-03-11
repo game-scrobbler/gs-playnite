@@ -387,7 +387,7 @@
                                        VerticalAlignment="Center"/>
                             <TextBlock x:Name="LastSyncStatusTextBlock"
                                        FontSize="11"
-                                       Foreground="{DynamicResource TextBrushDark}"
+                                       Foreground="{DynamicResource TextBrush}"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Border>
@@ -440,6 +440,72 @@
                                    TextWrapping="Wrap"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ─────────────────────────────────────────
+                 SECTION 6 — DANGER ZONE
+            ───────────────────────────────────────── -->
+            <Border Style="{StaticResource CardBorderStyle}"
+                    BorderBrush="#E53E3E">
+                <StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Rectangle Style="{StaticResource AccentBarStyle}"
+                                   Fill="#E53E3E"/>
+                        <TextBlock Text="Danger Zone" Style="{StaticResource SectionTitleStyle}"
+                                   Foreground="#E53E3E"/>
+                    </StackPanel>
+
+                    <TextBlock Foreground="#FFA500"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"
+                               Text="Please only use this option if you want to delete your Playnite data in the GameScrobbler servers. After your delete request you cannot continue using the GameScrobbler addon without opting in again."/>
+
+                    <Button x:Name="DeleteMyDataButton"
+                            Content="Delete My Data"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,0,8"
+                            Padding="14,7"
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            Cursor="Hand"
+                            MinWidth="160"
+                            Background="#E53E3E"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Click="DeleteMyData_Click">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#FC5656"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Background" Value="{DynamicResource NormalBorderBrush}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource TextBrushDarker}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <Button x:Name="OptBackInButton"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Content="Opt Back In"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,0,8"
+                            Visibility="Collapsed"
+                            Click="OptBackIn_Click"
+                            ToolTip="Re-enable the plugin and resume syncing"/>
+
+                    <TextBlock x:Name="DeleteStatusTextBlock"
+                               Foreground="#FFA500"
+                               FontSize="12"
+                               Visibility="Collapsed"
+                               TextWrapping="Wrap"/>
 
                 </StackPanel>
             </Border>
