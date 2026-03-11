@@ -58,7 +58,7 @@ namespace GsPlugin.Services {
                     NotificationId,
                     $"Game Scrobbler {latestVersion} is available. Click to open Add-ons.",
                     NotificationType.Info,
-                    () => _playniteApi.MainView.OpenPluginSettings(Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae"))));
+                    () => OpenAddonsDialog()));
 
                 GsDataManager.Data.LastNotifiedVersion = latestVersion;
                 GsDataManager.Save();
@@ -67,6 +67,47 @@ namespace GsPlugin.Services {
             }
             catch (Exception ex) {
                 _logger.Warn(ex, "Update check failed");
+            }
+        }
+
+        private static void OpenAddonsDialog() {
+            try {
+                var appType = Type.GetType("Playnite.PlayniteApplication, Playnite");
+                if (appType == null) {
+                    return;
+                }
+
+                var currentProp = appType.GetProperty(
+                    "Current",
+                    BindingFlags.Public | BindingFlags.Static);
+                var playniteApp = currentProp?.GetValue(null);
+                if (playniteApp == null) {
+                    return;
+                }
+
+                var mainModelProp = appType.GetProperty(
+                    "MainModelBase",
+                    BindingFlags.Public | BindingFlags.Instance);
+                var mainModel = mainModelProp?.GetValue(playniteApp);
+                if (mainModel == null) {
+                    return;
+                }
+
+                var openAddonsCommandProp = mainModel
+                    .GetType()
+                    .GetProperty("OpenAddonsCommand", BindingFlags.Public | BindingFlags.Instance);
+                var command = openAddonsCommandProp?.GetValue(mainModel);
+                if (command == null) {
+                    return;
+                }
+
+                var executeMethod = command
+                    .GetType()
+                    .GetMethod("Execute", new[] { typeof(object) });
+                executeMethod?.Invoke(command, new object[] { null });
+            }
+            catch (Exception ex) {
+                GsLogger.Warn($"Failed to open Add-ons dialog via reflection: {ex.Message}");
             }
         }
 
