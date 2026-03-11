@@ -42,9 +42,6 @@ TestResult.xml
 [Rr]eleasePS/
 dlldata.c
 
-bin/
-obj/
-
 # DNX
 project.lock.json
 project.fragment.lock.json
@@ -270,4 +267,4 @@ PackingOutput/
 # Tool config
 /qodana.yaml
 /.sentryclirc
-.claude/settings.local.json
+.claude/
