@@ -48,6 +48,11 @@ namespace GsPlugin.Services {
         /// <param name="args">URI arguments containing the token</param>
         private async void HandleUriRequest(PlayniteUriEventArgs args) {
             try {
+                if (GsDataManager.IsOptedOut) {
+                    GsLogger.Info("URI request ignored: plugin is opted out");
+                    return;
+                }
+
                 GsLogger.Info($"Received URI request with {args.Arguments.Length} arguments");
 
                 // Log the arguments for debugging (mask sensitive token values)

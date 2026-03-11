@@ -84,6 +84,11 @@ namespace GsPlugin.Services {
         /// <param name="context">The context in which linking is being performed</param>
         /// <returns>A LinkingResult indicating the outcome</returns>
         public async Task<LinkingResult> LinkAccountAsync(string token, LinkingContext context) {
+            // Block linking when user has opted out
+            if (GsDataManager.IsOptedOut) {
+                return LinkingResult.CreateError("Plugin is disabled. Opt back in to link your account.", context);
+            }
+
             // Validate token
             if (!ValidateToken(token)) {
                 return LinkingResult.CreateError("Please enter a valid token", context);

@@ -184,6 +184,8 @@ namespace GsPlugin.Api {
         /// Failed items are re-queued (up to <see cref="MaxFlushAttempts"/> times) so they survive transient failures.
         /// </summary>
         public async Task FlushPendingScrobblesAsync() {
+            if (GsDataManager.IsOptedOut) return;
+
             var pending = GsDataManager.DequeuePendingScrobbles();
             if (pending == null || pending.Count == 0) {
                 return;
@@ -193,6 +195,9 @@ namespace GsPlugin.Api {
             var failed = new List<PendingScrobble>();
 
             foreach (var item in pending) {
+                // Re-check opt-out before each send (user may have opted out mid-flush)
+                if (GsDataManager.IsOptedOut) break;
+
                 bool success = false;
                 try {
                     if (item.Type == "start" && item.StartData != null) {
@@ -468,6 +473,31 @@ namespace GsPlugin.Api {
 
                 return res;
             }, maxRetries: 1); // Token verification is less critical, only retry once
+        }
+
+        #endregion
+
+        #region Data Deletion
+
+        public class DeleteDataReq {
+            public string user_id { get; set; }
+        }
+
+        public class DeleteDataRes {
+            public bool success { get; set; }
+            public string message { get; set; }
+        }
+
+        public async Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req) {
+            if (req == null || string.IsNullOrEmpty(req.user_id)) {
+                _logger.Error("RequestDeleteMyData called with invalid request");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/delete-data";
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<DeleteDataRes>(url, req, true);
+            }, maxRetries: 2);
         }
 
         #endregion

@@ -15,6 +15,7 @@ namespace GsPlugin.View {
     /// </summary>
     public partial class GsPluginSettingsView : UserControl, INotifyPropertyChanged {
         private GsPluginSettingsViewModel _viewModel;
+        private GsPluginSettings _subscribedSettings;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -50,10 +51,11 @@ namespace GsPlugin.View {
 
             if (_viewModel != null) {
                 _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            }
 
-                if (_viewModel.Settings != null) {
-                    _viewModel.Settings.PropertyChanged -= Settings_PropertyChanged;
-                }
+            if (_subscribedSettings != null) {
+                _subscribedSettings.PropertyChanged -= Settings_PropertyChanged;
+                _subscribedSettings = null;
             }
         }
 
@@ -84,9 +86,18 @@ namespace GsPlugin.View {
                 // Subscribe to view model property changes
                 _viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
+                // Subscribe to the current settings object immediately so we don't
+                // miss property changes (e.g. IsDeleting) that fire before the
+                // ViewModel_PropertyChanged handler re-subscribes on a "Settings" change.
+                if (_viewModel.Settings != null) {
+                    _viewModel.Settings.PropertyChanged += Settings_PropertyChanged;
+                    _subscribedSettings = _viewModel.Settings;
+                }
+
                 // Initialize UI state
                 UpdateConnectionStatus();
                 UpdateLinkingState();
+                UpdateOptOutState();
             }
         }
         #endregion
@@ -98,6 +109,7 @@ namespace GsPlugin.View {
             // Ensure UI updates happen on the UI thread
             Dispatcher.Invoke(() => {
                 UpdateConnectionStatus();
+                UpdateOptOutState();
             });
         }
 
@@ -106,11 +118,17 @@ namespace GsPlugin.View {
         /// </summary>
         private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e) {
             if (e.PropertyName == "Settings") {
+                // Unsubscribe from old settings to prevent duplicate handlers
+                if (_subscribedSettings != null) {
+                    _subscribedSettings.PropertyChanged -= Settings_PropertyChanged;
+                }
+
                 // Subscribe to the new settings object property changes
                 var settings = _viewModel?.Settings;
                 if (settings != null) {
                     settings.PropertyChanged += Settings_PropertyChanged;
                 }
+                _subscribedSettings = settings;
             }
         }
 
@@ -130,6 +148,14 @@ namespace GsPlugin.View {
                 case nameof(GsPluginSettings.LinkStatusMessage):
                     UpdateStatusMessage();
                     break;
+
+                case nameof(GsPluginSettings.IsDeleting):
+                    UpdateDeletingState();
+                    break;
+
+                case nameof(GsPluginSettings.DeleteStatusMessage):
+                    UpdateDeleteStatusMessage();
+                    break;
             }
         }
 
@@ -138,14 +164,21 @@ namespace GsPlugin.View {
         /// Updates the connection status display and related UI elements.
         /// </summary>
         private void UpdateConnectionStatus() {
-            // Update status text and color
-            ConnectionStatusTextBlock.Text = GsPluginSettingsViewModel.ConnectionStatus;
-            ConnectionStatusTextBlock.Foreground = GsPluginSettingsViewModel.IsLinked
-                ? new SolidColorBrush(Colors.Green)
-                : new SolidColorBrush(Colors.Red);
+            bool isOptedOut = GsDataManager.IsOptedOut;
 
-            // Show/hide linking controls based on connection status
-            var linkingVisibility = GsPluginSettingsViewModel.ShowLinkingControls
+            if (isOptedOut) {
+                ConnectionStatusTextBlock.Text = "Opted Out";
+                ConnectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
+            }
+            else {
+                ConnectionStatusTextBlock.Text = GsPluginSettingsViewModel.ConnectionStatus;
+                ConnectionStatusTextBlock.Foreground = GsPluginSettingsViewModel.IsLinked
+                    ? new SolidColorBrush(Colors.Green)
+                    : new SolidColorBrush(Colors.Red);
+            }
+
+            // Hide linking controls when opted out or already linked
+            var linkingVisibility = (!isOptedOut && GsPluginSettingsViewModel.ShowLinkingControls)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             OpenWebsiteToLinkButton.Visibility = linkingVisibility;
@@ -231,6 +264,85 @@ namespace GsPlugin.View {
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+        }
+
+        /// <summary>
+        /// Handles the Delete My Data button click with two-stage confirmation.
+        /// </summary>
+        private void DeleteMyData_Click(object sender, RoutedEventArgs e) {
+            var result = MessageBox.Show(
+                "Are you sure you want to delete all your data from GameScrobbler servers?\n\n" +
+                "This will:\n" +
+                "• Remove your library, sessions, and achievements from our servers\n" +
+                "• Disable all plugin features\n" +
+                "• Require you to opt in again to resume using the plugin\n\n" +
+                "This action cannot be undone.",
+                "Delete My Data",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            var confirmResult = MessageBox.Show(
+                "Are you absolutely sure? Your data will be permanently deleted from the GameScrobbler servers.",
+                "Final Confirmation",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Exclamation);
+
+            if (confirmResult != MessageBoxResult.Yes) return;
+
+            _viewModel?.DeleteMyData();
+        }
+
+        /// <summary>
+        /// Updates the delete button state during deletion.
+        /// </summary>
+        private void UpdateDeletingState() {
+            if (_viewModel?.Settings == null) return;
+
+            bool isDeleting = _viewModel.Settings.IsDeleting;
+            DeleteMyDataButton.IsEnabled = !isDeleting;
+            DeleteMyDataButton.Content = isDeleting ? "Deleting..." : "Delete My Data";
+        }
+
+        /// <summary>
+        /// Toggles Delete / Opt-Back-In button visibility based on opt-out state.
+        /// </summary>
+        private void UpdateOptOutState() {
+            bool isOptedOut = GsDataManager.IsOptedOut;
+            DeleteMyDataButton.Visibility = isOptedOut ? Visibility.Collapsed : Visibility.Visible;
+            OptBackInButton.Visibility = isOptedOut ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Handles the Opt Back In button click.
+        /// </summary>
+        private void OptBackIn_Click(object sender, RoutedEventArgs e) {
+            var result = MessageBox.Show(
+                "Re-enable the GameScrobbler plugin?\n\n" +
+                "You will need to restart Playnite for all features to resume.",
+                "Opt Back In",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            _viewModel?.OptBackIn();
+            UpdateOptOutState();
+            UpdateConnectionStatus();
+        }
+
+        /// <summary>
+        /// Updates the delete status message display.
+        /// </summary>
+        private void UpdateDeleteStatusMessage() {
+            if (_viewModel?.Settings == null) return;
+
+            string message = _viewModel.Settings.DeleteStatusMessage;
+            DeleteStatusTextBlock.Text = message;
+            DeleteStatusTextBlock.Visibility = string.IsNullOrEmpty(message)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
         }
 
         /// <summary>

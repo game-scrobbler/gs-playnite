@@ -62,6 +62,11 @@ namespace GsPlugin.Models {
         // Hash of last-synced integration accounts (e.g. Steam UserId).
         // Forces a sync when a user links/switches accounts even if the library is unchanged.
         public string LastIntegrationAccountsHash { get; set; } = null;
+        /// <summary>
+        /// Global kill switch set when the user requests data deletion.
+        /// Separate from Flags so that UpdateFlags() cannot accidentally clear it.
+        /// </summary>
+        public bool OptedOut { get; set; } = false;
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling, bool disablePostHog = false) {
             Flags.Clear();
@@ -237,6 +242,45 @@ namespace GsPlugin.Models {
         /// Use this in code paths that may run during initialization (e.g. Sentry).
         /// </summary>
         public static GsData DataOrNull => _data;
+
+        /// <summary>
+        /// Returns true if the user has opted out (requested data deletion).
+        /// Safe to call before initialization (returns false).
+        /// </summary>
+        public static bool IsOptedOut => _data?.OptedOut == true;
+
+        /// <summary>
+        /// Transitions the plugin to the opted-out state: sets OptedOut flag,
+        /// clears all session/sync/linking state, and persists to disk. Thread-safe.
+        /// </summary>
+        public static void PerformOptOut() {
+            lock (_lock) {
+                _data.OptedOut = true;
+                _data.ActiveSessionId = null;
+                _data.PendingStartGameId = null;
+                _data.PendingScrobbles.Clear();
+                _data.LinkedUserId = null;
+                _data.LastLibraryHash = null;
+                _data.LastAchievementHash = null;
+                _data.LastSyncAt = null;
+                _data.LastSyncGameCount = null;
+                _data.SyncCooldownExpiresAt = null;
+                _data.LibraryDiffSyncCooldownExpiresAt = null;
+                _data.LastIntegrationAccountsHash = null;
+                SaveInternal();
+            }
+        }
+
+        /// <summary>
+        /// Clears the opted-out state so the plugin resumes normal operation.
+        /// The user will need to re-link their account and sync their library again.
+        /// </summary>
+        public static void PerformOptIn() {
+            lock (_lock) {
+                _data.OptedOut = false;
+                SaveInternal();
+            }
+        }
 
         /// <summary>
         /// Returns true if an account is linked (LinkedUserId is set and not the "not_linked" sentinel).

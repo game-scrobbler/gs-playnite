@@ -441,5 +441,8 @@ namespace GsPlugin.Tests {
             Task.FromResult(new TokenVerificationRes());
 
         public Task FlushPendingScrobblesAsync() => Task.CompletedTask;
+
+        public Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req) =>
+            Task.FromResult(new DeleteDataRes { success = true, message = "mock" });
     }
 }
