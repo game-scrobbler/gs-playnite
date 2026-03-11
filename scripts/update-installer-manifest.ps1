@@ -51,6 +51,10 @@ if ($changelogMatch.Success) {
     }
 }
 
+# Prepend marketing note as the first changelog entry
+$marketingNote = "Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!"
+$changelogEntries = @($marketingNote) + $changelogEntries
+
 # If no changelog entries found, add a generic one
 if ($changelogEntries.Count -eq 0) {
     $changelogEntries = @("Release version $Version")
