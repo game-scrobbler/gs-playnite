@@ -34,6 +34,12 @@ namespace GsPlugin.Models {
         public Dictionary<string, GameAchievementSnapshot> Achievements { get; set; } = new Dictionary<string, GameAchievementSnapshot>();
         public DateTime? LibraryFullSyncAt { get; set; }
         public DateTime? AchievementsFullSyncAt { get; set; }
+        /// <summary>
+        /// Must match GsData.IdentityGeneration. When they differ the snapshot was written for a
+        /// previous identity (e.g. crash between RotateInstallId and GsSnapshotManager.Reset) and
+        /// is discarded automatically on next startup.
+        /// </summary>
+        public int IdentityGeneration { get; set; } = 0;
     }
 
     /// <summary>
@@ -52,12 +58,24 @@ namespace GsPlugin.Models {
 
         /// <summary>
         /// Initializes the snapshot manager.
-        /// Call once during plugin startup, passing the same folder as GsDataManager.
+        /// Call once during plugin startup, after GsDataManager.Initialize(), passing the same folder.
+        /// If the persisted snapshot's IdentityGeneration does not match GsData.IdentityGeneration
+        /// (e.g. a crash occurred between RotateInstallId and GsSnapshotManager.Reset), the stale
+        /// snapshot is discarded and replaced with a clean one so the install runs a fresh full sync.
         /// </summary>
         public static void Initialize(string folderPath) {
             lock (_lock) {
                 _filePath = Path.Combine(folderPath, "gs_snapshot.json");
-                _snapshot = Load();
+                var loaded = Load();
+                var currentGeneration = GsDataManager.DataOrNull?.IdentityGeneration ?? 0;
+                if (loaded.IdentityGeneration != currentGeneration) {
+                    GsLogger.Warn($"[GsSnapshotManager] Snapshot generation {loaded.IdentityGeneration} != data generation {currentGeneration}; discarding stale snapshot");
+                    _snapshot = new GsSnapshot { IdentityGeneration = currentGeneration };
+                    SaveInternal();
+                }
+                else {
+                    _snapshot = loaded;
+                }
             }
         }
 
@@ -86,7 +104,27 @@ namespace GsPlugin.Models {
             }
         }
 
+        /// <summary>
+        /// Resets the snapshot to a clean state, stamps the current identity generation, and persists.
+        /// Call when the install identity is rotated so the recovered install is forced to
+        /// run a seeding full sync rather than inheriting stale diff baselines.
+        /// Thread-safe.
+        /// </summary>
+        public static void Reset() {
+            lock (_lock) {
+                var generation = GsDataManager.DataOrNull?.IdentityGeneration ?? 0;
+                _snapshot = new GsSnapshot { IdentityGeneration = generation };
+                SaveInternal();
+            }
+        }
+
         private static void SaveInternal() {
+            // Stamp the current identity generation before every write so the on-disk snapshot
+            // always reflects the identity it was built for. On next Initialize() a mismatch
+            // between this value and GsData.IdentityGeneration causes automatic discard.
+            if (_snapshot != null) {
+                _snapshot.IdentityGeneration = GsDataManager.DataOrNull?.IdentityGeneration ?? 0;
+            }
             try {
                 var json = JsonSerializer.Serialize(_snapshot, jsonOptions);
                 File.WriteAllText(_filePath, json);

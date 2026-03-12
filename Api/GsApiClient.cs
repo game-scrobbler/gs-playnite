@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Sentry;
@@ -64,6 +65,7 @@ namespace GsPlugin.Api {
         #region Game Session Management
 
         public class ScrobbleStartReq {
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public string user_id { get; set; }
             public string game_name { get; set; }
             public string game_id { get; set; }
@@ -97,8 +99,8 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            if (string.IsNullOrEmpty(startData.user_id)) {
-                _logger.Error("StartGameSession called with null or empty user_id");
+            if (string.IsNullOrEmpty(startData.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                _logger.Error("StartGameSession called with no user_id and no install token");
                 return null;
             }
 
@@ -124,6 +126,7 @@ namespace GsPlugin.Api {
         }
 
         public class ScrobbleFinishReq {
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public string user_id { get; set; }
             public string game_name { get; set; }
             public string game_id { get; set; }
@@ -151,8 +154,8 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            if (string.IsNullOrEmpty(endData.user_id)) {
-                _logger.Error("FinishGameSession called with null or empty user_id");
+            if (string.IsNullOrEmpty(endData.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                _logger.Error("FinishGameSession called with no user_id and no install token");
                 return null;
             }
 
@@ -289,6 +292,7 @@ namespace GsPlugin.Api {
         // --- v2 Library sync DTOs ---
 
         public class LibraryFullSyncReq {
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public string user_id { get; set; }
             public List<GameSyncDto> library { get; set; }
             public string[] flags { get; set; }
@@ -296,6 +300,7 @@ namespace GsPlugin.Api {
         }
 
         public class LibraryDiffSyncReq {
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public string user_id { get; set; }
             public List<GameSyncDto> added { get; set; }
             public List<GameSyncDto> updated { get; set; }
@@ -323,11 +328,13 @@ namespace GsPlugin.Api {
         }
 
         public class AchievementsFullSyncReq {
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public string user_id { get; set; }
             public List<GameAchievementsDto> games { get; set; }
         }
 
         public class AchievementsDiffSyncReq {
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public string user_id { get; set; }
             public List<GameAchievementsDto> changed { get; set; }
             public string base_snapshot_hash { get; set; }
@@ -346,8 +353,8 @@ namespace GsPlugin.Api {
                 _logger.Error("SyncLibraryFull called with null request");
                 return null;
             }
-            if (string.IsNullOrEmpty(req.user_id)) {
-                _logger.Error("SyncLibraryFull called with null or empty user_id");
+            if (string.IsNullOrEmpty(req.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                _logger.Error("SyncLibraryFull called with no user_id and no install token");
                 return null;
             }
 
@@ -362,8 +369,8 @@ namespace GsPlugin.Api {
                 _logger.Error("SyncLibraryDiff called with null request");
                 return null;
             }
-            if (string.IsNullOrEmpty(req.user_id)) {
-                _logger.Error("SyncLibraryDiff called with null or empty user_id");
+            if (string.IsNullOrEmpty(req.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                _logger.Error("SyncLibraryDiff called with no user_id and no install token");
                 return null;
             }
 
@@ -378,8 +385,8 @@ namespace GsPlugin.Api {
                 _logger.Error("SyncAchievementsFull called with null request");
                 return null;
             }
-            if (string.IsNullOrEmpty(req.user_id)) {
-                _logger.Error("SyncAchievementsFull called with null or empty user_id");
+            if (string.IsNullOrEmpty(req.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                _logger.Error("SyncAchievementsFull called with no user_id and no install token");
                 return null;
             }
 
@@ -394,8 +401,8 @@ namespace GsPlugin.Api {
                 _logger.Error("SyncAchievementsDiff called with null request");
                 return null;
             }
-            if (string.IsNullOrEmpty(req.user_id)) {
-                _logger.Error("SyncAchievementsDiff called with null or empty user_id");
+            if (string.IsNullOrEmpty(req.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                _logger.Error("SyncAchievementsDiff called with no user_id and no install token");
                 return null;
             }
 
@@ -403,6 +410,142 @@ namespace GsPlugin.Api {
             return await _circuitBreaker.ExecuteAsync(async () => {
                 return await PostJsonAsync<AsyncQueuedResponse>(url, req, true);
             }, maxRetries: 1);
+        }
+
+        #endregion
+
+        #region Install Token Registration
+
+        public class RegisterInstallTokenReq {
+            public string playnite_user_id { get; set; }
+        }
+
+        public class RegisterInstallTokenRes {
+            public bool success { get; set; }
+            public string token { get; set; }
+            public string message { get; set; }
+            public string error { get; set; }
+            public string error_code { get; set; }
+        }
+
+        /// <summary>
+        /// Registers the install with the server and retrieves a per-install auth token.
+        /// Call once on first boot (or when InstallToken is missing from persistent storage).
+        /// Returns the response body so the caller can inspect error_code.
+        /// HTTP 409 (error_code PLAYNITE_TOKEN_ALREADY_REGISTERED) means the server already has
+        /// a token for this install ID — the local copy was lost; call ResetInstallToken to recover.
+        /// </summary>
+        public async Task<RegisterInstallTokenRes> RegisterInstallToken(string installId) {
+            if (string.IsNullOrEmpty(installId)) {
+                _logger.Error("RegisterInstallToken called with null or empty installId");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/register";
+            var req = new RegisterInstallTokenReq { playnite_user_id = installId };
+
+            try {
+                string jsonData = JsonSerializer.Serialize(req, _jsonOptions);
+                using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
+                    request.Content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+                    HttpResponseMessage response = await _sharedHttpClient.SendAsync(request).ConfigureAwait(false);
+                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                    try {
+                        return JsonSerializer.Deserialize<RegisterInstallTokenRes>(responseBody, _jsonOptions)
+                            ?? new RegisterInstallTokenRes { success = false };
+                    }
+                    catch {
+                        return new RegisterInstallTokenRes { success = false };
+                    }
+                }
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "RegisterInstallToken HTTP error");
+                GsSentry.CaptureException(ex, "RegisterInstallToken HTTP error");
+                return null;
+            }
+        }
+
+        public class DashboardTokenRes {
+            public bool success { get; set; }
+            public string token { get; set; }
+            public int? expires_in { get; set; }
+        }
+
+        /// <summary>
+        /// Requests a short-lived (10-minute) dashboard read token from the server.
+        /// The plugin embeds this token in the WebView2 URL as ?access_token=...
+        /// instead of the raw install UUID, keeping the UUID out of browser history.
+        /// Requires a valid InstallToken (x-playnite-token header).
+        /// Returns the raw token string on success, or null on failure.
+        /// </summary>
+        public async Task<string> GetDashboardToken() {
+            var installToken = GsDataManager.DataOrNull?.InstallToken;
+            if (string.IsNullOrEmpty(installToken)) {
+                _logger.Warn("GetDashboardToken: no install token available, cannot request dashboard token");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/dashboard-token";
+
+            try {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url)) {
+                    request.Headers.Add("x-playnite-token", installToken);
+                    HttpResponseMessage response = await _sharedHttpClient.SendAsync(request).ConfigureAwait(false);
+                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                    if (!response.IsSuccessStatusCode) {
+                        _logger.Warn($"GetDashboardToken returned {(int)response.StatusCode}");
+                        return null;
+                    }
+
+                    var res = JsonSerializer.Deserialize<DashboardTokenRes>(responseBody, _jsonOptions);
+                    return res?.token;
+                }
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "GetDashboardToken HTTP error");
+                GsSentry.CaptureException(ex, "GetDashboardToken HTTP error");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Rotates the install token by calling /v2/reset-token with the current token.
+        /// Use when the server returns PLAYNITE_TOKEN_ALREADY_REGISTERED on registration
+        /// (meaning the plugin lost its locally-stored token and needs to rotate to recover).
+        /// Returns the new raw token on success, or null on failure.
+        /// </summary>
+        public async Task<string> ResetInstallToken(string currentToken) {
+            if (string.IsNullOrEmpty(currentToken)) {
+                _logger.Error("ResetInstallToken called with null or empty currentToken");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/reset-token";
+
+            try {
+                using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
+                    request.Headers.Add("x-playnite-token", currentToken);
+                    request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+                    HttpResponseMessage response = await _sharedHttpClient.SendAsync(request).ConfigureAwait(false);
+                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                    if (!response.IsSuccessStatusCode) {
+                        _logger.Warn($"ResetInstallToken returned {(int)response.StatusCode}");
+                        return null;
+                    }
+
+                    var res = JsonSerializer.Deserialize<RegisterInstallTokenRes>(responseBody, _jsonOptions);
+                    return res?.token;
+                }
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "ResetInstallToken HTTP error");
+                GsSentry.CaptureException(ex, "ResetInstallToken HTTP error");
+                return null;
+            }
         }
 
         #endregion
@@ -480,24 +623,54 @@ namespace GsPlugin.Api {
         #region Data Deletion
 
         public class DeleteDataReq {
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public string user_id { get; set; }
         }
 
         public class DeleteDataRes {
             public bool success { get; set; }
             public string message { get; set; }
+            // Set to true when the server returns 429 Too Many Requests
+            public bool rateLimited { get; set; }
         }
 
         public async Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req) {
-            if (req == null || string.IsNullOrEmpty(req.user_id)) {
-                _logger.Error("RequestDeleteMyData called with invalid request");
+            var installToken = GsDataManager.DataOrNull?.InstallToken;
+            if (req == null || string.IsNullOrEmpty(installToken)) {
+                _logger.Error("RequestDeleteMyData called with no install token");
                 return null;
             }
 
             string url = $"{_apiBaseUrl}/api/playnite/v2/delete-data";
-            return await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<DeleteDataRes>(url, req, true);
-            }, maxRetries: 2);
+            string jsonData = JsonSerializer.Serialize(req, _jsonOptions);
+            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+
+            try {
+                HttpResponseMessage response;
+                using (var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content }) {
+                    request.Headers.Add("x-playnite-token", installToken);
+                    response = await _sharedHttpClient.SendAsync(request).ConfigureAwait(false);
+                }
+                string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                if ((int)response.StatusCode == 429) {
+                    _logger.Warn("RequestDeleteMyData rate limited by server");
+                    return new DeleteDataRes { success = false, rateLimited = true };
+                }
+
+                if (!response.IsSuccessStatusCode) {
+                    _logger.Warn($"RequestDeleteMyData returned {(int)response.StatusCode}");
+                    return new DeleteDataRes { success = false };
+                }
+
+                return JsonSerializer.Deserialize<DeleteDataRes>(responseBody, _jsonOptions)
+                    ?? new DeleteDataRes { success = false };
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "RequestDeleteMyData HTTP error");
+                GsSentry.CaptureException(ex, "RequestDeleteMyData HTTP error");
+                return null;
+            }
         }
 
         #endregion
@@ -596,7 +769,20 @@ namespace GsPlugin.Api {
                 string responseBody = null;
 
                 try {
-                    response = await _sharedHttpClient.PostAsync(url, content).ConfigureAwait(false);
+                    // Attach the per-install auth token when available. The server resolves the
+                    // install identity from the token, so the route handler does not need to trust
+                    // the user_id field in the request body.
+                    var installToken = GsDataManager.DataOrNull?.InstallToken;
+
+                    HttpRequestMessage requestMessage = null;
+                    if (!string.IsNullOrEmpty(installToken)) {
+                        requestMessage = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+                        requestMessage.Headers.Add("x-playnite-token", installToken);
+                        response = await _sharedHttpClient.SendAsync(requestMessage).ConfigureAwait(false);
+                    }
+                    else {
+                        response = await _sharedHttpClient.PostAsync(url, content).ConfigureAwait(false);
+                    }
                     responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                     GsLogger.ShowHTTPDebugBox(

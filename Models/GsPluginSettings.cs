@@ -388,9 +388,7 @@ namespace GsPlugin.Models {
                 Settings.IsDeleting = true;
                 Settings.DeleteStatusMessage = "Requesting data deletion...";
 
-                var result = await _apiClient.RequestDeleteMyData(new GsApiClient.DeleteDataReq {
-                    user_id = GsDataManager.Data.InstallID
-                });
+                var result = await _apiClient.RequestDeleteMyData(new GsApiClient.DeleteDataReq());
 
                 if (result != null && result.success) {
                     // Capture analytics before opt-out disables telemetry
@@ -400,6 +398,9 @@ namespace GsPlugin.Models {
                     Settings.DeleteStatusMessage = "Your data has been deleted. The plugin is now disabled.";
                     // Notify UI to refresh connection status and button visibility
                     OnLinkingStatusChanged();
+                }
+                else if (result != null && result.rateLimited) {
+                    Settings.DeleteStatusMessage = "Too many deletion requests. Please wait 15 minutes and try again.";
                 }
                 else {
                     Settings.DeleteStatusMessage = "Failed to request data deletion. Please try again later.";

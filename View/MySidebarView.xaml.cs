@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 
@@ -9,12 +10,15 @@ namespace GsPlugin.View {
     public partial class MySidebarView : UserControl {
 
         private string viewPluginVer { get; set; }
-        public MySidebarView(string pluginVersion) {
+        private readonly IGsApiClient _apiClient;
+
+        public MySidebarView(string pluginVersion, IGsApiClient apiClient) {
             InitializeComponent();
+            viewPluginVer = pluginVersion;
+            _apiClient = apiClient;
 
             // One approach is to wait until the control is actually loaded in the visual tree.
             this.Loaded += MySidebarView_Loaded;
-            viewPluginVer = pluginVersion;
         }
 
         private async void MySidebarView_Loaded(object sender, RoutedEventArgs e) {
@@ -61,15 +65,42 @@ namespace GsPlugin.View {
                     }
                 };
 
-                // Now you can navigate to a URL directly.
-                // Properly encode all URL parameters to prevent injection attacks
-                string userId = Uri.EscapeDataString(GsDataManager.Data.InstallID);
+                // Build common query parameters
                 string theme = Uri.EscapeDataString((GsDataManager.Data.Theme ?? "Dark").ToLower());
                 bool isScrobblingDisabled = GsDataManager.Data.Flags.Contains("no-scrobble");
                 bool isSentryDisabled = GsDataManager.Data.Flags.Contains("no-sentry");
                 bool newDashboard = GsDataManager.Data.NewDashboardExperience;
                 bool syncAchievements = GsDataManager.Data.SyncAchievements;
-                string url = $"https://gamescrobbler.com/dashboard/playnite?user_id={userId}&plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}&new_dashboard={newDashboard.ToString().ToLower()}&sync_achievements={syncAchievements.ToString().ToLower()}";
+                string commonParams = $"plugin_version={Uri.EscapeDataString(viewPluginVer)}&theme={theme}&scrobbling_disabled={isScrobblingDisabled.ToString().ToLower()}&sentry_disabled={isSentryDisabled.ToString().ToLower()}&new_dashboard={newDashboard.ToString().ToLower()}&sync_achievements={syncAchievements.ToString().ToLower()}";
+
+                string url;
+                bool hasInstallToken = !string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken);
+
+                if (hasInstallToken) {
+                    // Install is registered — request a short-lived dashboard token to keep
+                    // the install UUID out of the browser URL and history.
+                    var dashboardToken = _apiClient != null
+                        ? await _apiClient.GetDashboardToken()
+                        : null;
+
+                    if (!string.IsNullOrEmpty(dashboardToken)) {
+                        url = $"https://gamescrobbler.com/dashboard/playnite?access_token={Uri.EscapeDataString(dashboardToken)}&{commonParams}";
+                        GsLogger.Info("Dashboard URL built with access_token (install UUID not in URL)");
+                    }
+                    else {
+                        // Dashboard-token request failed (network/server error) — fail closed
+                        // rather than falling back to the user_id URL and leaking the install UUID.
+                        GsLogger.Error("GetDashboardToken failed for a registered install; aborting dashboard navigation");
+                        ShowErrorMessage("Failed to load Game Scrobbler dashboard. Please try again later.");
+                        return;
+                    }
+                }
+                else {
+                    // No install token yet — use install ID (pre-registration behaviour).
+                    string userId = Uri.EscapeDataString(GsDataManager.Data.InstallID);
+                    url = $"https://gamescrobbler.com/dashboard/playnite?user_id={userId}&{commonParams}";
+                    GsLogger.Warn("Dashboard URL built with user_id fallback (install not yet registered)");
+                }
 
                 // Navigate to the URL
                 MyWebView2.CoreWebView2.Navigate(url);

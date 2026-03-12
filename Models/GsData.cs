@@ -68,6 +68,22 @@ namespace GsPlugin.Models {
         /// </summary>
         public bool OptedOut { get; set; } = false;
 
+        /// <summary>
+        /// Monotonically increasing counter incremented each time the install identity is rotated.
+        /// Written into gs_snapshot.json at save time; on load, GsSnapshotManager discards any
+        /// snapshot whose generation does not match this value, making stale snapshots
+        /// self-healing after a crash between the two-file rotation write sequence.
+        /// </summary>
+        public int IdentityGeneration { get; set; } = 0;
+
+        /// <summary>
+        /// Per-install authentication token issued by the server at registration.
+        /// Stored as the raw 64-char hex token (never the hash).
+        /// Sent in every write request as the x-playnite-token header.
+        /// Null until /v2/register has been called successfully.
+        /// </summary>
+        public string InstallToken { get; set; } = null;
+
         public void UpdateFlags(bool disableSentry, bool disableScrobbling, bool disablePostHog = false) {
             Flags.Clear();
             if (disableSentry) Flags.Add("no-sentry");
@@ -154,8 +170,11 @@ namespace GsPlugin.Models {
 
                 try {
                     if (string.IsNullOrEmpty(_data.InstallID)) {
-                        // Generate new InstallID if not present
+                        // Generate new InstallID if not present (fresh install or corrupt/missing data file).
+                        // Bumping IdentityGeneration ensures any surviving gs_snapshot.json is treated
+                        // as stale and discarded by GsSnapshotManager.Initialize().
                         _data.InstallID = Guid.NewGuid().ToString();
+                        _data.IdentityGeneration++;
                         GsLogger.Info("Generated new InstallID");
                         GsSentry.AddBreadcrumb(
                             message: "Generated new InstallID",
@@ -168,8 +187,9 @@ namespace GsPlugin.Models {
                 catch (Exception ex) {
                     GsLogger.Error("Failed to initialize GsData", ex);
                     GsSentry.CaptureException(ex, "Failed to initialize GsData");
-                    // Fallback to new GUID if initialization fails
+                    // Fallback to new GUID if initialization fails; bump generation for same reason.
                     _data.InstallID = Guid.NewGuid().ToString();
+                    _data.IdentityGeneration++;
                     SaveInternal();
                 }
             }
@@ -267,6 +287,7 @@ namespace GsPlugin.Models {
                 _data.SyncCooldownExpiresAt = null;
                 _data.LibraryDiffSyncCooldownExpiresAt = null;
                 _data.LastIntegrationAccountsHash = null;
+                _data.InstallToken = null; // Token is invalidated server-side on opt-out
                 SaveInternal();
             }
         }
@@ -281,6 +302,68 @@ namespace GsPlugin.Models {
                 SaveInternal();
             }
         }
+
+        /// <summary>
+        /// Atomically writes the install token only when the install is still active (not opted out).
+        /// Returns true if the token was stored, false if the write was suppressed due to opt-out.
+        /// Thread-safe: the opt-out check and the write happen under the same lock, eliminating the
+        /// window between a lockless IsOptedOut check and a subsequent direct field assignment.
+        /// </summary>
+        public static bool SetInstallTokenIfActive(string token) {
+            lock (_lock) {
+                if (_data.OptedOut) {
+                    return false;
+                }
+                _data.InstallToken = token;
+                SaveInternal();
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Rotates to a fresh InstallID and clears the stale InstallToken, then persists.
+        /// Used for lost-token recovery: when the server reports PLAYNITE_TOKEN_ALREADY_REGISTERED
+        /// and we have no local token, generating a new identity allows immediate re-registration
+        /// without depending on the missing old token. Thread-safe.
+        /// </summary>
+        public static string RotateInstallId() {
+            string newId;
+            lock (_lock) {
+                newId = Guid.NewGuid().ToString();
+                _data.InstallID = newId;
+                _data.InstallToken = null;
+                _data.IdentityGeneration++;
+                // Clear all identity-bound sync and linking state so the recovered install
+                // cannot inherit stale cooldowns, hashes, baselines, queued work, or an
+                // account link that belongs to the abandoned server-side identity.
+                _data.LinkedUserId = null;
+                _data.ActiveSessionId = null;
+                _data.PendingStartGameId = null;
+                _data.PendingScrobbles.Clear();
+                _data.LastLibraryHash = null;
+                _data.LastAchievementHash = null;
+                _data.LastSyncAt = null;
+                _data.LastSyncGameCount = null;
+                _data.SyncCooldownExpiresAt = null;
+                _data.LibraryDiffSyncCooldownExpiresAt = null;
+                _data.LastIntegrationAccountsHash = null;
+                SaveInternal();
+                GsLogger.Info("InstallID rotated for lost-token recovery; identity-bound state cleared");
+            }
+            // Reset snapshot outside the data lock (each manager has its own lock).
+            GsSnapshotManager.Reset();
+            return newId;
+        }
+
+        /// <summary>
+        /// Returns the install ID to include in new outbound request bodies, or null when a token
+        /// is present. When x-playnite-token is sent the server resolves identity from the token,
+        /// so including the UUID in the body is redundant and re-exposes it in request payloads.
+        /// Note: pending scrobble DTOs already have user_id baked in at queue time, so omitting it
+        /// here does not affect replay of previously serialized work.
+        /// </summary>
+        public static string InstallIdForBody =>
+            string.IsNullOrEmpty(_data?.InstallToken) ? _data?.InstallID : null;
 
         /// <summary>
         /// Returns true if an account is linked (LinkedUserId is set and not the "not_linked" sentinel).

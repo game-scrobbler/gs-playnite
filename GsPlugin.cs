@@ -171,6 +171,15 @@ namespace GsPlugin {
                     { "linked", !string.IsNullOrEmpty(GsDataManager.DataOrNull?.LinkedUserId) }
                 });
 
+                // Ensure the install has a server-issued auth token. Best-effort, fire-and-forget:
+                // registration is a one-time step on first boot and must not stall the rest of
+                // startup (plugin refresh, update check, queue flush, library sync) for up to 30 s
+                // on first run or during API outages.
+                _ = EnsureInstallTokenAsync();
+
+                // Re-check opt-out after token registration (user may have opted out during startup)
+                if (GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
+
                 // Refresh allowed plugins before syncing library (best-effort, don't block on failure)
                 try {
                     await _scrobblingService.RefreshAllowedPluginsAsync();
@@ -312,7 +321,7 @@ namespace GsPlugin {
                 Icon = iconImage,
                 Opened = () => {
                     // Return a new instance of your custom UserControl (WPF)
-                    return new MySidebarView(GsSentry.GetPluginVersion());
+                    return new MySidebarView(GsSentry.GetPluginVersion(), _apiClient);
                 },
             };
         }
@@ -343,7 +352,7 @@ namespace GsPlugin {
                     window.Title = "Game Scrobbler Dashboard";
                     window.Width = 1200;
                     window.Height = 800;
-                    window.Content = new MySidebarView(GsSentry.GetPluginVersion());
+                    window.Content = new MySidebarView(GsSentry.GetPluginVersion(), _apiClient);
                     window.Owner = PlayniteApi.Dialogs.GetCurrentAppWindow();
                     window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
                     window.ShowDialog();
@@ -396,6 +405,83 @@ namespace GsPlugin {
                 MenuSection = "@Game Scrobbler",
                 Action = _ => PlayniteApi.MainView.OpenPluginSettings(Id)
             };
+        }
+
+        /// <summary>
+        /// Ensures the install has a valid server-issued auth token stored in GsData.
+        /// Runs fire-and-forget from OnApplicationStarted so it never blocks startup.
+        ///
+        /// Flow:
+        ///   - If a token is already stored → nothing to do.
+        ///   - If no token → call /v2/register. On success store the token.
+        ///   - If register returns 409 PLAYNITE_TOKEN_ALREADY_REGISTERED → local token was lost.
+        ///     Rotate to a new InstallID (abandoning the old server-side identity) and re-register
+        ///     immediately. This is deterministic and requires no missing old token.
+        ///   - Persisting the token is guarded against a concurrent opt-out.
+        /// </summary>
+        private async Task EnsureInstallTokenAsync() {
+            if (!string.IsNullOrEmpty(GsDataManager.Data.InstallToken)) {
+                // Token already present — nothing to do.
+                return;
+            }
+
+            var installId = GsDataManager.Data.InstallID;
+            if (string.IsNullOrEmpty(installId)) {
+                _logger.Warn("EnsureInstallTokenAsync: no InstallID available, skipping registration");
+                return;
+            }
+
+            try {
+                _logger.Info("Registering install token with server");
+                var result = await _apiClient.RegisterInstallToken(installId);
+
+                if (result == null) {
+                    _logger.Warn("EnsureInstallTokenAsync: registration call returned null (network error?)");
+                    return;
+                }
+
+                if (result.success && !string.IsNullOrEmpty(result.token)) {
+                    // SetInstallTokenIfActive atomically checks opt-out and writes under lock,
+                    // preventing a race where PerformOptOut() clears the token between our check
+                    // and our write.
+                    if (GsDataManager.SetInstallTokenIfActive(result.token)) {
+                        _logger.Info("Install token registered and stored successfully");
+                    }
+                    else {
+                        _logger.Warn("EnsureInstallTokenAsync: opt-out occurred during registration; token discarded");
+                    }
+                    return;
+                }
+
+                // 409: token already issued for this install ID but the local copy was lost.
+                // Recovery: rotate to a fresh InstallID so we can re-register immediately without
+                // needing the missing old token. The old server-side identity is abandoned.
+                if (result.error_code == "PLAYNITE_TOKEN_ALREADY_REGISTERED") {
+                    _logger.Warn("EnsureInstallTokenAsync: lost-token conflict — rotating InstallID and re-registering");
+                    var newInstallId = GsDataManager.RotateInstallId();
+                    var retryResult = await _apiClient.RegisterInstallToken(newInstallId);
+                    if (retryResult != null && retryResult.success && !string.IsNullOrEmpty(retryResult.token)) {
+                        if (GsDataManager.SetInstallTokenIfActive(retryResult.token)) {
+                            _logger.Info("Install token recovered via InstallID rotation");
+                        }
+                        else {
+                            _logger.Warn("EnsureInstallTokenAsync: opt-out during retry registration; token discarded");
+                        }
+                    }
+                    else {
+                        _logger.Warn("EnsureInstallTokenAsync: re-registration after rotation failed; will retry on next startup");
+                    }
+                    return;
+                }
+
+                _logger.Warn($"EnsureInstallTokenAsync: unexpected registration result — " +
+                    $"success={result.success}, error_code={result.error_code ?? "(none)"}, " +
+                    $"error={result.error ?? "(none)"}");
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "EnsureInstallTokenAsync failed");
+                GsSentry.CaptureException(ex, "EnsureInstallTokenAsync failed");
+            }
         }
 
         /// <summary>

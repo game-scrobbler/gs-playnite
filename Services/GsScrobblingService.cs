@@ -170,7 +170,7 @@ namespace GsPlugin.Services {
                 if (GsDataManager.IsOptedOut) return;
 
                 var sessionData = await _apiClient.StartGameSession(new GsApiClient.ScrobbleStartReq {
-                    user_id = GsDataManager.Data.InstallID,
+                    user_id = GsDataManager.InstallIdForBody,
                     game_name = startedGame.Name,
                     game_id = startedGame.Id.ToString(),
                     plugin_id = startedGame.PluginId.ToString(),
@@ -193,7 +193,7 @@ namespace GsPlugin.Services {
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "start",
                         StartData = new GsApiClient.ScrobbleStartReq {
-                            user_id = GsDataManager.Data.InstallID,
+                            user_id = GsDataManager.InstallIdForBody,
                             game_name = startedGame.Name,
                             game_id = startedGame.Id.ToString(),
                             plugin_id = startedGame.PluginId.ToString(),
@@ -242,7 +242,7 @@ namespace GsPlugin.Services {
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
                         FinishData = new GsApiClient.ScrobbleFinishReq {
-                            user_id = GsDataManager.Data.InstallID,
+                            user_id = GsDataManager.InstallIdForBody,
                             game_name = stoppedGame.Name,
                             game_id = stoppedGame.Id.ToString(),
                             plugin_id = stoppedGame.PluginId.ToString(),
@@ -277,7 +277,7 @@ namespace GsPlugin.Services {
                 if (GsDataManager.IsOptedOut) return;
 
                 var finishResponse = await _apiClient.FinishGameSession(new GsApiClient.ScrobbleFinishReq {
-                    user_id = GsDataManager.Data.InstallID,
+                    user_id = GsDataManager.InstallIdForBody,
                     game_name = stoppedGame.Name,
                     game_id = stoppedGame.Id.ToString(),
                     plugin_id = stoppedGame.PluginId.ToString(),
@@ -296,7 +296,7 @@ namespace GsPlugin.Services {
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
                         FinishData = new GsApiClient.ScrobbleFinishReq {
-                            user_id = GsDataManager.Data.InstallID,
+                            user_id = GsDataManager.InstallIdForBody,
                             game_name = stoppedGame.Name,
                             game_id = stoppedGame.Id.ToString(),
                             plugin_id = stoppedGame.PluginId.ToString(),
@@ -339,7 +339,7 @@ namespace GsPlugin.Services {
 
                 DateTime localDate = DateTime.Now;
                 var finishResponse = await _apiClient.FinishGameSession(new GsApiClient.ScrobbleFinishReq {
-                    user_id = GsDataManager.Data.InstallID,
+                    user_id = GsDataManager.InstallIdForBody,
                     session_id = GsDataManager.Data.ActiveSessionId,
                     metadata = new { reason = "application_stopped" },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
@@ -353,7 +353,7 @@ namespace GsPlugin.Services {
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
                         FinishData = new GsApiClient.ScrobbleFinishReq {
-                            user_id = GsDataManager.Data.InstallID,
+                            user_id = GsDataManager.InstallIdForBody,
                             session_id = GsDataManager.Data.ActiveSessionId,
                             metadata = new { reason = "application_stopped" },
                             finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
@@ -514,7 +514,7 @@ namespace GsPlugin.Services {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
                 var syncResponse = await _apiClient.SyncLibraryFull(new GsApiClient.LibraryFullSyncReq {
-                    user_id = GsDataManager.Data.InstallID,
+                    user_id = GsDataManager.InstallIdForBody,
                     library = library,
                     flags = GsDataManager.Data.Flags.ToArray(),
                     integration_accounts = integrationAccounts.Count > 0 ? integrationAccounts : null
@@ -883,7 +883,7 @@ namespace GsPlugin.Services {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
                 var response = await _apiClient.SyncLibraryFull(new GsApiClient.LibraryFullSyncReq {
-                    user_id = GsDataManager.Data.InstallID,
+                    user_id = GsDataManager.InstallIdForBody,
                     library = library,
                     flags = GsDataManager.Data.Flags.ToArray(),
                     integration_accounts = integrationAccounts.Count > 0 ? integrationAccounts : null
@@ -973,7 +973,7 @@ namespace GsPlugin.Services {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
                 var response = await _apiClient.SyncLibraryDiff(new GsApiClient.LibraryDiffSyncReq {
-                    user_id = GsDataManager.Data.InstallID,
+                    user_id = GsDataManager.InstallIdForBody,
                     added = added,
                     updated = updated,
                     removed = removed.ToList(),
@@ -1091,7 +1091,7 @@ namespace GsPlugin.Services {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
                 var response = await _apiClient.SyncAchievementsFull(new GsApiClient.AchievementsFullSyncReq {
-                    user_id = GsDataManager.Data.InstallID,
+                    user_id = GsDataManager.InstallIdForBody,
                     games = games
                 });
 
@@ -1260,7 +1260,7 @@ namespace GsPlugin.Services {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
                 var response = await _apiClient.SyncAchievementsDiff(new GsApiClient.AchievementsDiffSyncReq {
-                    user_id = GsDataManager.Data.InstallID,
+                    user_id = GsDataManager.InstallIdForBody,
                     changed = changed,
                     base_snapshot_hash = GsDataManager.Data.LastAchievementHash ?? ""
                 });
