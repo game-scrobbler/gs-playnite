@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.3.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.2.0...GsPlugin-v2.3.0) (2026-03-12)
+
+
+### Features
+
+* add opt-out and delete my data support ([88a04ef](https://github.com/game-scrobbler/gs-playnite/commit/88a04efdaacd8592cd139943716b02d64d703992))
+* add opt-out, delete my data, and fix update notification ([d559a6f](https://github.com/game-scrobbler/gs-playnite/commit/d559a6f94021f3dc2a49e7076220bb076c24090e))
+* add per-install token authentication and identity management ([a75cb9e](https://github.com/game-scrobbler/gs-playnite/commit/a75cb9ec280d40489108ceaecd4bce980cde2273))
+
+
+### Bug Fixes
+
+* open Add-ons dialog instead of plugin settings on update notification click ([05d9889](https://github.com/game-scrobbler/gs-playnite/commit/05d98895357cd7d78b9d280d0e56d5058d17bc18))
+* remove missing package urls and add changelogs to installer manifest ([bfb4b20](https://github.com/game-scrobbler/gs-playnite/commit/bfb4b200007641e3501d478ed601fa478d77a457))
+* use theme-aware TextBrush for library sync status text ([77b9378](https://github.com/game-scrobbler/gs-playnite/commit/77b9378ea2596c024782443dd90d91096e7e0a12))
+
 ## [2.2.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.1.1...GsPlugin-v2.2.0) (2026-03-10)
 
 
