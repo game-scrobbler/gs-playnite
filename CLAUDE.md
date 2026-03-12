@@ -72,6 +72,20 @@ GsPlugin (entry point, IDisposable)
 └── All services use GsDataManager for persistent state
 ```
 
+### Install Token Authentication
+- `GsPlugin.OnApplicationStarted()` kicks off `EnsureInstallTokenAsync()` as a best-effort, fire-and-forget startup task so first-run registration does not block plugin startup.
+- Each install registers with the server via `/api/playnite/v2/register`, receiving a per-install token stored in `GsData.InstallToken`.
+- Authenticated write calls use the shared `PostJsonAsync()` path, which adds the `x-playnite-token` header when `InstallToken` is present. `RequestDeleteMyData()` and `GetDashboardToken()` also attach this header explicitly.
+- `InstallIdForBody` returns `null` when a token is present, and request DTOs use `JsonIgnore(WhenWritingNull)` on `user_id`, so the server resolves identity from the header instead of the body.
+- Pending scrobble DTOs still keep whatever `user_id` they were queued with, so old queued items can replay without depending on the current `InstallIdForBody` value.
+- If `/v2/register` returns `PLAYNITE_TOKEN_ALREADY_REGISTERED`, the plugin treats the local token as lost, rotates to a fresh `InstallID`, clears identity-bound state, resets snapshots, and immediately re-registers under the new identity.
+- `RotateInstallId()` clears token, linked user, sessions, pending scrobbles, sync hashes, cooldowns, and integration-account hashes before calling `GsSnapshotManager.Reset()`.
+- `SetInstallTokenIfActive()` atomically checks opt-out status before persisting the token, preventing races with `PerformOptOut()`.
+- Deletion requests require a valid `InstallToken`; the server resolves install identity from the `x-playnite-token` header. No `user_id` is sent in the body. `DeleteDataRes.rateLimited` is set when the server returns HTTP 429.
+- `GetDashboardToken()` fetches a short-lived dashboard token used by `MySidebarView` as `?access_token=...`; if token fetch fails for a registered install, the dashboard fails closed instead of falling back to `user_id`.
+- `IdentityGeneration` is incremented on fresh-install `InstallID` creation and on `RotateInstallId()`. `GsSnapshotManager` stamps this generation into `gs_snapshot.json` and discards snapshots whose generation no longer matches current data.
+- `ResetInstallToken()` exists on `IGsApiClient`/`GsApiClient`, but the current lost-token recovery path uses local `InstallID` rotation plus re-registration rather than token reset.
+
 ### Achievement Provider Architecture
 Achievement data comes from two optional addons via an aggregator pattern:
 - `IAchievementProvider` — common interface (`GetCounts`, `GetAchievements`, `IsInstalled`)
@@ -82,6 +96,7 @@ Achievement data comes from two optional addons via an aggregator pattern:
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
 - Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `ValidateTokenTests`
+- `GsDataManagerTests` and `GsDataTests` include coverage for install-token persistence, `IdentityGeneration`, `RotateInstallId()`, `SetInstallTokenIfActive()`, `InstallIdForBody`, and opt-out token clearing.
 
 ## Build Environment
 
