@@ -275,5 +275,204 @@ namespace GsPlugin.Tests {
                 Directory.Delete(tempDir, true);
             }
         }
+        [Fact]
+        public void Initialize_FreshInstall_BumpsIdentityGeneration() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+
+                // A fresh install (no existing gs_data.json) should bump IdentityGeneration
+                // so that any surviving stale gs_snapshot.json is invalidated.
+                Assert.True(GsDataManager.Data.IdentityGeneration >= 1);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void Initialize_ExistingInstallId_DoesNotBumpGeneration() {
+            var tempDir = CreateTempDir();
+            try {
+                // First init creates an InstallID and bumps generation
+                GsDataManager.Initialize(tempDir, null);
+                var gen = GsDataManager.Data.IdentityGeneration;
+                GsDataManager.Save();
+
+                // Re-initialize from same directory — InstallID already exists, no bump
+                GsDataManager.Initialize(tempDir, null);
+
+                Assert.Equal(gen, GsDataManager.Data.IdentityGeneration);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void RotateInstallId_ChangesInstallIdAndClearsToken() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                var originalId = GsDataManager.Data.InstallID;
+                GsDataManager.Data.InstallToken = "old-token";
+                GsDataManager.Save();
+
+                var newId = GsDataManager.RotateInstallId();
+
+                Assert.NotEqual(originalId, newId);
+                Assert.Equal(newId, GsDataManager.Data.InstallID);
+                Assert.Null(GsDataManager.Data.InstallToken);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void RotateInstallId_IncrementsIdentityGeneration() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                var genBefore = GsDataManager.Data.IdentityGeneration;
+
+                GsDataManager.RotateInstallId();
+
+                Assert.Equal(genBefore + 1, GsDataManager.Data.IdentityGeneration);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void RotateInstallId_ClearsLinkedUserId() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Data.LinkedUserId = "linked-user-123";
+                GsDataManager.Save();
+
+                GsDataManager.RotateInstallId();
+
+                Assert.Null(GsDataManager.Data.LinkedUserId);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void RotateInstallId_ClearsIdentityBoundState() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Data.ActiveSessionId = "session-1";
+                GsDataManager.Data.PendingStartGameId = "game-1";
+                GsDataManager.Data.LastLibraryHash = "hash-lib";
+                GsDataManager.Data.LastAchievementHash = "hash-ach";
+                GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
+                GsDataManager.Data.LastSyncGameCount = 50;
+                GsDataManager.Data.SyncCooldownExpiresAt = DateTime.UtcNow.AddHours(1);
+                GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt = DateTime.UtcNow.AddHours(2);
+                GsDataManager.Data.LastIntegrationAccountsHash = "hash-int";
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble { Type = "start", QueuedAt = DateTime.UtcNow });
+                GsDataManager.Save();
+
+                GsDataManager.RotateInstallId();
+
+                Assert.Null(GsDataManager.Data.ActiveSessionId);
+                Assert.Null(GsDataManager.Data.PendingStartGameId);
+                Assert.Null(GsDataManager.Data.LastLibraryHash);
+                Assert.Null(GsDataManager.Data.LastAchievementHash);
+                Assert.Null(GsDataManager.Data.LastSyncAt);
+                Assert.Null(GsDataManager.Data.LastSyncGameCount);
+                Assert.Null(GsDataManager.Data.SyncCooldownExpiresAt);
+                Assert.Null(GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt);
+                Assert.Null(GsDataManager.Data.LastIntegrationAccountsHash);
+                Assert.Empty(GsDataManager.Data.PendingScrobbles);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void SetInstallTokenIfActive_WhenNotOptedOut_StoresToken() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+
+                var stored = GsDataManager.SetInstallTokenIfActive("new-token-abc");
+
+                Assert.True(stored);
+                Assert.Equal("new-token-abc", GsDataManager.Data.InstallToken);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void SetInstallTokenIfActive_WhenOptedOut_RejectsToken() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.PerformOptOut();
+
+                var stored = GsDataManager.SetInstallTokenIfActive("should-not-persist");
+
+                Assert.False(stored);
+                Assert.Null(GsDataManager.Data.InstallToken);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void InstallIdForBody_WithNoToken_ReturnsInstallId() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Data.InstallToken = null;
+
+                Assert.Equal(GsDataManager.Data.InstallID, GsDataManager.InstallIdForBody);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void InstallIdForBody_WithToken_ReturnsNull() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Data.InstallToken = "active-token";
+
+                Assert.Null(GsDataManager.InstallIdForBody);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void PerformOptOut_ClearsInstallToken() {
+            var tempDir = CreateTempDir();
+            try {
+                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Data.InstallToken = "token-to-clear";
+                GsDataManager.Save();
+
+                GsDataManager.PerformOptOut();
+
+                Assert.Null(GsDataManager.Data.InstallToken);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
     }
 }

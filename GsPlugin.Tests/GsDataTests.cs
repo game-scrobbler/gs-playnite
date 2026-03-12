@@ -252,6 +252,40 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void DefaultValues_IdentityGenerationIsZero() {
+            var data = new GsData();
+            Assert.Equal(0, data.IdentityGeneration);
+        }
+
+        [Fact]
+        public void DefaultValues_InstallTokenIsNull() {
+            var data = new GsData();
+            Assert.Null(data.InstallToken);
+        }
+
+        [Fact]
+        public void DefaultValues_OptedOutIsFalse() {
+            var data = new GsData();
+            Assert.False(data.OptedOut);
+        }
+
+        [Fact]
+        public void SerializationRoundtrip_IncludesIdentityGenerationAndToken() {
+            var original = new GsData {
+                IdentityGeneration = 3,
+                InstallToken = "abcdef1234567890",
+                OptedOut = true
+            };
+
+            var json = JsonSerializer.Serialize(original);
+            var deserialized = JsonSerializer.Deserialize<GsData>(json);
+
+            Assert.Equal(3, deserialized.IdentityGeneration);
+            Assert.Equal("abcdef1234567890", deserialized.InstallToken);
+            Assert.True(deserialized.OptedOut);
+        }
+
+        [Fact]
         public void PendingScrobbles_SerializationRoundtrip() {
             var data = new GsData {
                 PendingScrobbles = new List<PendingScrobble> {
