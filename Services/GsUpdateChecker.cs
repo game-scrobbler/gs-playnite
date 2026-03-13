@@ -33,6 +33,10 @@ namespace GsPlugin.Services {
 
         public async Task CheckForUpdateAsync() {
             try {
+                if (!GsDataManager.Data.ShowUpdateNotifications) {
+                    return;
+                }
+
                 var currentVersion = GetCurrentVersion();
                 var latestTag = await FetchLatestTagAsync();
                 if (latestTag == null) {

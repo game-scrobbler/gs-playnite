@@ -44,6 +44,7 @@ namespace GsPlugin {
         private GsScrobblingService _scrobblingService;
         private GsAchievementAggregator _achievementHelper;
         private GsUpdateChecker _updateChecker;
+        private GsNotificationService _notificationService;
         private bool _disposed;
         private int _achievementSyncInFlight;
         /// <summary>
@@ -96,6 +97,9 @@ namespace GsPlugin {
 
             // Initialize update checker
             _updateChecker = new GsUpdateChecker(api);
+
+            // Initialize server notification service
+            _notificationService = new GsNotificationService(api, _apiClient, Id);
         }
 
         /// <summary>
@@ -175,7 +179,12 @@ namespace GsPlugin {
                 // registration is a one-time step on first boot and must not stall the rest of
                 // startup (plugin refresh, update check, queue flush, library sync) for up to 30 s
                 // on first run or during API outages.
-                _ = EnsureInstallTokenAsync();
+                var tokenTask = EnsureInstallTokenAsync();
+
+                // Fire-and-forget: fetch server notifications on a background thread after token
+                // registration completes, so we never block the startup critical path and notifications
+                // are available even when the token is freshly registered on first run.
+                _ = FetchNotificationsAfterTokenAsync(tokenTask);
 
                 // Re-check opt-out after token registration (user may have opted out during startup)
                 if (GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
@@ -481,6 +490,21 @@ namespace GsPlugin {
             catch (Exception ex) {
                 _logger.Error(ex, "EnsureInstallTokenAsync failed");
                 GsSentry.CaptureException(ex, "EnsureInstallTokenAsync failed");
+            }
+        }
+
+        /// <summary>
+        /// Waits for token registration to complete, then fetches and displays server notifications.
+        /// Runs fire-and-forget so it never blocks the startup critical path.
+        /// </summary>
+        private async Task FetchNotificationsAfterTokenAsync(Task tokenTask) {
+            try {
+                await tokenTask.ConfigureAwait(false);
+                if (GsDataManager.IsOptedOut) return;
+                await _notificationService.FetchAndShowNotificationsAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex) {
+                _logger.Warn(ex, "Server notification fetch failed");
             }
         }
 

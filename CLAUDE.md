@@ -37,6 +37,7 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │   ├── GsSuccessStoryHelper.cs      — SuccessStory addon integration (reflection)
 │   ├── GsPlayniteAchievementsHelper.cs — Playnite Achievements addon integration (reflection)
 │   ├── GsAccountLinkingService.cs   — Account linking operations
+│   ├── GsNotificationService.cs      — Server notification fetch and display
 │   ├── GsUriHandler.cs              — Deep link processing
 │   └── GsUpdateChecker.cs           — Plugin update checking
 │
@@ -67,6 +68,7 @@ GsPlugin (entry point, IDisposable)
 │                       │                         → GsPlayniteAchievementsHelper (reflection)
 │                       → GsSnapshotManager (diff-based sync state)
 ├── GsAccountLinkingService → GsApiClient
+├── GsNotificationService → GsApiClient (fire-and-forget background)
 ├── GsUriHandler → GsAccountLinkingService
 ├── GsUpdateChecker
 └── All services use GsDataManager for persistent state
@@ -86,6 +88,17 @@ GsPlugin (entry point, IDisposable)
 - `IdentityGeneration` is incremented on fresh-install `InstallID` creation and on `RotateInstallId()`. `GsSnapshotManager` stamps this generation into `gs_snapshot.json` and discards snapshots whose generation no longer matches current data.
 - `ResetInstallToken()` exists on `IGsApiClient`/`GsApiClient`, but the current lost-token recovery path uses local `InstallID` rotation plus re-registration rather than token reset.
 
+### Server Notifications
+- `GsNotificationService` fetches notifications from `GET /api/playnite/v2/notifications` at startup and displays them in Playnite's native notification tray.
+- Runs as fire-and-forget via `FetchNotificationsAfterTokenAsync()` which awaits `EnsureInstallTokenAsync()` first, ensuring the install token is available before fetching. Never blocks the startup critical path.
+- Auth: `x-playnite-token` header only — no `user_id`/`install_id` fallback.
+- `GetNotifications()` in `GsApiClient` intentionally bypasses the shared circuit breaker so notification failures cannot affect core sync/scrobble paths.
+- UI thread safety: notifications are collected on the background thread, then marshaled onto `Application.Current.Dispatcher.Invoke()` for `Notifications.Add()` calls.
+- `GsDataManager.GetShownNotificationIds()` returns a lock-protected snapshot; `RecordShownNotifications()` atomically appends and persists under `_lock`, preventing cross-thread races with concurrent startup writes.
+- `ShownNotificationIds` is capped at 100 entries and cleared on `RotateInstallId()` alongside other identity-bound state.
+- Action URL handling: `gs://settings` opens plugin settings via `OpenPluginSettings(Id)`, `gs://addons` opens the add-ons dialog, `https://` URLs are opened in the browser but only for trusted hosts (`gamescrobbler.com`, `playnite.link`). Plain `http://` and untrusted hosts are rejected.
+- Two user-facing settings (`ShowUpdateNotifications`, `ShowImportantNotifications`) control whether update and server notifications appear. Both default to `true` and are synced to `GsData` via `GsPluginSettingsViewModel.EndEdit()` and `LoadExistingSettings()`.
+
 ### Achievement Provider Architecture
 Achievement data comes from two optional addons via an aggregator pattern:
 - `IAchievementProvider` — common interface (`GetCounts`, `GetAchievements`, `IsInstalled`)
@@ -96,7 +109,7 @@ Achievement data comes from two optional addons via an aggregator pattern:
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
 - Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `ValidateTokenTests`
-- `GsDataManagerTests` and `GsDataTests` include coverage for install-token persistence, `IdentityGeneration`, `RotateInstallId()`, `SetInstallTokenIfActive()`, `InstallIdForBody`, and opt-out token clearing.
+- `GsDataManagerTests` and `GsDataTests` include coverage for install-token persistence, `IdentityGeneration`, `RotateInstallId()`, `SetInstallTokenIfActive()`, `InstallIdForBody`, opt-out token clearing, and `RecordShownNotifications()`/`GetShownNotificationIds()` thread-safe notification state.
 
 ## Build Environment
 

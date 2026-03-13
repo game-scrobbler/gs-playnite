@@ -65,6 +65,24 @@ namespace GsPlugin.Models {
             }
         }
 
+        private bool _showUpdateNotifications = true;
+        public bool ShowUpdateNotifications {
+            get => _showUpdateNotifications;
+            set {
+                _showUpdateNotifications = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private bool _showImportantNotifications = true;
+        public bool ShowImportantNotifications {
+            get => _showImportantNotifications;
+            set {
+                _showImportantNotifications = value;
+                OnPropertyChanged();
+            }
+        }
+
         private string _linkToken = "";
         public string LinkToken {
             get => _linkToken;
@@ -236,6 +254,8 @@ namespace GsPlugin.Models {
             // Sync settings to GsDataManager
             GsDataManager.Data.NewDashboardExperience = savedSettings.NewDashboardExperience;
             GsDataManager.Data.SyncAchievements = savedSettings.SyncAchievements;
+            GsDataManager.Data.ShowUpdateNotifications = savedSettings.ShowUpdateNotifications;
+            GsDataManager.Data.ShowImportantNotifications = savedSettings.ShowImportantNotifications;
 
             // Log successful load for debugging
             GsSentry.AddBreadcrumb(
@@ -298,6 +318,8 @@ namespace GsPlugin.Models {
             GsDataManager.Data.UpdateFlags(Settings.DisableSentry, Settings.DisableScrobbling, Settings.DisablePostHog);
             GsDataManager.Data.NewDashboardExperience = Settings.NewDashboardExperience;
             GsDataManager.Data.SyncAchievements = Settings.SyncAchievements;
+            GsDataManager.Data.ShowUpdateNotifications = Settings.ShowUpdateNotifications;
+            GsDataManager.Data.ShowImportantNotifications = Settings.ShowImportantNotifications;
             GsDataManager.Save();
 
             GsLogger.ShowDebugInfoBox($"Settings saved:\nTheme: {Settings.Theme}\nNew Dashboard: {Settings.NewDashboardExperience}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}", "Debug - Settings Saved");

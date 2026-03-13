@@ -511,6 +511,61 @@ namespace GsPlugin.Api {
             }
         }
 
+        #region Notifications
+
+        public class PlayniteNotificationDto {
+            public string id { get; set; }
+            public string title { get; set; }
+            public string message { get; set; }
+            public string notification_type { get; set; }
+            public string priority { get; set; }
+            public string action_url { get; set; }
+            public string action_label { get; set; }
+            public string created_at { get; set; }
+        }
+
+        public class PlayniteNotificationsRes {
+            public bool success { get; set; }
+            public List<PlayniteNotificationDto> notifications { get; set; }
+        }
+
+        /// <summary>
+        /// Fetches active notifications from the server for this install.
+        /// Requires a valid InstallToken (x-playnite-token header).
+        /// Returns null on failure or when no token is available.
+        /// Intentionally bypasses the shared circuit breaker so that notification
+        /// failures cannot affect the failure budget of core sync/scrobble paths.
+        /// </summary>
+        public async Task<PlayniteNotificationsRes> GetNotifications() {
+            var installToken = GsDataManager.DataOrNull?.InstallToken;
+            if (string.IsNullOrEmpty(installToken)) {
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/notifications";
+
+            try {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url)) {
+                    request.Headers.Add("x-playnite-token", installToken);
+                    HttpResponseMessage response = await _sharedHttpClient.SendAsync(request).ConfigureAwait(false);
+                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                    if (!response.IsSuccessStatusCode) {
+                        _logger.Warn($"GetNotifications returned {(int)response.StatusCode}");
+                        return null;
+                    }
+
+                    return JsonSerializer.Deserialize<PlayniteNotificationsRes>(responseBody, _jsonOptions);
+                }
+            }
+            catch (Exception ex) {
+                _logger.Warn(ex, "GetNotifications HTTP error");
+                return null;
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Rotates the install token by calling /v2/reset-token with the current token.
         /// Use when the server returns PLAYNITE_TOKEN_ALREADY_REGISTERED on registration

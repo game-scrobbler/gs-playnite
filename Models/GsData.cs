@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Sentry;
 using GsPlugin.Api;
@@ -83,6 +84,22 @@ namespace GsPlugin.Models {
         /// Null until /v2/register has been called successfully.
         /// </summary>
         public string InstallToken { get; set; } = null;
+
+        /// <summary>
+        /// Whether to show version update notifications in Playnite's notification tray.
+        /// </summary>
+        public bool ShowUpdateNotifications { get; set; } = true;
+
+        /// <summary>
+        /// Whether to show important server notifications in Playnite's notification tray.
+        /// </summary>
+        public bool ShowImportantNotifications { get; set; } = true;
+
+        /// <summary>
+        /// IDs of server notifications already shown in Playnite's tray.
+        /// Prevents re-showing on restart. Capped at 100 entries.
+        /// </summary>
+        public List<string> ShownNotificationIds { get; set; } = new List<string>();
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling, bool disablePostHog = false) {
             Flags.Clear();
@@ -304,6 +321,34 @@ namespace GsPlugin.Models {
         }
 
         /// <summary>
+        /// Atomically appends notification IDs to ShownNotificationIds and persists.
+        /// Trims to <paramref name="maxIds"/> to prevent unbounded growth. Thread-safe.
+        /// </summary>
+        public static void RecordShownNotifications(List<string> newIds, int maxIds) {
+            if (newIds == null || newIds.Count == 0) return;
+            lock (_lock) {
+                foreach (var id in newIds) {
+                    _data.ShownNotificationIds.Add(id);
+                }
+                if (_data.ShownNotificationIds.Count > maxIds) {
+                    _data.ShownNotificationIds = _data.ShownNotificationIds
+                        .Skip(_data.ShownNotificationIds.Count - maxIds)
+                        .ToList();
+                }
+                SaveInternal();
+            }
+        }
+
+        /// <summary>
+        /// Returns a snapshot of ShownNotificationIds for filtering. Thread-safe.
+        /// </summary>
+        public static HashSet<string> GetShownNotificationIds() {
+            lock (_lock) {
+                return new HashSet<string>(_data.ShownNotificationIds);
+            }
+        }
+
+        /// <summary>
         /// Atomically writes the install token only when the install is still active (not opted out).
         /// Returns true if the token was stored, false if the write was suppressed due to opt-out.
         /// Thread-safe: the opt-out check and the write happen under the same lock, eliminating the
@@ -347,6 +392,7 @@ namespace GsPlugin.Models {
                 _data.SyncCooldownExpiresAt = null;
                 _data.LibraryDiffSyncCooldownExpiresAt = null;
                 _data.LastIntegrationAccountsHash = null;
+                _data.ShownNotificationIds.Clear();
                 SaveInternal();
                 GsLogger.Info("InstallID rotated for lost-token recovery; identity-bound state cleared");
             }

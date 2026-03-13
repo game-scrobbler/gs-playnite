@@ -20,5 +20,6 @@ namespace GsPlugin.Api {
         Task<RegisterInstallTokenRes> RegisterInstallToken(string installId);
         Task<string> ResetInstallToken(string currentToken);
         Task<string> GetDashboardToken();
+        Task<PlayniteNotificationsRes> GetNotifications();
     }
 }

@@ -396,7 +396,31 @@
             </Border>
 
             <!-- ─────────────────────────────────────────
-                 SECTION 5 — PRIVACY CONTROLS
+                 SECTION 5 — NOTIFICATIONS
+            ───────────────────────────────────────── -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
+                        <TextBlock Text="Notifications" Style="{StaticResource SectionTitleStyle}"/>
+                    </StackPanel>
+
+                    <CheckBox Style="{StaticResource CheckBoxStyle}"
+                              Content="Show version update notifications"
+                              ToolTip="Show a notification in Playnite when a new plugin version is available"
+                              IsChecked="{Binding Settings.ShowUpdateNotifications, Mode=TwoWay}"/>
+
+                    <CheckBox Style="{StaticResource CheckBoxStyle}"
+                              Content="Show important notifications from GameScrobbler"
+                              ToolTip="Show notifications about important updates and announcements"
+                              IsChecked="{Binding Settings.ShowImportantNotifications, Mode=TwoWay}"/>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ─────────────────────────────────────────
+                 SECTION 6 — PRIVACY CONTROLS
             ───────────────────────────────────────── -->
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel>
@@ -445,7 +469,7 @@
             </Border>
 
             <!-- ─────────────────────────────────────────
-                 SECTION 6 — DANGER ZONE
+                 SECTION 7 — DANGER ZONE
             ───────────────────────────────────────── -->
             <Border Style="{StaticResource CardBorderStyle}"
                     BorderBrush="#E53E3E">
