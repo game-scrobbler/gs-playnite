@@ -127,17 +127,20 @@ namespace GsPlugin.Models {
         /// </summary>
         public static string FormatElapsed(TimeSpan elapsed) {
             if (elapsed.TotalMinutes < 1)
-                return "just now";
+                return GsLocalization.Get("LOCGsPluginElapsedJustNow", "just now");
             if (elapsed.TotalHours < 1) {
                 int mins = (int)elapsed.TotalMinutes;
-                return $"{mins} minute{(mins == 1 ? "" : "s")} ago";
+                return GsLocalization.Format("LOCGsPluginElapsedMinutesFormat",
+                    $"{mins} minute{(mins == 1 ? "" : "s")} ago", mins);
             }
             if (elapsed.TotalDays < 1) {
                 int hours = (int)elapsed.TotalHours;
-                return $"{hours} hour{(hours == 1 ? "" : "s")} ago";
+                return GsLocalization.Format("LOCGsPluginElapsedHoursFormat",
+                    $"{hours} hour{(hours == 1 ? "" : "s")} ago", hours);
             }
             int days = (int)elapsed.TotalDays;
-            return $"{days} day{(days == 1 ? "" : "s")} ago";
+            return GsLocalization.Format("LOCGsPluginElapsedDaysFormat",
+                $"{days} day{(days == 1 ? "" : "s")} ago", days);
         }
 
         /// <summary>
@@ -145,16 +148,19 @@ namespace GsPlugin.Models {
         /// </summary>
         public static string FormatRemaining(TimeSpan remaining) {
             if (remaining.TotalMinutes < 1)
-                return "less than a minute";
+                return GsLocalization.Get("LOCGsPluginRemainingLessThanMinute", "less than a minute");
             if (remaining.TotalHours < 1) {
                 int mins = (int)remaining.TotalMinutes;
-                return $"{mins} minute{(mins == 1 ? "" : "s")}";
+                return GsLocalization.Format("LOCGsPluginRemainingMinutesFormat",
+                    $"{mins} minute{(mins == 1 ? "" : "s")}", mins);
             }
             int hours = (int)remaining.TotalHours;
             int remMins = remaining.Minutes;
             return remMins > 0
-                ? $"{hours} hour{(hours == 1 ? "" : "s")} {remMins} minute{(remMins == 1 ? "" : "s")}"
-                : $"{hours} hour{(hours == 1 ? "" : "s")}";
+                ? GsLocalization.Format("LOCGsPluginRemainingHoursMinutesFormat",
+                    $"{hours} hour{(hours == 1 ? "" : "s")} {remMins} minute{(remMins == 1 ? "" : "s")}", hours, remMins)
+                : GsLocalization.Format("LOCGsPluginRemainingHoursFormat",
+                    $"{hours} hour{(hours == 1 ? "" : "s")}", hours);
         }
     }
 

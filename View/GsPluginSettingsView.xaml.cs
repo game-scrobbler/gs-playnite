@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Navigation;
+using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 using GsPlugin.Services;
 
@@ -86,11 +87,11 @@ namespace GsPlugin.View {
 
         private void UpdateInstallTokenStatus() {
             if (GsPluginSettingsViewModel.IsInstallTokenActive) {
-                InstallTokenStatusTextBlock.Text = "\u2713 Token: Active";
+                InstallTokenStatusTextBlock.Text = GsLocalization.Get("LOCGsPluginTokenStatusActive", "\u2713 Token: Active");
                 InstallTokenStatusTextBlock.Foreground = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50));
             }
             else {
-                InstallTokenStatusTextBlock.Text = "\u26A0 Token: Pending registration";
+                InstallTokenStatusTextBlock.Text = GsLocalization.Get("LOCGsPluginTokenStatusPending", "\u26A0 Token: Pending registration");
                 InstallTokenStatusTextBlock.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xA5, 0x00));
             }
         }
@@ -98,7 +99,8 @@ namespace GsPlugin.View {
         private void UpdatePendingScrobblesStatus() {
             int count = GsPluginSettingsViewModel.PendingScrobbleCount;
             if (count > 0) {
-                PendingScrobblesTextBlock.Text = $"{count} scrobble{(count == 1 ? "" : "s")} queued \u2014 will retry automatically";
+                PendingScrobblesTextBlock.Text = GsLocalization.Format("LOCGsPluginPendingScrobblesFormat",
+                    $"{count} scrobble{(count == 1 ? "" : "s")} queued \u2014 will retry automatically", count);
                 PendingScrobblesBorder.Visibility = Visibility.Visible;
             }
             else {
@@ -107,7 +109,8 @@ namespace GsPlugin.View {
 
             int dropped = GsPluginSettingsViewModel.DroppedScrobbleCount;
             if (dropped > 0) {
-                DroppedScrobblesTextBlock.Text = $"{dropped} scrobble{(dropped == 1 ? "" : "s")} lost due to server errors";
+                DroppedScrobblesTextBlock.Text = GsLocalization.Format("LOCGsPluginDroppedScrobblesFormat",
+                    $"{dropped} scrobble{(dropped == 1 ? "" : "s")} lost due to server errors", dropped);
                 DroppedScrobblesBorder.Visibility = Visibility.Visible;
             }
             else {
@@ -217,7 +220,7 @@ namespace GsPlugin.View {
             bool isOptedOut = GsDataManager.IsOptedOut;
 
             if (isOptedOut) {
-                ConnectionStatusTextBlock.Text = "Opted Out";
+                ConnectionStatusTextBlock.Text = GsLocalization.Get("LOCGsPluginConnectionStatusOptedOut", "Opted Out");
                 ConnectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
             }
             else {
@@ -252,7 +255,9 @@ namespace GsPlugin.View {
             TokenTextBox.IsEnabled = !isLinking;
             LinkAccountButton.IsEnabled = !isLinking;
             // Update button text
-            LinkAccountButton.Content = isLinking ? "Linking..." : "Link Account";
+            LinkAccountButton.Content = isLinking
+                ? GsLocalization.Get("LOCGsPluginLinkingInProgress", "Linking...")
+                : GsLocalization.Get("LOCGsPluginLinkAccountButton", "Link Account");
         }
 
         /// <summary>
@@ -318,8 +323,8 @@ namespace GsPlugin.View {
             }
             catch (Exception ex) {
                 MessageBox.Show(
-                    $"Failed to open URL: {ex.Message}",
-                    "Error",
+                    GsLocalization.Format("LOCGsPluginOpenUrlFailedFormat", "Failed to open URL: {0}", ex.Message),
+                    GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -334,15 +339,15 @@ namespace GsPlugin.View {
             try {
                 Clipboard.SetText(textBlock.Text);
                 MessageBox.Show(
-                    "Text copied to clipboard!",
-                    "Success",
+                    GsLocalization.Get("LOCGsPluginCopiedToClipboard", "Text copied to clipboard!"),
+                    GsLocalization.Get("LOCGsPluginCopiedDialogTitle", "Success"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (Exception ex) {
                 MessageBox.Show(
-                    $"Failed to copy text: {ex.Message}",
-                    "Error",
+                    GsLocalization.Format("LOCGsPluginCopyFailedFormat", "Failed to copy text: {0}", ex.Message),
+                    GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -353,21 +358,23 @@ namespace GsPlugin.View {
         /// </summary>
         private void DeleteMyData_Click(object sender, RoutedEventArgs e) {
             var result = MessageBox.Show(
-                "Are you sure you want to delete all your data from GameScrobbler servers?\n\n" +
-                "This will:\n" +
-                "• Remove your library, sessions, and achievements from our servers\n" +
-                "• Disable all plugin features\n" +
-                "• Require you to opt in again to resume using the plugin\n\n" +
-                "This action cannot be undone.",
-                "Delete My Data",
+                GsLocalization.Get("LOCGsPluginDeleteConfirmBody",
+                    "Are you sure you want to delete all your data from GameScrobbler servers?\n\n" +
+                    "This will:\n" +
+                    "• Remove your library, sessions, and achievements from our servers\n" +
+                    "• Disable all plugin features\n" +
+                    "• Require you to opt in again to resume using the plugin\n\n" +
+                    "This action cannot be undone."),
+                GsLocalization.Get("LOCGsPluginDeleteConfirmTitle", "Delete My Data"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
 
             if (result != MessageBoxResult.Yes) return;
 
             var confirmResult = MessageBox.Show(
-                "Are you absolutely sure? Your data will be permanently deleted from the GameScrobbler servers.",
-                "Final Confirmation",
+                GsLocalization.Get("LOCGsPluginDeleteFinalBody",
+                    "Are you absolutely sure? Your data will be permanently deleted from the GameScrobbler servers."),
+                GsLocalization.Get("LOCGsPluginDeleteFinalTitle", "Final Confirmation"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Exclamation);
 
@@ -384,7 +391,9 @@ namespace GsPlugin.View {
 
             bool isDeleting = _viewModel.Settings.IsDeleting;
             DeleteMyDataButton.IsEnabled = !isDeleting;
-            DeleteMyDataButton.Content = isDeleting ? "Deleting..." : "Delete My Data";
+            DeleteMyDataButton.Content = isDeleting
+                ? GsLocalization.Get("LOCGsPluginDeletingInProgress", "Deleting...")
+                : GsLocalization.Get("LOCGsPluginDeleteMyDataButton", "Delete My Data");
         }
 
         /// <summary>
@@ -401,9 +410,9 @@ namespace GsPlugin.View {
         /// </summary>
         private void OptBackIn_Click(object sender, RoutedEventArgs e) {
             var result = MessageBox.Show(
-                "Re-enable the GameScrobbler plugin?\n\n" +
-                "You will need to restart Playnite for all features to resume.",
-                "Opt Back In",
+                GsLocalization.Get("LOCGsPluginOptBackInConfirmBody",
+                    "Re-enable the GameScrobbler plugin?\n\nYou will need to restart Playnite for all features to resume."),
+                GsLocalization.Get("LOCGsPluginOptBackInConfirmTitle", "Opt Back In"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
@@ -440,8 +449,8 @@ namespace GsPlugin.View {
             }
             catch (Exception ex) {
                 MessageBox.Show(
-                    $"Failed to open URL: {ex.Message}",
-                    "Error",
+                    GsLocalization.Format("LOCGsPluginOpenUrlFailedFormat", "Failed to open URL: {0}", ex.Message),
+                    GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }

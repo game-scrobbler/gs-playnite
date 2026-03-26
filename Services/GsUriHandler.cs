@@ -231,8 +231,8 @@ namespace GsPlugin.Services {
         private void HandleEmptyToken() {
             GsLogger.Warn("Empty token received in URI request");
             _playniteApi?.Dialogs?.ShowMessage(
-                "Invalid linking token received.",
-                "Account Linking Error",
+                GsLocalization.Get("LOCGsPluginInvalidLinkingToken", "Invalid linking token received."),
+                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning
             );
@@ -247,8 +247,8 @@ namespace GsPlugin.Services {
             GsSentry.CaptureException(ex, "Exception during automatic linking via URI handler");
 
             _playniteApi?.Dialogs?.ShowMessage(
-                $"Error during automatic linking: {ex.Message}",
-                "Account Linking Error",
+                GsLocalization.Format("LOCGsPluginLinkingErrorFormat", $"Error during linking: {ex.Message}", ex.Message),
+                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error
             );
@@ -281,7 +281,10 @@ namespace GsPlugin.Services {
 
             // Null check to prevent cascading exceptions
             if (_playniteApi?.Dialogs != null) {
-                _playniteApi.Dialogs.ShowMessage($"Unexpected error processing URI request: {ex.Message}", "Account Linking Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _playniteApi.Dialogs.ShowMessage(
+                    GsLocalization.Format("LOCGsPluginUnexpectedUriErrorFormat", $"Unexpected error processing URI request: {ex.Message}", ex.Message),
+                    GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

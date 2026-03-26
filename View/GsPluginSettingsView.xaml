@@ -214,20 +214,20 @@
                                Foreground="{DynamicResource TextBrushDarker}"
                                Margin="0,0,0,12"
                                TextWrapping="Wrap">
-                        <Run Text="Link your plugin to your GS account to own and persist your data. Visit "/>
+                        <Run Text="{DynamicResource LOCGsPluginAccountLinkingHintPrefix}"/>
                         <Hyperlink NavigateUri="https://gamescrobbler.com?utm_source=playnite_plugin&amp;utm_medium=settings_page&amp;utm_campaign=account_linking&amp;utm_content=hint_text"
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="{StaticResource AccentBrush}">
                             <Run Text="gamescrobbler.com"/>
                         </Hyperlink>
-                        <Run Text=" to get started."/>
+                        <Run Text="{DynamicResource LOCGsPluginAccountLinkingHintSuffix}"/>
                     </TextBlock>
 
                     <!-- Connection status badge -->
                     <StackPanel Orientation="Horizontal"
                                 Margin="0,0,0,12"
                                 VerticalAlignment="Center">
-                        <TextBlock Text="Status:"
+                        <TextBlock Text="{DynamicResource LOCGsPluginStatusLabel}"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextBrushDarker}"
                                    VerticalAlignment="Center"
@@ -261,7 +261,7 @@
                             HorizontalAlignment="Left"
                             Margin="0,0,0,12"
                             Click="OpenWebsiteToLink_Click"
-                            ToolTip="Opens gamescrobbler.com in your browser to link your account automatically"/>
+                            ToolTip="{DynamicResource LOCGsPluginOpenWebsiteToLinkTooltip}"/>
 
                     <!-- Separator: lines + label -->
                     <Grid Margin="0,0,0,12">
@@ -300,7 +300,7 @@
                                  Style="{StaticResource DarkTextBoxStyle}"
                                  Text="{Binding Settings.LinkToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  Margin="0,0,8,0"
-                                 ToolTip="Enter your account linking token here"/>
+                                 ToolTip="{DynamicResource LOCGsPluginTokenInputTooltip}"/>
 
                         <Button Grid.Column="1"
                                 x:Name="LinkAccountButton"
@@ -466,12 +466,12 @@
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
                               Content="{DynamicResource LOCGsPluginShowUpdateNotificationsLabel}"
-                              ToolTip="Show a notification in Playnite when a new plugin version is available"
+                              ToolTip="{DynamicResource LOCGsPluginShowUpdateNotificationsTooltip}"
                               IsChecked="{Binding Settings.ShowUpdateNotifications, Mode=TwoWay}"/>
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
                               Content="{DynamicResource LOCGsPluginShowImportantNotificationsLabel}"
-                              ToolTip="Show notifications about important updates and announcements"
+                              ToolTip="{DynamicResource LOCGsPluginShowImportantNotificationsTooltip}"
                               IsChecked="{Binding Settings.ShowImportantNotifications, Mode=TwoWay}"/>
 
                 </StackPanel>
@@ -490,18 +490,18 @@
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
                               Content="{DynamicResource LOCGsPluginDisableSentryLabel}"
-                              ToolTip="Prevents sending crash reports and diagnostic data to improve the plugin"
+                              ToolTip="{DynamicResource LOCGsPluginDisableSentryTooltip}"
                               IsChecked="{Binding Settings.DisableSentry, Mode=TwoWay}"/>
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
                               Content="{DynamicResource LOCGsPluginDisablePostHogLabel}"
-                              ToolTip="Prevents sending anonymous usage analytics to help improve the plugin"
+                              ToolTip="{DynamicResource LOCGsPluginDisablePostHogTooltip}"
                               IsChecked="{Binding Settings.DisablePostHog, Mode=TwoWay}"/>
 
                     <CheckBox x:Name="DisableScrobblingCheckBox"
                               Style="{StaticResource CheckBoxStyle}"
                               Content="{DynamicResource LOCGsPluginDisableScrobblingLabel}"
-                              ToolTip="Prevents scrobbling of your game playing activity"
+                              ToolTip="{DynamicResource LOCGsPluginDisableScrobblingTooltip}"
                               Margin="0,0,0,6"
                               IsChecked="{Binding Settings.DisableScrobbling, Mode=TwoWay}"/>
 
@@ -582,7 +582,7 @@
                             Margin="0,0,0,8"
                             Visibility="Collapsed"
                             Click="OptBackIn_Click"
-                            ToolTip="Re-enable the plugin and resume syncing"/>
+                            ToolTip="{DynamicResource LOCGsPluginOptBackInTooltip}"/>
 
                     <TextBlock x:Name="DeleteStatusTextBlock"
                                Foreground="#FFA500"

@@ -73,4 +73,115 @@ ID пользователя: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteMyDataButton">Удалить мои данные</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInButton">Согласиться заново</sys:String>
 
+    <!-- ── Account Linking: Additional UI strings ── -->
+    <sys:String x:Key="LOCGsPluginAccountLinkingHintPrefix">Привяжите плагин к учётной записи GS, чтобы сохранить ваши данные. Перейдите на </sys:String>
+    <sys:String x:Key="LOCGsPluginAccountLinkingHintSuffix">, чтобы начать.</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusLabel">Статус:</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusConnected">Подключено к GameScrobbler</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusDisconnected">Отключено</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusOptedOut">Отказ от участия</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkingInProgress">Привязка...</sys:String>
+    <sys:String x:Key="LOCGsPluginOpenWebsiteToLinkTooltip">Открывает gamescrobbler.com в браузере для автоматической привязки учётной записи</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenInputTooltip">Введите токен привязки учётной записи</sys:String>
+
+    <!-- ── Install Token &amp; Diagnostics ── -->
+    <sys:String x:Key="LOCGsPluginTokenStatusActive">&#x2713; Токен: Активен</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenStatusPending">&#x26A0; Токен: Ожидает регистрации</sys:String>
+    <sys:String x:Key="LOCGsPluginPendingScrobblesFormat">{0} скробл(ов) в очереди — повтор будет автоматическим</sys:String>
+    <sys:String x:Key="LOCGsPluginDroppedScrobblesFormat">{0} скробл(ов) потеряно из-за ошибок сервера</sys:String>
+
+    <!-- ── Sync Status ── -->
+    <sys:String x:Key="LOCGsPluginNeverSynced">Не синхронизировалось</sys:String>
+    <sys:String x:Key="LOCGsPluginLastSyncedFormat">Синхронизация: {0} игр · {1}</sys:String>
+
+    <!-- ── Elapsed Time ── -->
+    <sys:String x:Key="LOCGsPluginElapsedJustNow">только что</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedMinutesFormat">{0} мин. назад</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedHoursFormat">{0} ч. назад</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedDaysFormat">{0} дн. назад</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingLessThanMinute">менее минуты</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingMinutesFormat">{0} мин.</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingHoursMinutesFormat">{0} ч. {1} мин.</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingHoursFormat">{0} ч.</sys:String>
+
+    <!-- ── Achievement Provider ── -->
+    <sys:String x:Key="LOCGsPluginAchievementProviderDetectedFormat">{0} обнаружено</sys:String>
+
+    <!-- ── Notification Tooltips ── -->
+    <sys:String x:Key="LOCGsPluginShowUpdateNotificationsTooltip">Показывать уведомление в Playnite при выходе новой версии плагина</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsTooltip">Показывать уведомления о важных обновлениях и объявлениях</sys:String>
+
+    <!-- ── Privacy Tooltips ── -->
+    <sys:String x:Key="LOCGsPluginDisableSentryTooltip">Запрещает отправку отчётов о сбоях и диагностических данных для улучшения плагина</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">Запрещает отправку анонимной аналитики использования для улучшения плагина</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableScrobblingTooltip">Запрещает отслеживание вашей игровой активности</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInTooltip">Повторно включить плагин и возобновить синхронизацию</sys:String>
+
+    <!-- ── Clipboard ── -->
+    <sys:String x:Key="LOCGsPluginCopiedToClipboard">Текст скопирован в буфер обмена!</sys:String>
+    <sys:String x:Key="LOCGsPluginCopiedDialogTitle">Успех</sys:String>
+    <sys:String x:Key="LOCGsPluginCopyFailedFormat">Не удалось скопировать текст: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginOpenUrlFailedFormat">Не удалось открыть URL: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorDialogTitle">Ошибка</sys:String>
+
+    <!-- ── Delete My Data Dialogs ── -->
+    <sys:String x:Key="LOCGsPluginDeleteConfirmBody">Вы уверены, что хотите удалить все ваши данные с серверов GameScrobbler?
+
+Это действие:
+• Удалит вашу библиотеку, сессии и достижения с наших серверов
+• Отключит все функции плагина
+• Потребует повторного согласия для возобновления использования плагина
+
+Это действие необратимо.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteConfirmTitle">Удалить мои данные</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFinalBody">Вы абсолютно уверены? Ваши данные будут безвозвратно удалены с серверов GameScrobbler.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFinalTitle">Подтверждение</sys:String>
+    <sys:String x:Key="LOCGsPluginDeletingInProgress">Удаление...</sys:String>
+
+    <!-- ── Opt Back In Dialog ── -->
+    <sys:String x:Key="LOCGsPluginOptBackInConfirmBody">Повторно включить плагин GameScrobbler?
+
+Для возобновления всех функций потребуется перезапуск Playnite.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInConfirmTitle">Согласиться заново</sys:String>
+
+    <!-- ── Account Linking: Status Messages ── -->
+    <sys:String x:Key="LOCGsPluginPleaseEnterToken">Пожалуйста, введите токен</sys:String>
+    <sys:String x:Key="LOCGsPluginVerifyingToken">Проверка токена...</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccess">Учётная запись успешно привязана!</sys:String>
+    <sys:String x:Key="LOCGsPluginNetworkErrorRetryFormat">{0} Нажмите «Привязать учётную запись», чтобы повторить.</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorRetryFormat">Ошибка: {0} Нажмите «Привязать учётную запись», чтобы повторить.</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorFormat">Ошибка: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginUnknownLinkingError">Произошла неизвестная ошибка при привязке</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Ошибка при привязке: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginNetworkError">Сетевая ошибка — не удалось связаться с сервером. Попробуйте ещё раз.</sys:String>
+    <sys:String x:Key="LOCGsPluginUnlinkFailed">Не удалось отвязать учётную запись.</sys:String>
+    <sys:String x:Key="LOCGsPluginAlreadyLinkedBody">Учётная запись уже привязана к User ID: {0}
+
+Хотите привязать другую учётную запись?</sys:String>
+    <sys:String x:Key="LOCGsPluginAlreadyLinkedTitle">Учётная запись уже привязана</sys:String>
+
+    <!-- ── Data Deletion: Status Messages ── -->
+    <sys:String x:Key="LOCGsPluginDeletingRequesting">Запрос на удаление данных...</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteSuccess">Ваши данные удалены. Плагин отключён.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteRateLimited">Слишком много запросов на удаление. Подождите 15 минут и попробуйте снова.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFailed">Не удалось запросить удаление данных. Попробуйте позже.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteError">Произошла ошибка. Попробуйте позже.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInSuccess">Плагин включён заново. Перезапустите Playnite для возобновления синхронизации.</sys:String>
+
+    <!-- ── URI Handler ── -->
+    <sys:String x:Key="LOCGsPluginInvalidLinkingToken">Получен недействительный токен привязки.</sys:String>
+    <sys:String x:Key="LOCGsPluginUnexpectedUriErrorFormat">Непредвиденная ошибка при обработке URI-запроса: {0}</sys:String>
+
+    <!-- ── Library Sync Messages ── -->
+    <sys:String x:Key="LOCGsPluginSyncCompleted">Синхронизация библиотеки завершена.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncUpToDate">Библиотека уже актуальна.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncCooldownFormat">Библиотека недавно синхронизировалась. Повторите через {0}.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncCooldownGeneric">Библиотека недавно синхронизировалась. Попробуйте позже.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncFailed">Ошибка синхронизации библиотеки. Подробности в логах.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncError">При синхронизации библиотеки произошла ошибка.</sys:String>
+
+    <!-- ── Menu Items ── -->
+    <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Синхронизировать библиотеку</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenSettings">Открыть настройки</sys:String>
+
 </ResourceDictionary>

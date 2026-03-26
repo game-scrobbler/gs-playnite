@@ -443,31 +443,32 @@ namespace GsPlugin {
             };
 
             yield return new MainMenuItem {
-                Description = "Sync Library Now",
+                Description = GsLocalization.Get("LOCGsPluginMenuSyncLibrary", "Sync Library Now"),
                 MenuSection = "@Game Scrobbler",
                 Action = async menuArgs => {
                     try {
                         var result = await SyncLibraryWithDiffAsync();
                         string message;
                         if (result == GsScrobblingService.SyncLibraryResult.Success) {
-                            message = "Library sync completed.";
+                            message = GsLocalization.Get("LOCGsPluginSyncCompleted", "Library sync completed.");
                         }
                         else if (result == GsScrobblingService.SyncLibraryResult.Skipped) {
-                            message = "Library is already up to date.";
+                            message = GsLocalization.Get("LOCGsPluginSyncUpToDate", "Library is already up to date.");
                         }
                         else if (result == GsScrobblingService.SyncLibraryResult.Cooldown) {
                             var expiry = GsDataManager.Data.SyncCooldownExpiresAt
                                 ?? GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt;
                             if (expiry.HasValue) {
                                 var timeLeft = GsTime.FormatRemaining(expiry.Value - DateTime.UtcNow);
-                                message = $"Library was already synced recently. Try again in {timeLeft}.";
+                                message = GsLocalization.Format("LOCGsPluginSyncCooldownFormat",
+                                    $"Library was already synced recently. Try again in {timeLeft}.", timeLeft);
                             }
                             else {
-                                message = "Library was already synced recently. Please try again later.";
+                                message = GsLocalization.Get("LOCGsPluginSyncCooldownGeneric", "Library was already synced recently. Please try again later.");
                             }
                         }
                         else {
-                            message = "Library sync failed. Check logs for details.";
+                            message = GsLocalization.Get("LOCGsPluginSyncFailed", "Library sync failed. Check logs for details.");
                         }
 
                         if (result != GsScrobblingService.SyncLibraryResult.Error) {
@@ -481,13 +482,13 @@ namespace GsPlugin {
                     catch (Exception ex) {
                         _logger.Error(ex, "Error in Sync Library Now menu action");
                         GsSentry.CaptureException(ex, "Error in Sync Library Now menu action");
-                        PlayniteApi.Dialogs.ShowMessage("Library sync encountered an error.", "Game Scrobbler");
+                        PlayniteApi.Dialogs.ShowMessage(GsLocalization.Get("LOCGsPluginSyncError", "Library sync encountered an error."), "Game Scrobbler");
                     }
                 }
             };
 
             yield return new MainMenuItem {
-                Description = "Open Settings",
+                Description = GsLocalization.Get("LOCGsPluginMenuOpenSettings", "Open Settings"),
                 MenuSection = "@Game Scrobbler",
                 Action = _ => PlayniteApi.MainView.OpenPluginSettings(Id)
             };

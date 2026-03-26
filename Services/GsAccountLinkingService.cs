@@ -154,7 +154,7 @@ namespace GsPlugin.Services {
                     return LinkingResult.CreateSuccess(response.userId, context);
                 }
                 else {
-                    string serverMessage = response?.message ?? "Unknown error occurred during linking";
+                    string serverMessage = response?.message ?? GsLocalization.Get("LOCGsPluginUnknownLinkingError", "Unknown error occurred during linking");
                     // Prefer structured errorCode; fall back to message matching
                     // only for older server versions that don't send errorCode.
                     string errorCode = response?.errorCode;
@@ -186,7 +186,9 @@ namespace GsPlugin.Services {
             catch (Exception ex) {
                 GsLogger.Error($"Exception during {context} linking", ex);
                 GsSentry.CaptureException(ex, $"Exception during {context} linking");
-                return LinkingResult.CreateError($"Error during linking: {ex.Message}", context, ex, isNetworkError: true);
+                return LinkingResult.CreateError(
+                    GsLocalization.Format("LOCGsPluginLinkingErrorFormat", $"Error during linking: {ex.Message}", ex.Message),
+                    context, ex, isNetworkError: true);
             }
         }
 
@@ -213,8 +215,10 @@ namespace GsPlugin.Services {
             }
 
             var result = _playniteApi.Dialogs.ShowMessage(
-                $"Account is already linked to User ID: {GsDataManager.Data.LinkedUserId}\n\nDo you want to link to a different account?",
-                "Account Already Linked",
+                GsLocalization.Format("LOCGsPluginAlreadyLinkedBody",
+                    $"Account is already linked to User ID: {GsDataManager.Data.LinkedUserId}\n\nDo you want to link to a different account?",
+                    GsDataManager.Data.LinkedUserId),
+                GsLocalization.Get("LOCGsPluginAlreadyLinkedTitle", "Account Already Linked"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question
             );
@@ -248,7 +252,7 @@ namespace GsPlugin.Services {
 
                 if (response == null) {
                     return LinkingResult.CreateError(
-                        "Network error — could not reach the server. Please try again.",
+                        GsLocalization.Get("LOCGsPluginNetworkError", "Network error — could not reach the server. Please try again."),
                         LinkingContext.ManualSettings, isNetworkError: true);
                 }
 
@@ -285,7 +289,7 @@ namespace GsPlugin.Services {
                     return LinkingResult.CreateSuccess(null, LinkingContext.ManualSettings);
                 }
                 else {
-                    string errorMessage = response.error ?? "Failed to disconnect account.";
+                    string errorMessage = response.error ?? GsLocalization.Get("LOCGsPluginUnlinkFailed", "Failed to disconnect account.");
                     GsLogger.Error($"Unlink failed: {errorMessage}");
                     return LinkingResult.CreateError(errorMessage, LinkingContext.ManualSettings);
                 }
@@ -294,7 +298,7 @@ namespace GsPlugin.Services {
                 GsLogger.Error("Exception during account unlinking", ex);
                 GsSentry.CaptureException(ex, "Exception during account unlinking");
                 return LinkingResult.CreateError(
-                    $"Error: {ex.Message}",
+                    GsLocalization.Format("LOCGsPluginErrorFormat", $"Error: {ex.Message}", ex.Message),
                     LinkingContext.ManualSettings, ex, isNetworkError: true);
             }
         }
