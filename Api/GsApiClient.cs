@@ -554,6 +554,49 @@ namespace GsPlugin.Api {
 
         #endregion
 
+        #region Account Unlinking
+
+        public async Task<UnlinkRes> UnlinkAccount() {
+            var installToken = GsDataManager.DataOrNull?.InstallToken;
+            if (string.IsNullOrEmpty(installToken)) {
+                _logger.Error("UnlinkAccount called with no install token");
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/unlink";
+
+            try {
+                using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
+                    request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+                    request.Headers.Add("x-playnite-token", installToken);
+                    var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                    if (string.IsNullOrWhiteSpace(responseBody)) {
+                        _logger.Warn($"UnlinkAccount received empty response (status {(int)response.StatusCode})");
+                        return null;
+                    }
+
+                    var res = JsonSerializer.Deserialize<UnlinkRes>(responseBody, _jsonOptions);
+                    if (res == null) return null;
+
+                    if (!response.IsSuccessStatusCode) {
+                        res.success = false;
+                        _logger.Warn($"UnlinkAccount returned {(int)response.StatusCode}: {res.error ?? "unknown"}");
+                    }
+
+                    return res;
+                }
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "UnlinkAccount HTTP error");
+                GsSentry.CaptureException(ex, "UnlinkAccount HTTP error");
+                return null;
+            }
+        }
+
+        #endregion
+
         #region Data Deletion
 
         public async Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req) {

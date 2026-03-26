@@ -289,6 +289,79 @@ namespace GsPlugin.Tests {
             }
         }
 
+        // --- UnlinkAccount Tests ---
+
+        [Fact]
+        public async Task UnlinkAccount_NoInstallToken_ReturnsNull() {
+            var tempDir = CreateTempDir();
+            try {
+                InitDataManager(tempDir); // no token
+                var handler = new MockHttpHandler();
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var result = await client.UnlinkAccount();
+
+                Assert.Null(result);
+                Assert.Equal(0, handler.CallCount);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task UnlinkAccount_WithToken_ReturnsSuccessAndAttachesHeader() {
+            var tempDir = CreateTempDir();
+            try {
+                InitDataManager(tempDir, "valid-token");
+
+                var handler = new MockHttpHandler {
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        success = true
+                    })
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var result = await client.UnlinkAccount();
+
+                Assert.NotNull(result);
+                Assert.True(result.success);
+                Assert.NotNull(handler.LastRequest);
+                Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
+                Assert.True(handler.LastRequest.Headers.Contains("x-playnite-token"));
+                Assert.Equal("{}", handler.LastRequestBody);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task UnlinkAccount_ServerError_PreservesErrorMessage() {
+            var tempDir = CreateTempDir();
+            try {
+                InitDataManager(tempDir, "valid-token");
+
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        success = false,
+                        error = "Already disconnected"
+                    })
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var result = await client.UnlinkAccount();
+
+                Assert.NotNull(result);
+                Assert.False(result.success);
+                Assert.Equal("Already disconnected", result.error);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
         // --- GetNotifications Tests ---
 
         [Fact]

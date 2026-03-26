@@ -95,5 +95,38 @@ namespace GsPlugin.Tests {
             var result = LinkingResult.CreateSuccess("user-123", LinkingContext.ManualSettings);
             Assert.False(result.IsNetworkError);
         }
+
+        [Fact]
+        public void CreateError_WithIsTokenExpiry_SetsIsTokenExpiryTrue() {
+            var result = LinkingResult.CreateError("Token expired", LinkingContext.AutomaticUri, isTokenExpiry: true);
+            Assert.True(result.IsTokenExpiry);
+        }
+
+        [Fact]
+        public void CreateError_Default_IsTokenExpiryIsFalse() {
+            var result = LinkingResult.CreateError("Some error", LinkingContext.ManualSettings);
+            Assert.False(result.IsTokenExpiry);
+        }
+
+        [Fact]
+        public void CreateSuccess_IsTokenExpiryIsFalse() {
+            var result = LinkingResult.CreateSuccess("user-123", LinkingContext.ManualSettings);
+            Assert.False(result.IsTokenExpiry);
+        }
+
+        [Fact]
+        public void CreateError_WithBothFlags_SetsCorrectly() {
+            var result = LinkingResult.CreateError("fail", LinkingContext.ManualSettings,
+                isNetworkError: true, isTokenExpiry: true);
+            Assert.True(result.IsNetworkError);
+            Assert.True(result.IsTokenExpiry);
+        }
+
+        [Fact]
+        public void CreateError_IsTokenExpiry_DoesNotSetIsNetworkError() {
+            var result = LinkingResult.CreateError("Token expired", LinkingContext.AutomaticUri, isTokenExpiry: true);
+            Assert.True(result.IsTokenExpiry);
+            Assert.False(result.IsNetworkError);
+        }
     }
 }

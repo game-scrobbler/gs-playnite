@@ -204,6 +204,15 @@ namespace GsPlugin.Api {
     }
 
     // ──────────────────────────────────────────────────────────
+    // Account Unlinking DTOs
+    // ──────────────────────────────────────────────────────────
+
+    public class UnlinkRes {
+        public bool success { get; set; }
+        public string error { get; set; }
+    }
+
+    // ──────────────────────────────────────────────────────────
     // Data Deletion DTOs
     // ──────────────────────────────────────────────────────────
 

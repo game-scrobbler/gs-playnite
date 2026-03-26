@@ -15,6 +15,7 @@ namespace GsPlugin.Api {
         Task<AllowedPluginsRes> GetAllowedPlugins();
         Task<TokenVerificationRes> VerifyToken(string token, string playniteId);
         Task FlushPendingScrobblesAsync();
+        Task<UnlinkRes> UnlinkAccount();
         Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req);
         Task<RegisterInstallTokenRes> RegisterInstallToken(string installId);
         Task<string> ResetInstallToken(string currentToken);

@@ -32,6 +32,11 @@ namespace GsPlugin.Services {
         /// a server-side token rejection. Callers can use this to offer a retry action.
         /// </summary>
         public bool IsNetworkError { get; set; }
+        /// <summary>
+        /// True when the failure was caused by an expired or invalid link token.
+        /// Callers can use this to offer contextual recovery (e.g. open linking page).
+        /// </summary>
+        public bool IsTokenExpiry { get; set; }
 
         public static LinkingResult CreateSuccess(string userId, LinkingContext context) {
             return new LinkingResult {
@@ -41,13 +46,14 @@ namespace GsPlugin.Services {
             };
         }
 
-        public static LinkingResult CreateError(string errorMessage, LinkingContext context, Exception exception = null, bool isNetworkError = false) {
+        public static LinkingResult CreateError(string errorMessage, LinkingContext context, Exception exception = null, bool isNetworkError = false, bool isTokenExpiry = false) {
             return new LinkingResult {
                 Success = false,
                 ErrorMessage = errorMessage,
                 Context = context,
                 Exception = exception,
-                IsNetworkError = isNetworkError
+                IsNetworkError = isNetworkError,
+                IsTokenExpiry = isTokenExpiry
             };
         }
     }
@@ -149,19 +155,32 @@ namespace GsPlugin.Services {
                 }
                 else {
                     string serverMessage = response?.message ?? "Unknown error occurred during linking";
-                    bool isTokenExpiry = serverMessage.IndexOf("expired", StringComparison.OrdinalIgnoreCase) >= 0
-                                      || serverMessage.IndexOf("invalid", StringComparison.OrdinalIgnoreCase) >= 0;
-
-                    string errorMessage = isTokenExpiry
-                        ? $"{serverMessage} Visit gamescrobbler.com/app/control and click \"Add Platform\" to generate a new token."
-                        : serverMessage;
+                    // Prefer structured errorCode; fall back to message matching
+                    // only for older server versions that don't send errorCode.
+                    string errorCode = response?.errorCode;
+                    bool isTokenExpiry = errorCode == "TOKEN_EXPIRED"
+                                      || errorCode == "TOKEN_INVALID"
+                                      || (string.IsNullOrEmpty(errorCode)
+                                          && (serverMessage.IndexOf("expired", StringComparison.OrdinalIgnoreCase) >= 0
+                                              || serverMessage.IndexOf("invalid", StringComparison.OrdinalIgnoreCase) >= 0));
 
                     GsLogger.Error($"{context} linking failed: {serverMessage}");
-                    GsSentry.CaptureMessage(
-                        $"{context} account linking failed: {serverMessage}",
-                        isTokenExpiry ? SentryLevel.Info : SentryLevel.Warning
-                    );
-                    return LinkingResult.CreateError(errorMessage, context);
+
+                    // Expired/invalid tokens are expected user behavior (slow to click,
+                    // reusing old links) — log as breadcrumb, not a Sentry issue.
+                    if (isTokenExpiry) {
+                        GsSentry.AddBreadcrumb(
+                            message: $"{context} account linking failed: token expired/invalid",
+                            category: "linking"
+                        );
+                    }
+                    else {
+                        GsSentry.CaptureMessage(
+                            $"{context} account linking failed: {serverMessage}",
+                            SentryLevel.Warning
+                        );
+                    }
+                    return LinkingResult.CreateError(serverMessage, context, isTokenExpiry: isTokenExpiry);
                 }
             }
             catch (Exception ex) {
@@ -201,6 +220,83 @@ namespace GsPlugin.Services {
             );
 
             return result == MessageBoxResult.Yes;
+        }
+
+        /// <summary>
+        /// Disconnects the current account link. Asks for confirmation,
+        /// calls the server to remove the link, then clears local state.
+        /// </summary>
+        public async Task<LinkingResult> UnlinkAccountAsync() {
+            if (!GsDataManager.IsAccountLinked) {
+                return LinkingResult.CreateError(
+                    GsLocalization.Get("LOCGsPluginDisconnectNoAccount", "No account is currently linked."),
+                    LinkingContext.ManualSettings);
+            }
+
+            var confirm = _playniteApi.Dialogs.ShowMessage(
+                GsLocalization.Get("LOCGsPluginDisconnectDialogBody", "Disconnect your account? Your game data will be kept on the server.\nYou can re-link anytime."),
+                GsLocalization.Get("LOCGsPluginDisconnectDialogTitle", "Disconnect Account"),
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes) {
+                return LinkingResult.CreateError("Cancelled", LinkingContext.ManualSettings);
+            }
+
+            try {
+                var response = await _apiClient.UnlinkAccount();
+
+                if (response == null) {
+                    return LinkingResult.CreateError(
+                        "Network error — could not reach the server. Please try again.",
+                        LinkingContext.ManualSettings, isNetworkError: true);
+                }
+
+                if (response.success) {
+                    // Clear all identity-bound state to prevent data from bleeding
+                    // across accounts after a re-link. Same fields as RotateInstallId
+                    // but without rotating the InstallID/InstallToken themselves.
+                    GsDataManager.MutateAndSave(d => {
+                        d.LinkedUserId = null;
+                        d.ActiveSessionId = null;
+                        d.PendingStartGameId = null;
+                        d.PendingScrobbles.Clear();
+                        d.LastLibraryHash = null;
+                        d.LastAchievementHash = null;
+                        d.LastSyncAt = null;
+                        d.LastSyncGameCount = null;
+                        d.SyncCooldownExpiresAt = null;
+                        d.LibraryDiffSyncCooldownExpiresAt = null;
+                        d.LastIntegrationAccountsHash = null;
+                    });
+                    GsSnapshotManager.Reset();
+                    OnLinkingStatusChanged();
+                    // Refresh diagnostics widgets (pending scrobble count, last-sync text)
+                    // since MutateAndSave does not emit DiagnosticsStateChanged.
+                    GsDataManager.NotifyDiagnosticsChanged();
+
+                    GsLogger.Info("Account unlinked; identity-bound state cleared.");
+                    GsSentry.AddBreadcrumb(
+                        message: "Account unlinked by user",
+                        category: "linking"
+                    );
+                    GsPostHog.Capture("account_unlinked");
+
+                    return LinkingResult.CreateSuccess(null, LinkingContext.ManualSettings);
+                }
+                else {
+                    string errorMessage = response.error ?? "Failed to disconnect account.";
+                    GsLogger.Error($"Unlink failed: {errorMessage}");
+                    return LinkingResult.CreateError(errorMessage, LinkingContext.ManualSettings);
+                }
+            }
+            catch (Exception ex) {
+                GsLogger.Error("Exception during account unlinking", ex);
+                GsSentry.CaptureException(ex, "Exception during account unlinking");
+                return LinkingResult.CreateError(
+                    $"Error: {ex.Message}",
+                    LinkingContext.ManualSettings, ex, isNetworkError: true);
+            }
         }
 
         /// <summary>

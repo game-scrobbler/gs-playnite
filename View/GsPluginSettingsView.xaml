@@ -244,6 +244,16 @@
                         </Border>
                     </StackPanel>
 
+                    <!-- Disconnect button (visible only when linked) -->
+                    <Button x:Name="DisconnectAccountButton"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Content="{DynamicResource LOCGsPluginDisconnectAccountButton}"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,0,12"
+                            Visibility="Collapsed"
+                            Click="DisconnectAccount_Click"
+                            ToolTip="{DynamicResource LOCGsPluginDisconnectAccountTooltip}"/>
+
                     <!-- Open website button -->
                     <Button x:Name="OpenWebsiteToLinkButton"
                             Style="{StaticResource SecondaryButtonStyle}"
@@ -298,6 +308,13 @@
                                 Content="{DynamicResource LOCGsPluginLinkAccountButton}"
                                 Click="LinkAccount_Click"/>
                     </Grid>
+
+                    <!-- Token expiry countdown (Visibility driven by code-behind) -->
+                    <TextBlock x:Name="TokenCountdownTextBlock"
+                               Foreground="{DynamicResource TextBrushDarker}"
+                               FontSize="11"
+                               Visibility="Collapsed"
+                               Margin="0,0,0,4"/>
 
                     <!-- Link status message (Visibility driven by code-behind) -->
                     <TextBlock x:Name="LinkStatusTextBlock"

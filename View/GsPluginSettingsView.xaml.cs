@@ -155,6 +155,7 @@ namespace GsPlugin.View {
             Dispatcher.Invoke(() => {
                 UpdateInstallTokenStatus();
                 UpdatePendingScrobblesStatus();
+                LastSyncStatusTextBlock.Text = GsPluginSettingsViewModel.LastSyncStatus;
             });
         }
 
@@ -194,6 +195,10 @@ namespace GsPlugin.View {
                     UpdateStatusMessage();
                     break;
 
+                case nameof(GsPluginSettings.TokenCountdown):
+                    UpdateCountdownDisplay();
+                    break;
+
                 case nameof(GsPluginSettings.IsDeleting):
                     UpdateDeletingState();
                     break;
@@ -229,6 +234,11 @@ namespace GsPlugin.View {
             OpenWebsiteToLinkButton.Visibility = linkingVisibility;
             ManualTokenSeparator.Visibility = linkingVisibility;
             LinkingControlsGrid.Visibility = linkingVisibility;
+
+            // Show disconnect button only when linked and not opted out
+            DisconnectAccountButton.Visibility = (!isOptedOut && GsPluginSettingsViewModel.IsLinked)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         /// <summary>
@@ -257,6 +267,19 @@ namespace GsPlugin.View {
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         }
+
+        /// <summary>
+        /// Updates the token countdown display.
+        /// </summary>
+        private void UpdateCountdownDisplay() {
+            if (_viewModel?.Settings == null) return;
+
+            string countdown = _viewModel.Settings.TokenCountdown;
+            TokenCountdownTextBlock.Text = countdown;
+            TokenCountdownTextBlock.Visibility = string.IsNullOrEmpty(countdown)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
         #endregion
 
         #region User Interaction Handlers
@@ -265,6 +288,20 @@ namespace GsPlugin.View {
         /// </summary>
         private void LinkAccount_Click(object sender, RoutedEventArgs e) {
             _viewModel?.LinkAccount();
+        }
+
+        /// <summary>
+        /// Handles the disconnect account button click event.
+        /// </summary>
+        private async void DisconnectAccount_Click(object sender, RoutedEventArgs e) {
+            if (_viewModel == null) return;
+            DisconnectAccountButton.IsEnabled = false;
+            try {
+                await _viewModel.UnlinkAccount();
+            }
+            finally {
+                DisconnectAccountButton.IsEnabled = true;
+            }
         }
 
         /// <summary>

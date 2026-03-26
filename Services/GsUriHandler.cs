@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
 using Playnite.SDK;
@@ -44,6 +45,7 @@ namespace GsPlugin.Services {
         /// <summary>
         /// Handles URI requests for automatic account linking.
         /// Expected format: playnite://gamescrobbler/link/[token]
+        /// Optional query param: ?expires_at=[unix_seconds]
         /// </summary>
         /// <param name="args">URI arguments containing the token</param>
         private async void HandleUriRequest(PlayniteUriEventArgs args) {
@@ -66,12 +68,28 @@ namespace GsPlugin.Services {
                 }
 
                 // Expected format: playnite://gamescrobbler/link/[token]
+                // or: playnite://gamescrobbler/link/[token]?expires_at=[unix_seconds]
                 if (args.Arguments.Length >= 2 && args.Arguments[0].Equals("link", StringComparison.OrdinalIgnoreCase)) {
-                    string token = args.Arguments[1];
+                    string rawToken = args.Arguments[1];
+
+                    // Parse optional expires_at query param from the token argument
+                    string token = rawToken;
+                    DateTimeOffset? expiresAt = null;
+                    int qIndex = rawToken.IndexOf('?');
+                    if (qIndex >= 0) {
+                        token = rawToken.Substring(0, qIndex);
+                        expiresAt = ParseExpiresAt(rawToken.Substring(qIndex + 1));
+                    }
 
                     if (string.IsNullOrWhiteSpace(token)) {
                         HandleEmptyToken();
                         return;
+                    }
+
+                    // expires_at is a UX hint only — server is authoritative.
+                    // Log if it looks expired but still attempt verification.
+                    if (expiresAt.HasValue && DateTimeOffset.UtcNow >= expiresAt.Value) {
+                        GsLogger.Info("Deep link expires_at suggests token may have expired; proceeding with server verification");
                     }
 
                     // Check if already linked and get user confirmation if needed
@@ -96,6 +114,30 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
+        /// Parses the expires_at value from a query string (e.g. "expires_at=1711459200").
+        /// Returns null if the param is missing or unparseable.
+        /// </summary>
+        private static DateTimeOffset? ParseExpiresAt(string queryString) {
+            try {
+                const string prefix = "expires_at=";
+                int start = queryString.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                if (start < 0) return null;
+
+                string value = queryString.Substring(start + prefix.Length);
+                int ampIndex = value.IndexOf('&');
+                if (ampIndex >= 0) value = value.Substring(0, ampIndex);
+
+                if (long.TryParse(value, out long unixSeconds)) {
+                    return DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+                }
+            }
+            catch (Exception ex) {
+                GsLogger.Warn($"Failed to parse expires_at from deep link: {ex.Message}");
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Processes automatic account linking using the provided token.
         /// </summary>
         /// <param name="token">The linking token from the web app</param>
@@ -108,10 +150,15 @@ namespace GsPlugin.Services {
 
                     if (result.Success) {
                         _playniteApi?.Dialogs?.ShowMessage(
-                            $"Account successfully linked!\nUser ID: {result.UserId}",
-                            "Account Linking Success",
+                            GsLocalization.Format("LOCGsPluginLinkSuccessDialogBody", "Account successfully linked!\nUser ID: {0}", result.UserId),
+                            GsLocalization.Get("LOCGsPluginLinkSuccessDialogTitle", "Account Linking Success"),
                             MessageBoxButton.OK,
                             MessageBoxImage.Information);
+                        return;
+                    }
+
+                    if (result.IsTokenExpiry) {
+                        OfferOpenLinkingPage();
                         return;
                     }
 
@@ -119,16 +166,16 @@ namespace GsPlugin.Services {
                         bool isLastAttempt = attempt == MaxLinkRetries - 1;
                         if (isLastAttempt) {
                             _playniteApi?.Dialogs?.ShowMessage(
-                                $"Account linking failed after multiple attempts:\n{result.ErrorMessage}\n\nPlease try again later.",
-                                "Account Linking Failed",
+                                GsLocalization.Format("LOCGsPluginLinkFailedRetriesBody", "Account linking failed after multiple attempts:\n{0}\n\nPlease try again later.", result.ErrorMessage),
+                                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"),
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Error);
                             return;
                         }
 
                         var retry = _playniteApi?.Dialogs?.ShowMessage(
-                            $"Account linking failed due to a network error:\n{result.ErrorMessage}\n\nWould you like to retry?",
-                            "Account Linking Failed \u2014 Retry?",
+                            GsLocalization.Format("LOCGsPluginLinkFailedNetworkBody", "Account linking failed due to a network error:\n{0}\n\nWould you like to retry?", result.ErrorMessage),
+                            GsLocalization.Get("LOCGsPluginLinkFailedRetryDialogTitle", "Account Linking Failed — Retry?"),
                             MessageBoxButton.YesNo,
                             MessageBoxImage.Warning);
                         if (retry != MessageBoxResult.Yes) {
@@ -138,8 +185,8 @@ namespace GsPlugin.Services {
                     }
                     else {
                         _playniteApi?.Dialogs?.ShowMessage(
-                            $"Account linking failed: {result.ErrorMessage}",
-                            "Account Linking Failed",
+                            GsLocalization.Format("LOCGsPluginLinkFailedBody", "Account linking failed: {0}", result.ErrorMessage),
+                            GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"),
                             MessageBoxButton.OK,
                             MessageBoxImage.Error);
                         return;
@@ -148,6 +195,31 @@ namespace GsPlugin.Services {
                 catch (Exception ex) {
                     HandleLinkingException(ex);
                     return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Offers to open the linking page in the browser when a token has expired.
+        /// </summary>
+        private void OfferOpenLinkingPage() {
+            var answer = _playniteApi?.Dialogs?.ShowMessage(
+                GsLocalization.Get("LOCGsPluginTokenExpiredDialogBody", "Your link token has expired.\n\nWould you like to open the linking page to get a new one?"),
+                GsLocalization.Get("LOCGsPluginTokenExpiredDialogTitle", "Token Expired"),
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (answer == MessageBoxResult.Yes) {
+                try {
+                    var installId = GsDataManager.Data.InstallID;
+                    var url = $"https://gamescrobbler.com/link?install_id={installId}";
+                    Process.Start(new ProcessStartInfo {
+                        FileName = url,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex) {
+                    GsLogger.Error("Failed to open linking page", ex);
                 }
             }
         }

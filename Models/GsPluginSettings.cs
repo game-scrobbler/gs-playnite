@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using Playnite.SDK;
 using Playnite.SDK.Data;
 using Sentry;
@@ -108,6 +109,15 @@ namespace GsPlugin.Models {
             }
         }
 
+        private string _tokenCountdown = "";
+        public string TokenCountdown {
+            get => _tokenCountdown;
+            set {
+                _tokenCountdown = value;
+                OnPropertyChanged();
+            }
+        }
+
         private bool _isDeleting = false;
         public bool IsDeleting {
             get => _isDeleting;
@@ -137,6 +147,10 @@ namespace GsPlugin.Models {
         private readonly IGsApiClient _apiClient;
         private GsPluginSettings _editingClone;
         private GsPluginSettings _settings;
+
+        private static readonly TimeSpan TokenTtl = TimeSpan.FromMinutes(5);
+        private DispatcherTimer _countdownTimer;
+        private DateTimeOffset _countdownDeadline;
 
         public GsPluginSettings Settings {
             get => _settings;
@@ -181,7 +195,7 @@ namespace GsPlugin.Models {
 
         public static bool IsLinked => GsDataManager.IsAccountLinked;
         public static string ConnectionStatus => IsLinked
-            ? $"Connected (User ID: {GsDataManager.Data.LinkedUserId})"
+            ? "Connected to GameScrobbler"
             : "Disconnected";
         public static bool ShowLinkingControls => !IsLinked;
 
@@ -359,11 +373,32 @@ namespace GsPlugin.Models {
         #region Account Linking Operations
 
         /// <summary>
+        /// Disconnects the linked account via the centralized service.
+        /// </summary>
+        public async Task UnlinkAccount() {
+            try {
+                var result = await _linkingService.UnlinkAccountAsync();
+                if (result.Success) {
+                    Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginStatusDisconnected", "Account disconnected.");
+                }
+                else if (result.ErrorMessage != "Cancelled") {
+                    Settings.LinkStatusMessage = result.ErrorMessage;
+                }
+            }
+            catch (Exception ex) {
+                GsLogger.Error("Unhandled exception in UnlinkAccount", ex);
+                GsSentry.CaptureException(ex, "Unhandled exception in UnlinkAccount");
+                Settings.LinkStatusMessage = $"Error: {ex.Message}";
+            }
+        }
+
+        /// <summary>
         /// Performs account linking with the provided token.
         /// </summary>
         public async void LinkAccount() {
             try {
                 if (!ValidateLinkToken()) return;
+                StartCountdown();
                 await PerformLinking();
             }
             catch (Exception ex) {
@@ -398,6 +433,9 @@ namespace GsPlugin.Models {
                     Settings.LinkStatusMessage = "Successfully linked account!";
                     // Note: OnLinkingStatusChanged() is already called inside LinkAccountAsync
                 }
+                else if (result.IsTokenExpiry) {
+                    Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginStatusTokenExpired", "Token expired — click \"Open website to link\" to get a new one.");
+                }
                 else if (result.IsNetworkError) {
                     Settings.LinkStatusMessage = $"{result.ErrorMessage} Click \"Link Account\" to retry.";
                 }
@@ -410,11 +448,51 @@ namespace GsPlugin.Models {
             }
             finally {
                 Settings.IsLinking = false;
+                StopCountdown();
                 // Preserve the token on network errors so the user can retry without re-entering it
                 if (Settings.LinkStatusMessage?.IndexOf("retry", System.StringComparison.OrdinalIgnoreCase) < 0) {
                     Settings.LinkToken = "";
                 }
             }
+        }
+
+        /// <summary>
+        /// Starts a local countdown timer from now, assuming the token was just generated
+        /// and has the standard 5-minute TTL. The countdown is a UX hint — the server is
+        /// still the authority on actual expiry.
+        /// </summary>
+        public void StartCountdown() {
+            _countdownDeadline = DateTimeOffset.UtcNow.Add(TokenTtl);
+            UpdateCountdownText();
+
+            if (_countdownTimer == null) {
+                _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                _countdownTimer.Tick += (s, e) => UpdateCountdownText();
+            }
+            _countdownTimer.Start();
+        }
+
+        /// <summary>
+        /// Stops the countdown timer and clears the display.
+        /// </summary>
+        public void StopCountdown() {
+            _countdownTimer?.Stop();
+            if (Settings != null) {
+                Settings.TokenCountdown = "";
+            }
+        }
+
+        private void UpdateCountdownText() {
+            var remaining = _countdownDeadline - DateTimeOffset.UtcNow;
+            if (remaining <= TimeSpan.Zero) {
+                // Timer expired — clear the countdown display but do NOT
+                // set an expiry status message. The server is authoritative;
+                // the in-flight VerifyToken call may still succeed.
+                _countdownTimer?.Stop();
+                Settings.TokenCountdown = "";
+                return;
+            }
+            Settings.TokenCountdown = GsLocalization.Format("LOCGsPluginTokenCountdownFormat", "Token expires in ~{0}:{1}", (int)remaining.TotalMinutes, remaining.Seconds.ToString("D2"));
         }
 
         #endregion

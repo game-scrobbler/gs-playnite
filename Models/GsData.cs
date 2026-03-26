@@ -171,6 +171,14 @@ namespace GsPlugin.Models {
         public static event EventHandler DiagnosticsStateChanged;
 
         /// <summary>
+        /// Manually fires DiagnosticsStateChanged for callers that modify
+        /// diagnostics-visible state via MutateAndSave (which does not auto-fire).
+        /// </summary>
+        public static void NotifyDiagnosticsChanged() {
+            DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
+        }
+
+        /// <summary>
         /// The current data instance.
         /// </summary>
         private static GsData _data;
