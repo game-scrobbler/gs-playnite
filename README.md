@@ -2,6 +2,7 @@
 
 [![GitHub license](https://img.shields.io/github/license/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/blob/main/LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/releases/latest)
+[![GitHub downloads](https://img.shields.io/github/downloads/game-scrobbler/gs-playnite/total.svg)](https://github.com/game-scrobbler/gs-playnite/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/game-scrobbler/gs-playnite/build.yml?branch=main)](https://github.com/game-scrobbler/gs-playnite/actions)
 [![GitHub issues](https://img.shields.io/github/issues/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/issues/)
 [![GitHub pull-requests](https://img.shields.io/github/issues-pr/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/pulls/)
