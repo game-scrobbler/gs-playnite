@@ -24,14 +24,14 @@
     <sys:String x:Key="LOCGsPluginSyncSettingsSectionTitle">Настройки синхронизации</sys:String>
     <sys:String x:Key="LOCGsPluginSyncAchievementsLabel">Синхронизировать данные о достижениях (требуется дополнение SuccessStory или Playnite Achievements)</sys:String>
     <sys:String x:Key="LOCGsPluginSyncAchievementsTooltip">Считывает данные о достижениях из дополнения SuccessStory или Playnite Achievements во время синхронизации библиотеки. Не действует, если ни одно из них не установлено.</sys:String>
-    <sys:String x:Key="LOCGsPluginAchievementProviderMissingWarning"> Не найдено дополнение для достижений — синхронизация достижений будет пропущена.</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderMissingWarning">Не найдено дополнение для достижений — синхронизация достижений будет пропущена.</sys:String>
     <sys:String x:Key="LOCGsPluginAchievementProviderInstallLink">Установить дополнение для достижений</sys:String>
     <sys:String x:Key="LOCGsPluginLibrarySyncLabel">Синхронизация библиотеки:</sys:String>
 
     <!-- ── Section 5: Notifications ── -->
     <sys:String x:Key="LOCGsPluginNotificationsSectionTitle">Уведомления</sys:String>
     <sys:String x:Key="LOCGsPluginShowUpdateNotificationsLabel">Показывать уведомления о выходе новой версии</sys:String>
-    <sys:String x:Key="LOCGsPluginShowImportantNotificationsLabel"> Показывать важные уведомления от GameScrobbler</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsLabel">Показывать важные уведомления от GameScrobbler</sys:String>
 
     <!-- ── Section 6: Privacy Controls ── -->
     <sys:String x:Key="LOCGsPluginPrivacySectionTitle">Управление конфиденциальностью</sys:String>
