@@ -10,11 +10,11 @@
 [![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.6.2-blue.svg)](https://dotnet.microsoft.com/download/dotnet-framework)
 [![Discord](https://img.shields.io/badge/Discord-community-5865F2?logo=discord&logoColor=white)](https://discord.gg/ynEGCAEBun)
 
-Visualize your gaming history in Playnite.
+Track, analyze, and visualize your gaming life — like Last.fm, but for games.
 
-GameScrobbler is a Playnite plugin for tracking, analyzing, and visualizing your gaming habits. It transforms your Playnite library into interactive analytics, visual maps, and AI-powered insights.
+[GameScrobbler](https://gamescrobbler.com) is the official Playnite plugin for the GameScrobbler platform. It automatically tracks your play sessions, syncs your library, and turns your gaming data into interactive analytics, visual maps, and AI-powered insights.
 
-Instead of a static list of games, your library becomes a living profile of how you actually play.
+Instead of a static list of games, your library becomes a living profile of how you actually play — across every platform Playnite manages.
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=aIkQVpO8NoA">
@@ -33,47 +33,41 @@ Instead of a static list of games, your library becomes a living profile of how 
 3. Search `GameScrobbler`
 4. Click **Install**
 
----
-
 ### Manual installation
 
-Download the latest release:
+Download the latest `.pext` from the [releases page](https://github.com/game-scrobbler/gs-playnite/releases/latest), then install via `Playnite -> Addons -> Install from file`.
 
-https://github.com/game-scrobbler/gs-playnite/releases/latest
+---
 
-Then install the `.pext` package via:
+## Supported Platforms
 
-`Playnite -> Addons -> Install from file`
+Playnite aggregates games from many launchers. GameScrobbler tracks everything Playnite sees, including games from:
+
+Steam, GOG, Epic Games, Xbox, PlayStation, Battle.net, Ubisoft Connect, itch.io, Humble, Amazon Games, and more.
+
+You can also link your GameScrobbler account to Steam and Discord at [gamescrobbler.com](https://gamescrobbler.com), with more platforms coming soon.
 
 ---
 
 ## Features
 
-### Gamer Mind Map
+All features are accessible inside Playnite through the embedded sidebar dashboard and on the web at [gamescrobbler.com](https://gamescrobbler.com).
 
-A visual graph of your gaming library centered around you.
+### Universe
 
-Genres form clusters around your profile, with games orbiting those genres. This reveals patterns in how you play.
-
-You can quickly see:
-
-- dominant genres in your library
-- hidden play patterns
-- how large your backlog really is
-
----
+Interactive graph visualizations of your gaming library. Games, genres, platforms, companies, and themes form a force-directed network that reveals your play patterns at a glance.
 
 ### Play Timeline
 
-Track your gaming sessions over time.
+Track your gaming sessions over time. See when you were most active, which games dominated specific periods, and how your habits evolve.
 
-See when you were most active, which games dominated specific periods, and how your habits evolve.
+### Dossier
 
----
+AI-generated gaming personality profile. GameScrobbler analyzes your play history and produces an archetype, playstyle breakdown, and personality insights.
 
 ### Chat With Your Library
 
-Ask questions about your gaming habits.
+Ask natural language questions about your gaming habits.
 
 Examples:
 
@@ -81,25 +75,35 @@ Examples:
 - Which games did I abandon halfway?
 - What should I finish next?
 
-GameScrobbler analyzes your library and returns answers based on your real play history.
+### For You
 
----
+Personalized game recommendations based on your library and play patterns, with similarity scores and reasons for each suggestion.
 
 ### AI Roast
 
-GameScrobbler can generate humorous commentary about your gaming habits.
+Humorous AI-generated commentary about your gaming habits.
 
-Example:
+> You own 287 games.
+> You have finished 19.
+> Your backlog now qualifies as a museum.
 
-You own 287 games.  
-You have finished 19.  
-Your backlog now qualifies as a museum.
+### Stats
+
+17 analytics charts covering genres, themes, platforms, companies, franchises, release years, game modes, playtime trends, and more.
+
+### Library
+
+Full game collection view with achievement rarity tracking, sortable by playtime, and switchable between grid and table layouts.
+
+### Social
+
+Steam friends, Discord servers, and linked accounts — all visible in one place.
 
 ---
 
 ## Screenshots
 
-### Gamer Mind Map
+### Universe (Mind Map)
 
 ![Gamer Mind Map](screenshots/gamer-mind-map.png)
 
@@ -117,25 +121,43 @@ Your backlog now qualifies as a museum.
 
 ---
 
-## Core Capabilities
+## How It Works
 
-- automatic game session tracking
-- Playnite library synchronization
-- optional achievement tracking
-- interactive statistics dashboard
-- AI analysis of gaming behavior
-- account linking for persistent data
-- configurable privacy controls
+1. You play a game — the plugin records the session automatically
+2. Your library, playtime, and achievements sync to GameScrobbler
+3. AI and analytics generate insights, visualizations, and recommendations
+4. View everything in Playnite's sidebar or at [gamescrobbler.com](https://gamescrobbler.com)
+
+Link your GameScrobbler account to connect data from other platforms (Steam, Xbox, PlayStation, etc.) into one unified profile.
 
 ---
 
-## How It Works
+## Public API & MCP
 
-GameScrobbler listens to Playnite game events and records play sessions automatically.
+GameScrobbler exposes a read-only public API and an MCP server for AI agents.
 
-Your library metadata and play history are synced to your GameScrobbler account where additional analysis and visualizations are generated.
+### REST API
 
-These insights are then displayed inside Playnite through an embedded dashboard.
+Base URL: `https://api.gamescrobbler.com/api/v1/public`
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /library/{token}` | Paginated game library |
+| `GET /insights/{token}` | Player archetype, stats, top genres |
+| `GET /recommendations/{token}` | Personalized game recommendations |
+| `GET /mind-map/{token}` | Force-directed graph of your gaming profile |
+| `GET /docs` | Interactive API documentation |
+| `GET /openapi.json` | OpenAPI 3.0.3 specification |
+
+Authentication is via a profile token (no API key needed). Rate limit: 30 requests per minute.
+
+### MCP Server
+
+Endpoint: `POST https://api.gamescrobbler.com/api/v1/public/mcp`
+
+Provides 5 tools for AI agents: `get_game_library`, `get_player_insights`, `get_recommendations`, `get_mind_map`, and `get_profile_summary`. Compatible with Claude, ChatGPT, and other MCP clients.
+
+Auth via `x-profile-token` header or `profile_token` parameter.
 
 ---
 
@@ -148,25 +170,23 @@ Supported providers:
 - [SuccessStory](https://playnite.link/addons.html#Success_Story_Addon)
 - [Playnite Achievements](https://playnite.link/addons.html#PlayniteAchievements_e6aad2c9-6e06-4d8d-ac55-ac3b252b5f7b)
 
-The plugin checks providers in priority order and uses the first one that returns data.
+The plugin checks providers in priority order and uses the first one that returns data. If neither addon is installed, achievement fields are sent as unknown, not zero.
 
-If neither addon is installed, achievement fields are sent as unknown, not zero.
-
-You can disable achievement sync in:
-
-`Settings -> Experimental Features -> Sync achievement data`
+You can disable achievement sync in `Settings -> Experimental Features -> Sync achievement data`.
 
 ---
 
 ## Privacy
 
-Users control their data.
+GameScrobbler is [open source](https://github.com/game-scrobbler/gs-playnite) — you can audit exactly what data is collected and sent.
 
 Settings allow you to:
 
-- disable scrobbling
+- disable scrobbling entirely
 - disable error reporting
 - disable achievement syncing
+- **delete all your data** from GameScrobbler servers (permanently removes server-side data and disables the plugin)
+- opt back in at any time after deletion
 
 All options are configurable inside the plugin settings.
 
@@ -180,15 +200,11 @@ All options are configurable inside the plugin settings.
 - Playnite SDK
 - Visual Studio / MSBuild
 
----
-
 ### Build
 
 ```bash
 MSBuild.exe GsPlugin.sln -p:Configuration=Release -restore
 ```
-
----
 
 ### Tests
 
@@ -196,9 +212,7 @@ MSBuild.exe GsPlugin.sln -p:Configuration=Release -restore
 dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build
 ```
 
----
-
-## Repository Structure
+### Repository Structure
 
 ```text
 gs-playnite/
@@ -217,19 +231,13 @@ gs-playnite/
 
 This project uses Release Please with Conventional Commits.
 
-Version bumps are determined automatically:
-
 | Commit type | Version bump |
 | --- | --- |
 | fix | patch |
 | feat | minor |
 | feat! | major |
 
-Release Please automatically:
-
-- updates version files
-- generates changelogs
-- publishes `.pext` plugin releases
+Release Please automatically updates version files, generates changelogs, and publishes `.pext` plugin releases.
 
 ---
 
@@ -237,29 +245,21 @@ Release Please automatically:
 
 1. Fork the repository
 2. Clone your fork
-3. Run setup script:
+3. Run the setup script to install git hooks:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1
 ```
 
-4. Format code before committing:
-
-```bash
-dotnet format GsPlugin.sln
-```
-
-All commits must follow Conventional Commits.
+4. All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by the `commit-msg` hook).
 
 ---
 
 ## Links
 
-Repository  
-https://github.com/game-scrobbler/gs-playnite
-
-Issues  
-https://github.com/game-scrobbler/gs-playnite/issues
-
-Playnite  
-https://playnite.link
+- [GameScrobbler](https://gamescrobbler.com)
+- [Repository](https://github.com/game-scrobbler/gs-playnite)
+- [Issues](https://github.com/game-scrobbler/gs-playnite/issues)
+- [Discord](https://discord.gg/ynEGCAEBun)
+- [Playnite](https://playnite.link)
+- [API Documentation](https://api.gamescrobbler.com/api/v1/public/docs)
