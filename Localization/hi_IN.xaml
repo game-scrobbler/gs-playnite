@@ -1,0 +1,187 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ── Section 1: Installation ID ── -->
+    <sys:String x:Key="LOCGsPluginInstallIdSectionTitle">इंस्टॉलेशन ID</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdDescription">आपके प्लगइन इंस्टॉलेशन का अद्वितीय पहचानकर्ता, जिसका उपयोग आपके खाते को लिंक करने के लिए किया जाता है।</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdCopyHint">क्लिपबोर्ड पर कॉपी करने के लिए ऊपर दी गई ID पर क्लिक करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdCopyTooltip">ID कॉपी करने के लिए क्लिक करें</sys:String>
+
+    <!-- ── Section 2: Theme &amp; Dashboard ── -->
+    <sys:String x:Key="LOCGsPluginThemeSectionTitle">थीम &amp; डैशबोर्ड</sys:String>
+    <sys:String x:Key="LOCGsPluginThemeDescription">Game Scrobbler साइडबार और व्यू पर लागू विज़ुअल थीम को नियंत्रित करता है।</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">नया डैशबोर्ड अनुभव</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">उन्नत सुविधाओं के साथ नया डैशबोर्ड अनुभव सक्षम करें</sys:String>
+
+    <!-- ── Section 3: Account Linking ── -->
+    <sys:String x:Key="LOCGsPluginAccountLinkingSectionTitle">खाता लिंकिंग</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkOnWebsiteButton">वेबसाइट पर खाता लिंक करें</sys:String>
+    <sys:String x:Key="LOCGsPluginManualTokenSeparator">या अपना टोकन मैन्युअल रूप से दर्ज करें</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkAccountButton">खाता लिंक करें</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountButton">खाता अनलिंक करें</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountTooltip">GameScrobbler से आपका खाता अनलिंक करता है। आपका गेम डेटा सर्वर पर सुरक्षित रहेगा।</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogTitle">खाता अनलिंक करें</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogBody">अपना खाता अनलिंक करें? आपका गेम डेटा सर्वर पर सुरक्षित रहेगा।
+आप कभी भी फिर से लिंक कर सकते हैं।</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectNoAccount">वर्तमान में कोई खाता लिंक नहीं है।</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusDisconnected">खाता अनलिंक हो गया।</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusTokenExpired">टोकन समाप्त — नया प्राप्त करने के लिए "वेबसाइट पर खाता लिंक करें" पर क्लिक करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenCountdownFormat">टोकन ~{0}:{1} में समाप्त होगा</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogTitle">टोकन समाप्त</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">आपका लिंक टोकन समाप्त हो गया है।
+
+क्या आप नया टोकन प्राप्त करने के लिए लिंकिंग पेज खोलना चाहेंगे?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">खाता लिंकिंग सफल</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">खाता सफलतापूर्वक लिंक हो गया!
+यूज़र ID: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedDialogTitle">खाता लिंकिंग विफल</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetryDialogTitle">खाता लिंकिंग विफल — पुनः प्रयास करें?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetriesBody">कई प्रयासों के बाद खाता लिंकिंग विफल:
+{0}
+
+कृपया बाद में पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedNetworkBody">नेटवर्क त्रुटि के कारण खाता लिंकिंग विफल:
+{0}
+
+क्या आप पुनः प्रयास करना चाहेंगे?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedBody">खाता लिंकिंग विफल: {0}</sys:String>
+
+    <!-- ── Section 4: Sync Settings ── -->
+    <sys:String x:Key="LOCGsPluginSyncSettingsSectionTitle">सिंक सेटिंग्स</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsLabel">अचीवमेंट डेटा सिंक करें (SuccessStory या Playnite Achievements ऐडऑन आवश्यक)</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsTooltip">लाइब्रेरी सिंक के दौरान SuccessStory या Playnite Achievements ऐडऑन से अचीवमेंट डेटा पढ़ता है। यदि कोई भी इंस्टॉल नहीं है तो कोई प्रभाव नहीं।</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderMissingWarning">कोई अचीवमेंट ऐडऑन नहीं मिला — अचीवमेंट सिंक छोड़ दिया जाएगा।</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderInstallLink">अचीवमेंट ऐडऑन इंस्टॉल करें</sys:String>
+    <sys:String x:Key="LOCGsPluginLibrarySyncLabel">लाइब्रेरी सिंक:</sys:String>
+
+    <!-- ── Section 5: Notifications ── -->
+    <sys:String x:Key="LOCGsPluginNotificationsSectionTitle">सूचनाएँ</sys:String>
+    <sys:String x:Key="LOCGsPluginShowUpdateNotificationsLabel">वर्शन अपडेट सूचनाएँ दिखाएँ</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsLabel">GameScrobbler से महत्वपूर्ण सूचनाएँ दिखाएँ</sys:String>
+
+    <!-- ── Section 6: Privacy Controls ── -->
+    <sys:String x:Key="LOCGsPluginPrivacySectionTitle">गोपनीयता नियंत्रण</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableSentryLabel">त्रुटि रिपोर्टिंग अक्षम करें (Sentry)</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogLabel">एनालिटिक्स अक्षम करें (PostHog)</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableScrobblingLabel">गेम एक्टिविटी ट्रैकिंग अक्षम करें (Scrobbling)</sys:String>
+    <sys:String x:Key="LOCGsPluginScrobblingDisabledWarning">सत्र डेटा पर निर्भर सुविधाएँ उपलब्ध नहीं होंगी</sys:String>
+
+    <!-- ── Section 7: Danger Zone ── -->
+    <sys:String x:Key="LOCGsPluginDangerZoneSectionTitle">खतरनाक क्षेत्र</sys:String>
+    <sys:String x:Key="LOCGsPluginDangerZoneWarning">इस विकल्प का उपयोग केवल तभी करें जब आप GameScrobbler सर्वर से अपना Playnite डेटा हटाना चाहते हैं। डिलीट अनुरोध के बाद, आप फिर से सहमति दिए बिना ऐडऑन का उपयोग जारी नहीं रख सकते।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteMyDataButton">मेरा डेटा हटाएँ</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInButton">फिर से सक्षम करें</sys:String>
+
+    <!-- ── Account Linking: Additional UI strings ── -->
+    <sys:String x:Key="LOCGsPluginAccountLinkingHintPrefix">अपना डेटा सुरक्षित रखने के लिए अपने GS खाते से प्लगइन लिंक करें। शुरू करने के लिए </sys:String>
+    <sys:String x:Key="LOCGsPluginAccountLinkingHintSuffix"> पर जाएँ।</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusLabel">स्थिति:</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusConnected">GameScrobbler से कनेक्टेड</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusDisconnected">डिस्कनेक्टेड</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusOptedOut">ऑप्ट आउट</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkingInProgress">लिंक हो रहा है...</sys:String>
+    <sys:String x:Key="LOCGsPluginOpenWebsiteToLinkTooltip">अपने खाते को स्वचालित रूप से लिंक करने के लिए ब्राउज़र में gamescrobbler.com खोलता है</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenInputTooltip">यहाँ अपना लिंकिंग टोकन दर्ज करें</sys:String>
+
+    <!-- ── Install Token &amp; Diagnostics ── -->
+    <sys:String x:Key="LOCGsPluginTokenStatusActive">&#x2713; टोकन: सक्रिय</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenStatusPending">&#x26A0; टोकन: पंजीकरण लंबित</sys:String>
+    <sys:String x:Key="LOCGsPluginPendingScrobblesFormat">{0} स्क्रॉबल कतार में — स्वचालित रूप से पुनः प्रयास होगा</sys:String>
+    <sys:String x:Key="LOCGsPluginDroppedScrobblesFormat">{0} स्क्रॉबल सर्वर त्रुटियों के कारण खो गए</sys:String>
+
+    <!-- ── Sync Status ── -->
+    <sys:String x:Key="LOCGsPluginNeverSynced">कभी सिंक नहीं हुआ</sys:String>
+    <sys:String x:Key="LOCGsPluginLastSyncedFormat">अंतिम सिंक: {0} गेम · {1}</sys:String>
+
+    <!-- ── Elapsed Time ── -->
+    <sys:String x:Key="LOCGsPluginElapsedJustNow">अभी-अभी</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedMinutesFormat">{0} मिनट पहले</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedHoursFormat">{0} घंटे पहले</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedDaysFormat">{0} दिन पहले</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingLessThanMinute">एक मिनट से कम</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingMinutesFormat">{0} मिनट</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingHoursMinutesFormat">{0} घंटे {1} मिनट</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingHoursFormat">{0} घंटे</sys:String>
+
+    <!-- ── Achievement Provider ── -->
+    <sys:String x:Key="LOCGsPluginAchievementProviderDetectedFormat">{0} पाया गया</sys:String>
+
+    <!-- ── Notification Tooltips ── -->
+    <sys:String x:Key="LOCGsPluginShowUpdateNotificationsTooltip">नया प्लगइन वर्शन उपलब्ध होने पर Playnite में सूचना दिखाएँ</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsTooltip">महत्वपूर्ण अपडेट और घोषणाओं के बारे में सूचनाएँ दिखाएँ</sys:String>
+
+    <!-- ── Privacy Tooltips ── -->
+    <sys:String x:Key="LOCGsPluginDisableSentryTooltip">क्रैश रिपोर्ट और डायग्नोस्टिक डेटा भेजने से रोकता है</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">अज्ञात उपयोग एनालिटिक्स भेजने से रोकता है</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableScrobblingTooltip">आपकी गेम एक्टिविटी की ट्रैकिंग रोकता है</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInTooltip">प्लगइन फिर से सक्षम करें और सिंक फिर से शुरू करें</sys:String>
+
+    <!-- ── Clipboard ── -->
+    <sys:String x:Key="LOCGsPluginCopiedToClipboard">क्लिपबोर्ड पर कॉपी हो गया!</sys:String>
+    <sys:String x:Key="LOCGsPluginCopiedDialogTitle">सफल</sys:String>
+    <sys:String x:Key="LOCGsPluginCopyFailedFormat">कॉपी विफल: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginOpenUrlFailedFormat">URL खोलने में विफल: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorDialogTitle">त्रुटि</sys:String>
+
+    <!-- ── Delete My Data Dialogs ── -->
+    <sys:String x:Key="LOCGsPluginDeleteConfirmBody">क्या आप वाकई GameScrobbler सर्वर से अपना सारा डेटा हटाना चाहते हैं?
+
+यह करेगा:
+• हमारे सर्वर से आपकी लाइब्रेरी, सत्र और अचीवमेंट हटाएगा
+• सभी प्लगइन सुविधाएँ अक्षम करेगा
+• प्लगइन का उपयोग जारी रखने के लिए फिर से सहमति की आवश्यकता होगी
+
+यह क्रिया पूर्ववत नहीं की जा सकती।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteConfirmTitle">मेरा डेटा हटाएँ</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFinalBody">क्या आप बिल्कुल सुनिश्चित हैं? आपका डेटा GameScrobbler सर्वर से स्थायी रूप से हटा दिया जाएगा।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFinalTitle">अंतिम पुष्टि</sys:String>
+    <sys:String x:Key="LOCGsPluginDeletingInProgress">हटा रहा है...</sys:String>
+
+    <!-- ── Opt Back In Dialog ── -->
+    <sys:String x:Key="LOCGsPluginOptBackInConfirmBody">GameScrobbler प्लगइन फिर से सक्षम करें?
+
+सभी सुविधाएँ फिर से शुरू करने के लिए Playnite को रीस्टार्ट करना होगा।</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInConfirmTitle">फिर से सक्षम करें</sys:String>
+
+    <!-- ── Account Linking: Status Messages ── -->
+    <sys:String x:Key="LOCGsPluginPleaseEnterToken">कृपया एक टोकन दर्ज करें</sys:String>
+    <sys:String x:Key="LOCGsPluginVerifyingToken">टोकन सत्यापित हो रहा है...</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccess">खाता सफलतापूर्वक लिंक हो गया!</sys:String>
+    <sys:String x:Key="LOCGsPluginNetworkErrorRetryFormat">{0} पुनः प्रयास के लिए "खाता लिंक करें" पर क्लिक करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorRetryFormat">त्रुटि: {0} पुनः प्रयास के लिए "खाता लिंक करें" पर क्लिक करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorFormat">त्रुटि: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginUnknownLinkingError">लिंकिंग के दौरान अज्ञात त्रुटि हुई</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkingErrorFormat">लिंकिंग त्रुटि: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginNetworkError">नेटवर्क त्रुटि — सर्वर से संपर्क नहीं हो सका। कृपया पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginUnlinkFailed">खाता अनलिंक करने में विफल।</sys:String>
+    <sys:String x:Key="LOCGsPluginAlreadyLinkedBody">खाता पहले से यूज़र ID से लिंक है: {0}
+
+क्या आप किसी अन्य खाते से लिंक करना चाहते हैं?</sys:String>
+    <sys:String x:Key="LOCGsPluginAlreadyLinkedTitle">खाता पहले से लिंक है</sys:String>
+
+    <!-- ── Data Deletion: Status Messages ── -->
+    <sys:String x:Key="LOCGsPluginDeletingRequesting">डेटा हटाने का अनुरोध किया जा रहा है...</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteSuccess">आपका डेटा हटा दिया गया है। प्लगइन अब अक्षम है।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteRateLimited">बहुत अधिक हटाने के अनुरोध। कृपया 15 मिनट प्रतीक्षा करें और पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFailed">डेटा हटाने का अनुरोध विफल। कृपया बाद में पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteError">एक त्रुटि हुई। कृपया बाद में पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInSuccess">प्लगइन फिर से सक्षम। सिंक फिर से शुरू करने के लिए Playnite रीस्टार्ट करें।</sys:String>
+
+    <!-- ── URI Handler ── -->
+    <sys:String x:Key="LOCGsPluginInvalidLinkingToken">अमान्य लिंकिंग टोकन प्राप्त हुआ।</sys:String>
+    <sys:String x:Key="LOCGsPluginUnexpectedUriErrorFormat">URI अनुरोध संसाधित करते समय अप्रत्याशित त्रुटि: {0}</sys:String>
+
+    <!-- ── Library Sync Messages ── -->
+    <sys:String x:Key="LOCGsPluginSyncCompleted">लाइब्रेरी सिंक पूर्ण।</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncUpToDate">लाइब्रेरी पहले से अपडेट है।</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncCooldownFormat">लाइब्रेरी हाल ही में सिंक हुई थी। {0} में पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncCooldownGeneric">लाइब्रेरी हाल ही में सिंक हुई थी। कृपया बाद में पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncFailed">लाइब्रेरी सिंक विफल। लॉग जाँचें।</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncError">लाइब्रेरी सिंक में त्रुटि हुई।</sys:String>
+
+    <!-- ── Menu Items ── -->
+    <sys:String x:Key="LOCGsPluginMenuSyncLibrary">अभी लाइब्रेरी सिंक करें</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenSettings">सेटिंग्स खोलें</sys:String>
+
+</ResourceDictionary>

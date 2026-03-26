@@ -1,0 +1,187 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ── Section 1: Installation ID ── -->
+    <sys:String x:Key="LOCGsPluginInstallIdSectionTitle">ID de Instalação</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdDescription">Identificador único da instalação do plugin, usado para vincular sua conta.</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdCopyHint">Clique no ID acima para copiá-lo para a área de transferência.</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdCopyTooltip">Clique para copiar o ID</sys:String>
+
+    <!-- ── Section 2: Theme &amp; Dashboard ── -->
+    <sys:String x:Key="LOCGsPluginThemeSectionTitle">Tema &amp; Painel</sys:String>
+    <sys:String x:Key="LOCGsPluginThemeDescription">Controla o tema visual aplicado à barra lateral e às visualizações do Game Scrobbler.</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">Nova Experiência do Painel</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">Ativar a nova experiência do painel com recursos aprimorados</sys:String>
+
+    <!-- ── Section 3: Account Linking ── -->
+    <sys:String x:Key="LOCGsPluginAccountLinkingSectionTitle">Vinculação de Conta</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkOnWebsiteButton">Vincular Conta no Site</sys:String>
+    <sys:String x:Key="LOCGsPluginManualTokenSeparator">ou insira seu token manualmente</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkAccountButton">Vincular Conta</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountButton">Desvincular Conta</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountTooltip">Desvincula sua conta do GameScrobbler. Seus dados de jogo são mantidos no servidor.</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogTitle">Desvincular Conta</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogBody">Desvincular sua conta? Seus dados de jogo serão mantidos no servidor.
+Você pode vincular novamente a qualquer momento.</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectNoAccount">Nenhuma conta está vinculada no momento.</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusDisconnected">Conta desvinculada.</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusTokenExpired">Token expirado — clique em "Vincular Conta no Site" para obter um novo.</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenCountdownFormat">Token expira em ~{0}:{1}</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogTitle">Token Expirado</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">Seu token de vinculação expirou.
+
+Deseja abrir a página de vinculação para obter um novo?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">Vinculação Bem-sucedida</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">Conta vinculada com sucesso!
+ID do usuário: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedDialogTitle">Falha na Vinculação</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetryDialogTitle">Falha na Vinculação — Tentar novamente?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetriesBody">A vinculação falhou após várias tentativas:
+{0}
+
+Tente novamente mais tarde.</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedNetworkBody">A vinculação falhou devido a um erro de rede:
+{0}
+
+Deseja tentar novamente?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedBody">Falha na vinculação: {0}</sys:String>
+
+    <!-- ── Section 4: Sync Settings ── -->
+    <sys:String x:Key="LOCGsPluginSyncSettingsSectionTitle">Configurações de Sincronização</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsLabel">Sincronizar conquistas (requer o addon SuccessStory ou Playnite Achievements)</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsTooltip">Lê dados de conquistas do addon SuccessStory ou Playnite Achievements durante a sincronização da biblioteca. Sem efeito se nenhum estiver instalado.</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderMissingWarning">Nenhum addon de conquistas encontrado — a sincronização de conquistas será ignorada.</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderInstallLink">Instalar um addon de conquistas</sys:String>
+    <sys:String x:Key="LOCGsPluginLibrarySyncLabel">Sincronização da Biblioteca:</sys:String>
+
+    <!-- ── Section 5: Notifications ── -->
+    <sys:String x:Key="LOCGsPluginNotificationsSectionTitle">Notificações</sys:String>
+    <sys:String x:Key="LOCGsPluginShowUpdateNotificationsLabel">Mostrar notificações de atualização de versão</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsLabel">Mostrar notificações importantes do GameScrobbler</sys:String>
+
+    <!-- ── Section 6: Privacy Controls ── -->
+    <sys:String x:Key="LOCGsPluginPrivacySectionTitle">Controles de Privacidade</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableSentryLabel">Desativar relatórios de erros (Sentry)</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogLabel">Desativar análises (PostHog)</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableScrobblingLabel">Desativar rastreamento de atividade (Scrobbling)</sys:String>
+    <sys:String x:Key="LOCGsPluginScrobblingDisabledWarning">Você não poderá usar recursos que dependem de dados de sessão</sys:String>
+
+    <!-- ── Section 7: Danger Zone ── -->
+    <sys:String x:Key="LOCGsPluginDangerZoneSectionTitle">Zona de Perigo</sys:String>
+    <sys:String x:Key="LOCGsPluginDangerZoneWarning">Use esta opção apenas se deseja excluir seus dados do Playnite nos servidores do GameScrobbler. Após a solicitação de exclusão, você não poderá continuar usando o addon sem aceitar novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteMyDataButton">Excluir Meus Dados</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInButton">Aceitar Novamente</sys:String>
+
+    <!-- ── Account Linking: Additional UI strings ── -->
+    <sys:String x:Key="LOCGsPluginAccountLinkingHintPrefix">Vincule seu plugin à sua conta GS para manter seus dados. Visite </sys:String>
+    <sys:String x:Key="LOCGsPluginAccountLinkingHintSuffix"> para começar.</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusLabel">Status:</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusConnected">Conectado ao GameScrobbler</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusDisconnected">Desconectado</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusOptedOut">Desativado</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkingInProgress">Vinculando...</sys:String>
+    <sys:String x:Key="LOCGsPluginOpenWebsiteToLinkTooltip">Abre gamescrobbler.com no navegador para vincular sua conta automaticamente</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenInputTooltip">Insira seu token de vinculação aqui</sys:String>
+
+    <!-- ── Install Token &amp; Diagnostics ── -->
+    <sys:String x:Key="LOCGsPluginTokenStatusActive">&#x2713; Token: Ativo</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenStatusPending">&#x26A0; Token: Aguardando registro</sys:String>
+    <sys:String x:Key="LOCGsPluginPendingScrobblesFormat">{0} scrobbles na fila — tentará novamente automaticamente</sys:String>
+    <sys:String x:Key="LOCGsPluginDroppedScrobblesFormat">{0} scrobbles perdidos devido a erros do servidor</sys:String>
+
+    <!-- ── Sync Status ── -->
+    <sys:String x:Key="LOCGsPluginNeverSynced">Nunca sincronizado</sys:String>
+    <sys:String x:Key="LOCGsPluginLastSyncedFormat">Última sincronização: {0} jogos · {1}</sys:String>
+
+    <!-- ── Elapsed Time ── -->
+    <sys:String x:Key="LOCGsPluginElapsedJustNow">agora mesmo</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedMinutesFormat">{0} min atrás</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedHoursFormat">{0} h atrás</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedDaysFormat">{0} dias atrás</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingLessThanMinute">menos de um minuto</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingMinutesFormat">{0} min</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingHoursMinutesFormat">{0} h {1} min</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingHoursFormat">{0} h</sys:String>
+
+    <!-- ── Achievement Provider ── -->
+    <sys:String x:Key="LOCGsPluginAchievementProviderDetectedFormat">{0} detectado</sys:String>
+
+    <!-- ── Notification Tooltips ── -->
+    <sys:String x:Key="LOCGsPluginShowUpdateNotificationsTooltip">Mostrar notificação no Playnite quando uma nova versão estiver disponível</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsTooltip">Mostrar notificações sobre atualizações e anúncios importantes</sys:String>
+
+    <!-- ── Privacy Tooltips ── -->
+    <sys:String x:Key="LOCGsPluginDisableSentryTooltip">Impede o envio de relatórios de falhas e dados de diagnóstico</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">Impede o envio de análises anônimas de uso</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableScrobblingTooltip">Impede o rastreamento da sua atividade de jogo</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInTooltip">Reativar o plugin e retomar a sincronização</sys:String>
+
+    <!-- ── Clipboard ── -->
+    <sys:String x:Key="LOCGsPluginCopiedToClipboard">Texto copiado para a área de transferência!</sys:String>
+    <sys:String x:Key="LOCGsPluginCopiedDialogTitle">Sucesso</sys:String>
+    <sys:String x:Key="LOCGsPluginCopyFailedFormat">Falha ao copiar texto: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginOpenUrlFailedFormat">Falha ao abrir URL: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorDialogTitle">Erro</sys:String>
+
+    <!-- ── Delete My Data Dialogs ── -->
+    <sys:String x:Key="LOCGsPluginDeleteConfirmBody">Tem certeza de que deseja excluir todos os seus dados dos servidores do GameScrobbler?
+
+Isso irá:
+• Remover sua biblioteca, sessões e conquistas dos nossos servidores
+• Desativar todas as funcionalidades do plugin
+• Exigir que você aceite novamente para continuar usando o plugin
+
+Esta ação não pode ser desfeita.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteConfirmTitle">Excluir Meus Dados</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFinalBody">Tem certeza absoluta? Seus dados serão permanentemente excluídos dos servidores do GameScrobbler.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFinalTitle">Confirmação Final</sys:String>
+    <sys:String x:Key="LOCGsPluginDeletingInProgress">Excluindo...</sys:String>
+
+    <!-- ── Opt Back In Dialog ── -->
+    <sys:String x:Key="LOCGsPluginOptBackInConfirmBody">Reativar o plugin GameScrobbler?
+
+Será necessário reiniciar o Playnite para retomar todas as funcionalidades.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInConfirmTitle">Aceitar Novamente</sys:String>
+
+    <!-- ── Account Linking: Status Messages ── -->
+    <sys:String x:Key="LOCGsPluginPleaseEnterToken">Por favor, insira um token</sys:String>
+    <sys:String x:Key="LOCGsPluginVerifyingToken">Verificando token...</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccess">Conta vinculada com sucesso!</sys:String>
+    <sys:String x:Key="LOCGsPluginNetworkErrorRetryFormat">{0} Clique em "Vincular Conta" para tentar novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorRetryFormat">Erro: {0} Clique em "Vincular Conta" para tentar novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorFormat">Erro: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginUnknownLinkingError">Ocorreu um erro desconhecido durante a vinculação</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Erro durante a vinculação: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginNetworkError">Erro de rede — não foi possível conectar ao servidor. Tente novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginUnlinkFailed">Falha ao desvincular conta.</sys:String>
+    <sys:String x:Key="LOCGsPluginAlreadyLinkedBody">A conta já está vinculada ao User ID: {0}
+
+Deseja vincular a uma conta diferente?</sys:String>
+    <sys:String x:Key="LOCGsPluginAlreadyLinkedTitle">Conta Já Vinculada</sys:String>
+
+    <!-- ── Data Deletion: Status Messages ── -->
+    <sys:String x:Key="LOCGsPluginDeletingRequesting">Solicitando exclusão de dados...</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteSuccess">Seus dados foram excluídos. O plugin está desativado.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteRateLimited">Muitas solicitações de exclusão. Aguarde 15 minutos e tente novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFailed">Falha ao solicitar exclusão de dados. Tente novamente mais tarde.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteError">Ocorreu um erro. Tente novamente mais tarde.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin reativado. Reinicie o Playnite para retomar a sincronização.</sys:String>
+
+    <!-- ── URI Handler ── -->
+    <sys:String x:Key="LOCGsPluginInvalidLinkingToken">Token de vinculação inválido recebido.</sys:String>
+    <sys:String x:Key="LOCGsPluginUnexpectedUriErrorFormat">Erro inesperado ao processar solicitação URI: {0}</sys:String>
+
+    <!-- ── Library Sync Messages ── -->
+    <sys:String x:Key="LOCGsPluginSyncCompleted">Sincronização da biblioteca concluída.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncUpToDate">A biblioteca já está atualizada.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncCooldownFormat">A biblioteca foi sincronizada recentemente. Tente novamente em {0}.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncCooldownGeneric">A biblioteca foi sincronizada recentemente. Tente novamente mais tarde.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncFailed">Falha na sincronização da biblioteca. Verifique os logs.</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncError">A sincronização da biblioteca encontrou um erro.</sys:String>
+
+    <!-- ── Menu Items ── -->
+    <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Sincronizar Biblioteca</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenSettings">Abrir Configurações</sys:String>
+
+</ResourceDictionary>

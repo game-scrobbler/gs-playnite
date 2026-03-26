@@ -1,0 +1,187 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ── Section 1: Installation ID ── -->
+    <sys:String x:Key="LOCGsPluginInstallIdSectionTitle">安装 ID</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdDescription">插件的唯一安装标识符，用于关联您的账户。</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdCopyHint">点击上方 ID 可复制到剪贴板。</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdCopyTooltip">点击复制 ID</sys:String>
+
+    <!-- ── Section 2: Theme &amp; Dashboard ── -->
+    <sys:String x:Key="LOCGsPluginThemeSectionTitle">主题与仪表盘</sys:String>
+    <sys:String x:Key="LOCGsPluginThemeDescription">控制 Game Scrobbler 侧边栏和视图的视觉主题。</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">新仪表盘体验</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">启用具有增强功能的新仪表盘体验</sys:String>
+
+    <!-- ── Section 3: Account Linking ── -->
+    <sys:String x:Key="LOCGsPluginAccountLinkingSectionTitle">账户关联</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkOnWebsiteButton">在网站上关联账户</sys:String>
+    <sys:String x:Key="LOCGsPluginManualTokenSeparator">或手动输入令牌</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkAccountButton">关联账户</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountButton">解除关联</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountTooltip">解除您与 GameScrobbler 的账户关联。您的游戏数据将保留在服务器上。</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogTitle">解除关联</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogBody">确定解除账户关联吗？您的游戏数据将保留在服务器上。
+您随时可以重新关联。</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectNoAccount">当前没有关联的账户。</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusDisconnected">账户已解除关联。</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusTokenExpired">令牌已过期——点击"在网站上关联账户"获取新令牌。</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenCountdownFormat">令牌将在 ~{0}:{1} 后过期</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogTitle">令牌已过期</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">您的关联令牌已过期。
+
+是否打开关联页面获取新令牌？</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">关联成功</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">账户关联成功！
+用户 ID：{0}</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedDialogTitle">关联失败</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetryDialogTitle">关联失败——重试？</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetriesBody">多次尝试后关联失败：
+{0}
+
+请稍后重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedNetworkBody">由于网络错误导致关联失败：
+{0}
+
+是否重试？</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedBody">关联失败：{0}</sys:String>
+
+    <!-- ── Section 4: Sync Settings ── -->
+    <sys:String x:Key="LOCGsPluginSyncSettingsSectionTitle">同步设置</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsLabel">同步成就数据（需要 SuccessStory 或 Playnite Achievements 插件）</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsTooltip">在库同步时从 SuccessStory 或 Playnite Achievements 插件读取成就数据。如果两者都未安装则无效。</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderMissingWarning">未找到成就插件——将跳过成就同步。</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderInstallLink">安装成就插件</sys:String>
+    <sys:String x:Key="LOCGsPluginLibrarySyncLabel">库同步：</sys:String>
+
+    <!-- ── Section 5: Notifications ── -->
+    <sys:String x:Key="LOCGsPluginNotificationsSectionTitle">通知</sys:String>
+    <sys:String x:Key="LOCGsPluginShowUpdateNotificationsLabel">显示版本更新通知</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsLabel">显示 GameScrobbler 的重要通知</sys:String>
+
+    <!-- ── Section 6: Privacy Controls ── -->
+    <sys:String x:Key="LOCGsPluginPrivacySectionTitle">隐私控制</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableSentryLabel">禁用错误报告 (Sentry)</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogLabel">禁用分析 (PostHog)</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableScrobblingLabel">禁用游戏活动追踪 (Scrobbling)</sys:String>
+    <sys:String x:Key="LOCGsPluginScrobblingDisabledWarning">依赖会话数据的功能将不可用</sys:String>
+
+    <!-- ── Section 7: Danger Zone ── -->
+    <sys:String x:Key="LOCGsPluginDangerZoneSectionTitle">危险操作</sys:String>
+    <sys:String x:Key="LOCGsPluginDangerZoneWarning">仅当您想要删除 GameScrobbler 服务器上的 Playnite 数据时才使用此选项。删除后，您需要重新同意才能继续使用该插件。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteMyDataButton">删除我的数据</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInButton">重新启用</sys:String>
+
+    <!-- ── Account Linking: Additional UI strings ── -->
+    <sys:String x:Key="LOCGsPluginAccountLinkingHintPrefix">将插件关联到您的 GS 账户以保存数据。请访问 </sys:String>
+    <sys:String x:Key="LOCGsPluginAccountLinkingHintSuffix"> 开始操作。</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusLabel">状态：</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusConnected">已连接到 GameScrobbler</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusDisconnected">已断开</sys:String>
+    <sys:String x:Key="LOCGsPluginConnectionStatusOptedOut">已退出</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkingInProgress">正在关联...</sys:String>
+    <sys:String x:Key="LOCGsPluginOpenWebsiteToLinkTooltip">在浏览器中打开 gamescrobbler.com 以自动关联账户</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenInputTooltip">在此输入您的关联令牌</sys:String>
+
+    <!-- ── Install Token &amp; Diagnostics ── -->
+    <sys:String x:Key="LOCGsPluginTokenStatusActive">&#x2713; 令牌：已激活</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenStatusPending">&#x26A0; 令牌：等待注册</sys:String>
+    <sys:String x:Key="LOCGsPluginPendingScrobblesFormat">{0} 条记录排队中——将自动重试</sys:String>
+    <sys:String x:Key="LOCGsPluginDroppedScrobblesFormat">{0} 条记录因服务器错误丢失</sys:String>
+
+    <!-- ── Sync Status ── -->
+    <sys:String x:Key="LOCGsPluginNeverSynced">从未同步</sys:String>
+    <sys:String x:Key="LOCGsPluginLastSyncedFormat">上次同步：{0} 款游戏 · {1}</sys:String>
+
+    <!-- ── Elapsed Time ── -->
+    <sys:String x:Key="LOCGsPluginElapsedJustNow">刚刚</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedMinutesFormat">{0} 分钟前</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedHoursFormat">{0} 小时前</sys:String>
+    <sys:String x:Key="LOCGsPluginElapsedDaysFormat">{0} 天前</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingLessThanMinute">不到一分钟</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingMinutesFormat">{0} 分钟</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingHoursMinutesFormat">{0} 小时 {1} 分钟</sys:String>
+    <sys:String x:Key="LOCGsPluginRemainingHoursFormat">{0} 小时</sys:String>
+
+    <!-- ── Achievement Provider ── -->
+    <sys:String x:Key="LOCGsPluginAchievementProviderDetectedFormat">已检测到 {0}</sys:String>
+
+    <!-- ── Notification Tooltips ── -->
+    <sys:String x:Key="LOCGsPluginShowUpdateNotificationsTooltip">有新插件版本时在 Playnite 中显示通知</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsTooltip">显示有关重要更新和公告的通知</sys:String>
+
+    <!-- ── Privacy Tooltips ── -->
+    <sys:String x:Key="LOCGsPluginDisableSentryTooltip">阻止发送崩溃报告和诊断数据</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">阻止发送匿名使用分析</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableScrobblingTooltip">阻止追踪您的游戏活动</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInTooltip">重新启用插件并恢复同步</sys:String>
+
+    <!-- ── Clipboard ── -->
+    <sys:String x:Key="LOCGsPluginCopiedToClipboard">已复制到剪贴板！</sys:String>
+    <sys:String x:Key="LOCGsPluginCopiedDialogTitle">成功</sys:String>
+    <sys:String x:Key="LOCGsPluginCopyFailedFormat">复制失败：{0}</sys:String>
+    <sys:String x:Key="LOCGsPluginOpenUrlFailedFormat">无法打开链接：{0}</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorDialogTitle">错误</sys:String>
+
+    <!-- ── Delete My Data Dialogs ── -->
+    <sys:String x:Key="LOCGsPluginDeleteConfirmBody">确定要从 GameScrobbler 服务器删除所有数据吗？
+
+此操作将：
+• 从服务器移除您的游戏库、会话和成就
+• 禁用所有插件功能
+• 需要重新同意才能继续使用插件
+
+此操作不可撤销。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteConfirmTitle">删除我的数据</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFinalBody">您确定吗？数据将从 GameScrobbler 服务器永久删除。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFinalTitle">最终确认</sys:String>
+    <sys:String x:Key="LOCGsPluginDeletingInProgress">正在删除...</sys:String>
+
+    <!-- ── Opt Back In Dialog ── -->
+    <sys:String x:Key="LOCGsPluginOptBackInConfirmBody">重新启用 GameScrobbler 插件？
+
+需要重启 Playnite 才能恢复所有功能。</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInConfirmTitle">重新启用</sys:String>
+
+    <!-- ── Account Linking: Status Messages ── -->
+    <sys:String x:Key="LOCGsPluginPleaseEnterToken">请输入令牌</sys:String>
+    <sys:String x:Key="LOCGsPluginVerifyingToken">正在验证令牌...</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccess">账户关联成功！</sys:String>
+    <sys:String x:Key="LOCGsPluginNetworkErrorRetryFormat">{0} 点击"关联账户"重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorRetryFormat">错误：{0} 点击"关联账户"重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginErrorFormat">错误：{0}</sys:String>
+    <sys:String x:Key="LOCGsPluginUnknownLinkingError">关联过程中发生未知错误</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkingErrorFormat">关联错误：{0}</sys:String>
+    <sys:String x:Key="LOCGsPluginNetworkError">网络错误——无法连接到服务器。请重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginUnlinkFailed">解除关联失败。</sys:String>
+    <sys:String x:Key="LOCGsPluginAlreadyLinkedBody">账户已关联到用户 ID：{0}
+
+是否关联到其他账户？</sys:String>
+    <sys:String x:Key="LOCGsPluginAlreadyLinkedTitle">账户已关联</sys:String>
+
+    <!-- ── Data Deletion: Status Messages ── -->
+    <sys:String x:Key="LOCGsPluginDeletingRequesting">正在请求删除数据...</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteSuccess">您的数据已删除。插件已禁用。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteRateLimited">删除请求过于频繁。请等待 15 分钟后重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteFailed">数据删除请求失败。请稍后重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteError">发生错误。请稍后重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInSuccess">插件已重新启用。请重启 Playnite 以恢复同步。</sys:String>
+
+    <!-- ── URI Handler ── -->
+    <sys:String x:Key="LOCGsPluginInvalidLinkingToken">收到无效的关联令牌。</sys:String>
+    <sys:String x:Key="LOCGsPluginUnexpectedUriErrorFormat">处理 URI 请求时发生意外错误：{0}</sys:String>
+
+    <!-- ── Library Sync Messages ── -->
+    <sys:String x:Key="LOCGsPluginSyncCompleted">库同步完成。</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncUpToDate">库已是最新状态。</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncCooldownFormat">库最近已同步。请在 {0} 后重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncCooldownGeneric">库最近已同步。请稍后重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncFailed">库同步失败。请查看日志。</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncError">库同步时遇到错误。</sys:String>
+
+    <!-- ── Menu Items ── -->
+    <sys:String x:Key="LOCGsPluginMenuSyncLibrary">立即同步库</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenSettings">打开设置</sys:String>
+
+</ResourceDictionary>
