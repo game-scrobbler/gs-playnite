@@ -176,6 +176,24 @@ You can disable achievement sync in `Settings -> Experimental Features -> Sync a
 
 ---
 
+## Localization
+
+The plugin UI is fully localized. Playnite automatically selects the matching language file based on your system locale.
+
+| Language | Locale | Contributors |
+| --- | --- | --- |
+| English | `en_US` | Default |
+| Russian | `ru_RU` | [@godOFslaves](https://github.com/godOFslaves) |
+| Portuguese (Brazil) | `pt_BR` | — |
+| German | `de_DE` | — |
+| French | `fr_FR` | — |
+| Chinese (Simplified) | `zh_CN` | — |
+| Hindi | `hi_IN` | — |
+
+Want to add a language or fix a translation? See [`Localization/`](Localization/) — each file is a standalone XAML resource dictionary with 117 string keys.
+
+---
+
 ## Privacy
 
 GameScrobbler is [open source](https://github.com/game-scrobbler/gs-playnite) — you can audit exactly what data is collected and sent.
@@ -221,7 +239,7 @@ gs-playnite/
 ├── Models/
 ├── Infrastructure/
 ├── View/
-├── Localization/
+├── Localization/       — en_US, ru_RU, pt_BR, de_DE, fr_FR, zh_CN, hi_IN
 └── GsPlugin.Tests/
 ```
 

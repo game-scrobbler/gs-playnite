@@ -48,6 +48,7 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │   └── GsPluginSettings.cs  — Settings data model and view model
 │
 ├── Infrastructure/      — namespace: GsPlugin.Infrastructure
+│   ├── GsLocalization.cs    — XAML resource string lookup helper
 │   ├── GsLogger.cs          — Logging wrapper
 │   └── GsSentry.cs          — Sentry error tracking
 │
@@ -130,6 +131,12 @@ Achievement data comes from two optional addons via an aggregator pattern:
 - `System.Data.SQLite.Core` NuGet package ships native `SQLite.Interop.dll` (x86/x64) via build targets.
 
 ### Settings UI & Localization
+- All user-facing strings are localized via XAML resource dictionaries in `Localization/` and accessed from C# via `GsLocalization.Get()`/`Format()` in `Infrastructure/GsLocalization.cs`.
+- Playnite auto-discovers locale files by naming convention (`Localization/{locale}.xaml`). The `en_US.xaml` is the fallback; locale-specific files override it.
+- Supported locales: `en_US` (English, default), `ru_RU` (Russian), `pt_BR` (Portuguese), `de_DE` (German), `fr_FR` (French), `zh_CN` (Chinese Simplified), `hi_IN` (Hindi).
+- All locale files must have the same set of keys (currently 117). When adding a new key, add it to **all 7 files**.
+- `GsLocalization.Get(key, fallback)` looks up from `Application.Current.Resources`; returns the fallback when no WPF app is running (e.g., in tests). `GsLocalization.Format(key, fallback, args)` wraps `string.Format()` on the resolved template.
+- For format strings with English pluralization (e.g., elapsed time), the code-behind fallback uses inline plural logic so tests see `"5 minutes ago"` while the XAML template is used at runtime for non-English locales (e.g., `"{0} мин. назад"`).
 - Settings view uses localized strings from `Localization/en_US.xaml` resource dictionary, organized into card-based sections.
 - `GsDataManager.DiagnosticsStateChanged` event fires (outside the lock) when install-token or pending-scrobble state changes; the settings UI subscribes for live status updates.
 - `GsPluginSettingsViewModel` exposes diagnostic properties: `IsInstallTokenActive`, `PendingScrobbleCount`, `HasPendingScrobbles`.
@@ -144,7 +151,7 @@ Achievement data comes from two optional addons via an aggregator pattern:
 - Targets .NET Framework 4.6.2 (old-style .csproj — requires Visual Studio MSBuild, not `dotnet build`)
 - XAML code-gen (WPF `PresentationBuildTasks`) requires the full `MSBuild.exe` from VS Build Tools or a full VS install; `dotnet msbuild` does **not** generate `.g.cs` files for old-style WPF projects, so View code-behind will fail to compile without it
 - Test project uses SDK-style .csproj and can be built/run with `dotnet test`
-- API endpoints: Debug → `api.stage.gamescrobbler.com`, Release → `api.gamescrobbler.com` (controlled via `#if DEBUG` in `GsApiClient.cs`)
+- API endpoints: All builds (Debug and Release) use the production URL `api.gamescrobbler.com`
 - When upgrading NuGet packages, only upgrade to versions that explicitly ship a `net462` (or `net461`/`net45`) lib folder. Do not rely on netstandard2.0 fallbacks for core runtime packages.
 
 ## Important Notes
