@@ -19,6 +19,33 @@
     <sys:String x:Key="LOCGsPluginLinkOnWebsiteButton">Link Account on Website</sys:String>
     <sys:String x:Key="LOCGsPluginManualTokenSeparator">or enter your token manually</sys:String>
     <sys:String x:Key="LOCGsPluginLinkAccountButton">Link Account</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountButton">Disconnect Account</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountTooltip">Disconnects your account from GameScrobbler. Your game data is kept on the server.</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogTitle">Disconnect Account</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogBody">Disconnect your account? Your game data will be kept on the server.
+You can re-link anytime.</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectNoAccount">No account is currently linked.</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusDisconnected">Account disconnected.</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusTokenExpired">Token expired — click "Open website to link" to get a new one.</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenCountdownFormat">Token expires in ~{0}:{1}</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogTitle">Token Expired</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">Your link token has expired.
+
+Would you like to open the linking page to get a new one?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">Account Linking Success</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">Account successfully linked!
+User ID: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedDialogTitle">Account Linking Failed</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetryDialogTitle">Account Linking Failed — Retry?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetriesBody">Account linking failed after multiple attempts:
+{0}
+
+Please try again later.</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedNetworkBody">Account linking failed due to a network error:
+{0}
+
+Would you like to retry?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedBody">Account linking failed: {0}</sys:String>
 
     <!-- ── Section 4: Sync Settings ── -->
     <sys:String x:Key="LOCGsPluginSyncSettingsSectionTitle">Sync Settings</sys:String>

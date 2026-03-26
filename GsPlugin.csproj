@@ -160,6 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Infrastructure -->
+    <Compile Include="Infrastructure\GsLocalization.cs" />
     <Compile Include="Infrastructure\GsLogger.cs" />
     <Compile Include="Infrastructure\GsPostHog.cs" />
     <Compile Include="Infrastructure\GsPlayniteHelper.cs" />

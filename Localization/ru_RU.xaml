@@ -19,6 +19,33 @@
     <sys:String x:Key="LOCGsPluginLinkOnWebsiteButton">Привязать учётную запись на веб-сайте</sys:String>
     <sys:String x:Key="LOCGsPluginManualTokenSeparator">или введите ваш токен вручную</sys:String>
     <sys:String x:Key="LOCGsPluginLinkAccountButton">Привязать учётную запись</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountButton">Отвязать учётную запись</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectAccountTooltip">Отвязывает вашу учётную запись от GameScrobbler. Ваши игровые данные сохраняются на сервере.</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogTitle">Отвязать учётную запись</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectDialogBody">Отвязать вашу учётную запись? Ваши игровые данные сохранятся на сервере.
+Вы можете привязать заново в любое время.</sys:String>
+    <sys:String x:Key="LOCGsPluginDisconnectNoAccount">Учётная запись не привязана.</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusDisconnected">Учётная запись отвязана.</sys:String>
+    <sys:String x:Key="LOCGsPluginStatusTokenExpired">Токен истёк — нажмите «Привязать учётную запись на веб-сайте», чтобы получить новый.</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenCountdownFormat">Токен истекает через ~{0}:{1}</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogTitle">Токен истёк</sys:String>
+    <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">Ваш токен привязки истёк.
+
+Хотите открыть страницу привязки, чтобы получить новый?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">Привязка успешна</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">Учётная запись успешно привязана!
+ID пользователя: {0}</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedDialogTitle">Ошибка привязки</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetryDialogTitle">Ошибка привязки — повторить?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedRetriesBody">Привязка не удалась после нескольких попыток:
+{0}
+
+Попробуйте позже.</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedNetworkBody">Привязка не удалась из-за сетевой ошибки:
+{0}
+
+Хотите повторить попытку?</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkFailedBody">Ошибка привязки: {0}</sys:String>
 
     <!-- ── Section 4: Sync Settings ── -->
     <sys:String x:Key="LOCGsPluginSyncSettingsSectionTitle">Настройки синхронизации</sys:String>
