@@ -1,5 +1,14 @@
 # GameScrobbler — Playnite Plugin
 
+[![GitHub license](https://img.shields.io/github/license/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/blob/main/LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/game-scrobbler/gs-playnite/build.yml?branch=main)](https://github.com/game-scrobbler/gs-playnite/actions)
+[![GitHub issues](https://img.shields.io/github/issues/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/issues/)
+[![GitHub pull-requests](https://img.shields.io/github/issues-pr/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/pulls/)
+[![GitHub contributors](https://img.shields.io/github/contributors/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/graphs/contributors/)
+[![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.6.2-blue.svg)](https://dotnet.microsoft.com/download/dotnet-framework)
+[![Discord](https://img.shields.io/badge/Discord-community-5865F2?logo=discord&logoColor=white)](https://discord.gg/ynEGCAEBun)
+
 Visualize your gaming history in Playnite.
 
 GameScrobbler is a Playnite plugin for tracking, analyzing, and visualizing your gaming habits. It transforms your Playnite library into interactive analytics, visual maps, and AI-powered insights.
