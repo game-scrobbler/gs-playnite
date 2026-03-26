@@ -1,0 +1,49 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ── Section 1: Installation ID ── -->
+    <sys:String x:Key="LOCGsPluginInstallIdSectionTitle">Installation ID</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdDescription">Уникальный идентификатор установки плагина, используемый для привязки вашей учётной записи</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdCopyHint">Нажмите на идентификатор выше, чтобы скопировать его в буфер обмена.</sys:String>
+    <sys:String x:Key="LOCGsPluginInstallIdCopyTooltip">Нажмите, чтобы скопировать идентификатор в буфер обмена.</sys:String>
+
+    <!-- ── Section 2: Theme &amp; Dashboard ── -->
+    <sys:String x:Key="LOCGsPluginThemeSectionTitle">Тема &amp; Панель управления</sys:String>
+    <sys:String x:Key="LOCGsPluginThemeDescription">Управляет визуальной темой, применяемой к боковой панели и к виду Game Scrobbler.</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">Новый интерфейс панели управления</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">Включить новый интерфейс панели управления с расширенными возможностями.</sys:String>
+
+    <!-- ── Section 3: Account Linking ── -->
+    <sys:String x:Key="LOCGsPluginAccountLinkingSectionTitle">Привязка учётной записи</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkOnWebsiteButton">Привязать учётную запись на веб-сайте</sys:String>
+    <sys:String x:Key="LOCGsPluginManualTokenSeparator">или введите ваш токен вручную</sys:String>
+    <sys:String x:Key="LOCGsPluginLinkAccountButton">Привязать учётную запись</sys:String>
+
+    <!-- ── Section 4: Sync Settings ── -->
+    <sys:String x:Key="LOCGsPluginSyncSettingsSectionTitle">Настройки синхронизации</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsLabel">Синхронизировать данные о достижениях (требуется дополнение SuccessStory или Playnite Achievements)</sys:String>
+    <sys:String x:Key="LOCGsPluginSyncAchievementsTooltip">Считывает данные о достижениях из дополнения SuccessStory или Playnite Achievements во время синхронизации библиотеки. Не действует, если ни одно из них не установлено.</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderMissingWarning"> Не найдено дополнение для достижений — синхронизация достижений будет пропущена.</sys:String>
+    <sys:String x:Key="LOCGsPluginAchievementProviderInstallLink">Установить дополнение для достижений</sys:String>
+    <sys:String x:Key="LOCGsPluginLibrarySyncLabel">Синхронизация библиотеки:</sys:String>
+
+    <!-- ── Section 5: Notifications ── -->
+    <sys:String x:Key="LOCGsPluginNotificationsSectionTitle">Уведомления</sys:String>
+    <sys:String x:Key="LOCGsPluginShowUpdateNotificationsLabel">Показывать уведомления о выходе новой версии</sys:String>
+    <sys:String x:Key="LOCGsPluginShowImportantNotificationsLabel"> Показывать важные уведомления от GameScrobbler</sys:String>
+
+    <!-- ── Section 6: Privacy Controls ── -->
+    <sys:String x:Key="LOCGsPluginPrivacySectionTitle">Управление конфиденциальностью</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableSentryLabel">Отключить отправку отчетов об ошибках (Sentry)</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogLabel">Отключить аналитику (PostHog)</sys:String>
+    <sys:String x:Key="LOCGsPluginDisableScrobblingLabel">Отключить отслеживание игровой активности (скробблинг)</sys:String>
+    <sys:String x:Key="LOCGsPluginScrobblingDisabledWarning">Вы не сможете пользоваться функциями, которые полагаются на данные игровых сессий.</sys:String>
+
+    <!-- ── Section 7: Danger Zone ── -->
+    <sys:String x:Key="LOCGsPluginDangerZoneSectionTitle">Опасная зона</sys:String>
+    <sys:String x:Key="LOCGsPluginDangerZoneWarning">Пожалуйста, используйте эту опцию только если вы хотите удалить ваши данные Playnite на серверах GameScrobbler. После выполнения запроса на удаление вы не сможете продолжать использовать дополнение GameScrobbler без повторного согласия.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteMyDataButton">Удалить мои данные</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInButton">Согласиться заново</sys:String>
+
+</ResourceDictionary>
