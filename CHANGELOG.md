@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.5.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.4.0...GsPlugin-v2.5.0) (2026-03-27)
+
+
+### Features
+
+* add localization for pt-BR, de-DE, fr-FR, zh-CN, hi-IN ([563f67b](https://github.com/game-scrobbler/gs-playnite/commit/563f67b8d95486b2a48e39121c6215be4ddc29bd))
+* add localization infrastructure and linking strings ([1d24ef1](https://github.com/game-scrobbler/gs-playnite/commit/1d24ef1652ce389618b623ef3de8ae31c7a14dc1))
+* add Russian localization (thanks to [[@god](https://github.com/god)OFslaves](https://github.com/godOFslaves)) ([544f538](https://github.com/game-scrobbler/gs-playnite/commit/544f538552fe00d16f790c41b8b3cc077f7f6e12))
+* improve token expiry UX and add account disconnect ([f01d8a5](https://github.com/game-scrobbler/gs-playnite/commit/f01d8a5df565d345fdbb68f7b51d3a9ee09de4ec))
+* localize all remaining hardcoded UI strings for Russian support ([962284b](https://github.com/game-scrobbler/gs-playnite/commit/962284b0c0eb14091a45e8608457222eb0dcabc5))
+
+
+### Bug Fixes
+
+* clean up leading spaces in Russian localization ([8378ee1](https://github.com/game-scrobbler/gs-playnite/commit/8378ee1f4f5299cca85c5cd76ea43433d61cf7c2))
+
 ## [2.4.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.3.3...GsPlugin-v2.4.0) (2026-03-25)
 
 
