@@ -8,8 +8,8 @@ namespace GsPlugin.Tests {
     public class GsScrobblingServiceHashTests {
         [Fact]
         public void ComputeLibraryHash_EmptyLibrary_ReturnsConsistentHash() {
-            var hash1 = GsScrobblingService.ComputeLibraryHash(new List<GameSyncDto>());
-            var hash2 = GsScrobblingService.ComputeLibraryHash(new List<GameSyncDto>());
+            var hash1 = GsHashUtils.ComputeLibraryHash(new List<GameSyncDto>());
+            var hash2 = GsHashUtils.ComputeLibraryHash(new List<GameSyncDto>());
             Assert.Equal(hash1, hash2);
             Assert.Equal(64, hash1.Length); // SHA-256 hex = 64 chars
         }
@@ -31,8 +31,8 @@ namespace GsPlugin.Tests {
                 }
             };
 
-            var hash1 = GsScrobblingService.ComputeLibraryHash(library);
-            var hash2 = GsScrobblingService.ComputeLibraryHash(library);
+            var hash1 = GsHashUtils.ComputeLibraryHash(library);
+            var hash2 = GsHashUtils.ComputeLibraryHash(library);
             Assert.Equal(hash1, hash2);
         }
 
@@ -53,8 +53,8 @@ namespace GsPlugin.Tests {
                 last_activity = null
             };
 
-            var hashAB = GsScrobblingService.ComputeLibraryHash(new List<GameSyncDto> { game1, game2 });
-            var hashBA = GsScrobblingService.ComputeLibraryHash(new List<GameSyncDto> { game2, game1 });
+            var hashAB = GsHashUtils.ComputeLibraryHash(new List<GameSyncDto> { game1, game2 });
+            var hashBA = GsHashUtils.ComputeLibraryHash(new List<GameSyncDto> { game2, game1 });
             Assert.Equal(hashAB, hashBA);
         }
 
@@ -78,8 +78,8 @@ namespace GsPlugin.Tests {
             };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeLibraryHash(before),
-                GsScrobblingService.ComputeLibraryHash(after));
+                GsHashUtils.ComputeLibraryHash(before),
+                GsHashUtils.ComputeLibraryHash(after));
         }
 
         [Fact]
@@ -102,8 +102,8 @@ namespace GsPlugin.Tests {
             };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeLibraryHash(one),
-                GsScrobblingService.ComputeLibraryHash(two));
+                GsHashUtils.ComputeLibraryHash(one),
+                GsHashUtils.ComputeLibraryHash(two));
         }
 
         [Fact]
@@ -130,8 +130,8 @@ namespace GsPlugin.Tests {
             };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeLibraryHash(before),
-                GsScrobblingService.ComputeLibraryHash(after));
+                GsHashUtils.ComputeLibraryHash(before),
+                GsHashUtils.ComputeLibraryHash(after));
         }
 
         [Fact]
@@ -156,8 +156,8 @@ namespace GsPlugin.Tests {
             };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeLibraryHash(before),
-                GsScrobblingService.ComputeLibraryHash(after));
+                GsHashUtils.ComputeLibraryHash(before),
+                GsHashUtils.ComputeLibraryHash(after));
         }
 
         /// <summary>
@@ -181,7 +181,7 @@ namespace GsPlugin.Tests {
             };
 
             const string expected = "262c8283df39850de9ee82fd42c57d55a9a6aed42029808e1400dc33c4655e8d";
-            Assert.Equal(expected, GsScrobblingService.ComputeLibraryHash(library));
+            Assert.Equal(expected, GsHashUtils.ComputeLibraryHash(library));
         }
     }
 }

@@ -209,7 +209,7 @@ namespace GsPlugin {
 
                 // Run refresh and update check in parallel — they are independent network calls.
                 // Best-effort: failures are logged but do not block library sync.
-                var refreshTask = _scrobblingService.RefreshAllowedPluginsAsync()
+                var refreshTask = GsAllowedPlugins.RefreshAsync(_apiClient)
                     .ContinueWith(t => {
                         if (t.IsFaulted)
                             _logger.Warn(t.Exception.GetBaseException(), "Plugin refresh failed, continuing with cached/hardcoded list");
@@ -248,19 +248,19 @@ namespace GsPlugin {
                 }, null, (int)TimeSpan.FromMinutes(5).TotalMilliseconds, (int)TimeSpan.FromMinutes(5).TotalMilliseconds);
 
                 var startupSyncResult = await SyncLibraryWithDiffAsync();
-                if (startupSyncResult == GsScrobblingService.SyncLibraryResult.Cooldown) {
+                if (startupSyncResult == SyncLibraryResult.Cooldown) {
                     _logger.Info("Startup library sync skipped: sync cooldown is still active.");
                 }
 
                 if (isFirstRun) {
                     PlayniteApi.Notifications.Remove("gs-first-run-setup");
-                    if (startupSyncResult == GsScrobblingService.SyncLibraryResult.Success) {
+                    if (startupSyncResult == SyncLibraryResult.Success) {
                         PlayniteApi.Notifications.Add(new NotificationMessage(
                             "gs-first-run-done",
                             "Game Scrobbler: Setup complete \u2014 your library has been synced.",
                             NotificationType.Info));
                     }
-                    else if (startupSyncResult == GsScrobblingService.SyncLibraryResult.Error) {
+                    else if (startupSyncResult == SyncLibraryResult.Error) {
                         PlayniteApi.Notifications.Add(new NotificationMessage(
                             "gs-first-run-error",
                             "Game Scrobbler: First-time sync failed. It will retry automatically on next launch.",
@@ -271,7 +271,7 @@ namespace GsPlugin {
                 // Run achievement sync unless library sync errored.
                 // Cooldown/Skipped mean library items already exist in the DB,
                 // so achievement FK references are valid.
-                if (startupSyncResult != GsScrobblingService.SyncLibraryResult.Error) {
+                if (startupSyncResult != SyncLibraryResult.Error) {
                     _ = SyncAchievementsWithDiffAsync().ContinueWith(t => {
                         if (t.IsFaulted)
                             _logger.Warn(t.Exception?.GetBaseException(), "Startup achievement sync failed");
@@ -324,11 +324,11 @@ namespace GsPlugin {
                     { "game_count", PlayniteApi.Database.Games?.Count ?? 0 }
                 });
                 var librarySyncResult = await SyncLibraryWithDiffAsync();
-                if (librarySyncResult == GsScrobblingService.SyncLibraryResult.Cooldown) {
+                if (librarySyncResult == SyncLibraryResult.Cooldown) {
                     _logger.Info("Library updated sync skipped: sync cooldown is still active.");
                 }
 
-                if (librarySyncResult != GsScrobblingService.SyncLibraryResult.Error) {
+                if (librarySyncResult != SyncLibraryResult.Error) {
                     _ = SyncAchievementsWithDiffAsync().ContinueWith(t => {
                         if (t.IsFaulted)
                             _logger.Warn(t.Exception?.GetBaseException(), "Library-update achievement sync failed");
@@ -449,13 +449,13 @@ namespace GsPlugin {
                     try {
                         var result = await SyncLibraryWithDiffAsync();
                         string message;
-                        if (result == GsScrobblingService.SyncLibraryResult.Success) {
+                        if (result == SyncLibraryResult.Success) {
                             message = GsLocalization.Get("LOCGsPluginSyncCompleted", "Library sync completed.");
                         }
-                        else if (result == GsScrobblingService.SyncLibraryResult.Skipped) {
+                        else if (result == SyncLibraryResult.Skipped) {
                             message = GsLocalization.Get("LOCGsPluginSyncUpToDate", "Library is already up to date.");
                         }
-                        else if (result == GsScrobblingService.SyncLibraryResult.Cooldown) {
+                        else if (result == SyncLibraryResult.Cooldown) {
                             var expiry = GsDataManager.Data.SyncCooldownExpiresAt
                                 ?? GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt;
                             if (expiry.HasValue) {
@@ -471,7 +471,7 @@ namespace GsPlugin {
                             message = GsLocalization.Get("LOCGsPluginSyncFailed", "Library sync failed. Check logs for details.");
                         }
 
-                        if (result != GsScrobblingService.SyncLibraryResult.Error) {
+                        if (result != SyncLibraryResult.Error) {
                             _ = SyncAchievementsWithDiffAsync().ContinueWith(t => {
                                 if (t.IsFaulted)
                                     _logger.Warn(t.Exception?.GetBaseException(), "Manual achievement sync failed");
@@ -602,10 +602,10 @@ namespace GsPlugin {
         /// Guarded against concurrent execution — overlapping calls (startup + library-update + manual)
         /// are skipped rather than allowed to interleave and corrupt snapshots.
         /// </summary>
-        private async Task<GsScrobblingService.SyncLibraryResult> SyncLibraryWithDiffAsync() {
+        private async Task<SyncLibraryResult> SyncLibraryWithDiffAsync() {
             if (Interlocked.CompareExchange(ref _librarySyncInFlight, 1, 0) != 0) {
                 _logger.Info("Library sync already in flight — skipping.");
-                return GsScrobblingService.SyncLibraryResult.Skipped;
+                return SyncLibraryResult.Skipped;
             }
             try {
                 if (GsSnapshotManager.HasLibraryBaseline) {

@@ -176,6 +176,9 @@
     <Compile Include="Models\GsPluginSettings.cs" />
     <!-- Services -->
     <Compile Include="Services\GsScrobblingService.cs" />
+    <Compile Include="Services\GsHashUtils.cs" />
+    <Compile Include="Services\GsAllowedPlugins.cs" />
+    <Compile Include="Services\SyncLibraryResult.cs" />
     <Compile Include="Services\GsAccountLinkingService.cs" />
     <Compile Include="Services\IAchievementProvider.cs" />
     <Compile Include="Services\GsSuccessStoryHelper.cs" />

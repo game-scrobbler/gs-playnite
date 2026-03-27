@@ -9,8 +9,8 @@ namespace GsPlugin.Tests {
         [Fact]
         public void ComputeGameMetadataHash_DefaultDto_ReturnsConsistentHash() {
             var dto = new GameSyncDto();
-            var hash1 = GsScrobblingService.ComputeGameMetadataHash(dto);
-            var hash2 = GsScrobblingService.ComputeGameMetadataHash(dto);
+            var hash1 = GsHashUtils.ComputeGameMetadataHash(dto);
+            var hash2 = GsHashUtils.ComputeGameMetadataHash(dto);
 
             Assert.Equal(hash1, hash2);
             Assert.Equal(64, hash1.Length); // SHA-256 hex = 64 chars
@@ -22,8 +22,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { game_name = "Renamed" };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -32,8 +32,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { completion_status_name = "Completed" };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -42,8 +42,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { is_installed = true };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -52,8 +52,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { platforms = new List<string> { "PC", "PlayStation" } };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -62,8 +62,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { achievement_count_unlocked = 6, achievement_count_total = 10 };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -72,8 +72,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { is_favorite = true };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -82,8 +82,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { is_hidden = true };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -92,8 +92,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { user_score = 90 };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -102,8 +102,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { critic_score = 85 };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -112,8 +112,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { community_score = 60 };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -122,8 +122,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { release_date = "2021-06-15" };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -132,8 +132,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { release_year = 2021 };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -142,8 +142,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { source_name = "GOG" };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -152,8 +152,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { modified = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -162,8 +162,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { genres = new List<string> { "Action", "RPG" } };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -172,8 +172,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { tags = new List<string> { "Multiplayer" } };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -182,8 +182,8 @@ namespace GsPlugin.Tests {
             var after = new GameSyncDto { date_added = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc) };
 
             Assert.NotEqual(
-                GsScrobblingService.ComputeGameMetadataHash(before),
-                GsScrobblingService.ComputeGameMetadataHash(after));
+                GsHashUtils.ComputeGameMetadataHash(before),
+                GsHashUtils.ComputeGameMetadataHash(after));
         }
 
         [Fact]
@@ -193,8 +193,8 @@ namespace GsPlugin.Tests {
 
             // null genres serialize as "" while empty list serializes as "" — should be same
             Assert.Equal(
-                GsScrobblingService.ComputeGameMetadataHash(withNull),
-                GsScrobblingService.ComputeGameMetadataHash(withEmpty));
+                GsHashUtils.ComputeGameMetadataHash(withNull),
+                GsHashUtils.ComputeGameMetadataHash(withEmpty));
         }
 
         [Fact]
@@ -214,8 +214,8 @@ namespace GsPlugin.Tests {
             };
 
             Assert.Equal(
-                GsScrobblingService.ComputeGameMetadataHash(dto1),
-                GsScrobblingService.ComputeGameMetadataHash(dto2));
+                GsHashUtils.ComputeGameMetadataHash(dto1),
+                GsHashUtils.ComputeGameMetadataHash(dto2));
         }
     }
 }

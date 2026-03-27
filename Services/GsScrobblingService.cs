@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -19,56 +17,6 @@ namespace GsPlugin.Services {
         private readonly IGsApiClient _apiClient;
         private readonly IAchievementProvider _achievementHelper;
         private readonly GsIntegrationAccountReader _integrationAccountReader;
-
-        /// <summary>
-        /// Hardcoded fallback list of official Playnite library plugin IDs.
-        /// Used when the server endpoint is unreachable and no disk cache exists.
-        /// </summary>
-        private static readonly HashSet<Guid> HardcodedPluginIds = new HashSet<Guid> {
-            Guid.Parse("CB91DFC9-B977-43BF-8E70-55F46E410FAB"), // Steam
-            Guid.Parse("AEBE8B7C-6DC3-4A66-AF31-E7375C6B5E9E"), // GOG
-            Guid.Parse("00000002-DBD1-46C6-B5D0-B1BA559D10E4"), // Epic Games
-            Guid.Parse("7E4FBB5E-2AE3-48D4-8BA0-6B30E7A4E287"), // Xbox
-            Guid.Parse("E3C26A3D-D695-4CB7-A769-5FF7612C7EDD"), // Battle.net
-            Guid.Parse("C2F038E5-8B92-4877-91F1-DA9094155FC5"), // Ubisoft Connect
-            Guid.Parse("00000001-EBB2-4EEC-ABCB-7C89937A42BB"), // itch.io
-            Guid.Parse("96E8C4BC-EC5C-4C8B-87E7-18EE5A690626"), // Humble
-            Guid.Parse("402674CD-4AF6-4886-B6EC-0E695BFA0688"), // Amazon Games
-            Guid.Parse("85DD7072-2F20-4E76-A007-41035E390724"), // Origin (deprecated, kept for legacy game scrobbling)
-            Guid.Parse("0E2E793E-E0DD-4447-835C-C44A1FD506EC"), // Bethesda (deprecated, kept for legacy game scrobbling)
-            Guid.Parse("E2A7D494-C138-489D-BB3F-1D786BEEB675"), // Twitch (deprecated, kept for legacy game scrobbling)
-            Guid.Parse("E4AC81CB-1B1A-4EC9-8639-9A9633989A71"), // PlayStation
-        };
-
-        private static volatile HashSet<Guid> _allowedPluginIds;
-        private static readonly object _pluginLock = new object();
-
-        /// <summary>
-        /// Dynamic allowed plugin set. Initialized from disk cache or hardcoded fallback.
-        /// Updated at runtime via RefreshAllowedPluginsAsync().
-        /// </summary>
-        private static HashSet<Guid> AllowedPluginIds {
-            get {
-                if (_allowedPluginIds != null) return _allowedPluginIds;
-                lock (_pluginLock) {
-                    if (_allowedPluginIds != null) return _allowedPluginIds;
-                    var persisted = GsDataManager.Data.AllowedPlugins;
-                    if (persisted != null && persisted.Count > 0) {
-                        var parsed = new HashSet<Guid>();
-                        foreach (var id in persisted) {
-                            if (Guid.TryParse(id, out var guid)) {
-                                parsed.Add(guid);
-                            }
-                        }
-                        _allowedPluginIds = parsed.Count > 0 ? parsed : new HashSet<Guid>(HardcodedPluginIds);
-                    }
-                    else {
-                        _allowedPluginIds = new HashSet<Guid>(HardcodedPluginIds);
-                    }
-                    return _allowedPluginIds;
-                }
-            }
-        }
 
         /// <summary>
         /// Initializes a new instance of the GsScrobblingService.
@@ -153,7 +101,7 @@ namespace GsPlugin.Services {
                 var startedGame = args.Game;
 
                 // Skip scrobbling for unsupported plugins
-                if (startedGame.PluginId == Guid.Empty || !AllowedPluginIds.Contains(startedGame.PluginId)) {
+                if (startedGame.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(startedGame.PluginId)) {
                     _logger.Info($"Skipping scrobble start for unsupported plugin: {startedGame.PluginId}");
                     return;
                 }
@@ -255,7 +203,7 @@ namespace GsPlugin.Services {
                 }
 
                 // Skip scrobbling for unsupported plugins
-                if (stoppedGame.PluginId == Guid.Empty || !AllowedPluginIds.Contains(stoppedGame.PluginId)) {
+                if (stoppedGame.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(stoppedGame.PluginId)) {
                     _logger.Info($"Skipping scrobble finish for unsupported plugin: {stoppedGame.PluginId}");
                     // Still clear the active session since we may have tracked start before this filter existed
                     ClearActiveSession();
@@ -358,56 +306,7 @@ namespace GsPlugin.Services {
             }
         }
 
-        /// <summary>
-        /// Fetch allowed plugins from server and update the local cache.
-        /// Fallback chain: server → disk cache (24h) → stale cache → hardcoded.
-        /// </summary>
-        public async Task RefreshAllowedPluginsAsync() {
-            try {
-                var response = await _apiClient.GetAllowedPlugins();
-                if (response?.plugins != null && response.plugins.Count > 0) {
-                    var newIds = new HashSet<Guid>();
-                    foreach (var plugin in response.plugins) {
-                        if (plugin.status == "active" && Guid.TryParse(plugin.pluginId, out var guid)) {
-                            newIds.Add(guid);
-                        }
-                    }
 
-                    if (newIds.Count > 0) {
-                        lock (_pluginLock) {
-                            _allowedPluginIds = newIds;
-                        }
-
-                        var pluginStrings = newIds.Select(g => g.ToString()).ToList();
-                        GsDataManager.MutateAndSave(d => {
-                            d.AllowedPlugins = pluginStrings;
-                            d.AllowedPluginsLastFetched = DateTime.UtcNow;
-                        });
-
-                        _logger.Info($"Refreshed allowed plugins from server ({response.source}): {newIds.Count} active plugins");
-                    }
-                }
-            }
-            catch (Exception ex) {
-                var lastFetched = GsDataManager.Data.AllowedPluginsLastFetched;
-                if (lastFetched.HasValue && (DateTime.UtcNow - lastFetched.Value).TotalHours < 24) {
-                    _logger.Info("Server unreachable, using cached plugin list (still fresh)");
-                }
-                else if (GsDataManager.Data.AllowedPlugins?.Count > 0) {
-                    _logger.Warn($"Server unreachable, using stale cached plugin list: {ex.Message}");
-                }
-                else {
-                    _logger.Warn($"Failed to fetch allowed plugins, using hardcoded fallback: {ex.Message}");
-                }
-            }
-        }
-
-        public enum SyncLibraryResult {
-            Success,
-            Cooldown,
-            Skipped,
-            Error
-        }
 
         /// <summary>
         /// Builds an ISO 8601 date string from a Playnite ReleaseDate struct.
@@ -422,37 +321,6 @@ namespace GsPlugin.Services {
             return v.Year.ToString("D4");
         }
 
-        /// <summary>
-        /// Computes a SHA-256 hex digest of the library for change detection.
-        /// Includes both activity fields (playtime, play_count, last_activity) and a per-game
-        /// metadata hash so that metadata-only changes (renames, genre edits, etc.) are also detected.
-        /// </summary>
-        /// <summary>
-        /// Format a DateTime for hashing — strips fractional seconds for deterministic
-        /// cross-platform matching between C# and TypeScript.
-        /// Both sides normalize to "yyyy-MM-ddTHH:mm:ssZ" (no fractional seconds, UTC).
-        /// </summary>
-        private static string FormatDateForHash(DateTime? dt) =>
-            dt?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") ?? "";
-
-        public static string ComputeLibraryHash(List<GameSyncDto> library) {
-            var keys = library
-                .Select(g =>
-                    $"{g.playnite_id ?? ""}:{g.playtime_seconds}:{g.play_count}:{FormatDateForHash(g.last_activity)}:{ComputeGameMetadataHash(g)}")
-                .OrderBy(k => k, StringComparer.Ordinal)
-                .ToArray();
-
-            var separator = new byte[] { (byte)'|' };
-            using (var sha256 = SHA256.Create()) {
-                foreach (var key in keys) {
-                    var bytes = Encoding.UTF8.GetBytes(key);
-                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
-                    sha256.TransformBlock(separator, 0, 1, null, 0);
-                }
-                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
-            }
-        }
 
         #region v2 Sync Methods
 
@@ -515,106 +383,6 @@ namespace GsPlugin.Services {
             };
         }
 
-        /// <summary>
-        /// Computes a SHA-256 hex digest of per-game metadata for diff detection.
-        /// Includes all DTO fields except activity fields (playtime, play_count, last_activity)
-        /// which are already covered by the library-level hash key.
-        /// </summary>
-        public static string ComputeGameMetadataHash(GameSyncDto g) {
-            var sb = new StringBuilder();
-            sb.Append(g.game_name ?? "");
-            sb.Append('|');
-            sb.Append(g.completion_status_id ?? "");
-            sb.Append('|');
-            sb.Append(g.completion_status_name ?? "");
-            sb.Append('|');
-            sb.Append(g.is_installed ? "1" : "0");
-            sb.Append('|');
-            sb.Append(g.genres != null ? string.Join(",", g.genres) : "");
-            sb.Append('|');
-            sb.Append(g.platforms != null ? string.Join(",", g.platforms) : "");
-            sb.Append('|');
-            sb.Append(g.developers != null ? string.Join(",", g.developers) : "");
-            sb.Append('|');
-            sb.Append(g.publishers != null ? string.Join(",", g.publishers) : "");
-            sb.Append('|');
-            sb.Append(g.tags != null ? string.Join(",", g.tags) : "");
-            sb.Append('|');
-            sb.Append(g.features != null ? string.Join(",", g.features) : "");
-            sb.Append('|');
-            sb.Append(g.categories != null ? string.Join(",", g.categories) : "");
-            sb.Append('|');
-            sb.Append(g.series != null ? string.Join(",", g.series) : "");
-            sb.Append('|');
-            sb.Append(g.age_ratings != null ? string.Join(",", g.age_ratings) : "");
-            sb.Append('|');
-            sb.Append(g.regions != null ? string.Join(",", g.regions) : "");
-            sb.Append('|');
-            sb.Append(g.release_date ?? "");
-            sb.Append('|');
-            sb.Append(g.release_year?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.user_score?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.critic_score?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.community_score?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.source_name ?? "");
-            sb.Append('|');
-            sb.Append(g.is_favorite ? "1" : "0");
-            sb.Append('|');
-            sb.Append(g.is_hidden ? "1" : "0");
-            sb.Append('|');
-            sb.Append(FormatDateForHash(g.date_added));
-            sb.Append('|');
-            sb.Append(FormatDateForHash(g.modified));
-            sb.Append('|');
-            sb.Append(g.achievement_count_unlocked?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.achievement_count_total?.ToString() ?? "");
-
-            using (var sha256 = SHA256.Create()) {
-                var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-                var hash = sha256.ComputeHash(bytes);
-                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-            }
-        }
-
-        /// <summary>
-        /// Compute a SHA-256 hash of achievement data for change detection.
-        /// Per-game key: {playnite_id}:{achievement_count}:{unlocked_count}:{sorted_names_hash}
-        /// Keys are sorted ordinally, then hashed with "|" separator.
-        /// Must match server's createAchievementHashV2() exactly.
-        /// </summary>
-        public static string ComputeAchievementHash(List<GameAchievementsDto> games) {
-            var keys = games
-                .Select(g => {
-                    var achs = g.achievements ?? new List<AchievementItemDto>();
-                    var unlockedCount = achs.Count(a => a.is_unlocked);
-                    var sortedNames = string.Join(",", achs.Select(a => a.name).OrderBy(n => n, StringComparer.Ordinal));
-                    string namesHash;
-                    using (var sha = SHA256.Create()) {
-                        var bytes = Encoding.UTF8.GetBytes(sortedNames);
-                        var hash = sha.ComputeHash(bytes);
-                        namesHash = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                    }
-                    return $"{g.playnite_id}:{achs.Count}:{unlockedCount}:{namesHash}";
-                })
-                .OrderBy(k => k, StringComparer.Ordinal)
-                .ToArray();
-
-            var separator = new byte[] { (byte)'|' };
-            using (var sha256 = SHA256.Create()) {
-                foreach (var key in keys) {
-                    var bytes = Encoding.UTF8.GetBytes(key);
-                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
-                    sha256.TransformBlock(separator, 0, 1, null, 0);
-                }
-                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
-            }
-        }
 
         /// <summary>
         /// Creates a GameSnapshot from a DTO for the local snapshot store.
@@ -627,7 +395,7 @@ namespace GsPlugin.Services {
                 playtime_seconds = g.playtime_seconds,
                 play_count = g.play_count,
                 last_activity = g.last_activity?.ToString("o"),
-                metadata_hash = ComputeGameMetadataHash(g),
+                metadata_hash = GsHashUtils.ComputeGameMetadataHash(g),
                 achievement_count_unlocked = g.achievement_count_unlocked,
                 achievement_count_total = g.achievement_count_total
             };
@@ -659,7 +427,7 @@ namespace GsPlugin.Services {
                 }
 
                 // Check metadata hash
-                var currentMetaHash = ComputeGameMetadataHash(g);
+                var currentMetaHash = GsHashUtils.ComputeGameMetadataHash(g);
                 if (currentMetaHash != prev.metadata_hash) {
                     updated.Add(g);
                 }
@@ -692,12 +460,12 @@ namespace GsPlugin.Services {
 
             var (library, libraryHash, filteredCount) = await Task.Run(() => {
                 var filtered = allGames
-                    .Where(g => g.PluginId != Guid.Empty && AllowedPluginIds.Contains(g.PluginId))
+                    .Where(g => g.PluginId != Guid.Empty && GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
                     .ToList();
 
                 var dtos = filtered.Select(g => MapGameToDto(g, syncAchievements)).ToList();
 
-                return (dtos, ComputeLibraryHash(dtos), allGames.Count - filtered.Count);
+                return (dtos, GsHashUtils.ComputeLibraryHash(dtos), allGames.Count - filtered.Count);
             });
 
             if (filteredCount > 0) {
@@ -728,24 +496,6 @@ namespace GsPlugin.Services {
             }
         }
 
-        /// <summary>
-        /// Computes a stable hash of integration account identities so we can detect
-        /// when accounts change even if the library itself hasn't.
-        /// </summary>
-        private static string ComputeIntegrationAccountsHash(List<IntegrationAccountDto> accounts) {
-            if (accounts == null || accounts.Count == 0) {
-                return "";
-            }
-            var sorted = accounts.OrderBy(a => a.provider_id).ThenBy(a => a.account_id);
-            var sb = new StringBuilder();
-            foreach (var a in sorted) {
-                sb.Append(a.provider_id).Append(':').Append(a.account_id).Append(';');
-            }
-            using (var sha = SHA256.Create()) {
-                var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
-                return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
-            }
-        }
 
         /// <summary>
         /// Sends the full library to the v2/library/sync-full endpoint and writes the snapshot.
@@ -769,7 +519,7 @@ namespace GsPlugin.Services {
                 var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
 
                 var integrationAccounts = ReadIntegrationAccountsSafe();
-                var accountsHash = ComputeIntegrationAccountsHash(integrationAccounts);
+                var accountsHash = GsHashUtils.ComputeIntegrationAccountsHash(integrationAccounts);
                 var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
 
                 // Only skip on hash match if a snapshot baseline exists.
@@ -848,7 +598,7 @@ namespace GsPlugin.Services {
                 var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
 
                 var integrationAccounts = ReadIntegrationAccountsSafe();
-                var accountsHash = ComputeIntegrationAccountsHash(integrationAccounts);
+                var accountsHash = GsHashUtils.ComputeIntegrationAccountsHash(integrationAccounts);
                 var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
 
                 if (libraryHash == GsDataManager.Data.LastLibraryHash && !accountsChanged) {
@@ -959,7 +709,7 @@ namespace GsPlugin.Services {
 
                 var games = await Task.Run(() => {
                     return allGames
-                        .Where(g => g.PluginId != Guid.Empty && AllowedPluginIds.Contains(g.PluginId))
+                        .Where(g => g.PluginId != Guid.Empty && GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
                         .Select(g => {
                             var achievements = _achievementHelper.GetAchievements(g.Id);
                             if (achievements == null || achievements.Count == 0)
@@ -1028,7 +778,7 @@ namespace GsPlugin.Services {
                     GsSnapshotManager.UpdateAchievementsSnapshot(snapshotDict);
 
                     // Store achievement hash for diff sync change detection
-                    var achHash = ComputeAchievementHash(games);
+                    var achHash = GsHashUtils.ComputeAchievementHash(games);
                     GsDataManager.MutateAndSave(d => d.LastAchievementHash = achHash);
 
                     return SyncLibraryResult.Success;
@@ -1084,7 +834,7 @@ namespace GsPlugin.Services {
                     int withDataCount = 0;
 
                     foreach (var g in allGames) {
-                        if (g.PluginId == Guid.Empty || !AllowedPluginIds.Contains(g.PluginId))
+                        if (g.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
                             continue;
 
                         filteredCount++;
@@ -1271,7 +1021,7 @@ namespace GsPlugin.Services {
                             rarity_percent = a.rarity_percent
                         }).ToList() ?? new List<AchievementItemDto>()
                     }).ToList();
-                    var diffAchHash = ComputeAchievementHash(snapshotAsDtos);
+                    var diffAchHash = GsHashUtils.ComputeAchievementHash(snapshotAsDtos);
                     GsDataManager.MutateAndSave(d => d.LastAchievementHash = diffAchHash);
 
                     return SyncLibraryResult.Success;
