@@ -1,6 +1,17 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.5.0
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-03-27
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.5.0/GsPlugin-v2.5.0.pext
+    Changelog:
+      - add localization for pt-BR, de-DE, fr-FR, zh-CN, hi-IN
+      - add localization infrastructure and linking strings
+      - "add Russian localization (thanks to [[@god](https://github.com/god)OFslaves](https://github.com/godOFslaves))"
+      - improve token expiry UX and add account disconnect
+      - localize all remaining hardcoded UI strings for Russian support
+      - clean up leading spaces in Russian localization
   - Version: 2.4.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-25
