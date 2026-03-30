@@ -96,7 +96,10 @@ namespace GsPlugin.Api {
 
             if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
                 _logger.Info($"Scrobble start queued with ID: {asyncResponse.queueId}");
-                return new ScrobbleStartRes { session_id = "queued" };
+                // session_id is null here: the session UUID is created asynchronously
+                // when the BullMQ job is processed. The backend uses name-based matching
+                // (Strategy 2) when no valid UUID session_id is provided.
+                return new ScrobbleStartRes { session_id = null };
             }
             else {
                 GsLogger.Error("Failed to queue scrobble start request");
