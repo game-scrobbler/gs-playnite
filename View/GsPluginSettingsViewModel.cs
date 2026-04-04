@@ -418,11 +418,33 @@ namespace GsPlugin.Models {
 
         /// <summary>
         /// Re-enables the plugin after a previous opt-out / data deletion.
+        /// Calls the server to clear the opted-out flag and reset the token,
+        /// then clears local opt-out state so /v2/register runs on next startup.
         /// </summary>
-        public void OptBackIn() {
-            GsDataManager.PerformOptIn();
-            Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInSuccess", "Plugin re-enabled. Please restart Playnite to resume syncing.");
-            OnLinkingStatusChanged();
+        public async void OptBackIn() {
+            try {
+                Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInRequesting", "Re-enabling...");
+
+                var result = await _apiClient.RequestOptIn(new OptInReq());
+
+                if (result == null || !result.success) {
+                    if (result?.rateLimited == true) {
+                        Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInRateLimited", "Too many attempts. Please wait and try again.");
+                    } else {
+                        Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInFailed", "Failed to re-enable. Please restart Playnite to try again.");
+                    }
+                    return;
+                }
+
+                GsDataManager.PerformOptIn();
+                Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInSuccess", "Plugin re-enabled. Please restart Playnite to resume syncing.");
+                OnLinkingStatusChanged();
+            }
+            catch (Exception ex) {
+                Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInError", "An error occurred. Please restart Playnite to try again.");
+                GsLogger.Error("Error during opt-back-in", ex);
+                GsSentry.CaptureException(ex, "Error during opt-back-in");
+            }
         }
 
         #endregion

@@ -88,23 +88,30 @@ namespace GsPlugin.Api {
                 _logger.Warn("StartGameSession called with null or empty game_name");
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/scrobble/start";
+            string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/start";
 
-            var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<AsyncQueuedResponse>(url, startData);
+            var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<ApiResponse<ScrobbleStartData>>(url, startData);
             }, maxRetries: 2, isFailure: r => r == null);
 
-            if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
-                _logger.Info($"Scrobble start queued with ID: {asyncResponse.queueId}");
-                // session_id is null here: the session UUID is created asynchronously
-                // when the BullMQ job is processed. The backend uses name-based matching
-                // (Strategy 2) when no valid UUID session_id is provided.
-                return new ScrobbleStartRes { session_id = null };
-            }
-            else {
-                GsLogger.Error("Failed to queue scrobble start request");
-                CaptureSentryMessage("Failed to queue scrobble start", SentryLevel.Warning, startData.game_name, startData.user_id);
-                return null;
+            switch (envelope?.Outcome) {
+                case ApiOutcome.Success when envelope.data?.session_id != null:
+                    _logger.Info($"Scrobble start complete with session ID: {envelope.data.session_id}");
+                    return new ScrobbleStartRes { session_id = envelope.data.session_id };
+
+                case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
+                    _logger.Info($"Scrobble start skipped: {envelope.message}");
+                    return null;
+
+                case ApiOutcome.Fail:
+                    _logger.Warn($"Scrobble start rejected by server: [{envelope.code}] {envelope.message}");
+                    CaptureSentryMessage($"Scrobble start fail: {envelope.code}", SentryLevel.Warning, startData.game_name, startData.user_id);
+                    return null;
+
+                default:
+                    GsLogger.Error("Failed to start scrobble session");
+                    CaptureSentryMessage("Failed to start scrobble session", SentryLevel.Warning, startData.game_name, startData.user_id);
+                    return null;
             }
         }
 
@@ -115,30 +122,64 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            if (string.IsNullOrEmpty(endData.session_id)) {
-                GsLogger.Error("Attempted to finish session with null session_id");
-                CaptureSentryMessage("Null session ID in finish request", SentryLevel.Error, endData.game_name, endData.user_id);
+            // Clone before mutating so the caller's persisted PendingScrobble is not modified
+            // before the send is confirmed (peek-then-remove flush strategy).
+            var sendData = new ScrobbleFinishReq {
+                user_id = endData.user_id,
+                game_name = endData.game_name,
+                game_id = endData.game_id,
+                plugin_id = endData.plugin_id,
+                external_game_id = endData.external_game_id,
+                metadata = endData.metadata,
+                finished_at = endData.finished_at,
+                session_id = endData.session_id,
+            };
+
+            if (string.IsNullOrEmpty(sendData.session_id) || !Guid.TryParse(sendData.session_id, out _)) {
+                if (!string.IsNullOrEmpty(sendData.session_id)) {
+                    // Non-null but non-UUID: likely a stale "queued" placeholder from an older
+                    // plugin version in the pending-scrobble queue. Cleared so the backend falls
+                    // back to name-based matching (Strategy 2) instead of rejecting the request.
+                    GsLogger.Warn($"Clearing non-UUID session_id '{sendData.session_id}' before finish — backend will use name-based matching (game: {sendData.game_name ?? "unknown"})");
+                }
+                else {
+                    _logger.Info($"Finishing session without session_id (game: {sendData.game_name ?? "unknown"}), backend will use name-based matching");
+                }
+                sendData.session_id = null;
+            }
+
+            if (sendData.session_id == null && string.IsNullOrEmpty(sendData.game_name)) {
+                GsLogger.Error("FinishGameSession aborted: no session_id and no game_name — Strategy 2 would match an arbitrary open session");
                 return null;
             }
 
-            if (string.IsNullOrEmpty(endData.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+            if (string.IsNullOrEmpty(sendData.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
                 _logger.Error("FinishGameSession called with no user_id and no install token");
                 return null;
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/scrobble/finish";
+            string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/finish";
 
-            var asyncResponse = await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<AsyncQueuedResponse>(url, endData, true);
+            var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(url, sendData, true);
             }, maxRetries: 2, isFailure: r => r == null);
 
-            if (asyncResponse != null && asyncResponse.success && asyncResponse.status == "queued") {
-                _logger.Info($"Scrobble finish queued with ID: {asyncResponse.queueId}");
-                return new ScrobbleFinishRes { status = "queued" };
-            }
-            else {
-                GsLogger.Error("Failed to queue scrobble finish request");
-                return null;
+            switch (envelope?.Outcome) {
+                case ApiOutcome.Success:
+                    _logger.Info($"Scrobble finish complete ({envelope.data?.duration_seconds}s)");
+                    return new ScrobbleFinishRes();
+
+                case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
+                    _logger.Info($"Scrobble finish skipped: {envelope.message}");
+                    return new ScrobbleFinishRes();
+
+                case ApiOutcome.Fail:
+                    _logger.Warn($"Scrobble finish rejected by server: [{envelope.code}] {envelope.message}");
+                    return null;
+
+                default:
+                    GsLogger.Error("Failed to finish scrobble session");
+                    return null;
             }
         }
 
@@ -637,6 +678,42 @@ namespace GsPlugin.Api {
             catch (Exception ex) {
                 _logger.Error(ex, "RequestDeleteMyData HTTP error");
                 GsSentry.CaptureException(ex, "RequestDeleteMyData HTTP error");
+                return null;
+            }
+        }
+
+        public async Task<OptInRes> RequestOptIn(OptInReq req) {
+            var installId = GsDataManager.DataOrNull?.InstallID;
+            if (req == null || string.IsNullOrEmpty(installId)) {
+                _logger.Error("RequestOptIn called with no install ID");
+                return null;
+            }
+
+            req.user_id = installId;
+            string url = $"{_apiBaseUrl}/api/playnite/v2/opt-in";
+            string jsonData = JsonSerializer.Serialize(req, _jsonOptions);
+            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+
+            try {
+                HttpResponseMessage response = await _httpClient.PostAsync(url, content).ConfigureAwait(false);
+                string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                if ((int)response.StatusCode == 429) {
+                    _logger.Warn("RequestOptIn rate limited by server");
+                    return new OptInRes { success = false, rateLimited = true };
+                }
+
+                if (!response.IsSuccessStatusCode) {
+                    _logger.Warn($"RequestOptIn returned {(int)response.StatusCode}");
+                    return new OptInRes { success = false };
+                }
+
+                return JsonSerializer.Deserialize<OptInRes>(responseBody, _jsonOptions)
+                    ?? new OptInRes { success = false };
+            }
+            catch (Exception ex) {
+                _logger.Error(ex, "RequestOptIn HTTP error");
+                GsSentry.CaptureException(ex, "RequestOptIn HTTP error");
                 return null;
             }
         }

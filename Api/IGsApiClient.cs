@@ -17,6 +17,7 @@ namespace GsPlugin.Api {
         Task FlushPendingScrobblesAsync();
         Task<UnlinkRes> UnlinkAccount();
         Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req);
+        Task<OptInRes> RequestOptIn(OptInReq req);
         Task<RegisterInstallTokenRes> RegisterInstallToken(string installId);
         Task<string> ResetInstallToken(string currentToken);
         Task<string> GetDashboardToken();

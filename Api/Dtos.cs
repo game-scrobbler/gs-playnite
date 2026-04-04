@@ -18,6 +18,37 @@ namespace GsPlugin.Api {
         public string started_at { get; set; }
     }
 
+    // ──────────────────────────────────────────────────────────
+    // v3 standard API envelope
+    // ──────────────────────────────────────────────────────────
+
+    public enum ApiOutcome {
+        Success,
+        Fail,
+        Error,
+    }
+
+    public class ApiResponse<T> {
+        public string status { get; set; }
+        public T data { get; set; }
+        public string code { get; set; }
+        public string message { get; set; }
+
+        public ApiOutcome Outcome =>
+            status == "success" ? ApiOutcome.Success :
+            status == "fail"    ? ApiOutcome.Fail    :
+                                  ApiOutcome.Error;
+    }
+
+    public class ScrobbleStartData {
+        public string session_id { get; set; }
+    }
+
+    public class ScrobbleFinishData {
+        public int duration_seconds { get; set; }
+    }
+
+    // Kept for pending-scrobble flush path which still reads session_id
     public class ScrobbleStartRes {
         public string session_id { get; set; }
     }
@@ -43,12 +74,11 @@ namespace GsPlugin.Api {
         public string external_game_id { get; set; }
         public object metadata { get; set; }
         public string finished_at { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string session_id { get; set; }
     }
 
-    public class ScrobbleFinishRes {
-        public string status { get; set; }
-    }
+    public class ScrobbleFinishRes { }
 
     // ──────────────────────────────────────────────────────────
     // Library Sync DTOs
@@ -222,6 +252,17 @@ namespace GsPlugin.Api {
     }
 
     public class DeleteDataRes {
+        public bool success { get; set; }
+        public string message { get; set; }
+        public bool rateLimited { get; set; }
+    }
+
+    public class OptInReq {
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string user_id { get; set; }
+    }
+
+    public class OptInRes {
         public bool success { get; set; }
         public string message { get; set; }
         public bool rateLimited { get; set; }
