@@ -79,18 +79,18 @@ namespace GsPlugin.Tests {
         // --- ScrobbleStartRes DTO tests ---
 
         [Fact]
-        public void ScrobbleStartRes_QueuedSessionId_IsLiteralString() {
-            // The async v2 path always returns session_id = "queued"
-            var res = new ScrobbleStartRes { session_id = "queued" };
-            Assert.Equal("queued", res.session_id);
+        public void ScrobbleStartRes_HasSessionId() {
+            var id = Guid.NewGuid().ToString();
+            var res = new ScrobbleStartRes { session_id = id };
+            Assert.Equal(id, res.session_id);
         }
 
         // --- ScrobbleFinishRes DTO tests ---
 
         [Fact]
-        public void ScrobbleFinishRes_QueuedStatus_IsLiteralString() {
-            var res = new ScrobbleFinishRes { status = "queued" };
-            Assert.Equal("queued", res.status);
+        public void ScrobbleFinishRes_CanBeConstructed() {
+            var res = new ScrobbleFinishRes();
+            Assert.NotNull(res);
         }
 
         // --- AsyncQueuedResponse DTO tests ---
@@ -131,7 +131,8 @@ namespace GsPlugin.Tests {
             // This call must compile with exactly one argument (no useAsync)
             var result = await client.StartGameSession(req);
             Assert.NotNull(result);
-            Assert.Equal("queued", result.session_id);
+            Assert.NotNull(result.session_id);
+            Assert.True(Guid.TryParse(result.session_id, out _));
         }
 
         [Fact]
@@ -145,7 +146,6 @@ namespace GsPlugin.Tests {
 
             var result = await client.FinishGameSession(req);
             Assert.NotNull(result);
-            Assert.Equal("queued", result.status);
         }
 
         [Fact]
@@ -158,9 +158,9 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public async Task MockClient_FinishGameSession_ReturnsNull_WhenSessionIdMissing() {
+        public async Task MockClient_FinishGameSession_ReturnsNull_WhenIdentifiersMissing() {
             IGsApiClient client = new MockGsApiClient(rejectMissingSessionId: true);
-            var req = new ScrobbleFinishReq { user_id = "u1", session_id = null };
+            var req = new ScrobbleFinishReq { user_id = "u1", session_id = null, game_name = null };
 
             var result = await client.FinishGameSession(req);
             Assert.Null(result);
@@ -413,13 +413,20 @@ namespace GsPlugin.Tests {
         public Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) {
             if (startData == null || (_rejectMissingUserId && string.IsNullOrEmpty(startData.user_id)))
                 return Task.FromResult<ScrobbleStartRes>(null);
-            return Task.FromResult(new ScrobbleStartRes { session_id = "queued" });
+            return Task.FromResult(new ScrobbleStartRes { session_id = Guid.NewGuid().ToString() });
         }
 
         public Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData) {
-            if (endData == null || (_rejectMissingSessionId && string.IsNullOrEmpty(endData.session_id)))
+            if (endData == null)
                 return Task.FromResult<ScrobbleFinishRes>(null);
-            return Task.FromResult(new ScrobbleFinishRes { status = "queued" });
+            if (_rejectMissingSessionId) {
+                var hasValidSessionId = !string.IsNullOrEmpty(endData.session_id) && Guid.TryParse(endData.session_id, out _);
+                var hasGameName = !string.IsNullOrEmpty(endData.game_name);
+                if (!hasValidSessionId && !hasGameName) {
+                    return Task.FromResult<ScrobbleFinishRes>(null);
+                }
+            }
+            return Task.FromResult(new ScrobbleFinishRes());
         }
 
         public Task<AsyncQueuedResponse> SyncLibraryFull(LibraryFullSyncReq req) =>

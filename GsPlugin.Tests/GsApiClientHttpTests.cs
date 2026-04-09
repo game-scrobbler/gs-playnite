@@ -68,16 +68,19 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public async Task StartGameSession_SuccessfulQueue_ReturnsSessionId() {
+        public async Task StartGameSession_Successful_ReturnsSessionId() {
             var tempDir = CreateTempDir();
             try {
                 InitDataManager(tempDir, "test-token-abc");
 
+                var sessionId = Guid.NewGuid().ToString();
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
-                        success = true,
-                        status = "queued",
-                        queueId = "q-123"
+                        status = "success",
+                        data = new {
+                            session_id = sessionId
+                        },
+                        message = "Scrobble started successfully"
                     })
                 };
                 var client = new GsApiClient(new HttpClient(handler));
@@ -90,7 +93,7 @@ namespace GsPlugin.Tests {
                 });
 
                 Assert.NotNull(result);
-                Assert.Equal("queued", result.session_id);
+                Assert.Equal(sessionId, result.session_id);
                 Assert.True(handler.CallCount > 0);
             }
             finally {
@@ -127,17 +130,69 @@ namespace GsPlugin.Tests {
         // --- FinishGameSession Tests ---
 
         [Fact]
-        public async Task FinishGameSession_NullSessionId_ReturnsNull() {
-            var handler = new MockHttpHandler();
-            var client = new GsApiClient(new HttpClient(handler));
+        public async Task FinishGameSession_NullSessionId_ProceedsWithNameBasedMatching() {
+            var tempDir = CreateTempDir();
+            try {
+                InitDataManager(tempDir, "test-token-abc");
 
-            var result = await client.FinishGameSession(new ScrobbleFinishReq {
-                user_id = "user-1",
-                session_id = null
-            });
+                var handler = new MockHttpHandler {
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        status = "success",
+                        data = new { duration_seconds = 120 },
+                        message = "Scrobble finished successfully"
+                    })
+                };
+                var client = new GsApiClient(new HttpClient(handler));
 
-            Assert.Null(result);
-            Assert.Equal(0, handler.CallCount);
+                var result = await client.FinishGameSession(new ScrobbleFinishReq {
+                    user_id = "user-1",
+                    game_name = "Test Game",
+                    session_id = null
+                });
+
+                // Null session_id is allowed — backend uses name-based matching (Strategy 2)
+                Assert.NotNull(result);
+                Assert.True(handler.CallCount > 0);
+                Assert.Contains("\"game_name\":\"Test Game\"", handler.LastRequestBody ?? "");
+                Assert.DoesNotContain("\"session_id\"", handler.LastRequestBody ?? "");
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task FinishGameSession_NonUuidSessionId_ClearsToNull() {
+            var tempDir = CreateTempDir();
+            try {
+                InitDataManager(tempDir, "test-token-abc");
+
+                var handler = new MockHttpHandler {
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        status = "success",
+                        data = new { duration_seconds = 60 },
+                        message = "Scrobble finished successfully"
+                    }),
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var req = new ScrobbleFinishReq {
+                    user_id = "user-1",
+                    game_name = "Test Game",
+                    session_id = "queued"
+                };
+                var result = await client.FinishGameSession(req);
+
+                // Non-UUID "queued" is cleared to null on the cloned send payload, not on the caller's object
+                Assert.NotNull(result);
+                Assert.Equal("queued", req.session_id); // original object must not be mutated
+                Assert.True(handler.CallCount > 0);
+                Assert.Contains("\"game_name\":\"Test Game\"", handler.LastRequestBody ?? "");
+                Assert.DoesNotContain("\"session_id\"", handler.LastRequestBody ?? ""); // null fields are omitted
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
         }
 
         // --- RegisterInstallToken Tests ---
