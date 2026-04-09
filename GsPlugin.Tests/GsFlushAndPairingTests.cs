@@ -157,7 +157,7 @@ namespace GsPlugin.Tests {
                     user_id = "u1",
                     game_name = "Test Game",
                     game_id = gameId,
-                    session_id = "queued",
+                    session_id = null,
                     finished_at = now.AddMinutes(30).ToString("yyyy-MM-ddTHH:mm:ssK")
                 },
                 QueuedAt = now.AddMinutes(30)
@@ -169,7 +169,7 @@ namespace GsPlugin.Tests {
             Assert.Equal(2, GsDataManager.Data.PendingScrobbles.Count);
             Assert.Equal("start", GsDataManager.Data.PendingScrobbles[0].Type);
             Assert.Equal("finish", GsDataManager.Data.PendingScrobbles[1].Type);
-            Assert.Equal("queued", GsDataManager.Data.PendingScrobbles[1].FinishData.session_id);
+            Assert.Null(GsDataManager.Data.PendingScrobbles[1].FinishData.session_id);
             Assert.Null(GsDataManager.Data.PendingStartGameId);
         }
 
@@ -194,7 +194,7 @@ namespace GsPlugin.Tests {
                     user_id = "u1",
                     game_name = "Test",
                     game_id = gameId,
-                    session_id = "queued",
+                    session_id = null,
                     finished_at = now.AddMinutes(30).ToString("yyyy-MM-ddTHH:mm:ssK")
                 },
                 QueuedAt = now.AddMinutes(30)
@@ -211,7 +211,7 @@ namespace GsPlugin.Tests {
             Assert.Equal("finish", items[1].Type);
             Assert.NotNull(items[1].FinishData);
             Assert.Equal(gameId, items[1].FinishData.game_id);
-            Assert.Equal("queued", items[1].FinishData.session_id);
+            Assert.Null(items[1].FinishData.session_id);
         }
 
         #endregion

@@ -187,7 +187,7 @@ namespace GsPlugin.Services {
                             game_id = stoppedGame.Id.ToString(),
                             plugin_id = stoppedGame.PluginId.ToString(),
                             external_game_id = stoppedGame.GameId,
-                            session_id = "queued",
+                            session_id = null,
                             metadata = new { PluginId = stoppedGame.PluginId.ToString() },
                             finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                         },
