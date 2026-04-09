@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Playnite.SDK;
+using Playnite;
 
 namespace GsPlugin.Api {
     /// <summary>
@@ -62,7 +62,7 @@ namespace GsPlugin.Api {
         /// results count toward the failure threshold and trigger retries.</param>
         /// <returns>Result of the function or default(T) if all attempts fail</returns>
         public async Task<T> ExecuteAsync<T>(Func<Task<T>> func, int maxRetries = 3,
-            TimeSpan? baseDelay = null, Func<T, bool> isFailure = null) {
+            TimeSpan? baseDelay = null, Func<T, bool>? isFailure = null) {
             var delay = baseDelay ?? TimeSpan.FromSeconds(1);
 
             for (int attempt = 0; attempt <= maxRetries; attempt++) {

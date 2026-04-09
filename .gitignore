@@ -268,3 +268,14 @@ PackingOutput/
 /qodana.yaml
 /.sentryclirc
 .claude/
+
+# MSBuild binary log
+*.binlog
+
+# WPF/SDK generated source files
+*.g.cs
+
+# Playnite 10 project leftovers (replaced by P11 equivalents; files may linger on disk)
+extension.yaml
+packages.config
+app.config

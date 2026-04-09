@@ -1,8 +1,5 @@
-// System.Collections.Generic is required for WPF _wpftmp assembly compilation —
-// it triggers transitive assembly loading that lets the XAML compiler resolve
-// Playnite.SDK.ObservableObject's base type chain.
 using System.Collections.Generic;
-using Playnite.SDK;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace GsPlugin.Models {
     /// <summary>
@@ -13,7 +10,7 @@ namespace GsPlugin.Models {
         private string _theme = "Dark";
         public string Theme {
             get => _theme;
-            set => SetValue(ref _theme, value);
+            set => SetProperty(ref _theme, value);
         }
 
         private bool _disableSentry = false;

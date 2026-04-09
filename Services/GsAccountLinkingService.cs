@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
-using Playnite.SDK;
+using Playnite;
 using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
@@ -46,7 +46,7 @@ namespace GsPlugin.Services {
             };
         }
 
-        public static LinkingResult CreateError(string errorMessage, LinkingContext context, Exception exception = null, bool isNetworkError = false, bool isTokenExpiry = false) {
+        public static LinkingResult CreateError(string errorMessage, LinkingContext context, Exception? exception = null, bool isNetworkError = false, bool isTokenExpiry = false) {
             return new LinkingResult {
                 Success = false,
                 ErrorMessage = errorMessage,
@@ -65,7 +65,7 @@ namespace GsPlugin.Services {
     public class GsAccountLinkingService {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private readonly IGsApiClient _apiClient;
-        private readonly IPlayniteAPI _playniteApi;
+        private readonly IPlayniteApi _playniteApi;
 
         /// <summary>
         /// Event triggered when account linking status changes.
@@ -77,7 +77,7 @@ namespace GsPlugin.Services {
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
         /// <param name="playniteApi">The Playnite API instance for UI interactions.</param>
-        public GsAccountLinkingService(IGsApiClient apiClient, IPlayniteAPI playniteApi) {
+        public GsAccountLinkingService(IGsApiClient apiClient, IPlayniteApi playniteApi) {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             _playniteApi = playniteApi ?? throw new ArgumentNullException(nameof(playniteApi));
         }
@@ -209,12 +209,13 @@ namespace GsPlugin.Services {
         /// Checks if the user wants to proceed with relinking to a different account.
         /// </summary>
         /// <returns>True if the user wants to proceed, false otherwise</returns>
-        public bool ShouldProceedWithRelinking() {
+        public static bool ShouldProceedWithRelinking() {
             if (!GsDataManager.IsAccountLinked) {
                 return true;
             }
 
-            var result = _playniteApi.Dialogs.ShowMessage(
+            // P11: use WPF MessageBox directly for yes/no dialogs.
+            var result = MessageBox.Show(
                 GsLocalization.Format("LOCGsPluginAlreadyLinkedBody",
                     $"Account is already linked to User ID: {GsDataManager.Data.LinkedUserId}\n\nDo you want to link to a different account?",
                     GsDataManager.Data.LinkedUserId),
@@ -223,7 +224,7 @@ namespace GsPlugin.Services {
                 MessageBoxImage.Question
             );
 
-            return result == MessageBoxResult.Yes;
+            return result == System.Windows.MessageBoxResult.Yes;
         }
 
         /// <summary>
@@ -237,13 +238,14 @@ namespace GsPlugin.Services {
                     LinkingContext.ManualSettings);
             }
 
-            var confirm = _playniteApi.Dialogs.ShowMessage(
+            // P11: use WPF MessageBox directly for yes/no dialogs.
+            var confirm = MessageBox.Show(
                 GsLocalization.Get("LOCGsPluginDisconnectDialogBody", "Disconnect your account? Your game data will be kept on the server.\nYou can re-link anytime."),
                 GsLocalization.Get("LOCGsPluginDisconnectDialogTitle", "Disconnect Account"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (confirm != MessageBoxResult.Yes) {
+            if (confirm != System.Windows.MessageBoxResult.Yes) {
                 return LinkingResult.CreateError("Cancelled", LinkingContext.ManualSettings);
             }
 

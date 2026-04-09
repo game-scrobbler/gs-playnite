@@ -1,5 +1,5 @@
 using System;
-using Playnite.SDK;
+using Playnite;
 
 namespace GsPlugin.Infrastructure {
     public static class GsLogger {

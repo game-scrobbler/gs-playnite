@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
-using System.Linq;
-using Playnite.SDK;
-using Playnite.SDK.Plugins;
+using Playnite;
 using GsPlugin.Infrastructure;
 
 namespace GsPlugin.Services {
@@ -18,12 +16,15 @@ namespace GsPlugin.Services {
             "e6aad2c9-6e06-4d8d-ac55-ac3b252b5f7b"
         );
 
-        private readonly IPlayniteAPI _api;
+        private readonly IPlayniteApi? _api;
         private readonly string _dbPath;
 
-        public GsPlayniteAchievementsHelper(IPlayniteAPI api) {
+        public GsPlayniteAchievementsHelper(IPlayniteApi api) {
             _api = api;
-            _dbPath = Path.Combine(api.Paths.ExtensionsDataPath,
+            // In P11, UserDataDir is the plugin-specific data dir.
+            // Parent directory is the shared ExtensionsData folder.
+            var extensionsDataPath = Path.GetDirectoryName(api.UserDataDir)!;
+            _dbPath = Path.Combine(extensionsDataPath,
                 PlayniteAchievementsId.ToString(), "achievement_cache.db");
         }
 
@@ -34,12 +35,7 @@ namespace GsPlugin.Services {
 
         public string ProviderName => "Playnite Achievements";
 
-        public bool IsInstalled {
-            get {
-                if (File.Exists(_dbPath)) return true;
-                return _api?.Addons?.Plugins?.Any(p => p.Id == PlayniteAchievementsId) == true;
-            }
-        }
+        public bool IsInstalled => File.Exists(_dbPath);
 
         public (int unlocked, int total)? GetCounts(Guid gameId) {
             try {
@@ -159,18 +155,8 @@ namespace GsPlugin.Services {
         }
 
         public string GetVersion() {
-            try {
-                var plugin = _api?.Addons?.Plugins?.FirstOrDefault(p => p.Id == PlayniteAchievementsId);
-                if (plugin == null) return null;
-                return PluginVersionHelper.GetExtensionYamlVersion(plugin)
-                    ?? plugin.GetType().Assembly.GetName().Version?.ToString(3);
-            }
-            catch (Exception ex) {
-                GsLogger.Warn(
-                    $"[GsPlayniteAchievementsHelper] Version lookup failed: {ex.Message}"
-                );
-                return null;
-            }
+            // TODO P11: Addons.Plugins API removed — version lookup not yet implemented.
+            return null;
         }
     }
 }

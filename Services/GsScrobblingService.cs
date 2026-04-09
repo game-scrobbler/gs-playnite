@@ -2,8 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Playnite.SDK;
-using Playnite.SDK.Events;
+using Playnite;
 using GsPlugin.Api;
 using GsPlugin.Models;
 
@@ -58,7 +57,7 @@ namespace GsPlugin.Services {
         /// Sets the linked user information in the data manager.
         /// </summary>
         /// <param name="userId">The linked user ID, or null if not linked</param>
-        private static void SetLinkedUser(string userId = null) {
+        private static void SetLinkedUser(string? userId = null) {
             bool oldLinked = GsDataManager.IsAccountLinked;
             var oldId = GsDataManager.Data.LinkedUserId;
 
@@ -81,8 +80,8 @@ namespace GsPlugin.Services {
         /// <summary>
         /// Handles the game starting event and initiates a new scrobbling session.
         /// </summary>
-        /// <param name="args">Event arguments containing game information.</param>
-        public async Task OnGameStartAsync(OnGameStartingEventArgs args) {
+        /// <param name="game">The game that started.</param>
+        public async Task OnGameStartAsync(Game game) {
             try {
                 if (GsDataManager.IsOptedOut) return;
 
@@ -92,32 +91,31 @@ namespace GsPlugin.Services {
                     return;
                 }
 
-                if (args?.Game == null) {
+                if (game == null) {
                     _logger.Warn("OnGameStartAsync called with null game; skipping.");
                     return;
                 }
 
                 DateTime localDate = DateTime.Now;
-                var startedGame = args.Game;
 
                 // Skip scrobbling for unsupported plugins
-                if (startedGame.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(startedGame.PluginId)) {
-                    _logger.Info($"Skipping scrobble start for unsupported plugin: {startedGame.PluginId}");
+                if (string.IsNullOrEmpty(game.LibraryId) || !GsAllowedPlugins.AllowedPluginIds.Contains(game.LibraryId)) {
+                    _logger.Info($"Skipping scrobble start for unsupported plugin: {game.LibraryId}");
                     return;
                 }
 
-                _logger.Info($"Starting scrobble session for game: {startedGame.Name} (ID: {startedGame.Id})");
+                _logger.Info($"Starting scrobble session for game: {game.Name} (ID: {game.Id})");
 
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
                 if (GsDataManager.IsOptedOut) return;
 
                 var sessionData = await _apiClient.StartGameSession(new ScrobbleStartReq {
                     user_id = GsDataManager.InstallIdForBody,
-                    game_name = startedGame.Name,
-                    game_id = startedGame.Id.ToString(),
-                    plugin_id = startedGame.PluginId.ToString(),
-                    external_game_id = startedGame.GameId,
-                    metadata = new { PluginId = startedGame.PluginId.ToString() },
+                    game_name = game.Name,
+                    game_id = game.Id.ToString(),
+                    plugin_id = game.LibraryId,
+                    external_game_id = game.LibraryGameId,
+                    metadata = new { LibraryId = game.LibraryId },
                     started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 });
                 if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
@@ -130,35 +128,35 @@ namespace GsPlugin.Services {
                     _logger.Info($"Successfully started scrobble session with ID: {sessionData.session_id}");
                 }
                 else {
-                    _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id}). Queuing start for retry.");
+                    _logger.Error($"Failed to start scrobble session for game: {game.Name} (ID: {game.Id}). Queuing start for retry.");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "start",
                         StartData = new ScrobbleStartReq {
                             user_id = GsDataManager.InstallIdForBody,
-                            game_name = startedGame.Name,
-                            game_id = startedGame.Id.ToString(),
-                            plugin_id = startedGame.PluginId.ToString(),
-                            external_game_id = startedGame.GameId,
-                            metadata = new { PluginId = startedGame.PluginId.ToString() },
+                            game_name = game.Name,
+                            game_id = game.Id.ToString(),
+                            plugin_id = game.LibraryId,
+                            external_game_id = game.LibraryGameId,
+                            metadata = new { LibraryId = game.LibraryId },
                             started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                         },
                         QueuedAt = localDate
                     });
                     // Mark that this game has a queued start so OnGameStoppedAsync can pair it
                     // with a finish even though there is no ActiveSessionId.
-                    GsDataManager.MutateAndSave(d => d.PendingStartGameId = startedGame.Id.ToString());
+                    GsDataManager.MutateAndSave(d => d.PendingStartGameId = game.Id.ToString());
                 }
             }
             catch (Exception ex) {
-                _logger.Error(ex, $"Error starting scrobble session for game: {args?.Game?.Name ?? "<null>"} (ID: {(args?.Game != null ? args.Game.Id.ToString() : "<null>")})");
+                _logger.Error(ex, $"Error starting scrobble session for game: {game?.Name ?? "<null>"} (ID: {game?.Id.ToString() ?? "<null>"})");
             }
         }
 
         /// <summary>
         /// Handles the game stopped event and finishes the active scrobbling session.
         /// </summary>
-        /// <param name="args">Event arguments containing game information.</param>
-        public async Task OnGameStoppedAsync(OnGameStoppedEventArgs args) {
+        /// <param name="game">The game that stopped.</param>
+        public async Task OnGameStoppedAsync(Game game) {
             try {
                 if (GsDataManager.IsOptedOut) return;
 
@@ -166,29 +164,28 @@ namespace GsPlugin.Services {
                     _logger.Info("Scrobbling disabled, skipping game stop tracking");
                     return;
                 }
-                if (args?.Game == null) {
+                if (game == null) {
                     _logger.Warn("OnGameStoppedAsync called with null game; skipping.");
                     return;
                 }
 
                 DateTime localDate = DateTime.Now;
-                var stoppedGame = args.Game;
 
                 // If the start was queued (failed to send), queue a matching finish so the
                 // replay produces a paired session. No API call is needed here.
                 var pendingStartGameId = GsDataManager.Data.PendingStartGameId;
-                if (!string.IsNullOrEmpty(pendingStartGameId) && pendingStartGameId == stoppedGame.Id.ToString()) {
-                    _logger.Info($"Queuing finish to pair with pending start for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
+                if (!string.IsNullOrEmpty(pendingStartGameId) && pendingStartGameId == game.Id.ToString()) {
+                    _logger.Info($"Queuing finish to pair with pending start for game: {game.Name} (ID: {game.Id})");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
                         FinishData = new ScrobbleFinishReq {
                             user_id = GsDataManager.InstallIdForBody,
-                            game_name = stoppedGame.Name,
-                            game_id = stoppedGame.Id.ToString(),
-                            plugin_id = stoppedGame.PluginId.ToString(),
-                            external_game_id = stoppedGame.GameId,
+                            game_name = game.Name,
+                            game_id = game.Id.ToString(),
+                            plugin_id = game.LibraryId,
+                            external_game_id = game.LibraryGameId,
                             session_id = null,
-                            metadata = new { PluginId = stoppedGame.PluginId.ToString() },
+                            metadata = new { LibraryId = game.LibraryId },
                             finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                         },
                         QueuedAt = localDate
@@ -203,45 +200,45 @@ namespace GsPlugin.Services {
                 }
 
                 // Skip scrobbling for unsupported plugins
-                if (stoppedGame.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(stoppedGame.PluginId)) {
-                    _logger.Info($"Skipping scrobble finish for unsupported plugin: {stoppedGame.PluginId}");
+                if (string.IsNullOrEmpty(game.LibraryId) || !GsAllowedPlugins.AllowedPluginIds.Contains(game.LibraryId)) {
+                    _logger.Info($"Skipping scrobble finish for unsupported plugin: {game.LibraryId}");
                     // Still clear the active session since we may have tracked start before this filter existed
                     ClearActiveSession();
                     return;
                 }
 
-                _logger.Info($"Stopping scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
+                _logger.Info($"Stopping scrobble session for game: {game.Name} (ID: {game.Id})");
 
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
                 if (GsDataManager.IsOptedOut) return;
 
                 var finishResponse = await _apiClient.FinishGameSession(new ScrobbleFinishReq {
                     user_id = GsDataManager.InstallIdForBody,
-                    game_name = stoppedGame.Name,
-                    game_id = stoppedGame.Id.ToString(),
-                    plugin_id = stoppedGame.PluginId.ToString(),
-                    external_game_id = stoppedGame.GameId,
+                    game_name = game.Name,
+                    game_id = game.Id.ToString(),
+                    plugin_id = game.LibraryId,
+                    external_game_id = game.LibraryGameId,
                     session_id = GsDataManager.Data.ActiveSessionId,
-                    metadata = new { PluginId = stoppedGame.PluginId.ToString() },
+                    metadata = new { LibraryId = game.LibraryId },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 });
                 if (finishResponse != null) {
                     // Only clear the session ID if the request was successful
                     ClearActiveSession();
-                    _logger.Info($"Successfully finished scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
+                    _logger.Info($"Successfully finished scrobble session for game: {game.Name} (ID: {game.Id})");
                 }
                 else {
-                    _logger.Error($"Failed to finish game session for {stoppedGame.Name} (ID: {stoppedGame.Id}). Queuing for retry.");
+                    _logger.Error($"Failed to finish game session for {game.Name} (ID: {game.Id}). Queuing for retry.");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
                         FinishData = new ScrobbleFinishReq {
                             user_id = GsDataManager.InstallIdForBody,
-                            game_name = stoppedGame.Name,
-                            game_id = stoppedGame.Id.ToString(),
-                            plugin_id = stoppedGame.PluginId.ToString(),
-                            external_game_id = stoppedGame.GameId,
+                            game_name = game.Name,
+                            game_id = game.Id.ToString(),
+                            plugin_id = game.LibraryId,
+                            external_game_id = game.LibraryGameId,
                             session_id = GsDataManager.Data.ActiveSessionId,
-                            metadata = new { PluginId = stoppedGame.PluginId.ToString() },
+                            metadata = new { LibraryId = game.LibraryId },
                             finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                         },
                         QueuedAt = localDate
@@ -250,7 +247,7 @@ namespace GsPlugin.Services {
                 }
             }
             catch (Exception ex) {
-                _logger.Error(ex, $"Error stopping scrobble session for game: {args?.Game?.Name ?? "<null>"} (ID: {(args?.Game != null ? args.Game.Id.ToString() : "<null>")})");
+                _logger.Error(ex, $"Error stopping scrobble session for game: {game?.Name ?? "<null>"} (ID: {game?.Id.ToString() ?? "<null>"})");
             }
         }
 
@@ -309,16 +306,13 @@ namespace GsPlugin.Services {
 
 
         /// <summary>
-        /// Builds an ISO 8601 date string from a Playnite ReleaseDate struct.
-        /// Returns "YYYY-MM-DD" when day and month are known, "YYYY" when only year is known, or null.
+        /// Builds an ISO 8601 date string from a nullable PartialDate (Playnite 11 Game.ReleaseDate).
+        /// Returns "YYYY-MM-DD" or null.
         /// </summary>
-        private static string BuildReleaseDateString(Playnite.SDK.Models.ReleaseDate? rd) {
-            if (!rd.HasValue || rd.Value.Year == 0)
-                return null;
-            var v = rd.Value;
-            if (v.Month > 0 && v.Day > 0)
-                return $"{v.Year:D4}-{v.Month:D2}-{v.Day:D2}";
-            return v.Year.ToString("D4");
+        private static string? BuildReleaseDateString(PartialDate? rd) {
+            if (rd == null) return null;
+            // PartialDate.Year is int (not int?); Month/Day are int?
+            return $"{rd.Year:D4}-{(rd.Month ?? 1):D2}-{(rd.Day ?? 1):D2}";
         }
 
 
@@ -327,59 +321,44 @@ namespace GsPlugin.Services {
         /// <summary>
         /// Maps a Playnite Game to the API DTO. Shared by all sync paths.
         /// </summary>
-        /// <summary>
-        /// Safely extracts names from a Playnite collection, filtering out null entries.
-        /// Returns null for empty or null collections.
-        /// </summary>
-        private static List<string> SafeNames<T>(IEnumerable<T> items) where T : Playnite.SDK.Models.DatabaseObject {
-            if (items == null) return null;
-            var list = new List<string>();
-            foreach (var item in items) {
-                if (item?.Name != null) list.Add(item.Name);
-            }
-            return list.Count > 0 ? list : null;
-        }
-
-        private GameSyncDto MapGameToDto(Playnite.SDK.Models.Game g, bool syncAchievements) {
-            var achievementCounts = syncAchievements
-                ? _achievementHelper.GetCounts(g.Id)
+        private GameSyncDto MapGameToDto(Game g, bool syncAchievements) {
+            var achievementCounts = syncAchievements && Guid.TryParse(g.Id, out var gameGuid)
+                ? _achievementHelper.GetCounts(gameGuid)
                 : null;
 
             return new GameSyncDto {
-                game_id = g.GameId,
-                plugin_id = g.PluginId.ToString(),
+                game_id = g.LibraryGameId,
+                plugin_id = g.LibraryId,
                 game_name = g.Name,
                 playnite_id = g.Id.ToString(),
-                playtime_seconds = (long)g.Playtime,
-                play_count = (int)g.PlayCount,
-                last_activity = g.LastActivity,
-                is_installed = g.IsInstalled,
-                completion_status_id = g.CompletionStatusId != Guid.Empty
-                    ? g.CompletionStatusId.ToString()
-                    : null,
-                completion_status_name = g.CompletionStatus?.Name,
+                playtime_seconds = (long)g.PlayTime,
+                play_count = 0, // TODO P11: PlayCount removed
+                last_activity = g.LastPlayedDate?.UtcDateTime,
+                is_installed = g.InstallState == InstallState.Installed,
+                completion_status_id = null, // TODO P11: CompletionStatusId removed
+                completion_status_name = null, // TODO P11: CompletionStatus removed
                 achievement_count_unlocked = achievementCounts?.unlocked,
                 achievement_count_total = achievementCounts?.total,
-                genres = SafeNames(g.Genres),
-                platforms = SafeNames(g.Platforms),
-                developers = SafeNames(g.Developers),
-                publishers = SafeNames(g.Publishers),
-                tags = SafeNames(g.Tags),
-                features = SafeNames(g.Features),
-                categories = SafeNames(g.Categories),
-                series = SafeNames(g.Series),
+                genres = null, // TODO P11: Game.Genres collection removed
+                platforms = null, // TODO P11: Game.Platforms collection removed
+                developers = null, // TODO P11: Game.Developers collection removed
+                publishers = null, // TODO P11: Game.Publishers collection removed
+                tags = null, // TODO P11: Game.Tags collection removed
+                features = null, // TODO P11: Game.Features collection removed
+                categories = null, // TODO P11: Game.Categories collection removed
+                series = null, // TODO P11: Game.Series collection removed
                 user_score = g.UserScore,
                 critic_score = g.CriticScore,
                 community_score = g.CommunityScore,
                 release_year = g.ReleaseDate?.Year,
-                date_added = g.Added,
+                date_added = g.AddedDate?.UtcDateTime,
                 is_favorite = g.Favorite,
                 is_hidden = g.Hidden,
-                source_name = g.Source?.Name,
+                source_name = null, // TODO P11: Game.Source removed
                 release_date = BuildReleaseDateString(g.ReleaseDate),
-                modified = g.Modified,
-                age_ratings = SafeNames(g.AgeRatings),
-                regions = SafeNames(g.Regions)
+                modified = g.ModifiedDate?.UtcDateTime,
+                age_ratings = null, // TODO P11: Game.AgeRatings collection removed
+                regions = null // TODO P11: Game.Regions collection removed
             };
         }
 
@@ -445,10 +424,10 @@ namespace GsPlugin.Services {
         /// Shared by full and diff sync paths.
         /// </summary>
         private async Task<(List<GameSyncDto> library, string libraryHash, int totalCount, int filteredCount)>
-            BuildLibraryDtosAsync(IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+            BuildLibraryDtosAsync(IEnumerable<Game> playniteDatabaseGames) {
             // Snapshot the live Playnite collection to avoid "Collection was modified" if Playnite
             // updates its database concurrently (e.g. metadata download or library import).
-            List<Playnite.SDK.Models.Game> allGames;
+            List<Game> allGames;
             try {
                 allGames = playniteDatabaseGames.ToList();
             }
@@ -460,7 +439,7 @@ namespace GsPlugin.Services {
 
             var (library, libraryHash, filteredCount) = await Task.Run(() => {
                 var filtered = allGames
-                    .Where(g => g.PluginId != Guid.Empty && GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
+                    .Where(g => !string.IsNullOrEmpty(g.LibraryId) && GsAllowedPlugins.AllowedPluginIds.Contains(g.LibraryId))
                     .ToList();
 
                 var dtos = filtered.Select(g => MapGameToDto(g, syncAchievements)).ToList();
@@ -503,7 +482,7 @@ namespace GsPlugin.Services {
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
         /// <param name="bypassCooldown">When true, skip the client-side cooldown check (used when server requests force-full-sync)</param>
         public async Task<SyncLibraryResult> SyncLibraryFullAsync(
-            IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
+            IEnumerable<Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
@@ -584,7 +563,7 @@ namespace GsPlugin.Services {
         /// Falls back to full sync if the server requests it.
         /// </summary>
         public async Task<SyncLibraryResult> SyncLibraryDiffAsync(
-            IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+            IEnumerable<Game> playniteDatabaseGames) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
@@ -689,7 +668,7 @@ namespace GsPlugin.Services {
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
         /// <param name="bypassCooldown">When true, skip the client-side cooldown check (used when server requests force-full-sync)</param>
         public async Task<SyncLibraryResult> SyncAchievementsFullAsync(
-            IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
+            IEnumerable<Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
@@ -699,7 +678,7 @@ namespace GsPlugin.Services {
                 }
 
                 _logger.Info("Starting full achievements sync (v2)");
-                List<Playnite.SDK.Models.Game> allGames;
+                List<Game> allGames;
                 try {
                     allGames = playniteDatabaseGames.ToList();
                 }
@@ -709,9 +688,11 @@ namespace GsPlugin.Services {
 
                 var games = await Task.Run(() => {
                     return allGames
-                        .Where(g => g.PluginId != Guid.Empty && GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
+                        .Where(g => !string.IsNullOrEmpty(g.LibraryId) && GsAllowedPlugins.AllowedPluginIds.Contains(g.LibraryId))
                         .Select(g => {
-                            var achievements = _achievementHelper.GetAchievements(g.Id);
+                            var achievements = Guid.TryParse(g.Id, out var gAchId)
+                                ? _achievementHelper.GetAchievements(gAchId)
+                                : null;
                             if (achievements == null || achievements.Count == 0)
                                 return null;
 
@@ -730,12 +711,13 @@ namespace GsPlugin.Services {
 
                             return new GameAchievementsDto {
                                 playnite_id = g.Id.ToString(),
-                                game_id = g.GameId,
-                                plugin_id = g.PluginId.ToString(),
+                                game_id = g.LibraryGameId,
+                                plugin_id = g.LibraryId,
                                 achievements = dedupedByName.Values.ToList()
                             };
                         })
                         .Where(x => x != null)
+                        .Select(x => x!)
                         .ToList();
                 });
 
@@ -798,7 +780,7 @@ namespace GsPlugin.Services {
         /// Falls back to full sync if the server requests it.
         /// </summary>
         public async Task<SyncLibraryResult> SyncAchievementsDiffAsync(
-            IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
+            IEnumerable<Game> playniteDatabaseGames) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
@@ -808,7 +790,7 @@ namespace GsPlugin.Services {
                 }
 
                 _logger.Info("Starting diff achievements sync (v2)");
-                List<Playnite.SDK.Models.Game> allGames;
+                List<Game> allGames;
                 try {
                     allGames = playniteDatabaseGames.ToList();
                 }
@@ -826,7 +808,7 @@ namespace GsPlugin.Services {
                 _logger.Info($"Achievement diff: {allGames.Count} total games, " +
                     $"snapshot has {achievementSnapshot.Count} entries");
 
-                var (changed, clearedIds) = await Task.Run(() => {
+                (List<GameAchievementsDto> changed, List<string> clearedIds) = await Task.Run(() => {
                     var result = new List<GameAchievementsDto>();
                     var currentGameIds = new HashSet<string>();
                     int filteredCount = 0;
@@ -834,29 +816,31 @@ namespace GsPlugin.Services {
                     int withDataCount = 0;
 
                     foreach (var g in allGames) {
-                        if (g.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
+                        if (string.IsNullOrEmpty(g.LibraryId) || !GsAllowedPlugins.AllowedPluginIds.Contains(g.LibraryId))
                             continue;
 
                         filteredCount++;
                         var playniteId = g.Id.ToString();
-                        List<AchievementItem> achievements;
+                        List<AchievementItem> achievements = null;
                         string sourceProvider = null;
 
                         // Use source-aware lookup when available for diagnostics
-                        if (_achievementHelper is GsAchievementAggregator diagAgg) {
-                            var (achs, src) = diagAgg.GetAchievementsWithSource(g.Id);
-                            achievements = achs;
-                            sourceProvider = src;
-                        }
-                        else {
-                            achievements = _achievementHelper.GetAchievements(g.Id);
+                        if (Guid.TryParse(g.Id, out var diffAchId)) {
+                            if (_achievementHelper is GsAchievementAggregator diagAgg) {
+                                var (achs, src) = diagAgg.GetAchievementsWithSource(diffAchId);
+                                achievements = achs;
+                                sourceProvider = src;
+                            }
+                            else {
+                                achievements = _achievementHelper.GetAchievements(diffAchId);
+                            }
                         }
 
                         if (achievements == null || achievements.Count == 0) {
                             nullCount++;
                             // Log first 3 games with no data for diagnosis
                             if (nullCount <= 3) {
-                                _logger.Debug($"Achievement diag: game '{g.Name}' (plugin={g.PluginId}) returned no achievements");
+                                _logger.Debug($"Achievement diag: game '{g.Name}' (plugin={g.LibraryId}) returned no achievements");
                             }
                         }
                         else {
@@ -874,8 +858,8 @@ namespace GsPlugin.Services {
                             currentGameIds.Add(playniteId);
                             result.Add(new GameAchievementsDto {
                                 playnite_id = playniteId,
-                                game_id = g.GameId,
-                                plugin_id = g.PluginId.ToString(),
+                                game_id = g.LibraryGameId,
+                                plugin_id = g.LibraryId,
                                 achievements = new List<AchievementItemDto>()
                             });
                             continue;
@@ -932,8 +916,8 @@ namespace GsPlugin.Services {
 
                             result.Add(new GameAchievementsDto {
                                 playnite_id = playniteId,
-                                game_id = g.GameId,
-                                plugin_id = g.PluginId.ToString(),
+                                game_id = g.LibraryGameId,
+                                plugin_id = g.LibraryId,
                                 achievements = dedupedByName.Values.ToList()
                             });
                         }

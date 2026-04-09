@@ -18,7 +18,7 @@ namespace GsPlugin.View {
         private GsPluginSettingsViewModel _viewModel;
         private GsPluginSettings _subscribedSettings;
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         #region Constructor
         public GsPluginSettingsView() {
@@ -40,7 +40,7 @@ namespace GsPlugin.View {
         }
         #endregion
 
-        protected virtual void OnPropertyChanged(string propertyName = null) {
+        protected virtual void OnPropertyChanged(string? propertyName = null) {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
@@ -74,7 +74,6 @@ namespace GsPlugin.View {
         /// <summary>
         /// Initializes view-specific data that doesn't depend on the view model.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822", Justification = "Accesses WPF-generated instance controls")]
         private void InitializeViewData() {
             // Display the installation ID
             IDTextBlock.Text = GsDataManager.Data.InstallID;
@@ -86,7 +85,7 @@ namespace GsPlugin.View {
             UpdatePendingScrobblesStatus();
         }
 
-        private static void UpdateInstallTokenStatus() {
+        private void UpdateInstallTokenStatus() {
             if (GsPluginSettingsViewModel.IsInstallTokenActive) {
                 InstallTokenStatusTextBlock.Text = GsLocalization.Get("LOCGsPluginTokenStatusActive", "\u2713 Token: Active");
                 InstallTokenStatusTextBlock.Foreground = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50));
@@ -97,7 +96,7 @@ namespace GsPlugin.View {
             }
         }
 
-        private static void UpdatePendingScrobblesStatus() {
+        private void UpdatePendingScrobblesStatus() {
             int count = GsPluginSettingsViewModel.PendingScrobbleCount;
             if (count > 0) {
                 PendingScrobblesTextBlock.Text = GsLocalization.Format("LOCGsPluginPendingScrobblesFormat",
@@ -217,7 +216,7 @@ namespace GsPlugin.View {
         /// <summary>
         /// Updates the connection status display and related UI elements.
         /// </summary>
-        private static void UpdateConnectionStatus() {
+        private void UpdateConnectionStatus() {
             bool isOptedOut = GsDataManager.IsOptedOut;
 
             if (isOptedOut) {
@@ -400,7 +399,7 @@ namespace GsPlugin.View {
         /// <summary>
         /// Toggles Delete / Opt-Back-In button visibility based on opt-out state.
         /// </summary>
-        private static void UpdateOptOutState() {
+        private void UpdateOptOutState() {
             bool isOptedOut = GsDataManager.IsOptedOut;
             DeleteMyDataButton.Visibility = isOptedOut ? Visibility.Collapsed : Visibility.Visible;
             OptBackInButton.Visibility = isOptedOut ? Visibility.Visible : Visibility.Collapsed;

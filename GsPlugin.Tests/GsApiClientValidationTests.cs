@@ -466,5 +466,8 @@ namespace GsPlugin.Tests {
 
         public Task<UnlinkRes> UnlinkAccount() =>
             Task.FromResult(new UnlinkRes { success = true });
+
+        public Task<OptInRes> RequestOptIn(OptInReq req) =>
+            Task.FromResult(new OptInRes { success = true });
     }
 }

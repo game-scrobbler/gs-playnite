@@ -1,22 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Threading;
-using Playnite.SDK;
-using Playnite.SDK.Data;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Services;
-using PluginClass = GsPlugin.GsPlugin;
 
 namespace GsPlugin.Models {
     /// <summary>
-    /// View model for plugin settings that implements ISettings interface.
-    /// Handles settings persistence, validation, and account linking operations.
+    /// View model for plugin settings. Handles settings persistence, validation, and account linking operations.
     /// </summary>
-    public class GsPluginSettingsViewModel : ObservableObject, ISettings {
-        private readonly PluginClass _plugin;
+    public class GsPluginSettingsViewModel : ObservableObject {
+        private readonly string _settingsFilePath;
         private readonly GsAccountLinkingService _linkingService;
         private readonly GsAchievementAggregator _achievementHelper;
         private readonly IGsApiClient _apiClient;
@@ -112,18 +111,19 @@ namespace GsPlugin.Models {
         /// <summary>
         /// Initializes a new instance of the GsPluginSettingsViewModel.
         /// </summary>
-        /// <param name="plugin">The plugin instance for settings persistence.</param>
+        /// <param name="userDataDir">The plugin's user data directory (PlayniteApi.UserDataDir).</param>
         /// <param name="linkingService">The account linking service.</param>
         /// <param name="achievementHelper">The aggregated achievement provider for detection status.</param>
         /// <param name="apiClient">The API client for server communication.</param>
         public GsPluginSettingsViewModel(
-            PluginClass plugin,
+            string userDataDir,
             GsAccountLinkingService linkingService,
             GsAchievementAggregator achievementHelper,
             IGsApiClient apiClient
         ) {
-            // Store plugin reference for save/load operations
-            _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
+            _settingsFilePath = Path.Combine(
+                userDataDir ?? throw new ArgumentNullException(nameof(userDataDir)),
+                "settings.json");
             _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
             _achievementHelper =
                 achievementHelper ?? throw new ArgumentNullException(nameof(achievementHelper));
@@ -137,7 +137,16 @@ namespace GsPlugin.Models {
         /// Initializes settings by loading saved data or creating defaults.
         /// </summary>
         private void InitializeSettings() {
-            var savedSettings = _plugin.LoadPluginSettings<GsPluginSettings>();
+            GsPluginSettings savedSettings = null;
+            if (File.Exists(_settingsFilePath)) {
+                try {
+                    var json = File.ReadAllText(_settingsFilePath);
+                    savedSettings = JsonSerializer.Deserialize<GsPluginSettings>(json);
+                }
+                catch (Exception ex) {
+                    GsLogger.Warn($"[GsPluginSettingsViewModel] Failed to load settings: {ex.Message}");
+                }
+            }
             if (savedSettings != null) {
                 LoadExistingSettings(savedSettings);
             }
@@ -202,7 +211,8 @@ namespace GsPlugin.Models {
         /// Begins the editing process by creating a backup of current settings.
         /// </summary>
         public void BeginEdit() {
-            _editingClone = Serialization.GetClone(Settings);
+            var json = JsonSerializer.Serialize(Settings);
+            _editingClone = JsonSerializer.Deserialize<GsPluginSettings>(json);
         }
 
         /// <summary>
@@ -217,8 +227,13 @@ namespace GsPlugin.Models {
         /// Commits the changes and saves settings to storage.
         /// </summary>
         public void EndEdit() {
-            // Save settings to Playnite storage
-            _plugin.SavePluginSettings(Settings);
+            // Save settings to disk
+            try {
+                File.WriteAllText(_settingsFilePath, JsonSerializer.Serialize(Settings));
+            }
+            catch (Exception ex) {
+                GsLogger.Warn($"[GsPluginSettingsViewModel] Failed to save settings: {ex.Message}");
+            }
 
             // Update global data manager
             var s = Settings;

@@ -502,9 +502,8 @@ namespace GsPlugin.Tests {
 
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
-                        success = true,
-                        status = "queued",
-                        queueId = "q-1"
+                        status = "success",
+                        data = new { session_id = Guid.NewGuid().ToString() }
                     })
                 };
                 var client = new GsApiClient(new HttpClient(handler));

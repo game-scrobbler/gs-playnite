@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:GsPlugin.View"
+             xmlns:loc="clr-namespace:Playnite"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="620">
 
@@ -39,8 +40,7 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
-        <!-- TextBox that inherits Playnite theme — BasedOn preserves the theme's ControlTemplate
-             so the TextBox stays editable across all Playnite themes -->
+        <!-- TextBox that inherits Playnite theme -->
         <Style x:Key="DarkTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="Background" Value="{DynamicResource TextBoxBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -53,7 +53,7 @@
             <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}"/>
         </Style>
 
-        <!-- Primary accent button — brand color is intentional -->
+        <!-- Primary accent button -->
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Foreground" Value="White"/>
@@ -100,7 +100,7 @@
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
-        <!-- Left accent bar for section headers — brand color, always fixed -->
+        <!-- Left accent bar for section headers -->
         <Style x:Key="AccentBarStyle" TargetType="Rectangle">
             <Setter Property="Width" Value="3"/>
             <Setter Property="RadiusX" Value="1.5"/>
@@ -124,12 +124,12 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginInstallIdSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="{loc:LocalizedString install_id_section_title}" Style="{StaticResource SectionTitleStyle}"/>
                     </StackPanel>
 
                     <TextBlock Style="{StaticResource MutedTextStyle}"
                                Margin="0,0,0,8"
-                               Text="{DynamicResource LOCGsPluginInstallIdDescription}"/>
+                               Text="{loc:LocalizedString install_id_description}"/>
 
                     <!-- Code-block styled ID display -->
                     <Border Background="{DynamicResource TextBoxBackgroundBrush}"
@@ -142,13 +142,13 @@
                                    FontSize="13"
                                    Foreground="{DynamicResource TextBrush}"
                                    Cursor="Hand"
-                                   ToolTip="{DynamicResource LOCGsPluginInstallIdCopyTooltip}"
+                                   ToolTip="{loc:LocalizedString install_id_copy_tooltip}"
                                    MouseLeftButtonUp="TextBlock_MouseLeftButtonUp"/>
                     </Border>
 
                     <TextBlock Style="{StaticResource MutedTextStyle}"
                                Margin="0,5,0,8"
-                               Text="{DynamicResource LOCGsPluginInstallIdCopyHint}"/>
+                               Text="{loc:LocalizedString install_id_copy_hint}"/>
 
                     <!-- Install token status indicator -->
                     <StackPanel Orientation="Horizontal">
@@ -168,12 +168,12 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginThemeSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="{loc:LocalizedString theme_section_title}" Style="{StaticResource SectionTitleStyle}"/>
                     </StackPanel>
 
                     <TextBlock Style="{StaticResource MutedTextStyle}"
                                Margin="0,0,0,8"
-                               Text="{DynamicResource LOCGsPluginThemeDescription}"/>
+                               Text="{loc:LocalizedString theme_description}"/>
 
                     <ComboBox x:Name="ThemeComboBox"
                               Width="180"
@@ -188,10 +188,9 @@
                               ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding Settings.Theme, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <!-- New Dashboard Experience toggle (display feature, grouped with theme) -->
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
-                              Content="{DynamicResource LOCGsPluginNewDashboardExperienceLabel}"
-                              ToolTip="{DynamicResource LOCGsPluginNewDashboardExperienceTooltip}"
+                              Content="{loc:LocalizedString new_dashboard_experience_label}"
+                              ToolTip="{loc:LocalizedString new_dashboard_experience_tooltip}"
                               IsChecked="{Binding Settings.NewDashboardExperience, Mode=TwoWay}"
                               Margin="0,0,0,0"/>
 
@@ -206,7 +205,7 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginAccountLinkingSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="{loc:LocalizedString account_linking_section_title}" Style="{StaticResource SectionTitleStyle}"/>
                     </StackPanel>
 
                     <!-- Hint with hyperlink -->
@@ -214,20 +213,20 @@
                                Foreground="{DynamicResource TextBrushDarker}"
                                Margin="0,0,0,12"
                                TextWrapping="Wrap">
-                        <Run Text="{DynamicResource LOCGsPluginAccountLinkingHintPrefix}"/>
+                        <Run Text="{loc:LocalizedString account_linking_hint_prefix}"/>
                         <Hyperlink NavigateUri="https://gamescrobbler.com?utm_source=playnite_plugin&amp;utm_medium=settings_page&amp;utm_campaign=account_linking&amp;utm_content=hint_text"
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="{StaticResource AccentBrush}">
                             <Run Text="gamescrobbler.com"/>
                         </Hyperlink>
-                        <Run Text="{DynamicResource LOCGsPluginAccountLinkingHintSuffix}"/>
+                        <Run Text="{loc:LocalizedString account_linking_hint_suffix}"/>
                     </TextBlock>
 
                     <!-- Connection status badge -->
                     <StackPanel Orientation="Horizontal"
                                 Margin="0,0,0,12"
                                 VerticalAlignment="Center">
-                        <TextBlock Text="{DynamicResource LOCGsPluginStatusLabel}"
+                        <TextBlock Text="{loc:LocalizedString status_label}"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextBrushDarker}"
                                    VerticalAlignment="Center"
@@ -247,21 +246,21 @@
                     <!-- Disconnect button (visible only when linked) -->
                     <Button x:Name="DisconnectAccountButton"
                             Style="{StaticResource SecondaryButtonStyle}"
-                            Content="{DynamicResource LOCGsPluginDisconnectAccountButton}"
+                            Content="{loc:LocalizedString disconnect_account_button}"
                             HorizontalAlignment="Left"
                             Margin="0,0,0,12"
                             Visibility="Collapsed"
                             Click="DisconnectAccount_Click"
-                            ToolTip="{DynamicResource LOCGsPluginDisconnectAccountTooltip}"/>
+                            ToolTip="{loc:LocalizedString disconnect_account_tooltip}"/>
 
                     <!-- Open website button -->
                     <Button x:Name="OpenWebsiteToLinkButton"
                             Style="{StaticResource SecondaryButtonStyle}"
-                            Content="{DynamicResource LOCGsPluginLinkOnWebsiteButton}"
+                            Content="{loc:LocalizedString link_on_website_button}"
                             HorizontalAlignment="Left"
                             Margin="0,0,0,12"
                             Click="OpenWebsiteToLink_Click"
-                            ToolTip="{DynamicResource LOCGsPluginOpenWebsiteToLinkTooltip}"/>
+                            ToolTip="{loc:LocalizedString open_website_to_link_tooltip}"/>
 
                     <!-- Separator: lines + label -->
                     <Grid Margin="0,0,0,12">
@@ -280,7 +279,7 @@
                                    FontSize="11"
                                    Foreground="{DynamicResource TextBrushDarker}"
                                    VerticalAlignment="Center"
-                                   Text="{DynamicResource LOCGsPluginManualTokenSeparator}"/>
+                                   Text="{loc:LocalizedString manual_token_separator}"/>
                         <Border Grid.Column="2"
                                 Height="1"
                                 Background="{DynamicResource NormalBorderBrush}"
@@ -300,23 +299,23 @@
                                  Style="{StaticResource DarkTextBoxStyle}"
                                  Text="{Binding Settings.LinkToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  Margin="0,0,8,0"
-                                 ToolTip="{DynamicResource LOCGsPluginTokenInputTooltip}"/>
+                                 ToolTip="{loc:LocalizedString token_input_tooltip}"/>
 
                         <Button Grid.Column="1"
                                 x:Name="LinkAccountButton"
                                 Style="{StaticResource PrimaryButtonStyle}"
-                                Content="{DynamicResource LOCGsPluginLinkAccountButton}"
+                                Content="{loc:LocalizedString link_account_button}"
                                 Click="LinkAccount_Click"/>
                     </Grid>
 
-                    <!-- Token expiry countdown (Visibility driven by code-behind) -->
+                    <!-- Token expiry countdown -->
                     <TextBlock x:Name="TokenCountdownTextBlock"
                                Foreground="{DynamicResource TextBrushDarker}"
                                FontSize="11"
                                Visibility="Collapsed"
                                Margin="0,0,0,4"/>
 
-                    <!-- Link status message (Visibility driven by code-behind) -->
+                    <!-- Link status message -->
                     <TextBlock x:Name="LinkStatusTextBlock"
                                Foreground="#FFA500"
                                FontSize="12"
@@ -334,14 +333,14 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginSyncSettingsSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="{loc:LocalizedString sync_settings_section_title}" Style="{StaticResource SectionTitleStyle}"/>
                     </StackPanel>
 
                     <!-- Achievement sync -->
                     <StackPanel Margin="0,0,0,4">
                         <CheckBox Style="{StaticResource CheckBoxStyle}"
-                                  Content="{DynamicResource LOCGsPluginSyncAchievementsLabel}"
-                                  ToolTip="{DynamicResource LOCGsPluginSyncAchievementsTooltip}"
+                                  Content="{loc:LocalizedString sync_achievements_label}"
+                                  ToolTip="{loc:LocalizedString sync_achievements_tooltip}"
                                   IsChecked="{Binding Settings.SyncAchievements, Mode=TwoWay}"
                                   Margin="0,0,0,6"/>
 
@@ -375,12 +374,12 @@
                                        FontSize="11"
                                        VerticalAlignment="Center"
                                        TextWrapping="Wrap">
-                                <Run Text="{DynamicResource LOCGsPluginAchievementProviderMissingWarning}"/>
+                                <Run Text="{loc:LocalizedString achievement_provider_missing_warning}"/>
                                 <Run Text=" "/>
                                 <Hyperlink NavigateUri="https://playnite.link/addons.html"
                                            RequestNavigate="Hyperlink_RequestNavigate"
                                            Foreground="{StaticResource AccentBrush}">
-                                    <Run Text="{DynamicResource LOCGsPluginAchievementProviderInstallLink}"/>
+                                    <Run Text="{loc:LocalizedString achievement_provider_install_link}"/>
                                 </Hyperlink>
                             </TextBlock>
                         </StackPanel>
@@ -394,7 +393,7 @@
                             Padding="10,6"
                             Margin="0,8,0,4">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{DynamicResource LOCGsPluginLibrarySyncLabel}"
+                            <TextBlock Text="{loc:LocalizedString library_sync_label}"
                                        FontSize="11"
                                        Foreground="{DynamicResource TextBrushDarker}"
                                        Margin="0,0,6,0"
@@ -406,7 +405,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Pending scrobbles indicator — only visible when queue is non-empty -->
+                    <!-- Pending scrobbles indicator -->
                     <Border x:Name="PendingScrobblesBorder"
                             Background="{DynamicResource TextBoxBackgroundBrush}"
                             BorderBrush="#FFA500"
@@ -428,7 +427,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Dropped scrobbles indicator — only visible when scrobbles were lost -->
+                    <!-- Dropped scrobbles indicator -->
                     <Border x:Name="DroppedScrobblesBorder"
                             Background="{DynamicResource TextBoxBackgroundBrush}"
                             BorderBrush="#E53935"
@@ -461,17 +460,17 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginNotificationsSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="{loc:LocalizedString notifications_section_title}" Style="{StaticResource SectionTitleStyle}"/>
                     </StackPanel>
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
-                              Content="{DynamicResource LOCGsPluginShowUpdateNotificationsLabel}"
-                              ToolTip="{DynamicResource LOCGsPluginShowUpdateNotificationsTooltip}"
+                              Content="{loc:LocalizedString show_update_notifications_label}"
+                              ToolTip="{loc:LocalizedString show_update_notifications_tooltip}"
                               IsChecked="{Binding Settings.ShowUpdateNotifications, Mode=TwoWay}"/>
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
-                              Content="{DynamicResource LOCGsPluginShowImportantNotificationsLabel}"
-                              ToolTip="{DynamicResource LOCGsPluginShowImportantNotificationsTooltip}"
+                              Content="{loc:LocalizedString show_important_notifications_label}"
+                              ToolTip="{loc:LocalizedString show_important_notifications_tooltip}"
                               IsChecked="{Binding Settings.ShowImportantNotifications, Mode=TwoWay}"/>
 
                 </StackPanel>
@@ -485,23 +484,23 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginPrivacySectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="{loc:LocalizedString privacy_section_title}" Style="{StaticResource SectionTitleStyle}"/>
                     </StackPanel>
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
-                              Content="{DynamicResource LOCGsPluginDisableSentryLabel}"
-                              ToolTip="{DynamicResource LOCGsPluginDisableSentryTooltip}"
+                              Content="{loc:LocalizedString disable_sentry_label}"
+                              ToolTip="{loc:LocalizedString disable_sentry_tooltip}"
                               IsChecked="{Binding Settings.DisableSentry, Mode=TwoWay}"/>
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
-                              Content="{DynamicResource LOCGsPluginDisablePostHogLabel}"
-                              ToolTip="{DynamicResource LOCGsPluginDisablePostHogTooltip}"
+                              Content="{loc:LocalizedString disable_posthog_label}"
+                              ToolTip="{loc:LocalizedString disable_posthog_tooltip}"
                               IsChecked="{Binding Settings.DisablePostHog, Mode=TwoWay}"/>
 
                     <CheckBox x:Name="DisableScrobblingCheckBox"
                               Style="{StaticResource CheckBoxStyle}"
-                              Content="{DynamicResource LOCGsPluginDisableScrobblingLabel}"
-                              ToolTip="{DynamicResource LOCGsPluginDisableScrobblingTooltip}"
+                              Content="{loc:LocalizedString disable_scrobbling_label}"
+                              ToolTip="{loc:LocalizedString disable_scrobbling_tooltip}"
                               Margin="0,0,0,6"
                               IsChecked="{Binding Settings.DisableScrobbling, Mode=TwoWay}"/>
 
@@ -515,7 +514,7 @@
                                    FontSize="13"
                                    Margin="0,0,8,0"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginScrobblingDisabledWarning}"
+                        <TextBlock Text="{loc:LocalizedString scrobbling_disabled_warning}"
                                    Foreground="#FFA500"
                                    FontSize="11"
                                    FontStyle="Italic"
@@ -536,7 +535,7 @@
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Rectangle Style="{StaticResource AccentBarStyle}"
                                    Fill="#E53E3E"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginDangerZoneSectionTitle}"
+                        <TextBlock Text="{loc:LocalizedString danger_zone_section_title}"
                                    Style="{StaticResource SectionTitleStyle}"
                                    Foreground="#E53E3E"/>
                     </StackPanel>
@@ -545,10 +544,10 @@
                                FontSize="11"
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"
-                               Text="{DynamicResource LOCGsPluginDangerZoneWarning}"/>
+                               Text="{loc:LocalizedString danger_zone_warning}"/>
 
                     <Button x:Name="DeleteMyDataButton"
-                            Content="{DynamicResource LOCGsPluginDeleteMyDataButton}"
+                            Content="{loc:LocalizedString delete_my_data_button}"
                             HorizontalAlignment="Left"
                             Margin="0,0,0,8"
                             Padding="14,7"
@@ -577,12 +576,12 @@
 
                     <Button x:Name="OptBackInButton"
                             Style="{StaticResource PrimaryButtonStyle}"
-                            Content="{DynamicResource LOCGsPluginOptBackInButton}"
+                            Content="{loc:LocalizedString opt_back_in_button}"
                             HorizontalAlignment="Left"
                             Margin="0,0,0,8"
                             Visibility="Collapsed"
                             Click="OptBackIn_Click"
-                            ToolTip="{DynamicResource LOCGsPluginOptBackInTooltip}"/>
+                            ToolTip="{loc:LocalizedString opt_back_in_tooltip}"/>
 
                     <TextBlock x:Name="DeleteStatusTextBlock"
                                Foreground="#FFA500"

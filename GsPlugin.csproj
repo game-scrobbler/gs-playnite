@@ -17,14 +17,31 @@
     <AssemblyTitle>Game Scrobbler</AssemblyTitle>
     <Company>GameScrobbler</Company>
     <Copyright>Copyright © 2025</Copyright>
-    <!-- Allow test project to access internal members -->
-    <InternalsVisibleTo>GsPlugin.Tests</InternalsVisibleTo>
   </PropertyGroup>
+
+  <!-- Allow test project to access internal members (constructors, helpers) -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>GsPlugin.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <!-- Explicitly exclude the test project — the SDK **/*.cs glob would otherwise
+       include test source files in GenerateTemporaryTargetAssembly (WPF XAML Pass2). -->
+  <ItemGroup>
+    <Compile Remove="GsPlugin.Tests\**\*.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Playnite.SDK" Version="11.0.0-alpha6" />
     <PackageReference Include="Sentry" Version="5.*" />
     <PackageReference Include="PostHog" Version="2.4.0" />
+    <!-- CommunityToolkit.Mvvm provides ObservableObject for settings view model/data -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
+    <!-- WebView2 replaces CefSharp for the embedded dashboard browser -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" />
+    <!-- SQLite for Playnite Achievements addon integration -->
+    <PackageReference Include="System.Data.SQLite.Core" Version="1.*" />
   </ItemGroup>
 
   <ItemGroup>

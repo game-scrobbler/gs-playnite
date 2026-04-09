@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Playnite.SDK;
+using Playnite;
 using Sentry;
 using GsPlugin.Models;
 
@@ -269,7 +269,7 @@ namespace GsPlugin.Infrastructure {
         /// </summary>
         /// <param name="exception">The exception to capture.</param>
         /// <param name="message">An optional message describing the context of the exception.</param>
-        public static void CaptureException(Exception exception, string message = null) {
+        public static void CaptureException(Exception exception, string? message = null) {
             // Skip if Sentry is disabled or data not yet initialized
             var data = GsDataManager.DataOrNull;
             if (data == null) {
@@ -307,7 +307,7 @@ namespace GsPlugin.Infrastructure {
         /// <param name="category">The category of the breadcrumb.</param>
         /// <param name="data">Optional key-value data to attach.</param>
         /// <param name="level">The severity level of the breadcrumb.</param>
-        public static void AddBreadcrumb(string message, string category = null, Dictionary<string, string> data = null, BreadcrumbLevel level = BreadcrumbLevel.Info) {
+        public static void AddBreadcrumb(string message, string? category = null, Dictionary<string, string>? data = null, BreadcrumbLevel level = BreadcrumbLevel.Info) {
             // Skip if Sentry is disabled or data not yet initialized
             var gsData = GsDataManager.DataOrNull;
             if (gsData == null) return;

@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows;
-using Playnite.SDK;
+using Playnite;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
@@ -16,13 +15,13 @@ namespace GsPlugin.Services {
     /// </summary>
     internal class GsNotificationService {
         private static readonly ILogger _logger = LogManager.GetLogger();
-        private readonly IPlayniteAPI _playniteApi;
+        private readonly IPlayniteApi _playniteApi;
         private readonly IGsApiClient _apiClient;
-        private readonly Guid _pluginId;
+        private readonly string _pluginId;
         private const string NotifIdPrefix = "gs-server-notif-";
         private const int MaxShownIds = 100;
 
-        public GsNotificationService(IPlayniteAPI playniteApi, IGsApiClient apiClient, Guid pluginId) {
+        public GsNotificationService(IPlayniteApi playniteApi, IGsApiClient apiClient, string pluginId) {
             _playniteApi = playniteApi;
             _apiClient = apiClient;
             _pluginId = pluginId;
@@ -50,14 +49,14 @@ namespace GsPlugin.Services {
 
             // Take a snapshot of already-shown IDs under the lock to avoid racing with other threads.
             var alreadyShown = GsDataManager.GetShownNotificationIds();
-            var toShow = new List<(string id, NotificationType type, string message, Action action)>();
+            var toShow = new List<(string id, NotificationSeverity severity, string message, Func<Task>? action)>();
 
             foreach (var notif in result.notifications) {
                 if (string.IsNullOrEmpty(notif.id) || alreadyShown.Contains(notif.id)) {
                     continue;
                 }
 
-                var playniteType = MapNotificationType(notif.notification_type);
+                var playniteType = MapNotificationSeverity(notif.notification_type);
                 var clickAction = CreateClickAction(notif.action_url);
 
                 var message = !string.IsNullOrEmpty(notif.title)
@@ -75,12 +74,12 @@ namespace GsPlugin.Services {
             // Wrapped in try/catch so a dispatcher fault cannot surface as an unhandled exception
             // that would be captured by Sentry as a false plugin error.
             try {
-                Application.Current.Dispatcher.Invoke(() => {
-                    foreach (var (id, type, message, action) in toShow) {
+                UIDispatcher.Invoke(() => {
+                    foreach (var (id, severity, message, action) in toShow) {
                         _playniteApi.Notifications.Add(new NotificationMessage(
                             NotifIdPrefix + id,
                             message,
-                            type,
+                            severity,
                             action));
                     }
                 });
@@ -96,24 +95,24 @@ namespace GsPlugin.Services {
             GsLogger.Info($"Displayed {toShow.Count} server notification(s)");
         }
 
-        private static NotificationType MapNotificationType(string backendType) {
+        private static NotificationSeverity MapNotificationSeverity(string backendType) {
             switch (backendType) {
                 case "error":
-                    return NotificationType.Error;
+                    return NotificationSeverity.Error;
                 default:
-                    return NotificationType.Info;
+                    return NotificationSeverity.Info;
             }
         }
 
-        private Action CreateClickAction(string actionUrl) {
+        private Func<Task>? CreateClickAction(string? actionUrl) {
             if (string.IsNullOrEmpty(actionUrl)) {
                 return null;
             }
 
             if (actionUrl == "gs://settings") {
-                return () => {
+                return async () => {
                     try {
-                        _playniteApi.MainView.OpenPluginSettings(_pluginId);
+                        await _playniteApi.MainView.OpenPluginSettingsAsync(_pluginId);
                     }
                     catch (Exception ex) {
                         GsLogger.Warn($"Failed to open settings: {ex.Message}");
@@ -122,7 +121,8 @@ namespace GsPlugin.Services {
             }
 
             if (actionUrl == "gs://addons") {
-                return () => {
+                return async () => {
+                    await Task.CompletedTask;
                     try {
                         OpenAddonsDialog();
                     }
@@ -137,7 +137,8 @@ namespace GsPlugin.Services {
                     GsLogger.Warn($"Notification action_url rejected (untrusted host): {actionUrl}");
                     return null;
                 }
-                return () => {
+                return async () => {
+                    await Task.CompletedTask;
                     try {
                         Process.Start(new ProcessStartInfo(actionUrl) { UseShellExecute = true });
                     }

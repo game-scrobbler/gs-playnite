@@ -74,7 +74,7 @@ namespace GsPlugin.Tests {
             }
         }
 
-        private void InsertTestData(SQLiteConnection conn, Guid gameId, string gameName,
+        private static void InsertTestData(SQLiteConnection conn, Guid gameId, string gameName,
             (string name, string desc, bool unlocked, string unlockTime, double? rarity)[] achievements) {
             using (var cmd = conn.CreateCommand()) {
                 cmd.CommandText = "INSERT INTO Users (Id, ProviderKey, ExternalUserId, IsCurrentUser) VALUES (1, 'Steam', '12345', 1)";

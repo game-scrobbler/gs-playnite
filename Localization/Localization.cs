@@ -1,16 +1,40 @@
+using System;
+using System.Windows.Markup;
 using GsPlugin;
-using Playnite.Markup;
 
 namespace Playnite;
 
 /// <summary>
-/// XAML markup extension for localized strings. Usage: Text="{p:LocalizedString {x:Static p:LocId.some_key}}"
+/// XAML markup extension for localized strings.
+/// Usage: Text="{loc:LocalizedString some_key}"
+///
+/// Extends MarkupExtension directly (rather than LocStringMarkup) so that the
+/// WPF XAML compiler can resolve this type at build time without needing to load
+/// the full Playnite runtime assembly chain.
 /// </summary>
-public class LocalizedString : LocStringMarkup {
-    public LocalizedString() : base(GsPluginPlugin.Id) {
+[MarkupExtensionReturnType(typeof(string))]
+public class LocalizedString : MarkupExtension {
+    private string _key;
+
+    public LocalizedString() { }
+
+    public LocalizedString(string key) {
+        _key = key;
     }
 
-    public LocalizedString(string stringId) : base(GsPluginPlugin.Id, stringId) {
+    public string Key {
+        get => _key;
+        set => _key = value;
+    }
+
+    public override object ProvideValue(IServiceProvider serviceProvider) {
+        if (string.IsNullOrEmpty(_key)) return string.Empty;
+        try {
+            return Loc.Api?.GetLocalizedString(_key) ?? _key;
+        }
+        catch {
+            return _key;
+        }
     }
 }
 

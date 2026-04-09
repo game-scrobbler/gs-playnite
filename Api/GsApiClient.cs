@@ -9,7 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Playnite.SDK;
+using Playnite;
 using Sentry;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
@@ -26,8 +26,7 @@ namespace GsPlugin.Api {
         private static readonly HttpClient _defaultHttpClient;
 
         static GsApiClient() {
-            // Enforce TLS 1.2+ to avoid negotiating insecure protocol versions on .NET Framework 4.6.2
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            // TLS 1.2+ is the default on .NET 10; ServicePointManager is not used.
 
             try {
                 _defaultHttpClient = new HttpClient(new SentryHttpMessageHandler()) {
@@ -725,12 +724,12 @@ namespace GsPlugin.Api {
         /// <summary>
         /// Helper method to capture HTTP-related exceptions with consistent context.
         /// </summary>
-        private static void CaptureHttpException(Exception exception, string url, string requestBody, HttpResponseMessage response = null, string responseBody = null) {
+        private static void CaptureHttpException(Exception exception, string url, string requestBody, HttpResponseMessage? response = null, string? responseBody = null) {
             string contextMessage = $"HTTP request failed for {url}. Status: {response?.StatusCode}";
             GsSentry.CaptureException(exception, contextMessage);
         }
 
-        private static void CaptureSentryMessage(string message, SentryLevel level, string gameName = null, string userId = null, string sessionId = null) {
+        private static void CaptureSentryMessage(string message, SentryLevel level, string? gameName = null, string? userId = null, string? sessionId = null) {
             string contextMessage = message;
             if (!string.IsNullOrEmpty(gameName)) {
                 contextMessage += $" [Game: {gameName}]";

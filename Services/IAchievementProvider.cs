@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Playnite.SDK.Plugins;
+using Playnite;
 
 namespace GsPlugin.Services {
     /// <summary>

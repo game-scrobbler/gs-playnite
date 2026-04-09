@@ -1,39 +1,27 @@
-using System;
-using System.Windows;
-
 namespace GsPlugin.Infrastructure {
     /// <summary>
-    /// Helper to access XAML resource dictionary strings from C# code.
-    /// Falls back to the provided key if the resource is not found.
+    /// Thin localization shim for C# code-behind.
+    /// P11 uses Fluent (FTL) localization via <c>Loc.GetString()</c> for XAML and
+    /// typed generated methods for code. The legacy LOCGsPlugin* keys used throughout
+    /// the codebase are not FTL keys, so this helper returns the hardcoded English
+    /// fallback directly. Non-English localization for code-side strings is a TODO.
+    /// XAML bindings using <c>{p:LocalizedString}</c> are unaffected.
     /// </summary>
     public static class GsLocalization {
         /// <summary>
-        /// Looks up a localized string from the merged resource dictionaries.
-        /// Returns <paramref name="fallback"/> (or the key itself) if not found.
+        /// Returns the English fallback string (or key if no fallback provided).
         /// </summary>
-        public static string Get(string key, string fallback = null) {
-            try {
-                var app = Application.Current;
-                if (app != null && app.Resources.Contains(key)) {
-                    return app.Resources[key] as string ?? fallback ?? key;
-                }
-            }
-            catch {
-                // Silently fall back — resource lookup should never crash the plugin.
-            }
-            return fallback ?? key;
-        }
+        public static string Get(string key, string? fallback = null) => fallback ?? key;
 
         /// <summary>
-        /// Looks up a localized format string and applies arguments.
+        /// Formats the English fallback string with the provided arguments.
         /// </summary>
         public static string Format(string key, string fallback, params object[] args) {
-            string template = Get(key, fallback);
             try {
-                return string.Format(template, args);
+                return string.Format(fallback ?? key, args);
             }
             catch {
-                return template;
+                return fallback ?? key;
             }
         }
     }

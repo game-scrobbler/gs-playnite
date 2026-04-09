@@ -14,6 +14,8 @@
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Nullable reference type and static-member analyzer warnings: tracked but not build-blocking during P11 migration -->
+    <WarningsNotAsErrors>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8619;CS8622;CS8625;CS8629;CA1822</WarningsNotAsErrors>
   </PropertyGroup>
 
   <!-- Disable slow WinRT source generator in all builds -->

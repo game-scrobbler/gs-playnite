@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
-using Playnite.SDK;
+using Playnite;
 using PostHog;
 using GsPlugin.Models;
 
@@ -52,7 +52,7 @@ namespace GsPlugin.Infrastructure {
         /// </summary>
         /// <param name="eventName">The event name (e.g., "plugin_started").</param>
         /// <param name="properties">Optional properties to attach to the event.</param>
-        public static void Capture(string eventName, Dictionary<string, object> properties = null) {
+        public static void Capture(string eventName, Dictionary<string, object>? properties = null) {
             var data = GsDataManager.DataOrNull;
             if (data == null) return;
             if (data.Flags.Contains("no-posthog") || data.OptedOut) return;

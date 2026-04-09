@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
+#pragma warning disable CS8618 // JSON DTOs: properties are populated by the deserializer, not constructors
+
 namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Scrobble DTOs

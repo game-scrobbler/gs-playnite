@@ -2,9 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
-using Playnite.SDK;
-using Playnite.SDK.Events;
-using Sentry;
+using Playnite;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 
@@ -14,11 +12,11 @@ namespace GsPlugin.Services {
     /// This service manages deep link processing from web applications.
     /// </summary>
     public class GsUriHandler {
-        private readonly IPlayniteAPI _playniteApi;
+        private readonly IPlayniteApi _playniteApi;
         private readonly GsAccountLinkingService _linkingService;
         private static readonly ILogger _logger = LogManager.GetLogger();
 
-        public GsUriHandler(IPlayniteAPI playniteApi, GsAccountLinkingService linkingService) {
+        public GsUriHandler(IPlayniteApi playniteApi, GsAccountLinkingService linkingService) {
             _playniteApi = playniteApi ?? throw new ArgumentNullException(nameof(playniteApi));
             _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
         }
@@ -29,7 +27,7 @@ namespace GsPlugin.Services {
         public void RegisterUriHandler() {
             try {
                 _playniteApi.UriHandler.RegisterSource("gamescrobbler", HandleUriRequest);
-                GsLogger.Info("Successfully registered URI handler for playnite://gamescrobbler links");
+                GsLogger.Info("Successfully registered URI handler for playnite11://gamescrobbler links");
 
                 GsSentry.AddBreadcrumb(
                     message: "URI handler registered",
@@ -48,7 +46,7 @@ namespace GsPlugin.Services {
         /// Optional query param: ?expires_at=[unix_seconds]
         /// </summary>
         /// <param name="args">URI arguments containing the token</param>
-        private async void HandleUriRequest(PlayniteUriEventArgs args) {
+        private async Task HandleUriRequest(PlayniteUriEventArgs args) {
             try {
                 if (GsDataManager.IsOptedOut) {
                     GsLogger.Info("URI request ignored: plugin is opted out");
@@ -94,7 +92,7 @@ namespace GsPlugin.Services {
 
                     // Check if already linked and get user confirmation if needed
                     bool isLinked = GsDataManager.IsAccountLinked;
-                    if (isLinked && !_linkingService.ShouldProceedWithRelinking()) {
+                    if (isLinked && !GsAccountLinkingService.ShouldProceedWithRelinking()) {
                         return;
                     }
 
@@ -149,11 +147,10 @@ namespace GsPlugin.Services {
                     var result = await _linkingService.LinkAccountAsync(token, LinkingContext.AutomaticUri);
 
                     if (result.Success) {
-                        _playniteApi?.Dialogs?.ShowMessage(
-                            GsLocalization.Format("LOCGsPluginLinkSuccessDialogBody", "Account successfully linked!\nUser ID: {0}", result.UserId),
-                            GsLocalization.Get("LOCGsPluginLinkSuccessDialogTitle", "Account Linking Success"),
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
+                        if (_playniteApi?.Dialogs != null)
+                            await _playniteApi.Dialogs.ShowMessageAsync(
+                                GsLocalization.Format("LOCGsPluginLinkSuccessDialogBody", "Account successfully linked!\nUser ID: {0}", result.UserId),
+                                GsLocalization.Get("LOCGsPluginLinkSuccessDialogTitle", "Account Linking Success"));
                         return;
                     }
 
@@ -165,30 +162,28 @@ namespace GsPlugin.Services {
                     if (result.IsNetworkError) {
                         bool isLastAttempt = attempt == MaxLinkRetries - 1;
                         if (isLastAttempt) {
-                            _playniteApi?.Dialogs?.ShowMessage(
-                                GsLocalization.Format("LOCGsPluginLinkFailedRetriesBody", "Account linking failed after multiple attempts:\n{0}\n\nPlease try again later.", result.ErrorMessage),
-                                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"),
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Error);
+                            if (_playniteApi?.Dialogs != null)
+                                await _playniteApi.Dialogs.ShowMessageAsync(
+                                    GsLocalization.Format("LOCGsPluginLinkFailedRetriesBody", "Account linking failed after multiple attempts:\n{0}\n\nPlease try again later.", result.ErrorMessage),
+                                    GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"));
                             return;
                         }
 
-                        var retry = _playniteApi?.Dialogs?.ShowMessage(
+                        var retry = System.Windows.MessageBox.Show(
                             GsLocalization.Format("LOCGsPluginLinkFailedNetworkBody", "Account linking failed due to a network error:\n{0}\n\nWould you like to retry?", result.ErrorMessage),
                             GsLocalization.Get("LOCGsPluginLinkFailedRetryDialogTitle", "Account Linking Failed — Retry?"),
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Warning);
-                        if (retry != MessageBoxResult.Yes) {
+                            System.Windows.MessageBoxButton.YesNo,
+                            System.Windows.MessageBoxImage.Warning);
+                        if (retry != System.Windows.MessageBoxResult.Yes) {
                             return;
                         }
                         // Loop continues to next attempt
                     }
                     else {
-                        _playniteApi?.Dialogs?.ShowMessage(
-                            GsLocalization.Format("LOCGsPluginLinkFailedBody", "Account linking failed: {0}", result.ErrorMessage),
-                            GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"),
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
+                        if (_playniteApi?.Dialogs != null)
+                            await _playniteApi.Dialogs.ShowMessageAsync(
+                                GsLocalization.Format("LOCGsPluginLinkFailedBody", "Account linking failed: {0}", result.ErrorMessage),
+                                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"));
                         return;
                     }
                 }
@@ -202,14 +197,14 @@ namespace GsPlugin.Services {
         /// <summary>
         /// Offers to open the linking page in the browser when a token has expired.
         /// </summary>
-        private void OfferOpenLinkingPage() {
-            var answer = _playniteApi?.Dialogs?.ShowMessage(
+        private static void OfferOpenLinkingPage() {
+            var answer = System.Windows.MessageBox.Show(
                 GsLocalization.Get("LOCGsPluginTokenExpiredDialogBody", "Your link token has expired.\n\nWould you like to open the linking page to get a new one?"),
                 GsLocalization.Get("LOCGsPluginTokenExpiredDialogTitle", "Token Expired"),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Warning);
 
-            if (answer == MessageBoxResult.Yes) {
+            if (answer == System.Windows.MessageBoxResult.Yes) {
                 try {
                     var installId = GsDataManager.Data.InstallID;
                     var url = $"https://gamescrobbler.com/link?install_id={installId}";
@@ -230,12 +225,9 @@ namespace GsPlugin.Services {
         /// </summary>
         private void HandleEmptyToken() {
             GsLogger.Warn("Empty token received in URI request");
-            _playniteApi?.Dialogs?.ShowMessage(
+            _ = _playniteApi?.Dialogs?.ShowMessageAsync(
                 GsLocalization.Get("LOCGsPluginInvalidLinkingToken", "Invalid linking token received."),
-                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"),
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning
-            );
+                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"));
         }
 
         /// <summary>
@@ -246,12 +238,9 @@ namespace GsPlugin.Services {
             GsLogger.Error("Exception during automatic linking", ex);
             GsSentry.CaptureException(ex, "Exception during automatic linking via URI handler");
 
-            _playniteApi?.Dialogs?.ShowMessage(
+            _ = _playniteApi?.Dialogs?.ShowMessageAsync(
                 GsLocalization.Format("LOCGsPluginLinkingErrorFormat", $"Error during linking: {ex.Message}", ex.Message),
-                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"),
-                MessageBoxButton.OK,
-                MessageBoxImage.Error
-            );
+                GsLocalization.Get("LOCGsPluginLinkFailedDialogTitle", "Account Linking Failed"));
         }
 
         /// <summary>
@@ -280,12 +269,9 @@ namespace GsPlugin.Services {
             GsSentry.CaptureException(ex, "Unexpected error handling URI request");
 
             // Null check to prevent cascading exceptions
-            if (_playniteApi?.Dialogs != null) {
-                _playniteApi.Dialogs.ShowMessage(
-                    GsLocalization.Format("LOCGsPluginUnexpectedUriErrorFormat", $"Unexpected error processing URI request: {ex.Message}", ex.Message),
-                    GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            _ = _playniteApi?.Dialogs?.ShowMessageAsync(
+                GsLocalization.Format("LOCGsPluginUnexpectedUriErrorFormat", $"Unexpected error processing URI request: {ex.Message}", ex.Message),
+                GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"));
         }
     }
 }

@@ -4,7 +4,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Playnite.SDK;
+using Playnite;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 
@@ -25,9 +25,9 @@ namespace GsPlugin.Services {
             _httpClient.Timeout = TimeSpan.FromSeconds(10);
         }
 
-        private readonly IPlayniteAPI _playniteApi;
+        private readonly IPlayniteApi _playniteApi;
 
-        public GsUpdateChecker(IPlayniteAPI playniteApi) {
+        public GsUpdateChecker(IPlayniteApi playniteApi) {
             _playniteApi = playniteApi;
         }
 
@@ -61,8 +61,8 @@ namespace GsPlugin.Services {
                 _playniteApi.Notifications.Add(new NotificationMessage(
                     NotificationId,
                     $"Game Scrobbler {latestVersion} is available. Click to open Add-ons.",
-                    NotificationType.Info,
-                    () => OpenAddonsDialog()));
+                    NotificationSeverity.Info,
+                    async () => { await Task.CompletedTask; OpenAddonsDialog(); }));
 
                 GsDataManager.MutateAndSave(d => d.LastNotifiedVersion = latestVersion);
 

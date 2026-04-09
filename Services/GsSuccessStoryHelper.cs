@@ -4,8 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using Playnite.SDK;
-using Playnite.SDK.Plugins;
+using Playnite;
 using GsPlugin.Infrastructure;
 
 namespace GsPlugin.Services {
@@ -19,12 +18,14 @@ namespace GsPlugin.Services {
             "cebe6d32-8c46-4459-b993-5a5189d60788"
         );
 
-        private readonly IPlayniteAPI _api;
+        private readonly IPlayniteApi? _api;
         private readonly string _dataPath;
 
-        public GsSuccessStoryHelper(IPlayniteAPI api) {
+        public GsSuccessStoryHelper(IPlayniteApi api) {
             _api = api;
-            _dataPath = ResolveDataPath(api.Paths.ExtensionsDataPath);
+            // In P11, UserDataDir is the plugin-specific data dir.
+            // Parent directory is the shared ExtensionsData folder.
+            _dataPath = ResolveDataPath(Path.GetDirectoryName(api.UserDataDir)!);
         }
 
         internal GsSuccessStoryHelper(string dataPathOverride) {
@@ -36,8 +37,8 @@ namespace GsPlugin.Services {
 
         public bool IsInstalled {
             get {
-                if (_dataPath != null && Directory.Exists(_dataPath)) return true;
-                return _api?.Addons?.Plugins?.Any(p => p.Id == SuccessStoryId) == true;
+                // In P11, check data directory existence only (Addons.Plugins API changed).
+                return _dataPath != null && Directory.Exists(_dataPath);
             }
         }
 
@@ -123,16 +124,8 @@ namespace GsPlugin.Services {
         }
 
         public string GetVersion() {
-            try {
-                var plugin = _api?.Addons?.Plugins?.FirstOrDefault(p => p.Id == SuccessStoryId);
-                if (plugin == null) return null;
-                return PluginVersionHelper.GetExtensionYamlVersion(plugin)
-                    ?? plugin.GetType().Assembly.GetName().Version?.ToString(3);
-            }
-            catch (Exception ex) {
-                GsLogger.Warn($"[GsSuccessStoryHelper] Version lookup failed: {ex.Message}");
-                return null;
-            }
+            // TODO P11: Addons.Plugins API removed — version lookup not yet implemented.
+            return null;
         }
 
         private static string ResolveDataPath(string extensionsDataPath) {

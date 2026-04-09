@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using Playnite.SDK;
+using Playnite;
 using GsPlugin.Infrastructure;
 
 namespace GsPlugin.Services {
@@ -24,8 +24,10 @@ namespace GsPlugin.Services {
             { "cb91dfc9-b977-43bf-8e70-55f46e410fab", "steam" },
         };
 
-        public GsIntegrationAccountReader(IPlayniteAPI api) {
-            _extensionsDataPath = api.Paths.ExtensionsDataPath;
+        public GsIntegrationAccountReader(IPlayniteApi api) {
+            // In P11, UserDataDir is the plugin-specific data dir.
+            // Parent directory is the shared ExtensionsData folder.
+            _extensionsDataPath = Path.GetDirectoryName(api.UserDataDir)!;
         }
 
         /// <summary>
