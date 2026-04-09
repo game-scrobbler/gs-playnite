@@ -57,16 +57,6 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public void ComputeGameMetadataHash_AchievementCountChange_ProducesDifferentHash() {
-            var before = new GameSyncDto { achievement_count_unlocked = 5, achievement_count_total = 10 };
-            var after = new GameSyncDto { achievement_count_unlocked = 6, achievement_count_total = 10 };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeGameMetadataHash(before),
-                GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
         public void ComputeGameMetadataHash_IsFavoriteChange_ProducesDifferentHash() {
             var before = new GameSyncDto { is_favorite = false };
             var after = new GameSyncDto { is_favorite = true };

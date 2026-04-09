@@ -56,12 +56,10 @@ namespace GsPlugin {
         private GsAccountLinkingService _linkingService;
         private GsUriHandler _uriHandler;
         private GsScrobblingService _scrobblingService;
-        private GsAchievementAggregator _achievementHelper;
         private GsUpdateChecker _updateChecker;
         private GsNotificationService _notificationService;
         private bool _disposed;
         private int _librarySyncInFlight;
-        private int _achievementSyncInFlight;
         private Timer _pendingFlushTimer;
 
         /// <summary>
@@ -96,18 +94,13 @@ namespace GsPlugin {
             // Initialize centralized account linking service
             _linkingService = new GsAccountLinkingService(_apiClient, args.Api);
 
-            // Initialize achievement providers (SuccessStory and Playnite Achievements)
-            var successStoryHelper = new GsSuccessStoryHelper(args.Api);
-            var playniteAchievementsHelper = new GsPlayniteAchievementsHelper(args.Api);
-            _achievementHelper = new GsAchievementAggregator(successStoryHelper, playniteAchievementsHelper);
-
             // Initialize settings view model
             _settings = new GsPluginSettingsViewModel(
-                args.Api.UserDataDir, _linkingService, _achievementHelper, _apiClient);
+                args.Api.UserDataDir, _linkingService, _apiClient);
 
             // Initialize scrobbling service
             var integrationAccountReader = new GsIntegrationAccountReader(args.Api);
-            _scrobblingService = new GsScrobblingService(_apiClient, _achievementHelper, integrationAccountReader);
+            _scrobblingService = new GsScrobblingService(_apiClient, integrationAccountReader, args.Api.Library);
 
             // Initialize and register URI handler for automatic account linking
             _uriHandler = new GsUriHandler(args.Api, _linkingService);
@@ -198,13 +191,6 @@ namespace GsPlugin {
                             "Game Scrobbler: First-time sync failed. It will retry automatically on next launch.",
                             NotificationSeverity.Error));
                     }
-                }
-
-                if (startupSyncResult != SyncLibraryResult.Error) {
-                    _ = SyncAchievementsWithDiffAsync().ContinueWith(t => {
-                        if (t.IsFaulted)
-                            _logger.Warn(t.Exception?.GetBaseException(), "Startup achievement sync failed");
-                    }, TaskContinuationOptions.OnlyOnFaulted);
                 }
 
                 sw.Stop();
@@ -317,8 +303,8 @@ namespace GsPlugin {
                 items.Add(new MenuItemDescriptor("gs-settings", "Open Settings", "Game Scrobbler"));
             }
             else {
-                items.Add(new MenuItemDescriptor("gs-sync", GsLocalization.Get("LOCGsPluginMenuSyncLibrary", "Sync Library Now"), "Game Scrobbler"));
-                items.Add(new MenuItemDescriptor("gs-settings", GsLocalization.Get("LOCGsPluginMenuOpenSettings", "Open Settings"), "Game Scrobbler"));
+                items.Add(new MenuItemDescriptor("gs-sync", Loc.menu_sync_library(), "Game Scrobbler"));
+                items.Add(new MenuItemDescriptor("gs-settings", Loc.menu_open_settings(), "Game Scrobbler"));
             }
             return items;
         }
@@ -326,53 +312,46 @@ namespace GsPlugin {
         public override ICollection<MenuItemImpl>? GetAppMenuItems(GetAppMenuItemsArgs args) {
             if (args.ItemId == "gs-sync") {
                 return [new MenuItemImpl(
-                    GsLocalization.Get("LOCGsPluginMenuSyncLibrary", "Sync Library Now"),
+                    Loc.menu_sync_library(),
                     async () => {
                         try {
                             var result = await SyncLibraryWithDiffAsync();
                             string message;
                             if (result == SyncLibraryResult.Success) {
-                                message = GsLocalization.Get("LOCGsPluginSyncCompleted", "Library sync completed.");
+                                message = Loc.sync_completed();
                             }
                             else if (result == SyncLibraryResult.Skipped) {
-                                message = GsLocalization.Get("LOCGsPluginSyncUpToDate", "Library is already up to date.");
+                                message = Loc.sync_up_to_date();
                             }
                             else if (result == SyncLibraryResult.Cooldown) {
                                 var expiry = GsDataManager.Data.SyncCooldownExpiresAt
                                     ?? GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt;
                                 if (expiry.HasValue) {
                                     var timeLeft = GsTime.FormatRemaining(expiry.Value - DateTime.UtcNow);
-                                    message = GsLocalization.Format("LOCGsPluginSyncCooldownFormat",
-                                        $"Library was already synced recently. Try again in {timeLeft}.", timeLeft);
+                                    message = Loc.sync_cooldown_format(timeLeft);
                                 }
                                 else {
-                                    message = GsLocalization.Get("LOCGsPluginSyncCooldownGeneric", "Library was already synced recently. Please try again later.");
+                                    message = Loc.sync_cooldown_generic();
                                 }
                             }
                             else {
-                                message = GsLocalization.Get("LOCGsPluginSyncFailed", "Library sync failed. Check logs for details.");
+                                message = Loc.sync_failed();
                             }
 
-                            if (result != SyncLibraryResult.Error) {
-                                _ = SyncAchievementsWithDiffAsync().ContinueWith(t => {
-                                    if (t.IsFaulted)
-                                        _logger.Warn(t.Exception?.GetBaseException(), "Manual achievement sync failed");
-                                }, TaskContinuationOptions.OnlyOnFaulted);
-                            }
                             await PlayniteApi.Dialogs.ShowMessageAsync(message, "Game Scrobbler");
                         }
                         catch (Exception ex) {
                             _logger.Error(ex, "Error in Sync Library Now menu action");
                             GsSentry.CaptureException(ex, "Error in Sync Library Now menu action");
                             await PlayniteApi.Dialogs.ShowMessageAsync(
-                                GsLocalization.Get("LOCGsPluginSyncError", "Library sync encountered an error."), "Game Scrobbler");
+                                Loc.sync_error(), "Game Scrobbler");
                         }
                     })];
             }
 
             if (args.ItemId == "gs-settings") {
                 return [new MenuItemImpl(
-                    GsLocalization.Get("LOCGsPluginMenuOpenSettings", "Open Settings"),
+                    Loc.menu_open_settings(),
                     async () => await PlayniteApi.MainView.OpenPluginSettingsAsync(GsPluginPlugin.Id))];
             }
 
@@ -470,28 +449,6 @@ namespace GsPlugin {
             }
             finally {
                 Interlocked.Exchange(ref _librarySyncInFlight, 0);
-            }
-        }
-
-        private async Task SyncAchievementsWithDiffAsync() {
-            if (Interlocked.CompareExchange(ref _achievementSyncInFlight, 1, 0) != 0) {
-                _logger.Info("Achievement sync already in flight — skipping.");
-                return;
-            }
-            try {
-                if (GsSnapshotManager.HasAchievementsBaseline) {
-                    await _scrobblingService.SyncAchievementsDiffAsync(PlayniteApi.Library.Games);
-                }
-                else {
-                    await _scrobblingService.SyncAchievementsFullAsync(PlayniteApi.Library.Games);
-                }
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "Achievement sync failed");
-                GsSentry.CaptureException(ex, "Achievement sync failed");
-            }
-            finally {
-                Interlocked.Exchange(ref _achievementSyncInFlight, 0);
             }
         }
 

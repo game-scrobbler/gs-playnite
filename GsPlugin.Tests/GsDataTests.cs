@@ -192,12 +192,6 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public void DefaultValues_SyncAchievementsIsTrue() {
-            var data = new GsData();
-            Assert.True(data.SyncAchievements);
-        }
-
-        [Fact]
         public void DefaultValues_CooldownAndHashFieldsAreNull() {
             var data = new GsData();
             Assert.Null(data.SyncCooldownExpiresAt);

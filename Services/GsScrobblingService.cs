@@ -14,19 +14,19 @@ namespace GsPlugin.Services {
     public class GsScrobblingService {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private readonly IGsApiClient _apiClient;
-        private readonly IAchievementProvider _achievementHelper;
         private readonly GsIntegrationAccountReader _integrationAccountReader;
+        private readonly ILibraryApi _libraryApi;
 
         /// <summary>
         /// Initializes a new instance of the GsScrobblingService.
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
-        /// <param name="achievementHelper">Helper for reading achievement data from the SuccessStory plugin.</param>
         /// <param name="integrationAccountReader">Reader for extracting integration account identities from library plugin configs.</param>
-        public GsScrobblingService(IGsApiClient apiClient, IAchievementProvider achievementHelper, GsIntegrationAccountReader integrationAccountReader) {
+        /// <param name="libraryApi">Playnite library API for resolving game metadata IDs to names.</param>
+        public GsScrobblingService(IGsApiClient apiClient, GsIntegrationAccountReader integrationAccountReader, ILibraryApi libraryApi) {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
-            _achievementHelper = achievementHelper ?? throw new ArgumentNullException(nameof(achievementHelper));
             _integrationAccountReader = integrationAccountReader;
+            _libraryApi = libraryApi ?? throw new ArgumentNullException(nameof(libraryApi));
         }
 
         /// <summary>
@@ -321,32 +321,28 @@ namespace GsPlugin.Services {
         /// <summary>
         /// Maps a Playnite Game to the API DTO. Shared by all sync paths.
         /// </summary>
-        private GameSyncDto MapGameToDto(Game g, bool syncAchievements) {
-            var achievementCounts = syncAchievements && Guid.TryParse(g.Id, out var gameGuid)
-                ? _achievementHelper.GetCounts(gameGuid)
-                : null;
-
+        private GameSyncDto MapGameToDto(Game g) {
             return new GameSyncDto {
                 game_id = g.LibraryGameId,
                 plugin_id = g.LibraryId,
                 game_name = g.Name,
                 playnite_id = g.Id.ToString(),
                 playtime_seconds = (long)g.PlayTime,
-                play_count = 0, // TODO P11: PlayCount removed
+                play_count = (int)(g.SessionIds?.Count ?? 0),
                 last_activity = g.LastPlayedDate?.UtcDateTime,
                 is_installed = g.InstallState == InstallState.Installed,
-                completion_status_id = null, // TODO P11: CompletionStatusId removed
-                completion_status_name = null, // TODO P11: CompletionStatus removed
-                achievement_count_unlocked = achievementCounts?.unlocked,
-                achievement_count_total = achievementCounts?.total,
-                genres = null, // TODO P11: Game.Genres collection removed
-                platforms = null, // TODO P11: Game.Platforms collection removed
-                developers = null, // TODO P11: Game.Developers collection removed
-                publishers = null, // TODO P11: Game.Publishers collection removed
-                tags = null, // TODO P11: Game.Tags collection removed
-                features = null, // TODO P11: Game.Features collection removed
-                categories = null, // TODO P11: Game.Categories collection removed
-                series = null, // TODO P11: Game.Series collection removed
+                completion_status_id = g.CompletionStatusId,
+                completion_status_name = g.CompletionStatusId != null
+                    ? _libraryApi.CompletionStatuses.Get(g.CompletionStatusId)?.Name
+                    : null,
+                genres = ResolveNames(g.GenreIds, _libraryApi.Genres),
+                platforms = ResolveNames(g.PlatformIds, _libraryApi.Platforms),
+                developers = ResolveNames(g.DeveloperIds, _libraryApi.Companies),
+                publishers = ResolveNames(g.PublisherIds, _libraryApi.Companies),
+                tags = ResolveNames(g.TagIds, _libraryApi.Tags),
+                features = ResolveNames(g.FeatureIds, _libraryApi.Features),
+                categories = ResolveNames(g.CategoryIds, _libraryApi.Categories),
+                series = ResolveNames(g.SeriesIds, _libraryApi.Series),
                 user_score = g.UserScore,
                 critic_score = g.CriticScore,
                 community_score = g.CommunityScore,
@@ -354,12 +350,25 @@ namespace GsPlugin.Services {
                 date_added = g.AddedDate?.UtcDateTime,
                 is_favorite = g.Favorite,
                 is_hidden = g.Hidden,
-                source_name = null, // TODO P11: Game.Source removed
+                source_name = g.SourceId != null
+                    ? _libraryApi.Sources.Get(g.SourceId)?.Name
+                    : null,
                 release_date = BuildReleaseDateString(g.ReleaseDate),
                 modified = g.ModifiedDate?.UtcDateTime,
-                age_ratings = null, // TODO P11: Game.AgeRatings collection removed
-                regions = null // TODO P11: Game.Regions collection removed
+                age_ratings = ResolveNames(g.AgeRatingIds, _libraryApi.AgeRatings),
+                regions = ResolveNames(g.RegionIds, _libraryApi.Regions)
             };
+        }
+
+        private static List<string>? ResolveNames<T>(HashSet<string>? ids, ILibraryCollection<T> collection)
+            where T : LibraryObject {
+            if (ids == null || ids.Count == 0) return null;
+            var names = new List<string>(ids.Count);
+            foreach (var id in ids) {
+                var name = collection.Get(id)?.Name;
+                if (name != null) names.Add(name);
+            }
+            return names.Count > 0 ? names : null;
         }
 
 
@@ -435,14 +444,12 @@ namespace GsPlugin.Services {
                 _logger.Warn(ex, "Database collection modified during snapshot — retrying once");
                 allGames = playniteDatabaseGames.ToList();
             }
-            var syncAchievements = GsDataManager.Data.SyncAchievements;
-
             var (library, libraryHash, filteredCount) = await Task.Run(() => {
                 var filtered = allGames
                     .Where(g => !string.IsNullOrEmpty(g.LibraryId) && GsAllowedPlugins.AllowedPluginIds.Contains(g.LibraryId))
                     .ToList();
 
-                var dtos = filtered.Select(g => MapGameToDto(g, syncAchievements)).ToList();
+                var dtos = filtered.Select(g => MapGameToDto(g)).ToList();
 
                 return (dtos, GsHashUtils.ComputeLibraryHash(dtos), allGames.Count - filtered.Count);
             });
@@ -662,365 +669,9 @@ namespace GsPlugin.Services {
             }
         }
 
-        /// <summary>
-        /// Sends all per-achievement data to v2/achievements/sync-full and writes the achievement snapshot.
-        /// </summary>
-        /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
-        /// <param name="bypassCooldown">When true, skip the client-side cooldown check (used when server requests force-full-sync)</param>
-        public async Task<SyncLibraryResult> SyncAchievementsFullAsync(
-            IEnumerable<Game> playniteDatabaseGames, bool bypassCooldown = false) {
-            try {
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+        // SyncAchievementsFullAsync removed — will be re-added after SuccessStory/PlayniteAchievements v11 releases.
 
-                if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
-                    _logger.Info("Achievement sync skipped: disabled or no achievement provider installed.");
-                    return SyncLibraryResult.Skipped;
-                }
-
-                _logger.Info("Starting full achievements sync (v2)");
-                List<Game> allGames;
-                try {
-                    allGames = playniteDatabaseGames.ToList();
-                }
-                catch (InvalidOperationException) {
-                    allGames = playniteDatabaseGames.ToList();
-                }
-
-                var games = await Task.Run(() => {
-                    return allGames
-                        .Where(g => !string.IsNullOrEmpty(g.LibraryId) && GsAllowedPlugins.AllowedPluginIds.Contains(g.LibraryId))
-                        .Select(g => {
-                            var achievements = Guid.TryParse(g.Id, out var gAchId)
-                                ? _achievementHelper.GetAchievements(gAchId)
-                                : null;
-                            if (achievements == null || achievements.Count == 0)
-                                return null;
-
-                            // Deduplicate by achievement name — last entry wins.
-                            // Achievement providers may return duplicates; matches diff sync behavior.
-                            var dedupedByName = new Dictionary<string, AchievementItemDto>();
-                            foreach (var a in achievements) {
-                                dedupedByName[a.Name ?? ""] = new AchievementItemDto {
-                                    name = a.Name,
-                                    description = a.Description,
-                                    date_unlocked = a.DateUnlocked,
-                                    is_unlocked = a.IsUnlocked,
-                                    rarity_percent = a.RarityPercent
-                                };
-                            }
-
-                            return new GameAchievementsDto {
-                                playnite_id = g.Id.ToString(),
-                                game_id = g.LibraryGameId,
-                                plugin_id = g.LibraryId,
-                                achievements = dedupedByName.Values.ToList()
-                            };
-                        })
-                        .Where(x => x != null)
-                        .Select(x => x!)
-                        .ToList();
-                });
-
-                if (games.Count == 0) {
-                    _logger.Info("No games with achievements found — setting empty baseline.");
-                    GsSnapshotManager.UpdateAchievementsSnapshot(new Dictionary<string, GameAchievementSnapshot>());
-                    return SyncLibraryResult.Skipped;
-                }
-
-                _logger.Info($"Sending full achievements for {games.Count} games.");
-
-                // Re-check opt-out before sending data (user may have opted out mid-flight)
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
-
-                var response = await _apiClient.SyncAchievementsFull(new AchievementsFullSyncReq {
-                    user_id = GsDataManager.InstallIdForBody,
-                    games = games
-                });
-
-                if (response == null) {
-                    _logger.Error("Failed to queue full achievements sync.");
-                    return SyncLibraryResult.Error;
-                }
-
-                if (response.success && response.status == "queued") {
-                    _logger.Info("Full achievements sync queued successfully.");
-
-                    // Write achievement snapshot
-                    var snapshotDict = games.ToDictionary(
-                        g => g.playnite_id,
-                        g => new GameAchievementSnapshot {
-                            playnite_id = g.playnite_id,
-                            achievements = g.achievements.Select(a => new AchievementSnapshot {
-                                name = a.name,
-                                is_unlocked = a.is_unlocked,
-                                date_unlocked = a.date_unlocked?.ToString("o"),
-                                rarity_percent = a.rarity_percent
-                            }).ToList()
-                        });
-                    GsSnapshotManager.UpdateAchievementsSnapshot(snapshotDict);
-
-                    // Store achievement hash for diff sync change detection
-                    var achHash = GsHashUtils.ComputeAchievementHash(games);
-                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = achHash);
-
-                    return SyncLibraryResult.Success;
-                }
-
-                _logger.Error($"Unexpected response from full achievements sync: status={response.status}");
-                return SyncLibraryResult.Error;
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "Error in SyncAchievementsFullAsync");
-                return SyncLibraryResult.Error;
-            }
-        }
-
-        /// <summary>
-        /// Computes achievement diff against snapshot and sends to v2/achievements/sync-diff.
-        /// Falls back to full sync if the server requests it.
-        /// </summary>
-        public async Task<SyncLibraryResult> SyncAchievementsDiffAsync(
-            IEnumerable<Game> playniteDatabaseGames) {
-            try {
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
-
-                if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
-                    _logger.Info("Achievement diff sync skipped: disabled or no achievement provider installed.");
-                    return SyncLibraryResult.Skipped;
-                }
-
-                _logger.Info("Starting diff achievements sync (v2)");
-                List<Game> allGames;
-                try {
-                    allGames = playniteDatabaseGames.ToList();
-                }
-                catch (InvalidOperationException) {
-                    allGames = playniteDatabaseGames.ToList();
-                }
-                var achievementSnapshot = GsSnapshotManager.GetAchievementsSnapshot();
-
-                // Diagnostic: log provider status and game counts
-                if (_achievementHelper is GsAchievementAggregator agg) {
-                    var installed = agg.GetInstalledProviders();
-                    _logger.Info($"Achievement providers installed: {installed.Count} — " +
-                        string.Join(", ", installed.Select(p => $"{p.ProviderName} (v{p.GetVersion() ?? "?"})")));
-                }
-                _logger.Info($"Achievement diff: {allGames.Count} total games, " +
-                    $"snapshot has {achievementSnapshot.Count} entries");
-
-                (List<GameAchievementsDto> changed, List<string> clearedIds) = await Task.Run(() => {
-                    var result = new List<GameAchievementsDto>();
-                    var currentGameIds = new HashSet<string>();
-                    int filteredCount = 0;
-                    int nullCount = 0;
-                    int withDataCount = 0;
-
-                    foreach (var g in allGames) {
-                        if (string.IsNullOrEmpty(g.LibraryId) || !GsAllowedPlugins.AllowedPluginIds.Contains(g.LibraryId))
-                            continue;
-
-                        filteredCount++;
-                        var playniteId = g.Id.ToString();
-                        List<AchievementItem> achievements = null;
-                        string sourceProvider = null;
-
-                        // Use source-aware lookup when available for diagnostics
-                        if (Guid.TryParse(g.Id, out var diffAchId)) {
-                            if (_achievementHelper is GsAchievementAggregator diagAgg) {
-                                var (achs, src) = diagAgg.GetAchievementsWithSource(diffAchId);
-                                achievements = achs;
-                                sourceProvider = src;
-                            }
-                            else {
-                                achievements = _achievementHelper.GetAchievements(diffAchId);
-                            }
-                        }
-
-                        if (achievements == null || achievements.Count == 0) {
-                            nullCount++;
-                            // Log first 3 games with no data for diagnosis
-                            if (nullCount <= 3) {
-                                _logger.Debug($"Achievement diag: game '{g.Name}' (plugin={g.LibraryId}) returned no achievements");
-                            }
-                        }
-                        else {
-                            withDataCount++;
-                            // Log first game with data to confirm which provider works
-                            if (withDataCount == 1) {
-                                _logger.Info($"Achievement diag: first hit from '{sourceProvider ?? "unknown"}' — " +
-                                    $"game '{g.Name}' has {achievements.Count} achievements");
-                            }
-                        }
-
-                        // Game previously had achievements but now has none — send empty list to clear server-side
-                        if ((achievements == null || achievements.Count == 0)
-                            && achievementSnapshot.ContainsKey(playniteId)) {
-                            currentGameIds.Add(playniteId);
-                            result.Add(new GameAchievementsDto {
-                                playnite_id = playniteId,
-                                game_id = g.LibraryGameId,
-                                plugin_id = g.LibraryId,
-                                achievements = new List<AchievementItemDto>()
-                            });
-                            continue;
-                        }
-
-                        if (achievements == null || achievements.Count == 0)
-                            continue;
-
-                        currentGameIds.Add(playniteId);
-                        bool hasChanged = false;
-
-                        if (!achievementSnapshot.TryGetValue(playniteId, out var prevSnap)) {
-                            hasChanged = true;
-                        }
-                        else {
-                            // Compare: different count, new unlocks, rarity changes
-                            if (prevSnap.achievements == null || achievements.Count != prevSnap.achievements.Count) {
-                                hasChanged = true;
-                            }
-                            else {
-                                // Use a loop instead of ToDictionary to handle duplicate achievement names gracefully.
-                                // Last entry wins, matching the most recent snapshot state.
-                                var prevByName = new Dictionary<string, AchievementSnapshot>();
-                                foreach (var snap in prevSnap.achievements) {
-                                    prevByName[snap.name ?? ""] = snap;
-                                }
-                                foreach (var a in achievements) {
-                                    if (!prevByName.TryGetValue(a.Name ?? "", out var prev)) {
-                                        hasChanged = true;
-                                        break;
-                                    }
-                                    if (a.IsUnlocked != prev.is_unlocked
-                                        || a.RarityPercent != prev.rarity_percent) {
-                                        hasChanged = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (hasChanged) {
-                            // Deduplicate by achievement name — last entry wins.
-                            // Matches full sync deduplication to avoid data inconsistency.
-                            var dedupedByName = new Dictionary<string, AchievementItemDto>();
-                            foreach (var a in achievements) {
-                                dedupedByName[a.Name ?? ""] = new AchievementItemDto {
-                                    name = a.Name,
-                                    description = a.Description,
-                                    date_unlocked = a.DateUnlocked,
-                                    is_unlocked = a.IsUnlocked,
-                                    rarity_percent = a.RarityPercent
-                                };
-                            }
-
-                            result.Add(new GameAchievementsDto {
-                                playnite_id = playniteId,
-                                game_id = g.LibraryGameId,
-                                plugin_id = g.LibraryId,
-                                achievements = dedupedByName.Values.ToList()
-                            });
-                        }
-                    }
-
-                    _logger.Info($"Achievement diff scan: {filteredCount} eligible games, " +
-                        $"{withDataCount} with data, {nullCount} with no data, " +
-                        $"{result.Count} changed");
-
-                    // IDs in snapshot but not in current library (game uninstalled/removed)
-                    var cleared = achievementSnapshot.Keys
-                        .Where(id => !currentGameIds.Contains(id))
-                        .ToList();
-
-                    return (result, cleared);
-                });
-
-                if (changed.Count == 0 && clearedIds.Count == 0) {
-                    _logger.Info("Achievement diff is empty — skipping.");
-                    return SyncLibraryResult.Skipped;
-                }
-
-                // Include removed-library games as empty-achievement entries so the server deletes them
-                foreach (var clearedId in clearedIds) {
-                    changed.Add(new GameAchievementsDto {
-                        playnite_id = clearedId,
-                        achievements = new List<AchievementItemDto>()
-                    });
-                }
-
-                _logger.Info($"Achievement diff: {changed.Count} games total ({clearedIds.Count} cleared).");
-
-                // Re-check opt-out before sending data (user may have opted out mid-flight)
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
-
-                var response = await _apiClient.SyncAchievementsDiff(new AchievementsDiffSyncReq {
-                    user_id = GsDataManager.InstallIdForBody,
-                    changed = changed,
-                    base_snapshot_hash = GsDataManager.Data.LastAchievementHash ?? ""
-                });
-
-                if (response == null) {
-                    _logger.Error("Failed to queue achievements diff sync.");
-                    return SyncLibraryResult.Error;
-                }
-
-                if (response.status == "force-full-sync") {
-                    _logger.Info($"Server requested full achievement sync (reason: {response.reason}). Falling back.");
-                    GsSnapshotManager.ClearAchievementsSnapshot();
-                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = null);
-                    return await SyncAchievementsFullAsync(playniteDatabaseGames, bypassCooldown: true);
-                }
-
-                if (response.success && response.status == "queued") {
-                    _logger.Info("Achievement diff sync queued successfully.");
-
-                    // Update snapshot: upsert changed games (with achievements), remove cleared ones
-                    var changedSnapshots = changed
-                        .Where(g => g.achievements != null && g.achievements.Count > 0)
-                        .ToDictionary(
-                            g => g.playnite_id,
-                            g => new GameAchievementSnapshot {
-                                playnite_id = g.playnite_id,
-                                achievements = g.achievements.Select(a => new AchievementSnapshot {
-                                    name = a.name,
-                                    is_unlocked = a.is_unlocked,
-                                    date_unlocked = a.date_unlocked?.ToString("o"),
-                                    rarity_percent = a.rarity_percent
-                                }).ToList()
-                            });
-                    // Combine games sent with empty achievements and games removed from library
-                    var allCleared = changed
-                        .Where(g => g.achievements == null || g.achievements.Count == 0)
-                        .Select(g => g.playnite_id)
-                        .Concat(clearedIds)
-                        .ToList();
-                    GsSnapshotManager.ApplyAchievementsDiff(changedSnapshots, allCleared);
-
-                    // Recompute achievement hash from the full updated snapshot
-                    var updatedSnapshot = GsSnapshotManager.GetAchievementsSnapshot();
-                    var snapshotAsDtos = updatedSnapshot.Values.Select(snap => new GameAchievementsDto {
-                        playnite_id = snap.playnite_id,
-                        achievements = snap.achievements?.Select(a => new AchievementItemDto {
-                            name = a.name,
-                            is_unlocked = a.is_unlocked,
-                            date_unlocked = a.date_unlocked != null && DateTime.TryParse(a.date_unlocked, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt) ? dt : (DateTime?)null,
-                            rarity_percent = a.rarity_percent
-                        }).ToList() ?? new List<AchievementItemDto>()
-                    }).ToList();
-                    var diffAchHash = GsHashUtils.ComputeAchievementHash(snapshotAsDtos);
-                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = diffAchHash);
-
-                    return SyncLibraryResult.Success;
-                }
-
-                _logger.Error($"Unexpected response from achievements diff sync: status={response.status}");
-                return SyncLibraryResult.Error;
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "Error in SyncAchievementsDiffAsync");
-                return SyncLibraryResult.Error;
-            }
-        }
+        // SyncAchievementsDiffAsync removed — will be re-added after SuccessStory/PlayniteAchievements v11 releases.
 
         /// <summary>
         /// Parses cooldown info from an AsyncQueuedResponse and persists it to the appropriate field.

@@ -336,55 +336,6 @@
                         <TextBlock Text="{loc:LocalizedString sync_settings_section_title}" Style="{StaticResource SectionTitleStyle}"/>
                     </StackPanel>
 
-                    <!-- Achievement sync -->
-                    <StackPanel Margin="0,0,0,4">
-                        <CheckBox Style="{StaticResource CheckBoxStyle}"
-                                  Content="{loc:LocalizedString sync_achievements_label}"
-                                  ToolTip="{loc:LocalizedString sync_achievements_tooltip}"
-                                  IsChecked="{Binding Settings.SyncAchievements, Mode=TwoWay}"
-                                  Margin="0,0,0,6"/>
-
-                        <!-- Achievement provider(s) detected -->
-                        <StackPanel Orientation="Horizontal"
-                                    Margin="20,0,0,4"
-                                    Visibility="{Binding IsAnyAchievementProviderInstalled,
-                                        Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <TextBlock Text="&#10003;"
-                                       Foreground="#4CAF50"
-                                       FontSize="12"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding AchievementProviderStatusText}"
-                                       Foreground="#4CAF50"
-                                       FontSize="11"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <!-- No achievement provider installed -->
-                        <StackPanel Orientation="Horizontal"
-                                    Margin="20,0,0,0"
-                                    Visibility="{Binding IsAllAchievementProvidersMissing,
-                                        Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <TextBlock Text="&#9888;"
-                                       Foreground="#FFA500"
-                                       FontSize="12"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Foreground="#FFA500"
-                                       FontSize="11"
-                                       VerticalAlignment="Center"
-                                       TextWrapping="Wrap">
-                                <Run Text="{loc:LocalizedString achievement_provider_missing_warning}"/>
-                                <Run Text=" "/>
-                                <Hyperlink NavigateUri="https://playnite.link/addons.html"
-                                           RequestNavigate="Hyperlink_RequestNavigate"
-                                           Foreground="{StaticResource AccentBrush}">
-                                    <Run Text="{loc:LocalizedString achievement_provider_install_link}"/>
-                                </Hyperlink>
-                            </TextBlock>
-                        </StackPanel>
-                    </StackPanel>
-
                     <!-- Library sync status -->
                     <Border Background="{DynamicResource TextBoxBackgroundBrush}"
                             BorderBrush="{DynamicResource NormalBorderBrush}"

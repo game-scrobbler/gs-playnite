@@ -412,7 +412,6 @@ namespace GsPlugin.Api {
                     sentry_disabled = data?.Flags?.Contains("no-sentry") ?? false,
                     posthog_disabled = data?.Flags?.Contains("no-posthog") ?? false,
                     new_dashboard = data?.NewDashboardExperience ?? false,
-                    sync_achievements = data?.SyncAchievements ?? false,
                 };
 
                 string jsonBody = JsonSerializer.Serialize(new { context }, _jsonOptions);

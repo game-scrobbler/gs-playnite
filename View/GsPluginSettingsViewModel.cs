@@ -17,7 +17,6 @@ namespace GsPlugin.Models {
     public class GsPluginSettingsViewModel : ObservableObject {
         private readonly string _settingsFilePath;
         private readonly GsAccountLinkingService _linkingService;
-        private readonly GsAchievementAggregator _achievementHelper;
         private readonly IGsApiClient _apiClient;
         private GsPluginSettings _editingClone;
         private GsPluginSettings _settings;
@@ -36,42 +35,10 @@ namespace GsPlugin.Models {
 
         public List<string> AvailableThemes { get; set; }
 
-        private bool? _isAnyAchievementProviderInstalled;
-        public bool IsAnyAchievementProviderInstalled {
-            get {
-                if (!_isAnyAchievementProviderInstalled.HasValue)
-                    _isAnyAchievementProviderInstalled = _achievementHelper.IsInstalled;
-                return _isAnyAchievementProviderInstalled.Value;
-            }
-        }
-
-        public bool IsAllAchievementProvidersMissing => !IsAnyAchievementProviderInstalled;
-
-        private string _achievementProviderStatusText;
-        public string AchievementProviderStatusText {
-            get {
-                if (_achievementProviderStatusText == null) {
-                    var installed = _achievementHelper.GetInstalledProviders();
-                    var parts = new System.Collections.Generic.List<string>();
-                    foreach (var p in installed) {
-                        var version = p.GetVersion();
-                        parts.Add(version != null
-                            ? $"{p.ProviderName} (v{version})"
-                            : p.ProviderName);
-                    }
-                    _achievementProviderStatusText = parts.Count > 0
-                        ? GsLocalization.Format("LOCGsPluginAchievementProviderDetectedFormat",
-                            string.Join(", ", parts) + " detected", string.Join(", ", parts))
-                        : "";
-                }
-                return _achievementProviderStatusText;
-            }
-        }
-
         public static bool IsLinked => GsDataManager.IsAccountLinked;
         public static string ConnectionStatus => IsLinked
-            ? GsLocalization.Get("LOCGsPluginConnectionStatusConnected", "Connected to GameScrobbler")
-            : GsLocalization.Get("LOCGsPluginConnectionStatusDisconnected", "Disconnected");
+            ? "Connected to GameScrobbler"
+            : "Disconnected";
         public static bool ShowLinkingControls => !IsLinked;
 
         /// <summary>True when the install has a server-issued auth token.</summary>
@@ -94,10 +61,10 @@ namespace GsPlugin.Models {
                 var syncAt = GsDataManager.Data.LastSyncAt;
                 var count = GsDataManager.Data.LastSyncGameCount;
                 if (syncAt == null || count == null)
-                    return GsLocalization.Get("LOCGsPluginNeverSynced", "Never synced");
+                    return "Never synced";
 
                 var ago = GsTime.FormatElapsed(DateTime.UtcNow - syncAt.Value);
-                return GsLocalization.Format("LOCGsPluginLastSyncedFormat", "Last synced: {0} games · {1}", count.Value.ToString("N0"), ago);
+                return $"Last synced: {count.Value:N0} games · {ago}";
             }
         }
 
@@ -113,20 +80,16 @@ namespace GsPlugin.Models {
         /// </summary>
         /// <param name="userDataDir">The plugin's user data directory (PlayniteApi.UserDataDir).</param>
         /// <param name="linkingService">The account linking service.</param>
-        /// <param name="achievementHelper">The aggregated achievement provider for detection status.</param>
         /// <param name="apiClient">The API client for server communication.</param>
         public GsPluginSettingsViewModel(
             string userDataDir,
             GsAccountLinkingService linkingService,
-            GsAchievementAggregator achievementHelper,
             IGsApiClient apiClient
         ) {
             _settingsFilePath = Path.Combine(
                 userDataDir ?? throw new ArgumentNullException(nameof(userDataDir)),
                 "settings.json");
             _linkingService = linkingService ?? throw new ArgumentNullException(nameof(linkingService));
-            _achievementHelper =
-                achievementHelper ?? throw new ArgumentNullException(nameof(achievementHelper));
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             AvailableThemes = new List<string> { "Dark", "Light", "System" };
 
@@ -168,7 +131,6 @@ namespace GsPlugin.Models {
             // Sync settings to GsDataManager
             GsDataManager.MutateAndSave(d => {
                 d.NewDashboardExperience = savedSettings.NewDashboardExperience;
-                d.SyncAchievements = savedSettings.SyncAchievements;
                 d.ShowUpdateNotifications = savedSettings.ShowUpdateNotifications;
                 d.ShowImportantNotifications = savedSettings.ShowImportantNotifications;
             });
@@ -241,7 +203,6 @@ namespace GsPlugin.Models {
                 d.Theme = s.Theme;
                 d.UpdateFlags(s.DisableSentry, s.DisableScrobbling, s.DisablePostHog);
                 d.NewDashboardExperience = s.NewDashboardExperience;
-                d.SyncAchievements = s.SyncAchievements;
                 d.ShowUpdateNotifications = s.ShowUpdateNotifications;
                 d.ShowImportantNotifications = s.ShowImportantNotifications;
             });
@@ -270,7 +231,7 @@ namespace GsPlugin.Models {
             try {
                 var result = await _linkingService.UnlinkAccountAsync();
                 if (result.Success) {
-                    Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginStatusDisconnected", "Account disconnected.");
+                    Settings.LinkStatusMessage = "Account disconnected.";
                 }
                 else if (result.ErrorMessage != "Cancelled") {
                     Settings.LinkStatusMessage = result.ErrorMessage;
@@ -279,7 +240,7 @@ namespace GsPlugin.Models {
             catch (Exception ex) {
                 GsLogger.Error("Unhandled exception in UnlinkAccount", ex);
                 GsSentry.CaptureException(ex, "Unhandled exception in UnlinkAccount");
-                Settings.LinkStatusMessage = GsLocalization.Format("LOCGsPluginErrorFormat", $"Error: {ex.Message}", ex.Message);
+                Settings.LinkStatusMessage = $"Error: {ex.Message}";
             }
         }
 
@@ -304,7 +265,7 @@ namespace GsPlugin.Models {
         /// <returns>True if token is valid, false otherwise.</returns>
         private bool ValidateLinkToken() {
             if (string.IsNullOrWhiteSpace(Settings.LinkToken)) {
-                Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginPleaseEnterToken", "Please enter a token");
+                Settings.LinkStatusMessage = "Please enter a token";
                 return false;
             }
             return true;
@@ -315,23 +276,22 @@ namespace GsPlugin.Models {
         /// </summary>
         private async Task PerformLinking() {
             Settings.IsLinking = true;
-            Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginVerifyingToken", "Verifying token...");
+            Settings.LinkStatusMessage = "Verifying token...";
             bool preserveToken = false;
 
             try {
                 var result = await _linkingService.LinkAccountAsync(Settings.LinkToken, LinkingContext.ManualSettings);
 
                 if (result.Success) {
-                    Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginLinkSuccess", "Successfully linked account!");
+                    Settings.LinkStatusMessage = "Successfully linked account!";
                     // Note: OnLinkingStatusChanged() is already called inside LinkAccountAsync
                 }
                 else if (result.IsTokenExpiry) {
-                    Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginStatusTokenExpired", "Token expired — click \"Open website to link\" to get a new one.");
+                    Settings.LinkStatusMessage = "Token expired — click \"Open website to link\" to get a new one.";
                 }
                 else if (result.IsNetworkError) {
                     preserveToken = true;
-                    Settings.LinkStatusMessage = GsLocalization.Format("LOCGsPluginNetworkErrorRetryFormat",
-                        $"{result.ErrorMessage} Click \"Link Account\" to retry.", result.ErrorMessage);
+                    Settings.LinkStatusMessage = $"{result.ErrorMessage} Click \"Link Account\" to retry.";
                 }
                 else {
                     Settings.LinkStatusMessage = result.ErrorMessage;
@@ -339,8 +299,7 @@ namespace GsPlugin.Models {
             }
             catch (Exception ex) {
                 preserveToken = true;
-                Settings.LinkStatusMessage = GsLocalization.Format("LOCGsPluginErrorRetryFormat",
-                    $"Error: {ex.Message} Click \"Link Account\" to retry.", ex.Message);
+                Settings.LinkStatusMessage = $"Error: {ex.Message} Click \"Link Account\" to retry.";
             }
             finally {
                 Settings.IsLinking = false;
@@ -388,7 +347,7 @@ namespace GsPlugin.Models {
                 Settings.TokenCountdown = "";
                 return;
             }
-            Settings.TokenCountdown = GsLocalization.Format("LOCGsPluginTokenCountdownFormat", "Token expires in ~{0}:{1}", (int)remaining.TotalMinutes, remaining.Seconds.ToString("D2"));
+            Settings.TokenCountdown = $"Token expires in ~{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
         }
 
         #endregion
@@ -401,7 +360,7 @@ namespace GsPlugin.Models {
         public async void DeleteMyData() {
             try {
                 Settings.IsDeleting = true;
-                Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeletingRequesting", "Requesting data deletion...");
+                Settings.DeleteStatusMessage = "Requesting data deletion...";
 
                 var result = await _apiClient.RequestDeleteMyData(new DeleteDataReq());
 
@@ -410,19 +369,19 @@ namespace GsPlugin.Models {
                     GsPostHog.Capture("data_deletion_requested");
                     GsDataManager.PerformOptOut();
                     GsSnapshotManager.ClearAll();
-                    Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteSuccess", "Your data has been deleted. The plugin is now disabled.");
+                    Settings.DeleteStatusMessage = "Your data has been deleted. The plugin is now disabled.";
                     // Notify UI to refresh connection status and button visibility
                     OnLinkingStatusChanged();
                 }
                 else if (result != null && result.rateLimited) {
-                    Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteRateLimited", "Too many deletion requests. Please wait 15 minutes and try again.");
+                    Settings.DeleteStatusMessage = "Too many deletion requests. Please wait 15 minutes and try again.";
                 }
                 else {
-                    Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteFailed", "Failed to request data deletion. Please try again later.");
+                    Settings.DeleteStatusMessage = "Failed to request data deletion. Please try again later.";
                 }
             }
             catch (Exception ex) {
-                Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteError", "An error occurred. Please try again later.");
+                Settings.DeleteStatusMessage = "An error occurred. Please try again later.";
                 GsLogger.Error("Error requesting data deletion", ex);
                 GsSentry.CaptureException(ex, "Error requesting data deletion");
             }
@@ -438,26 +397,26 @@ namespace GsPlugin.Models {
         /// </summary>
         public async void OptBackIn() {
             try {
-                Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInRequesting", "Re-enabling...");
+                Settings.DeleteStatusMessage = "Re-enabling...";
 
                 var result = await _apiClient.RequestOptIn(new OptInReq());
 
                 if (result == null || !result.success) {
                     if (result?.rateLimited == true) {
-                        Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInRateLimited", "Too many attempts. Please wait and try again.");
+                        Settings.DeleteStatusMessage = "Too many attempts. Please wait and try again.";
                     }
                     else {
-                        Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInFailed", "Failed to re-enable. Please restart Playnite to try again.");
+                        Settings.DeleteStatusMessage = "Failed to re-enable. Please restart Playnite to try again.";
                     }
                     return;
                 }
 
                 GsDataManager.PerformOptIn();
-                Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInSuccess", "Plugin re-enabled. Please restart Playnite to resume syncing.");
+                Settings.DeleteStatusMessage = "Plugin re-enabled. Please restart Playnite to resume syncing.";
                 OnLinkingStatusChanged();
             }
             catch (Exception ex) {
-                Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInError", "An error occurred. Please restart Playnite to try again.");
+                Settings.DeleteStatusMessage = "An error occurred. Please restart Playnite to try again.";
                 GsLogger.Error("Error during opt-back-in", ex);
                 GsSentry.CaptureException(ex, "Error during opt-back-in");
             }

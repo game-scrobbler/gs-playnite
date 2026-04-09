@@ -17,23 +17,9 @@ namespace GsPlugin.Models {
         public int? achievement_count_total { get; set; }
     }
 
-    public class AchievementSnapshot {
-        public string name { get; set; }
-        public bool is_unlocked { get; set; }
-        public string date_unlocked { get; set; }
-        public float? rarity_percent { get; set; }
-    }
-
-    public class GameAchievementSnapshot {
-        public string playnite_id { get; set; }
-        public List<AchievementSnapshot> achievements { get; set; }
-    }
-
     public class GsSnapshot {
         public Dictionary<string, GameSnapshot> Library { get; set; } = new Dictionary<string, GameSnapshot>();
-        public Dictionary<string, GameAchievementSnapshot> Achievements { get; set; } = new Dictionary<string, GameAchievementSnapshot>();
         public DateTime? LibraryFullSyncAt { get; set; }
-        public DateTime? AchievementsFullSyncAt { get; set; }
         /// <summary>
         /// Must match GsData.IdentityGeneration. When they differ the snapshot was written for a
         /// previous identity (e.g. crash between RotateInstallId and GsSnapshotManager.Reset) and
@@ -101,7 +87,6 @@ namespace GsPlugin.Models {
                 var snapshot = JsonSerializer.Deserialize<GsSnapshot>(json, jsonOptions) ?? new GsSnapshot();
                 // Guard against null dictionaries from persisted JSON (e.g., "Library": null)
                 snapshot.Library = snapshot.Library ?? new Dictionary<string, GameSnapshot>();
-                snapshot.Achievements = snapshot.Achievements ?? new Dictionary<string, GameAchievementSnapshot>();
                 return snapshot;
             }
             catch (Exception ex) {
@@ -168,14 +153,6 @@ namespace GsPlugin.Models {
         }
 
         /// <summary>
-        /// Returns true if an achievements baseline exists.
-        /// Uses the timestamp rather than dictionary count so that empty achievement sets are valid baselines.
-        /// </summary>
-        public static bool HasAchievementsBaseline {
-            get { lock (_lock) { EnsureInitialized(); return _snapshot.AchievementsFullSyncAt.HasValue; } }
-        }
-
-        /// <summary>
         /// Returns a shallow copy of the library dictionary for safe read-only use.
         /// Callers can iterate without risk of concurrent mutation by writers.
         /// </summary>
@@ -183,17 +160,6 @@ namespace GsPlugin.Models {
             lock (_lock) {
                 EnsureInitialized();
                 return new Dictionary<string, GameSnapshot>(_snapshot.Library);
-            }
-        }
-
-        /// <summary>
-        /// Returns a shallow copy of the achievements dictionary for safe read-only use.
-        /// Callers can iterate without risk of concurrent mutation by writers.
-        /// </summary>
-        public static Dictionary<string, GameAchievementSnapshot> GetAchievementsSnapshot() {
-            lock (_lock) {
-                EnsureInitialized();
-                return new Dictionary<string, GameAchievementSnapshot>(_snapshot.Achievements);
             }
         }
 
@@ -230,36 +196,7 @@ namespace GsPlugin.Models {
         }
 
         /// <summary>
-        /// Replaces the achievements snapshot with the current state and persists it.
-        /// </summary>
-        public static void UpdateAchievementsSnapshot(Dictionary<string, GameAchievementSnapshot> achievements) {
-            lock (_lock) {
-                _snapshot.Achievements = achievements;
-                _snapshot.AchievementsFullSyncAt = DateTime.UtcNow;
-                SaveInternal();
-            }
-        }
-
-        /// <summary>
-        /// Applies a diff result to the existing achievements snapshot and persists it.
-        /// Changed entries are upserted; cleared entries are removed.
-        /// </summary>
-        public static void ApplyAchievementsDiff(
-            Dictionary<string, GameAchievementSnapshot> changed,
-            List<string> cleared) {
-            lock (_lock) {
-                foreach (var kvp in changed) {
-                    _snapshot.Achievements[kvp.Key] = kvp.Value;
-                }
-                foreach (var id in cleared) {
-                    _snapshot.Achievements.Remove(id);
-                }
-                SaveInternal();
-            }
-        }
-
-        /// <summary>
-        /// Clears both library and achievements snapshots entirely. Called on data deletion opt-out.
+        /// Clears both library snapshot entirely. Called on data deletion opt-out.
         /// </summary>
         public static void ClearAll() {
             lock (_lock) {
@@ -275,17 +212,6 @@ namespace GsPlugin.Models {
             lock (_lock) {
                 _snapshot.Library = new Dictionary<string, GameSnapshot>();
                 _snapshot.LibraryFullSyncAt = null;
-                SaveInternal();
-            }
-        }
-
-        /// <summary>
-        /// Clears the achievements snapshot. Called when the server requests a force-full-sync.
-        /// </summary>
-        public static void ClearAchievementsSnapshot() {
-            lock (_lock) {
-                _snapshot.Achievements = new Dictionary<string, GameAchievementSnapshot>();
-                _snapshot.AchievementsFullSyncAt = null;
                 SaveInternal();
             }
         }

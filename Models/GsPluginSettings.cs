@@ -48,15 +48,6 @@ namespace GsPlugin.Models {
             }
         }
 
-        private bool _syncAchievements = true;
-        public bool SyncAchievements {
-            get => _syncAchievements;
-            set {
-                _syncAchievements = value;
-                OnPropertyChanged();
-            }
-        }
-
         private bool _showUpdateNotifications = true;
         public bool ShowUpdateNotifications {
             get => _showUpdateNotifications;

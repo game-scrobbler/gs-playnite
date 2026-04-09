@@ -332,7 +332,6 @@ namespace GsPlugin.Tests {
                 GsDataManager.Data.ActiveSessionId = "session-1";
                 GsDataManager.Data.PendingStartGameId = "game-1";
                 GsDataManager.Data.LastLibraryHash = "hash-lib";
-                GsDataManager.Data.LastAchievementHash = "hash-ach";
                 GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                 GsDataManager.Data.LastSyncGameCount = 50;
                 GsDataManager.Data.SyncCooldownExpiresAt = DateTime.UtcNow.AddHours(1);
@@ -346,7 +345,6 @@ namespace GsPlugin.Tests {
                 Assert.Null(GsDataManager.Data.ActiveSessionId);
                 Assert.Null(GsDataManager.Data.PendingStartGameId);
                 Assert.Null(GsDataManager.Data.LastLibraryHash);
-                Assert.Null(GsDataManager.Data.LastAchievementHash);
                 Assert.Null(GsDataManager.Data.LastSyncAt);
                 Assert.Null(GsDataManager.Data.LastSyncGameCount);
                 Assert.Null(GsDataManager.Data.SyncCooldownExpiresAt);

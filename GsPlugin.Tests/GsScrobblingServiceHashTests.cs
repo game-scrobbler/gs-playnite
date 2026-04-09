@@ -180,7 +180,7 @@ namespace GsPlugin.Tests {
                 }
             };
 
-            const string expected = "262c8283df39850de9ee82fd42c57d55a9a6aed42029808e1400dc33c4655e8d";
+            const string expected = "aad3b8a72f613626d7629c3d79190e09df51cb79f1e5fe207baa0a0325c4a3d2";
             Assert.Equal(expected, GsHashUtils.ComputeLibraryHash(library));
         }
     }

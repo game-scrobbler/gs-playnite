@@ -97,50 +97,10 @@ namespace GsPlugin.Services {
             sb.Append(FormatDateForHash(g.date_added));
             sb.Append('|');
             sb.Append(FormatDateForHash(g.modified));
-            sb.Append('|');
-            sb.Append(g.achievement_count_unlocked?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.achievement_count_total?.ToString() ?? "");
-
             using (var sha256 = SHA256.Create()) {
                 var bytes = Encoding.UTF8.GetBytes(sb.ToString());
                 var hash = sha256.ComputeHash(bytes);
                 return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-            }
-        }
-
-        /// <summary>
-        /// Compute a SHA-256 hash of achievement data for change detection.
-        /// Per-game key: {playnite_id}:{achievement_count}:{unlocked_count}:{sorted_names_hash}
-        /// Keys are sorted ordinally, then hashed with "|" separator.
-        /// Must match server's createAchievementHashV2() exactly.
-        /// </summary>
-        public static string ComputeAchievementHash(List<GameAchievementsDto> games) {
-            var keys = games
-                .Select(g => {
-                    var achs = g.achievements ?? new List<AchievementItemDto>();
-                    var unlockedCount = achs.Count(a => a.is_unlocked);
-                    var sortedNames = string.Join(",", achs.Select(a => a.name).OrderBy(n => n, StringComparer.Ordinal));
-                    string namesHash;
-                    using (var sha = SHA256.Create()) {
-                        var bytes = Encoding.UTF8.GetBytes(sortedNames);
-                        var hash = sha.ComputeHash(bytes);
-                        namesHash = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                    }
-                    return $"{g.playnite_id}:{achs.Count}:{unlockedCount}:{namesHash}";
-                })
-                .OrderBy(k => k, StringComparer.Ordinal)
-                .ToArray();
-
-            var separator = new byte[] { (byte)'|' };
-            using (var sha256 = SHA256.Create()) {
-                foreach (var key in keys) {
-                    var bytes = Encoding.UTF8.GetBytes(key);
-                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
-                    sha256.TransformBlock(separator, 0, 1, null, 0);
-                }
-                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
             }
         }
 

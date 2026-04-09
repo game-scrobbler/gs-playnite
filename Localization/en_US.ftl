@@ -50,10 +50,6 @@ link_failed_body = Account linking failed: { $error }
 
 # ── Section 4: Sync Settings ──
 sync_settings_section_title = Sync Settings
-sync_achievements_label = Sync achievement data (requires SuccessStory or Playnite Achievements addon)
-sync_achievements_tooltip = Reads achievement data from SuccessStory or Playnite Achievements addon during library sync. Has no effect if neither is installed.
-achievement_provider_missing_warning = No achievement addon found — achievement sync will be skipped.
-achievement_provider_install_link = Install an achievement addon
 library_sync_label = Library Sync:
 
 # ── Section 5: Notifications ──
@@ -104,9 +100,6 @@ remaining_less_than_minute = less than a minute
 remaining_minutes_format = { $count } minutes
 remaining_hours_minutes_format = { $hours } hours { $minutes } minutes
 remaining_hours_format = { $count } hours
-
-# ── Achievement Provider ──
-achievement_provider_detected_format = { $provider } detected
 
 # ── Notification Tooltips ──
 show_update_notifications_tooltip = Show a notification in Playnite when a new plugin version is available

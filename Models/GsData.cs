@@ -44,7 +44,6 @@ namespace GsPlugin.Models {
         public List<string> Flags { get; set; } = new List<string>();
         public string LinkedUserId { get; set; } = null;
         public bool NewDashboardExperience { get; set; } = false;
-        public bool SyncAchievements { get; set; } = true;
         public List<string> AllowedPlugins { get; set; } = new List<string>();
         public DateTime? AllowedPluginsLastFetched { get; set; }
         public List<PendingScrobble> PendingScrobbles { get; set; } = new List<PendingScrobble>();
@@ -56,8 +55,6 @@ namespace GsPlugin.Models {
         // SHA-256 hex hash of the last library payload sent to the server.
         // Used to skip syncs when the library hasn't changed between sessions.
         public string LastLibraryHash { get; set; } = null;
-        // SHA-256 hex hash of the last achievement payload sent to the server.
-        public string LastAchievementHash { get; set; } = null;
         // UTC time until which the server has asked us not to send library diffs.
         public DateTime? LibraryDiffSyncCooldownExpiresAt { get; set; } = null;
         // Hash of last-synced integration accounts (e.g. Steam UserId).
@@ -127,20 +124,17 @@ namespace GsPlugin.Models {
         /// </summary>
         public static string FormatElapsed(TimeSpan elapsed) {
             if (elapsed.TotalMinutes < 1)
-                return GsLocalization.Get("LOCGsPluginElapsedJustNow", "just now");
+                return "just now";
             if (elapsed.TotalHours < 1) {
                 int mins = (int)elapsed.TotalMinutes;
-                return GsLocalization.Format("LOCGsPluginElapsedMinutesFormat",
-                    $"{mins} minute{(mins == 1 ? "" : "s")} ago", mins);
+                return $"{mins} minute{(mins == 1 ? "" : "s")} ago";
             }
             if (elapsed.TotalDays < 1) {
                 int hours = (int)elapsed.TotalHours;
-                return GsLocalization.Format("LOCGsPluginElapsedHoursFormat",
-                    $"{hours} hour{(hours == 1 ? "" : "s")} ago", hours);
+                return $"{hours} hour{(hours == 1 ? "" : "s")} ago";
             }
             int days = (int)elapsed.TotalDays;
-            return GsLocalization.Format("LOCGsPluginElapsedDaysFormat",
-                $"{days} day{(days == 1 ? "" : "s")} ago", days);
+            return $"{days} day{(days == 1 ? "" : "s")} ago";
         }
 
         /// <summary>
@@ -148,19 +142,16 @@ namespace GsPlugin.Models {
         /// </summary>
         public static string FormatRemaining(TimeSpan remaining) {
             if (remaining.TotalMinutes < 1)
-                return GsLocalization.Get("LOCGsPluginRemainingLessThanMinute", "less than a minute");
+                return "less than a minute";
             if (remaining.TotalHours < 1) {
                 int mins = (int)remaining.TotalMinutes;
-                return GsLocalization.Format("LOCGsPluginRemainingMinutesFormat",
-                    $"{mins} minute{(mins == 1 ? "" : "s")}", mins);
+                return $"{mins} minute{(mins == 1 ? "" : "s")}";
             }
             int hours = (int)remaining.TotalHours;
             int remMins = remaining.Minutes;
             return remMins > 0
-                ? GsLocalization.Format("LOCGsPluginRemainingHoursMinutesFormat",
-                    $"{hours} hour{(hours == 1 ? "" : "s")} {remMins} minute{(remMins == 1 ? "" : "s")}", hours, remMins)
-                : GsLocalization.Format("LOCGsPluginRemainingHoursFormat",
-                    $"{hours} hour{(hours == 1 ? "" : "s")}", hours);
+                ? $"{hours} hour{(hours == 1 ? "" : "s")} {remMins} minute{(remMins == 1 ? "" : "s")}"
+                : $"{hours} hour{(hours == 1 ? "" : "s")}";
         }
     }
 
@@ -361,7 +352,7 @@ namespace GsPlugin.Models {
                 _data.PendingScrobbles.Clear();
                 _data.LinkedUserId = null;
                 _data.LastLibraryHash = null;
-                _data.LastAchievementHash = null;
+
                 _data.LastSyncAt = null;
                 _data.LastSyncGameCount = null;
                 _data.SyncCooldownExpiresAt = null;
@@ -453,7 +444,7 @@ namespace GsPlugin.Models {
                 _data.PendingStartGameId = null;
                 _data.PendingScrobbles.Clear();
                 _data.LastLibraryHash = null;
-                _data.LastAchievementHash = null;
+
                 _data.LastSyncAt = null;
                 _data.LastSyncGameCount = null;
                 _data.SyncCooldownExpiresAt = null;
