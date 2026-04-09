@@ -47,24 +47,84 @@ When P11 reaches GA and P10 is deprecated, `playnite11` becomes `main`.
 
 ## What still needs porting
 
-### 1 — Fluent localization migration
+### Phase A — Metadata sync ✅ DONE
 
-Currently the plugin still uses `GsLocalization.Get()` / `Format()` wrappers backed by XAML resource dictionaries (`Localization/*.xaml`). The `Localization/Localization.cs` Fluent wrapper exists but the migration from XAML → `.ftl` is not yet complete.
+`MapGameToDto` now resolves all metadata via `ILibraryApi` collections. P11 key facts:
+- `Game.*Ids` are `HashSet<string>?` (not `List<Guid>`)
+- Developers and publishers both resolve through `lib.Companies.Get(id)?.Name`
+- Lookup method: `ILibraryCollection<T>.Get(string id)` (not indexer)
+- `ILibraryApi` is injected via `GsScrobblingService` constructor; `GsPlugin.cs` passes `args.Api.Library`
 
-When ready:
-1. Convert all 7 XAML locale files to `Localization/en_US.ftl` (and other locales)
-2. Run `Toolbox.exe ftlgen "Localization/" "Localization/"` to generate `Localization/Localization.g.cs` with typed `Loc.*()` methods and `LocId.*` constants
-3. Replace all `GsLocalization.Get(key, fallback)` / `GsLocalization.Format(key, fallback, args)` calls with `Loc.*(...)` equivalents
-4. Delete `Infrastructure/GsLocalization.cs` and the XAML locale files
-5. Commit the generated `Localization/Localization.g.cs`
+### Phase B — PlayCount ✅ DONE
 
-### 2 — `Microsoft.Data.Sqlite` migration
+`play_count = (int)(g.SessionIds?.Count ?? 0)` — `Game.PlayCount` is gone in P11; `SessionIds` is a `HashSet<string>`.
 
-`GsPlayniteAchievementsHelper.cs` still uses `System.Data.SQLite.Core` (which ships `SQLite.Interop.dll` native binaries). Replace with `Microsoft.Data.Sqlite` (NuGet). The API is nearly identical; only the connection string format and `using` namespaces change.
+### Phase D — Plugin version lookup ✅ DONE (permanent null)
 
-### 3 — Remaining `// TODO P11` items in source
+`GetVersion()` returns `null` in both achievement helpers. `PlayniteApi.Addons.Plugins` is gone in P11 and the version is optional server-side metadata.
 
-Grep for `// TODO P11` comments in the source before release to catch any deferred items not covered above.
+---
+
+### Phase C — Game stop detection via `GameSession.Length`
+
+**Affected file:** `GsPlugin.cs`, line 263
+
+**Problem:** P10 fired `OnGameStopped(Game game, long sessionLength)`. In P11 the stop callback is TBD; the current workaround fires scrobble stop only on `OnApplicationStopped`.
+
+**Known P11 SDK facts (confirmed from SDK XML):**
+- `GameSession` has `GameId`, `LibraryId`, `SessionId`, `Length`, `Date`
+- `GameSession.OnLengthChanged(uint oldValue, uint newValue)` exists
+
+**Suspected P11 event:** A `GameSessionChanged` / `GameSessionUpdated` event on `PlayniteApi.Library` that fires when `Length` goes from 0 → non-zero marks game stop. Needs verification once Playnite 11 has published documentation or source.
+
+**Interim plan (already in place):** `OnApplicationStopped` cleanup handles the common case. When the real P11 stop event is documented, wire it up here and remove this TODO.
+
+---
+
+### Phase D — Plugin version lookup in achievement helpers
+
+**Affected files:**
+- `Services/GsSuccessStoryHelper.cs:127`
+- `Services/GsPlayniteAchievementsHelper.cs:158`
+
+Both `GetVersion()` methods return `null` because `PlayniteApi.Addons.Plugins` was removed in P11.
+
+**Options (pick one when P11 GA docs are available):**
+1. **Read `extension.toml`** from the target addon's data directory — but the format is TOML and the path isn't guaranteed.
+2. **Use file version info** on the addon DLL (if the path is predictable):
+   ```csharp
+   var dllPath = Path.Combine(extensionsPath, addonGuid.ToString(), "SuccessStory.dll");
+   return File.Exists(dllPath)
+       ? System.Diagnostics.FileVersionInfo.GetVersionInfo(dllPath).FileVersion
+       : null;
+   ```
+3. **Return `null` permanently** — the version is sent to the API as metadata only; `null` is already handled by the server.
+
+Option 3 is the lowest-risk path and is already the current behaviour. Promote it to a permanent decision when P11 GA ships and the Addons API is confirmed absent.
+
+---
+
+### Phase E — `Microsoft.Data.Sqlite` migration ✅ DONE
+
+`System.Data.SQLite.Core` → `Microsoft.Data.Sqlite 9.*` in both csproj files. `SQLiteConnection` → `SqliteConnection`, connection string `Mode=ReadOnly`, `SQLiteException` → `SqliteException`. Test project updated identically.
+
+---
+
+### Phase F — Fluent localization migration ✅ DONE
+
+All `GsLocalization.Get()` / `Format()` call sites replaced:
+- `GsPlugin.cs`, `GsAccountLinkingService.cs`, `GsUriHandler.cs`, `GsPluginSettingsView.xaml.cs` → `Loc.*()` typed methods
+- `GsData.cs` (`FormatElapsed`/`FormatRemaining`), `GsPluginSettingsViewModel.cs` → inline C# (keeps `GsTimeTests` and settings ViewModel tests passing without a live `Loc.Api`)
+- `Infrastructure/GsLocalization.cs` deleted
+- `Loc.Api = args.Api;` wired in `InitializeAsync`
+
+---
+
+### Remaining `// TODO P11` items
+
+| File | Line area | Phase |
+|---|---|---|
+| `GsPlugin.cs` | game stop detection | Phase C (blocked on P11 GA docs) |
 
 ---
 

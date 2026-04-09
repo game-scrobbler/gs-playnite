@@ -119,6 +119,7 @@ GsPlugin (entry point, IDisposable)
 - Pending scrobble flush is fire-and-forget so library sync starts immediately; the periodic timer catches remaining items.
 - First-run detection: when `LastSyncAt` is null and `InstallToken` is empty, progress notifications guide the user through initial setup.
 - `startup_completed` PostHog event captures elapsed time and sync result for startup performance tracking.
+- Achievement sync (`SyncAchievementsWithDiffAsync`) has been removed from the startup flow; it will be re-added once SuccessStory and Playnite Achievements release P11-compatible versions.
 
 ### Sidebar Dashboard
 - `MySidebarView` constructor takes only `IGsApiClient` — plugin version and flags are sent server-side via the dashboard token POST body.
@@ -127,23 +128,23 @@ GsPlugin (entry point, IDisposable)
 - Handles `gs:refresh-token` postMessage from the frontend for manual retry when the session expires.
 
 ### Achievement Provider Architecture
-Achievement data comes from two optional addons via an aggregator pattern:
+Achievement data reading infrastructure is present but **achievement sync to the server is disabled** pending SuccessStory and Playnite Achievements releasing P11-compatible versions:
 - `IAchievementProvider` — common interface (`GetCounts`, `GetAchievements`, `IsInstalled`)
 - `GsSuccessStoryHelper` — reads SuccessStory's per-game JSON files from `{ExtensionsDataPath}/{pluginGuid}/SuccessStory/{gameId}.json` (priority 1)
-- `GsPlayniteAchievementsHelper` — reads Playnite Achievements' SQLite database at `{ExtensionsDataPath}/{pluginGuid}/achievement_cache.db` via `System.Data.SQLite` in read-only mode (priority 2; migration to `Microsoft.Data.Sqlite` is a future step)
+- `GsPlayniteAchievementsHelper` — reads Playnite Achievements' SQLite database at `{ExtensionsDataPath}/{pluginGuid}/achievement_cache.db` via `Microsoft.Data.Sqlite` in read-only mode (priority 2)
 - `GsAchievementAggregator` — iterates providers in order; first with data wins. Skips `(0, 0)` results to allow fallback.
-- `PluginVersionHelper` — reads version from `extension.toml` next to the plugin DLL; shared by both providers for `GetVersion()`.
 - `IsInstalled` checks data directory/file existence on disk, not plugin presence in `_api.Addons.Plugins`.
-- `System.Data.SQLite.Core` NuGet package ships native `SQLite.Interop.dll` (x86/x64) via build targets.
+- `GetVersion()` returns `null` permanently — `PlayniteApi.Addons.Plugins` is gone in P11.
+- `SyncAchievementsFullAsync` and `SyncAchievementsDiffAsync` are removed from `GsScrobblingService`; the API client methods (`SyncAchievementsFull`, `SyncAchievementsDiff`) are retained for when P11-compatible addon versions ship.
+- `Microsoft.Data.Sqlite` has been removed from the project — SQLite was only needed for `GsPlayniteAchievementsHelper` which is removed pending P11 addon compatibility.
 
 ### Settings UI & Localization
-- All user-facing strings are localized via XAML resource dictionaries in `Localization/` and accessed from C# via `GsLocalization.Get()`/`Format()` in `Infrastructure/GsLocalization.cs`.
-- Playnite auto-discovers locale files by naming convention (`Localization/{locale}.xaml`). The `en_US.xaml` is the fallback; locale-specific files override it.
-- Supported locales: `en_US` (English, default), `ru_RU` (Russian), `pt_BR` (Portuguese), `de_DE` (German), `fr_FR` (French), `zh_CN` (Chinese Simplified), `hi_IN` (Hindi).
-- All locale files must have the same set of keys (currently 117). When adding a new key, add it to **all 7 files**.
-- `GsLocalization.Get(key, fallback)` looks up from `Application.Current.Resources`; returns the fallback when no WPF app is running (e.g., in tests). `GsLocalization.Format(key, fallback, args)` wraps `string.Format()` on the resolved template.
-- For format strings with English pluralization (e.g., elapsed time), the code-behind fallback uses inline plural logic so tests see `"5 minutes ago"` while the XAML template is used at runtime for non-English locales (e.g., `"{0} мин. назад"`).
-- Settings view uses localized strings from `Localization/en_US.xaml` resource dictionary, organized into card-based sections.
+- All user-facing strings use Project Fluent (`.ftl`) localization via `Loc.*()` typed methods generated into `Localization/Localization.g.cs`.
+- `Loc.Api = args.Api;` is set in `InitializeAsync` before any `Loc.*()` calls.
+- `Loc.GetString()` null-guards with `?? stringId` fallback so tests (which have no live `Loc.Api`) see the FTL key string rather than NPE.
+- Time-formatting methods in `GsData.cs` (`FormatElapsed`, `FormatRemaining`) and status strings in `GsPluginSettingsViewModel.cs` use **inline C# string interpolation** — no `Loc.*()` calls — so that `GsTimeTests` and `GsPluginSettingsViewModelTests` continue to assert exact English strings without a live `Loc.Api`.
+- `Infrastructure/GsLocalization.cs` is deleted; `GsPlugin.Infrastructure` using directives remain in files that still use `GsLogger`, `GsSentry`, `GsPostHog`.
+- To add a new localization key: add it to `Localization/en_US.ftl`, run `Toolbox.exe ftlgen "Localization/" "Localization/"` to regenerate `Localization.g.cs`, then call the new typed `Loc.*()` method.
 - `GsDataManager.DiagnosticsStateChanged` event fires (outside the lock) when install-token or pending-scrobble state changes; the settings UI subscribes for live status updates.
 - `GsPluginSettingsViewModel` exposes diagnostic properties: `IsInstallTokenActive`, `PendingScrobbleCount`, `HasPendingScrobbles`.
 
