@@ -154,7 +154,7 @@ namespace GsPlugin.Services {
                     return LinkingResult.CreateSuccess(response.userId, context);
                 }
                 else {
-                    string serverMessage = response?.message ?? GsLocalization.Get("LOCGsPluginUnknownLinkingError", "Unknown error occurred during linking");
+                    string serverMessage = response?.message ?? Loc.unknown_linking_error();
                     // Prefer structured errorCode; fall back to message matching
                     // only for older server versions that don't send errorCode.
                     string errorCode = response?.errorCode;
@@ -187,7 +187,7 @@ namespace GsPlugin.Services {
                 GsLogger.Error($"Exception during {context} linking", ex);
                 GsSentry.CaptureException(ex, $"Exception during {context} linking");
                 return LinkingResult.CreateError(
-                    GsLocalization.Format("LOCGsPluginLinkingErrorFormat", $"Error during linking: {ex.Message}", ex.Message),
+                    Loc.linking_error_format(ex.Message),
                     context, ex, isNetworkError: true);
             }
         }
@@ -216,10 +216,8 @@ namespace GsPlugin.Services {
 
             // P11: use WPF MessageBox directly for yes/no dialogs.
             var result = MessageBox.Show(
-                GsLocalization.Format("LOCGsPluginAlreadyLinkedBody",
-                    $"Account is already linked to User ID: {GsDataManager.Data.LinkedUserId}\n\nDo you want to link to a different account?",
-                    GsDataManager.Data.LinkedUserId),
-                GsLocalization.Get("LOCGsPluginAlreadyLinkedTitle", "Account Already Linked"),
+                Loc.already_linked_body(GsDataManager.Data.LinkedUserId),
+                Loc.already_linked_title(),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question
             );
@@ -234,14 +232,14 @@ namespace GsPlugin.Services {
         public async Task<LinkingResult> UnlinkAccountAsync() {
             if (!GsDataManager.IsAccountLinked) {
                 return LinkingResult.CreateError(
-                    GsLocalization.Get("LOCGsPluginDisconnectNoAccount", "No account is currently linked."),
+                    Loc.disconnect_no_account(),
                     LinkingContext.ManualSettings);
             }
 
             // P11: use WPF MessageBox directly for yes/no dialogs.
             var confirm = MessageBox.Show(
-                GsLocalization.Get("LOCGsPluginDisconnectDialogBody", "Disconnect your account? Your game data will be kept on the server.\nYou can re-link anytime."),
-                GsLocalization.Get("LOCGsPluginDisconnectDialogTitle", "Disconnect Account"),
+                Loc.disconnect_dialog_body(),
+                Loc.disconnect_dialog_title(),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
@@ -254,7 +252,7 @@ namespace GsPlugin.Services {
 
                 if (response == null) {
                     return LinkingResult.CreateError(
-                        GsLocalization.Get("LOCGsPluginNetworkError", "Network error — could not reach the server. Please try again."),
+                        Loc.network_error(),
                         LinkingContext.ManualSettings, isNetworkError: true);
                 }
 
@@ -268,7 +266,6 @@ namespace GsPlugin.Services {
                         d.PendingStartGameId = null;
                         d.PendingScrobbles.Clear();
                         d.LastLibraryHash = null;
-                        d.LastAchievementHash = null;
                         d.LastSyncAt = null;
                         d.LastSyncGameCount = null;
                         d.SyncCooldownExpiresAt = null;
@@ -291,7 +288,7 @@ namespace GsPlugin.Services {
                     return LinkingResult.CreateSuccess(null, LinkingContext.ManualSettings);
                 }
                 else {
-                    string errorMessage = response.error ?? GsLocalization.Get("LOCGsPluginUnlinkFailed", "Failed to disconnect account.");
+                    string errorMessage = response.error ?? Loc.unlink_failed();
                     GsLogger.Error($"Unlink failed: {errorMessage}");
                     return LinkingResult.CreateError(errorMessage, LinkingContext.ManualSettings);
                 }
@@ -300,7 +297,7 @@ namespace GsPlugin.Services {
                 GsLogger.Error("Exception during account unlinking", ex);
                 GsSentry.CaptureException(ex, "Exception during account unlinking");
                 return LinkingResult.CreateError(
-                    GsLocalization.Format("LOCGsPluginErrorFormat", $"Error: {ex.Message}", ex.Message),
+                    Loc.error_format(ex.Message),
                     LinkingContext.ManualSettings, ex, isNetworkError: true);
             }
         }

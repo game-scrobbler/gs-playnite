@@ -47,13 +47,11 @@ public class LocalizedString : MarkupExtension {
 public static partial class Loc {
     public static IPlayniteApi Api = null!;
 
-    public static string GetString(string stringId) {
-        return Api.GetLocalizedString(stringId);
-    }
+    public static string GetString(string stringId) =>
+        Api?.GetLocalizedString(stringId) ?? stringId;
 
-    public static string GetString(string stringId, params (string name, object value)[] args) {
-        return Api.GetLocalizedString(stringId, args);
-    }
+    public static string GetString(string stringId, params (string name, object value)[] args) =>
+        Api?.GetLocalizedString(stringId, args) ?? stringId;
 
     public static bool IsStringId(string id) {
         return LocId.StringIds.Contains(id);
