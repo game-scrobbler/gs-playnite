@@ -40,8 +40,6 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
     <!-- WebView2 replaces CefSharp for the embedded dashboard browser -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" />
-    <!-- SQLite for Playnite Achievements addon integration -->
-    <PackageReference Include="System.Data.SQLite.Core" Version="1.*" />
   </ItemGroup>
 
   <ItemGroup>
