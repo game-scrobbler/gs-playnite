@@ -847,7 +847,8 @@ namespace GsPlugin.Services {
                             var (achs, src) = diagAgg.GetAchievementsWithSource(g.Id);
                             achievements = achs;
                             sourceProvider = src;
-                        } else {
+                        }
+                        else {
                             achievements = _achievementHelper.GetAchievements(g.Id);
                         }
 
@@ -857,7 +858,8 @@ namespace GsPlugin.Services {
                             if (nullCount <= 3) {
                                 _logger.Debug($"Achievement diag: game '{g.Name}' (plugin={g.PluginId}) returned no achievements");
                             }
-                        } else {
+                        }
+                        else {
                             withDataCount++;
                             // Log first game with data to confirm which provider works
                             if (withDataCount == 1) {

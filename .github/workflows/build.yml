@@ -1,14 +1,13 @@
 on:
   push:
-    branches: ["main"]
+    branches: ["playnite11"]
   pull_request:
-    branches: ["main"]
+    branches: ["playnite11"]
 
-name: Release Build
+name: Release Build (Playnite 11)
 
 env:
-  PLAYNITE_VERSION: "10.34"
-  PLAYNITE_ZIP: "Playnite1034.zip"
+  PLAYNITE_VERSION: "11.0.2.0"
 
 jobs:
   build:
@@ -20,50 +19,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Checkout powershell-yaml
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          repository: cloudbase/powershell-yaml
-          ref: 9664752e6f0149fd95a769e5788e0c84f75bd99e # pin to immutable commit
-          path: powershell-yaml
-
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+      - name: Restore NuGet packages
+        run: dotnet restore GsPlugin.sln
 
-      - name: NuGet Restore
-        run: nuget restore .\GsPlugin.sln
+      - name: Verify Formatting
+        run: dotnet format GsPlugin.sln --verify-no-changes
 
-      # Code formatting is enforced by the pre-commit hook (dotnet format --verify-no-changes).
-      # CI cannot run dotnet format on this solution because the .NET 8 SDK on windows-2022
-      # is missing BuildHost-net472, which is required to load old-style .NET Framework .csproj
-      # files (including transitively via ProjectReference from the SDK-style test project).
-
-      - name: Build Entire Solution (.NET Framework 4.6.2)
-        run: msbuild $Env:GITHUB_WORKSPACE\GsPlugin.sln -p:Configuration=Release -restore -clp:ErrorsOnly
+      - name: Build
+        run: dotnet build GsPlugin.sln --configuration Release --no-restore
 
       - name: Run Tests
-        run: dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal
 
-      - name: Setup Playnite
+      - name: Setup Playnite Toolbox
         run: |
-          Invoke-WebRequest -Uri "https://github.com/JosefNemec/Playnite/releases/download/${{ env.PLAYNITE_VERSION }}/${{ env.PLAYNITE_ZIP }}" -OutFile "$Env:GITHUB_WORKSPACE\Playnite.zip"
+          Invoke-WebRequest -Uri "https://github.com/JosefNemec/Playnite/releases/download/${{ env.PLAYNITE_VERSION }}/Playnite${{ env.PLAYNITE_VERSION }}.zip" -OutFile "$Env:GITHUB_WORKSPACE\Playnite.zip"
           Expand-Archive "$Env:GITHUB_WORKSPACE\Playnite.zip" -DestinationPath "$Env:GITHUB_WORKSPACE\Playnite"
 
-      - name: Pack with Playnite
+      - name: Pack with Playnite Toolbox
         id: pack
         run: |
           mkdir "PackingOutput"
-          & "$Env:GITHUB_WORKSPACE\Playnite\Toolbox.exe" pack "$Env:GITHUB_WORKSPACE\bin\Release" "$Env:GITHUB_WORKSPACE\PackingOutput"
-          Get-ChildItem "$Env:GITHUB_WORKSPACE\PackingOutput" -Filter *.pext | Rename-Item -NewName ("GsPlugin_" + "${{ github.ref_name }}".Replace("/", "_") + ".pext")
-          Move-Item -Path "$Env:GITHUB_WORKSPACE\PackingOutput\*.pext" -Destination $Env:GITHUB_WORKSPACE
+          & "$Env:GITHUB_WORKSPACE\Playnite\Toolbox.exe" pack "$Env:GITHUB_WORKSPACE\bin\Release\net10.0-windows" "$Env:GITHUB_WORKSPACE\PackingOutput"
+          Get-ChildItem "$Env:GITHUB_WORKSPACE\PackingOutput" -Filter *.pext2 | Rename-Item -NewName ("GsPlugin_" + "${{ github.ref_name }}".Replace("/", "_") + ".pext2")
+          Move-Item -Path "$Env:GITHUB_WORKSPACE\PackingOutput\*.pext2" -Destination $Env:GITHUB_WORKSPACE
 
       - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/playnite11'
         id: release
         uses: googleapis/release-please-action@c3fc4de07084f75a2b61a5b933069bda6edf3d5c # v4
         with:
@@ -82,26 +69,24 @@ jobs:
           $version = "${{ steps.release.outputs.tag_name }}".TrimStart('v')
           sentry-cli releases new "GsPlugin@$version"
           sentry-cli releases set-commits "GsPlugin@$version" --auto
-          sentry-cli upload-dif --type=portablepdb "$Env:GITHUB_WORKSPACE\bin\Release" --log-level=info
+          sentry-cli upload-dif --type=portablepdb "$Env:GITHUB_WORKSPACE\bin\Release\net10.0-windows" --log-level=info
           sentry-cli releases finalize "GsPlugin@$version"
 
-      - name: Rename Packed File Name to Release Tag
+      - name: Rename Packed File to Release Tag
         if: ${{ steps.release.outputs.release_created }}
-        id: rename
         run: |
-          Get-ChildItem "$Env:GITHUB_WORKSPACE" -Filter *.pext | Rename-Item -NewName ("${{ steps.release.outputs.tag_name }}".Replace("/", "_") + ".pext")
+          Get-ChildItem "$Env:GITHUB_WORKSPACE" -Filter *.pext2 | Rename-Item -NewName ("${{ steps.release.outputs.tag_name }}" + ".pext2")
 
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-        run: gh release upload ${{ steps.release.outputs.tag_name }} .\${{ steps.release.outputs.tag_name }}.pext
+        run: gh release upload ${{ steps.release.outputs.tag_name }} .\${{ steps.release.outputs.tag_name }}.pext2
 
       - name: Update Installer Manifest
         if: ${{ steps.release.outputs.release_created }}
         run: |
           $version = "${{ steps.release.outputs.tag_name }}".Replace("GsPlugin-v", "")
-          Write-Host "Updating installer manifest for version $version"
           powershell -ExecutionPolicy Bypass -File "$Env:GITHUB_WORKSPACE\scripts\update-installer-manifest.ps1" -Version $version -TagName "${{ steps.release.outputs.tag_name }}"
 
       - name: Commit and Push Manifest Changes

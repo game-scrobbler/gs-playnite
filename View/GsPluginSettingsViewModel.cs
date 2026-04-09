@@ -430,7 +430,8 @@ namespace GsPlugin.Models {
                 if (result == null || !result.success) {
                     if (result?.rateLimited == true) {
                         Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInRateLimited", "Too many attempts. Please wait and try again.");
-                    } else {
+                    }
+                    else {
                         Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInFailed", "Failed to re-enable. Please restart Playnite to try again.");
                     }
                     return;

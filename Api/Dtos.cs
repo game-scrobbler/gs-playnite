@@ -36,7 +36,7 @@ namespace GsPlugin.Api {
 
         public ApiOutcome Outcome =>
             status == "success" ? ApiOutcome.Success :
-            status == "fail"    ? ApiOutcome.Fail    :
+            status == "fail" ? ApiOutcome.Fail :
                                   ApiOutcome.Error;
     }
 

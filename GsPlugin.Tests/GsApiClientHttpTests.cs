@@ -17,13 +17,13 @@ namespace GsPlugin.Tests {
     /// </summary>
     [Collection("StaticManagerTests")]
     public class GsApiClientHttpTests {
-        private string CreateTempDir() {
+        private static string CreateTempDir() {
             var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             Directory.CreateDirectory(dir);
             return dir;
         }
 
-        private void InitDataManager(string tempDir, string installToken = null) {
+        private static void InitDataManager(string tempDir, string installToken = null) {
             GsDataManager.Initialize(tempDir, null);
             if (installToken != null) {
                 GsDataManager.SetInstallTokenIfActive(installToken);

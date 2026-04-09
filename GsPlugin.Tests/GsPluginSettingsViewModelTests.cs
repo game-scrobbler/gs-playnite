@@ -21,7 +21,7 @@ namespace GsPlugin.Tests {
             catch { }
         }
 
-        private void SetSyncData(DateTime? lastSyncAt, int? lastSyncGameCount) {
+        private static void SetSyncData(DateTime? lastSyncAt, int? lastSyncGameCount) {
             GsDataManager.Data.LastSyncAt = lastSyncAt;
             GsDataManager.Data.LastSyncGameCount = lastSyncGameCount;
         }

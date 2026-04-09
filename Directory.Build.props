@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Disable INotifyPropertyChanging support to reduce MVVM toolkit overhead -->
+    <MvvmToolkitEnableINotifyPropertyChangingSupport>false</MvvmToolkitEnableINotifyPropertyChangingSupport>
+    <!-- Disable slow WinRT source generator -->
+    <CsWinRTAotOptimizerEnabled>false</CsWinRTAotOptimizerEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Disable slow WinRT source generator in all builds -->
+  <Target Name="DisableWinRTSourceGenerator" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)"
+                Condition="'%(FileName)%(Extension)' == 'WinRT.SourceGenerator.dll'" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,12 @@
+id = "GameScrobbler.GsPlugin"
+name = "Game Scrobbler"
+author = "GameScrobbler"
+version = "3.0.0"
+module = "GsPlugin.dll"
+source_link = "https://github.com/game-scrobbler/gs-playnite"
+
+#help_link = "https://gamescrobbler.com/help"
+
+#[[sponsor_links]]
+#name = "Ko-fi"
+#url = "https://ko-fi.com/gamescrobbler"

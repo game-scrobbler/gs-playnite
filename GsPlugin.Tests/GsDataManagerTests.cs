@@ -7,7 +7,7 @@ using GsPlugin.Models;
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]
     public class GsDataManagerTests {
-        private string CreateTempDir() {
+        private static string CreateTempDir() {
             var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             Directory.CreateDirectory(dir);
             return dir;
@@ -463,7 +463,7 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public void PeekPendingScrobbles_ReturnsSnapshotWithoutRemoving() {
+        public static void PeekPendingScrobbles_ReturnsSnapshotWithoutRemoving() {
             var tempDir = CreateTempDir();
             try {
                 GsDataManager.Initialize(tempDir, null);

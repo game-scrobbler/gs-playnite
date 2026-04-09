@@ -167,7 +167,7 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public async Task MockClient_FlushPendingScrobblesAsync_DoesNotThrow() {
+        public static async Task MockClient_FlushPendingScrobblesAsync_DoesNotThrow() {
             IGsApiClient client = new MockGsApiClient();
             // Should complete without throwing
             await client.FlushPendingScrobblesAsync();
