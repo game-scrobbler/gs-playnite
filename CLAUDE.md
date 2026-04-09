@@ -4,25 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Game Scrobbler is a Playnite plugin that tracks game sessions and provides statistics visualization. It's the official Playnite plugin for GameScrobbler. It's built as a .NET Framework 4.6.2 C# project using the Playnite SDK.
+Game Scrobbler is a Playnite plugin that tracks game sessions and provides statistics visualization. It's the official Playnite plugin for GameScrobbler. It's built as a .NET 10 SDK-style C# project targeting `net10.0-windows`, using the Playnite 11 SDK.
 
 ## Build & Development Commands
 
-- **Build solution**: `MSBuild.exe GsPlugin.sln -p:Configuration=Release -restore`
-- **Restore NuGet packages**: `nuget restore GsPlugin.sln`
+- **Build project**: `dotnet build GsPlugin.csproj -p:Configuration=Release`
 - **Format code**: `dotnet format GsPlugin.sln`
 - **Verify formatting**: `dotnet format GsPlugin.sln --verify-no-changes`
-- **Run all tests**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` (build with MSBuild first)
-- **Run a single test**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~ClassName.MethodName"`
+- **Run all tests**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --verbosity normal`
+- **Run a single test**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --filter "FullyQualifiedName~ClassName.MethodName"`
 - **Setup git hooks**: `powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1`
 - **Manual formatting**: `powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1`
-- **Pack plugin**: `Playnite\Toolbox.exe pack "bin\Release" "PackingOutput"`
+- **Pack plugin**: `Playnite\Toolbox.exe pack "bin\Release\net10.0-windows" "PackingOutput"` (produces `.pext2`)
 
 ## Architecture Overview
 
 ### Project Structure
 ```
-GsPlugin.cs              — Entry point (namespace: GsPlugin)
+GsPlugin.cs              — Entry point (namespace: GsPlugin); extends Plugin (P11)
 │
 ├── Api/                 — namespace: GsPlugin.Api
 │   ├── ApiResult.cs         — Generic API result wrapper
@@ -39,7 +38,7 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │   ├── GsPlayniteAchievementsHelper.cs — Playnite Achievements addon integration (direct SQLite reads)
 │   ├── GsAccountLinkingService.cs   — Account linking operations
 │   ├── GsNotificationService.cs      — Server notification fetch and display
-│   ├── GsUriHandler.cs              — Deep link processing
+│   ├── GsUriHandler.cs              — Deep link processing (Func<PlayniteUriEventArgs, Task>)
 │   └── GsUpdateChecker.cs           — Plugin update checking
 │
 ├── Models/              — namespace: GsPlugin.Models
@@ -48,18 +47,25 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │   └── GsPluginSettings.cs  — Settings data model and view model
 │
 ├── Infrastructure/      — namespace: GsPlugin.Infrastructure
-│   ├── GsLocalization.cs    — XAML resource string lookup helper
+│   ├── GsLocalization.cs    — XAML resource string lookup helper (still used; Fluent migration pending)
 │   ├── GsLogger.cs          — Logging wrapper
 │   └── GsSentry.cs          — Sentry error tracking
 │
+├── Localization/        — Locale resource files
+│   ├── Localization.cs      — Fluent wrapper (Loc / LocalizedString)
+│   └── en_US.xaml (+ ru_RU, pt_BR, de_DE, fr_FR, zh_CN, hi_IN) — still in use until Fluent migration
+│
 ├── View/                — namespace: GsPlugin.View
 │   ├── GsPluginSettingsView.xaml/.cs — Settings UI
-│   └── MySidebarView.xaml/.cs        — Sidebar with WebView2
+│   ├── GsPluginSettingsHandler.cs    — PluginSettingsHandler subclass (P11)
+│   ├── GsDashboardView.cs            — AppViewItem subclass wrapping MySidebarView (P11)
+│   └── MySidebarView.xaml/.cs        — Sidebar WebView2 content
 │
+├── extension.toml       — Extension manifest (replaces extension.yaml)
 ├── scripts/             — PowerShell build/dev scripts
 ├── hooks/               — Git hook scripts
-├── GsPlugin.Tests/      — xUnit test project (net462)
-└── Properties/          — AssemblyInfo.cs
+├── GsPlugin.Tests/      — xUnit test project (net10.0-windows)
+└── Directory.Build.props / global.json — Shared SDK-style build settings
 ```
 
 ### Service Dependency Graph
@@ -96,7 +102,7 @@ GsPlugin (entry point, IDisposable)
 - Runs as fire-and-forget via `FetchNotificationsAfterTokenAsync()` which awaits `EnsureInstallTokenAsync()` first, ensuring the install token is available before fetching. Never blocks the startup critical path.
 - Auth: `x-playnite-token` header only — no `user_id`/`install_id` fallback.
 - `GetNotifications()` in `GsApiClient` intentionally bypasses the shared circuit breaker so notification failures cannot affect core sync/scrobble paths.
-- UI thread safety: notifications are collected on the background thread, then marshaled onto `Application.Current.Dispatcher.Invoke()` for `Notifications.Add()` calls. The dispatcher invoke is wrapped in try/catch so a dispatcher fault does not surface as a false Sentry error.
+- UI thread safety: in P11, `Notifications.Add()` no longer requires explicit UI-thread marshalling — the old `Application.Current.Dispatcher.Invoke()` wrapper has been removed.
 - `GsDataManager.GetShownNotificationIds()` returns a lock-protected snapshot; `RecordShownNotifications()` atomically appends and persists under `_lock`, preventing cross-thread races with concurrent startup writes.
 - `ShownNotificationIds` is capped at 100 entries and cleared on `RotateInstallId()` alongside other identity-bound state.
 - Action URL handling: `gs://settings` opens plugin settings via `OpenPluginSettings(Id)`, `gs://addons` opens the add-ons dialog, `https://` URLs are opened in the browser but only for trusted hosts (`gamescrobbler.com`, `playnite.link`). Plain `http://` and untrusted hosts are rejected.
@@ -124,9 +130,9 @@ GsPlugin (entry point, IDisposable)
 Achievement data comes from two optional addons via an aggregator pattern:
 - `IAchievementProvider` — common interface (`GetCounts`, `GetAchievements`, `IsInstalled`)
 - `GsSuccessStoryHelper` — reads SuccessStory's per-game JSON files from `{ExtensionsDataPath}/{pluginGuid}/SuccessStory/{gameId}.json` (priority 1)
-- `GsPlayniteAchievementsHelper` — reads Playnite Achievements' SQLite database at `{ExtensionsDataPath}/{pluginGuid}/achievement_cache.db` via `System.Data.SQLite` in read-only mode (priority 2)
+- `GsPlayniteAchievementsHelper` — reads Playnite Achievements' SQLite database at `{ExtensionsDataPath}/{pluginGuid}/achievement_cache.db` via `System.Data.SQLite` in read-only mode (priority 2; migration to `Microsoft.Data.Sqlite` is a future step)
 - `GsAchievementAggregator` — iterates providers in order; first with data wins. Skips `(0, 0)` results to allow fallback.
-- `PluginVersionHelper` — reads version from `extension.yaml` next to the plugin DLL; shared by both providers for `GetVersion()`.
+- `PluginVersionHelper` — reads version from `extension.toml` next to the plugin DLL; shared by both providers for `GetVersion()`.
 - `IsInstalled` checks data directory/file existence on disk, not plugin presence in `_api.Addons.Plugins`.
 - `System.Data.SQLite.Core` NuGet package ships native `SQLite.Interop.dll` (x86/x64) via build targets.
 
@@ -142,17 +148,23 @@ Achievement data comes from two optional addons via an aggregator pattern:
 - `GsPluginSettingsViewModel` exposes diagnostic properties: `IsInstallTokenActive`, `PendingScrobbleCount`, `HasPendingScrobbles`.
 
 ### Test Project
-- **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
+- **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, `net10.0-windows` — must match main project TFM because it references it)
+- 301 tests pass against the P11 SDK.
 - Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `PlayniteAchievementsSqliteTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`
 - `GsDataManagerTests` and `GsDataTests` include coverage for install-token persistence, `IdentityGeneration`, `RotateInstallId()`, `SetInstallTokenIfActive()`, `InstallIdForBody`, opt-out token clearing, and `RecordShownNotifications()`/`GetShownNotificationIds()` thread-safe notification state.
+- `InternalsVisibleTo` is declared via `<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">` in an `<ItemGroup>` in `GsPlugin.csproj` — **not** via `<PropertyGroup>` (which does not work for SDK-style projects).
 
 ## Build Environment
 
-- Targets .NET Framework 4.6.2 (old-style .csproj — requires Visual Studio MSBuild, not `dotnet build`)
-- XAML code-gen (WPF `PresentationBuildTasks`) requires the full `MSBuild.exe` from VS Build Tools or a full VS install; `dotnet msbuild` does **not** generate `.g.cs` files for old-style WPF projects, so View code-behind will fail to compile without it
-- Test project uses SDK-style .csproj and can be built/run with `dotnet test`
+- Targets `net10.0-windows` — SDK-style csproj; use `dotnet build GsPlugin.csproj` (not `MSBuild.exe`)
+- Both main project and test project use SDK-style csproj; `dotnet test` works directly without a prior MSBuild step
+- XAML code-gen (`GenerateTemporaryTargetAssembly`) in the SDK-style WPF project compiles all `<Compile>` items in the project; the test project files are excluded via `<Compile Remove="GsPlugin.Tests\**\*.cs" />` in `Directory.Build.props` or the main csproj to prevent double-compilation
+- `TreatWarningsAsErrors=true` is set for Release builds; `CA1822` (mark member static) is listed in `WarningsNotAsErrors` to avoid false positives on plugin override methods
+- `ServicePointManager` is not available on .NET 10 (SYSLIB0014) — do not use it; TLS 1.2+ is the default
 - API endpoints: All builds (Debug and Release) use the production URL `api.gamescrobbler.com`
-- When upgrading NuGet packages, only upgrade to versions that explicitly ship a `net462` (or `net461`/`net45`) lib folder. Do not rely on netstandard2.0 fallbacks for core runtime packages.
+- Extension manifest: `extension.toml` (TOML) replaces the old `extension.yaml`; packed output is `.pext2`
+- NuGet feed: `https://nuget.playnite.link/v3/index.json` is required for `Playnite.SDK 11.0.0-alpha*` packages (configured in `nuget.config`)
+- When upgrading NuGet packages, prefer packages with a `net10.0` or `net8.0` target; avoid packages that only ship `netstandard2.0` without native AOT or trimming support if the package involves native interop
 
 ## Important Notes
 
@@ -173,23 +185,32 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks
 
 **Never use `--no-verify` when pushing or committing.** Git hooks enforce formatting and commit message standards; bypassing them is not allowed.
 
-### Playnite Plugin Hosting Constraints
-- Playnite loads plugins in its own AppDomain and **ignores plugin-level `app.config` binding redirects**. Assembly version mismatches must be resolved at runtime via the `AppDomain.CurrentDomain.AssemblyResolve` handler in `GsPlugin`'s static constructor.
-- When upgrading a NuGet package version, the plugin's dependencies (e.g., Sentry) may still reference the old assembly version. The `AssemblyResolve` handler in `GsPlugin.cs` handles this by loading whatever DLL version exists in the plugin's output directory.
+### Playnite Plugin Hosting Constraints (P11)
+- Playnite 11 loads plugins under .NET 10 — the old `AppDomain.CurrentDomain.AssemblyResolve` handler and `app.config` binding redirects are **gone**; do not re-add them.
+- The plugin base class is `Plugin` (not `GenericPlugin`). Entry point is `InitializeAsync(InitializeArgs args)`; dispose is `async ValueTask DisposeAsync()`.
+- `IPlayniteAPI` is obtained from `args.Api` inside `InitializeAsync` — there is no constructor injection in P11.
 - After building, the extension folder in `%APPDATA%\Playnite\Extensions\<plugin-guid>\` must contain the updated DLLs. Stale DLLs from a previous version will cause `FileNotFoundException` at runtime.
 - `GsSentry` methods (`CaptureException`, `CaptureMessage`, `AddBreadcrumb`) use `GsDataManager.DataOrNull` instead of `GsDataManager.Data` to avoid a circular crash when called during `GsDataManager.Initialize()` before `_data` is assigned.
 - All `SentrySdk` calls are wrapped in try/catch so the plugin continues working if the Sentry SDK is unavailable (e.g., expired account). `GsApiClient` similarly falls back to a plain `HttpClient` if `SentryHttpMessageHandler` throws.
 - `MaxBreadcrumbs` is capped at 50 (default 100) to reduce per-session memory overhead.
+- `IDialogs.ShowMessage` (sync) is removed in P11 — use `await IDialogs.ShowMessageAsync(...)` for informational dialogs; for Yes/No prompts use `System.Windows.MessageBox.Show()` and qualify the result type as `System.Windows.MessageBoxResult` to avoid ambiguity with `Playnite.MessageBoxResult`.
+- `GetAppMenuItems` matches menu items via `args.ItemId` string comparison (not `args.Descriptors` iteration); menu items are created with `MenuItemImpl(name, asyncAction)`.
+- `GetAppViewItem` matches via `args.ViewId` (not `args.ItemId`).
+- App view icons use `UIIcon.FromBitmapFile(path)` or `UIIcon.FromFontIcon(code, Playnite.Fonts.NerdFont)`.
+- `CollectionItemUpdateData<T>.NewData` is the property to read the updated item from `OnLibraryUpdated`-style events.
 
-### Playnite SDK Type Gotchas
+### Playnite SDK Type Gotchas (P11)
 - `Game.Playtime` and `Game.PlayCount` are `ulong` — cast explicitly to `long`/`int` when assigning to DTO fields (no implicit conversion).
 - `Game.CompletionStatusId` defaults to `Guid.Empty` (not `null`) when unset — guard with `g.CompletionStatusId != Guid.Empty` before calling `.ToString()`.
 - `Game.CompletionStatus` is a user-defined named object (not an enum) with a `.Name` string property; access null-safely (`g.CompletionStatus?.Name`).
-- Adding a new `.cs` file requires a `<Compile Include="Folder\FileName.cs" />` entry in `GsPlugin.csproj` (old-style non-SDK project — files are not auto-included). Place files in the appropriate namespace folder (`Api/`, `Services/`, `Models/`, `Infrastructure/`, `View/`).
+- `Game.Id` is `string` in P11 (was `Guid` in P10). Use `Guid.TryParse(g.Id, out var guid)` before passing to any method that expects a `Guid`.
+- `Game.ReleaseDate` is `Playnite.PartialDate?` in P11 — a **class** (reference type), not a struct. Check `!= null`, not `.HasValue`. Its properties are `int Year`, `int? Month`, `int? Day`.
+- `Game.LibraryId` (was `Game.PluginId` in P10), `Game.LibraryGameId` (was `Game.GameId`), `Game.PlayTime` (was `Game.Playtime`), `Game.LastPlayedDate` (was `Game.LastActivity`), `Game.AddedDate` (was `Game.Added`), `Game.ModifiedDate` (was `Game.Modified`).
+- New `.cs` files are auto-included in SDK-style projects — no manual `<Compile Include=.../>` entries needed. Place files in the appropriate namespace folder (`Api/`, `Services/`, `Models/`, `Infrastructure/`, `View/`).
 - New `.cs` files written with LF line endings will fail `dotnet format --verify-no-changes`; run `dotnet format` to auto-correct to CRLF.
 
 ### Sentry Release Management
-- Runtime: Plugin reports version as `GsPlugin@X.Y.Z` from AssemblyInfo
+- Runtime: Plugin reports version as `GsPlugin@X.Y.Z` from `extension.toml`
 - CI/CD: GitHub Actions creates Sentry releases, uploads portable PDB files (`--type=portablepdb`), and associates commits
-- release-please keeps versions synchronized across `AssemblyInfo.cs`, `extension.yaml`, and manifests
+- release-please keeps versions synchronized across `extension.toml` and manifests
 - Only runs when release-please creates a GitHub release (conditional on `${{ steps.release.outputs.release_created }}`)
