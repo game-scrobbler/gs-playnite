@@ -268,3 +268,9 @@ PackingOutput/
 /qodana.yaml
 /.sentryclirc
 .claude/
+
+# MSBuild binary logs
+*.binlog
+
+# Playnite-generated localization code
+Localization/Localization.g.cs
