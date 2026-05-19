@@ -250,6 +250,7 @@ namespace GsPlugin.Tests {
                 updated = new List<GameSyncDto> { new GameSyncDto { game_id = "g2" } },
                 removed = new List<string> { "playnite-id-3" },
                 base_snapshot_hash = "abc123",
+                result_snapshot_hash = "def456",
                 flags = new[] { "no-sentry" }
             };
 
@@ -258,6 +259,7 @@ namespace GsPlugin.Tests {
             Assert.Single(req.updated);
             Assert.Single(req.removed);
             Assert.Equal("abc123", req.base_snapshot_hash);
+            Assert.Equal("def456", req.result_snapshot_hash);
         }
 
         // --- v2 Achievement DTO tests ---

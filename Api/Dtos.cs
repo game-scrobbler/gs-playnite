@@ -132,7 +132,16 @@ namespace GsPlugin.Api {
         public List<GameSyncDto> added { get; set; }
         public List<GameSyncDto> updated { get; set; }
         public List<string> removed { get; set; }
+        /// <summary>Hash of the library *before* this diff (the previous synced baseline).</summary>
         public string base_snapshot_hash { get; set; }
+        /// <summary>
+        /// Hash of the library *after* this diff (the current full-library state).
+        /// The server stores this verbatim as the next baseline instead of
+        /// reconstructing it from persisted rows — exact even for games the
+        /// server never persists (e.g. Humble bundle extras). Old plugins omit
+        /// this field and fall back to server-side reconstruction.
+        /// </summary>
+        public string result_snapshot_hash { get; set; }
         public string[] flags { get; set; }
         public List<Services.IntegrationAccountDto> integration_accounts { get; set; }
     }

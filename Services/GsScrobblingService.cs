@@ -596,6 +596,9 @@ namespace GsPlugin.Services {
                     updated = updated,
                     removed = removed.ToList(),
                     base_snapshot_hash = GsDataManager.Data.LastLibraryHash ?? "",
+                    // libraryHash is computed over the current (post-diff) library, so it is
+                    // the exact baseline for the server to store — no DB reconstruction needed.
+                    result_snapshot_hash = libraryHash,
                     flags = GsDataManager.Data.Flags.ToArray(),
                     integration_accounts = integrationAccounts.Count > 0 ? integrationAccounts : null
                 });
