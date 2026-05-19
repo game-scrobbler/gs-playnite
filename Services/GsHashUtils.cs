@@ -45,8 +45,15 @@ namespace GsPlugin.Services {
 
         /// <summary>
         /// Computes a SHA-256 hex digest of per-game metadata for diff detection.
-        /// Includes all DTO fields except activity fields (playtime, play_count, last_activity)
-        /// which are already covered by the library-level hash key.
+        /// Operates over the slim v3 GameSyncDto field set — the server's IGDB
+        /// canonical layer owns genre/theme/company/score/release-date metadata
+        /// (per ADR-011 in gs-mono), so those fields are not sent or hashed.
+        /// Includes all DTO fields except activity fields (playtime, play_count,
+        /// last_activity) which are already covered by the library-level hash key.
+        ///
+        /// Must produce the **exact same output** as server-side
+        /// computeGameMetadataHashV3() in
+        /// gs-mono/apps/backend/src/services/playnite/playniteUtils/hashUtils.ts.
         /// </summary>
         public static string ComputeGameMetadataHash(GameSyncDto g) {
             var sb = new StringBuilder();
@@ -58,35 +65,7 @@ namespace GsPlugin.Services {
             sb.Append('|');
             sb.Append(g.is_installed ? "1" : "0");
             sb.Append('|');
-            sb.Append(g.genres != null ? string.Join(",", g.genres) : "");
-            sb.Append('|');
-            sb.Append(g.platforms != null ? string.Join(",", g.platforms) : "");
-            sb.Append('|');
-            sb.Append(g.developers != null ? string.Join(",", g.developers) : "");
-            sb.Append('|');
-            sb.Append(g.publishers != null ? string.Join(",", g.publishers) : "");
-            sb.Append('|');
-            sb.Append(g.tags != null ? string.Join(",", g.tags) : "");
-            sb.Append('|');
-            sb.Append(g.features != null ? string.Join(",", g.features) : "");
-            sb.Append('|');
-            sb.Append(g.categories != null ? string.Join(",", g.categories) : "");
-            sb.Append('|');
-            sb.Append(g.series != null ? string.Join(",", g.series) : "");
-            sb.Append('|');
-            sb.Append(g.age_ratings != null ? string.Join(",", g.age_ratings) : "");
-            sb.Append('|');
-            sb.Append(g.regions != null ? string.Join(",", g.regions) : "");
-            sb.Append('|');
-            sb.Append(g.release_date ?? "");
-            sb.Append('|');
-            sb.Append(g.release_year?.ToString() ?? "");
-            sb.Append('|');
             sb.Append(g.user_score?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.critic_score?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.community_score?.ToString() ?? "");
             sb.Append('|');
             sb.Append(g.source_name ?? "");
             sb.Append('|');

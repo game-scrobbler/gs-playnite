@@ -134,40 +134,20 @@ namespace GsPlugin.Tests {
                 GsHashUtils.ComputeLibraryHash(after));
         }
 
-        [Fact]
-        public void ComputeLibraryHash_GenreChange_ProducesDifferentHash() {
-            var before = new List<GameSyncDto> {
-                new GameSyncDto {
-                    playnite_id = "aaaaaaaa-0000-0000-0000-000000000001",
-                    playtime_seconds = 100,
-                    play_count = 1,
-                    last_activity = null,
-                    genres = new List<string> { "Action" }
-                }
-            };
-            var after = new List<GameSyncDto> {
-                new GameSyncDto {
-                    playnite_id = "aaaaaaaa-0000-0000-0000-000000000001",
-                    playtime_seconds = 100,
-                    play_count = 1,
-                    last_activity = null,
-                    genres = new List<string> { "Action", "RPG" }
-                }
-            };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeLibraryHash(before),
-                GsHashUtils.ComputeLibraryHash(after));
-        }
-
         /// <summary>
         /// Validates the exact SHA-256 output against a known value.
         /// The library hash key format is "{playnite_id}:{playtime_seconds}:{play_count}:{last_activity}:{metadata_hash}".
         /// Keys are sorted, each key + "|" fed to SHA-256 incrementally.
         ///
-        /// Input: one game with playnite_id="abc", playtime_seconds=0, play_count=0, last_activity=null, all metadata defaults
-        /// Metadata hash includes all DTO fields (26 fields pipe-separated); booleans default to "0".
-        /// Verified against Node.js reference implementation.
+        /// Input: one game with playnite_id="abc", playtime_seconds=0, play_count=0,
+        /// last_activity=null, all metadata defaults. The v3 slim metadata hash is
+        /// computed over 12 pipe-separated fields (game_name, completion_status_id,
+        /// completion_status_name, is_installed, user_score, source_name, is_favorite,
+        /// is_hidden, date_added, modified, achievement_count_unlocked,
+        /// achievement_count_total); booleans default to "0".
+        ///
+        /// Verified against Node.js reference implementation (server-side
+        /// createLibraryHashV3 in gs-mono).
         /// </summary>
         [Fact]
         public void ComputeLibraryHash_KnownInput_MatchesExpectedHash() {
@@ -180,7 +160,7 @@ namespace GsPlugin.Tests {
                 }
             };
 
-            const string expected = "262c8283df39850de9ee82fd42c57d55a9a6aed42029808e1400dc33c4655e8d";
+            const string expected = "428b0b563048984da73ee30ef54036b677950d3139834b615f3b409d54a167dd";
             Assert.Equal(expected, GsHashUtils.ComputeLibraryHash(library));
         }
     }

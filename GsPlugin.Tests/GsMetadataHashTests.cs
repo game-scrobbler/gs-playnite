@@ -47,16 +47,6 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public void ComputeGameMetadataHash_PlatformChange_ProducesDifferentHash() {
-            var before = new GameSyncDto { platforms = new List<string> { "PC" } };
-            var after = new GameSyncDto { platforms = new List<string> { "PC", "PlayStation" } };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeGameMetadataHash(before),
-                GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
         public void ComputeGameMetadataHash_AchievementCountChange_ProducesDifferentHash() {
             var before = new GameSyncDto { achievement_count_unlocked = 5, achievement_count_total = 10 };
             var after = new GameSyncDto { achievement_count_unlocked = 6, achievement_count_total = 10 };
@@ -97,46 +87,6 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public void ComputeGameMetadataHash_CriticScoreChange_ProducesDifferentHash() {
-            var before = new GameSyncDto { critic_score = 75 };
-            var after = new GameSyncDto { critic_score = 85 };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeGameMetadataHash(before),
-                GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
-        public void ComputeGameMetadataHash_CommunityScoreChange_ProducesDifferentHash() {
-            var before = new GameSyncDto { community_score = 70 };
-            var after = new GameSyncDto { community_score = 60 };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeGameMetadataHash(before),
-                GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
-        public void ComputeGameMetadataHash_ReleaseDateChange_ProducesDifferentHash() {
-            var before = new GameSyncDto { release_date = "2020-01-01" };
-            var after = new GameSyncDto { release_date = "2021-06-15" };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeGameMetadataHash(before),
-                GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
-        public void ComputeGameMetadataHash_ReleaseYearChange_ProducesDifferentHash() {
-            var before = new GameSyncDto { release_year = 2020 };
-            var after = new GameSyncDto { release_year = 2021 };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeGameMetadataHash(before),
-                GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
         public void ComputeGameMetadataHash_SourceNameChange_ProducesDifferentHash() {
             var before = new GameSyncDto { source_name = "Steam" };
             var after = new GameSyncDto { source_name = "GOG" };
@@ -157,26 +107,6 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
-        public void ComputeGameMetadataHash_GenreChange_ProducesDifferentHash() {
-            var before = new GameSyncDto { genres = new List<string> { "Action" } };
-            var after = new GameSyncDto { genres = new List<string> { "Action", "RPG" } };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeGameMetadataHash(before),
-                GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
-        public void ComputeGameMetadataHash_TagChange_ProducesDifferentHash() {
-            var before = new GameSyncDto { tags = new List<string> { "Singleplayer" } };
-            var after = new GameSyncDto { tags = new List<string> { "Multiplayer" } };
-
-            Assert.NotEqual(
-                GsHashUtils.ComputeGameMetadataHash(before),
-                GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
         public void ComputeGameMetadataHash_DateAddedChange_ProducesDifferentHash() {
             var before = new GameSyncDto { date_added = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
             var after = new GameSyncDto { date_added = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc) };
@@ -184,17 +114,6 @@ namespace GsPlugin.Tests {
             Assert.NotEqual(
                 GsHashUtils.ComputeGameMetadataHash(before),
                 GsHashUtils.ComputeGameMetadataHash(after));
-        }
-
-        [Fact]
-        public void ComputeGameMetadataHash_NullVsEmptyGenres_ProducesDifferentHash() {
-            var withNull = new GameSyncDto { genres = null };
-            var withEmpty = new GameSyncDto { genres = new List<string>() };
-
-            // null genres serialize as "" while empty list serializes as "" — should be same
-            Assert.Equal(
-                GsHashUtils.ComputeGameMetadataHash(withNull),
-                GsHashUtils.ComputeGameMetadataHash(withEmpty));
         }
 
         [Fact]

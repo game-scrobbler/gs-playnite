@@ -173,22 +173,7 @@ namespace GsPlugin.Tests {
             await client.FlushPendingScrobblesAsync();
         }
 
-        // --- GameSyncDto DTO tests ---
-
-        [Fact]
-        public void GameSyncDto_CollectionFields_DefaultToNull() {
-            var dto = new GameSyncDto();
-            Assert.Null(dto.genres);
-            Assert.Null(dto.platforms);
-            Assert.Null(dto.developers);
-            Assert.Null(dto.publishers);
-            Assert.Null(dto.tags);
-            Assert.Null(dto.features);
-            Assert.Null(dto.categories);
-            Assert.Null(dto.series);
-            Assert.Null(dto.age_ratings);
-            Assert.Null(dto.regions);
-        }
+        // --- GameSyncDto DTO tests (slim v3 shape — see ADR-011 in gs-mono) ---
 
         [Fact]
         public void GameSyncDto_AchievementFields_DefaultToNull() {
@@ -212,62 +197,32 @@ namespace GsPlugin.Tests {
                 completion_status_name = "Completed",
                 achievement_count_unlocked = 10,
                 achievement_count_total = 50,
-                genres = new List<string> { "RPG", "Action" },
-                platforms = new List<string> { "PC" },
-                developers = new List<string> { "Dev Studio" },
-                publishers = new List<string> { "Publisher Inc" },
-                tags = new List<string> { "tag1" },
-                features = new List<string> { "feature1" },
-                categories = new List<string> { "cat1" },
-                series = new List<string> { "Series A" },
                 user_score = 85,
-                critic_score = 90,
-                community_score = 80,
-                release_year = 2024,
                 date_added = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 is_favorite = true,
                 is_hidden = false,
                 source_name = "Steam",
-                release_date = "2024-06-15",
-                modified = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc),
-                age_ratings = new List<string> { "PEGI 16" },
-                regions = new List<string> { "World" }
+                modified = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc)
             };
 
             Assert.Equal("Test Game", dto.game_name);
             Assert.Equal(3600, dto.playtime_seconds);
             Assert.Equal(10, dto.achievement_count_unlocked);
             Assert.Equal(50, dto.achievement_count_total);
-            Assert.Equal(2, dto.genres.Count);
-            Assert.Contains("RPG", dto.genres);
-            Assert.Equal("PC", dto.platforms[0]);
             Assert.Equal(85, dto.user_score);
-            Assert.Equal(90, dto.critic_score);
-            Assert.Equal(80, dto.community_score);
-            Assert.Equal(2024, dto.release_year);
             Assert.True(dto.is_favorite);
             Assert.False(dto.is_hidden);
             Assert.Equal("Steam", dto.source_name);
-            Assert.Equal("2024-06-15", dto.release_date);
             Assert.NotNull(dto.modified);
-            Assert.Single(dto.age_ratings);
-            Assert.Equal("PEGI 16", dto.age_ratings[0]);
-            Assert.Single(dto.regions);
         }
 
         [Fact]
         public void GameSyncDto_MetadataFields_DefaultToNull() {
             var dto = new GameSyncDto();
             Assert.Null(dto.user_score);
-            Assert.Null(dto.critic_score);
-            Assert.Null(dto.community_score);
-            Assert.Null(dto.release_year);
             Assert.Null(dto.date_added);
             Assert.Null(dto.source_name);
-            Assert.Null(dto.release_date);
             Assert.Null(dto.modified);
-            Assert.Null(dto.age_ratings);
-            Assert.Null(dto.regions);
         }
 
         // --- v2 Library sync DTO tests ---

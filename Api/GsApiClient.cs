@@ -289,7 +289,7 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/library/sync-full";
+            string url = $"{_apiBaseUrl}/api/playnite/v3/library/sync-full";
             return await _circuitBreaker.ExecuteAsync(async () => {
                 return await PostJsonAsync<AsyncQueuedResponse>(url, req, true);
             }, maxRetries: 1, isFailure: r => r == null);
@@ -305,7 +305,7 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/library/sync-diff";
+            string url = $"{_apiBaseUrl}/api/playnite/v3/library/sync-diff";
             return await _circuitBreaker.ExecuteAsync(async () => {
                 return await PostJsonAsync<AsyncQueuedResponse>(url, req, true);
             }, maxRetries: 1, isFailure: r => r == null);

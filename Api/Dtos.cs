@@ -84,6 +84,19 @@ namespace GsPlugin.Api {
     // Library Sync DTOs
     // ──────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Slim sync DTO sent to the v3 library sync endpoints.
+    ///
+    /// Per ADR-011 (gs-mono), IGDB is the single source of truth for game
+    /// metadata (genres, themes, companies, scores, release dates, etc.).
+    /// The server reads those fields from the canonical `games` layer via
+    /// IGDB joins; the plugin no longer needs to send them.
+    ///
+    /// Fields removed vs the previous v2 GameSyncDto:
+    ///   genres, platforms, developers, publishers, tags, features,
+    ///   categories, series, age_ratings, regions, critic_score,
+    ///   community_score, release_year, release_date.
+    /// </summary>
     public class GameSyncDto {
         public string game_id { get; set; }
         public string plugin_id { get; set; }
@@ -97,26 +110,12 @@ namespace GsPlugin.Api {
         public string completion_status_name { get; set; }
         public int? achievement_count_unlocked { get; set; }
         public int? achievement_count_total { get; set; }
-        public List<string> genres { get; set; }
-        public List<string> platforms { get; set; }
-        public List<string> developers { get; set; }
-        public List<string> publishers { get; set; }
-        public List<string> tags { get; set; }
-        public List<string> features { get; set; }
-        public List<string> categories { get; set; }
-        public List<string> series { get; set; }
         public int? user_score { get; set; }
-        public int? critic_score { get; set; }
-        public int? community_score { get; set; }
-        public int? release_year { get; set; }
         public DateTime? date_added { get; set; }
         public bool is_favorite { get; set; }
         public bool is_hidden { get; set; }
         public string source_name { get; set; }
-        public string release_date { get; set; }
         public DateTime? modified { get; set; }
-        public List<string> age_ratings { get; set; }
-        public List<string> regions { get; set; }
     }
 
     public class LibraryFullSyncReq {

@@ -308,43 +308,21 @@ namespace GsPlugin.Services {
 
 
 
-        /// <summary>
-        /// Builds an ISO 8601 date string from a Playnite ReleaseDate struct.
-        /// Returns "YYYY-MM-DD" when day and month are known, "YYYY" when only year is known, or null.
-        /// </summary>
-        private static string BuildReleaseDateString(Playnite.SDK.Models.ReleaseDate? rd) {
-            if (!rd.HasValue || rd.Value.Year == 0)
-                return null;
-            var v = rd.Value;
-            if (v.Month > 0 && v.Day > 0)
-                return $"{v.Year:D4}-{v.Month:D2}-{v.Day:D2}";
-            return v.Year.ToString("D4");
-        }
-
-
-        #region v2 Sync Methods
+        #region v3 Sync Methods
 
         /// <summary>
-        /// Maps a Playnite Game to the API DTO. Shared by all sync paths.
+        /// Maps a Playnite Game to the slim v3 sync DTO.
+        /// Genre/theme/company/score/release-date metadata is intentionally
+        /// not mapped — see ADR-011 in gs-mono.
         /// </summary>
-        /// <summary>
-        /// Safely extracts names from a Playnite collection, filtering out null entries.
-        /// Returns null for empty or null collections.
-        /// </summary>
-        private static List<string> SafeNames<T>(IEnumerable<T> items) where T : Playnite.SDK.Models.DatabaseObject {
-            if (items == null) return null;
-            var list = new List<string>();
-            foreach (var item in items) {
-                if (item?.Name != null) list.Add(item.Name);
-            }
-            return list.Count > 0 ? list : null;
-        }
-
         private GameSyncDto MapGameToDto(Playnite.SDK.Models.Game g, bool syncAchievements) {
             var achievementCounts = syncAchievements
                 ? _achievementHelper.GetCounts(g.Id)
                 : null;
 
+            // v3 slim DTO — IGDB owns genre/theme/company/score/release-date
+            // metadata server-side, so we only ship identity, activity, and
+            // per-user state fields. See ADR-011 in gs-mono.
             return new GameSyncDto {
                 game_id = g.GameId,
                 plugin_id = g.PluginId.ToString(),
@@ -360,26 +338,12 @@ namespace GsPlugin.Services {
                 completion_status_name = g.CompletionStatus?.Name,
                 achievement_count_unlocked = achievementCounts?.unlocked,
                 achievement_count_total = achievementCounts?.total,
-                genres = SafeNames(g.Genres),
-                platforms = SafeNames(g.Platforms),
-                developers = SafeNames(g.Developers),
-                publishers = SafeNames(g.Publishers),
-                tags = SafeNames(g.Tags),
-                features = SafeNames(g.Features),
-                categories = SafeNames(g.Categories),
-                series = SafeNames(g.Series),
                 user_score = g.UserScore,
-                critic_score = g.CriticScore,
-                community_score = g.CommunityScore,
-                release_year = g.ReleaseDate?.Year,
                 date_added = g.Added,
                 is_favorite = g.Favorite,
                 is_hidden = g.Hidden,
                 source_name = g.Source?.Name,
-                release_date = BuildReleaseDateString(g.ReleaseDate),
-                modified = g.Modified,
-                age_ratings = SafeNames(g.AgeRatings),
-                regions = SafeNames(g.Regions)
+                modified = g.Modified
             };
         }
 
