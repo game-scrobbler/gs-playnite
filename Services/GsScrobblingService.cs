@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using GsPlugin.Api;
+using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 
 namespace GsPlugin.Services {
@@ -539,6 +540,7 @@ namespace GsPlugin.Services {
             }
             catch (Exception ex) {
                 _logger.Error(ex, "Error in SyncLibraryFullAsync");
+                GsSentry.CaptureException(ex, "SyncLibraryFullAsync: unexpected exception");
                 return SyncLibraryResult.Error;
             }
         }
@@ -643,6 +645,7 @@ namespace GsPlugin.Services {
             }
             catch (Exception ex) {
                 _logger.Error(ex, "Error in SyncLibraryDiffAsync");
+                GsSentry.CaptureException(ex, "SyncLibraryDiffAsync: unexpected exception");
                 return SyncLibraryResult.Error;
             }
         }
@@ -753,6 +756,7 @@ namespace GsPlugin.Services {
             }
             catch (Exception ex) {
                 _logger.Error(ex, "Error in SyncAchievementsFullAsync");
+                GsSentry.CaptureException(ex, "SyncAchievementsFullAsync: unexpected exception");
                 return SyncLibraryResult.Error;
             }
         }
@@ -996,6 +1000,7 @@ namespace GsPlugin.Services {
             }
             catch (Exception ex) {
                 _logger.Error(ex, "Error in SyncAchievementsDiffAsync");
+                GsSentry.CaptureException(ex, "SyncAchievementsDiffAsync: unexpected exception");
                 return SyncLibraryResult.Error;
             }
         }

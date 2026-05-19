@@ -242,6 +242,7 @@ namespace GsPlugin.Api {
                     }
                     catch (Exception ex) {
                         _logger.Error(ex, $"Exception flushing pending scrobble (type={item.Type}, queued={item.QueuedAt:O})");
+                        GsSentry.CaptureException(ex, $"FlushPendingScrobblesAsync: unexpected exception (type={item.Type})");
                     }
 
                     if (success) {
@@ -374,7 +375,9 @@ namespace GsPlugin.Api {
                         return JsonSerializer.Deserialize<RegisterInstallTokenRes>(responseBody, _jsonOptions)
                             ?? new RegisterInstallTokenRes { success = false };
                     }
-                    catch {
+                    catch (JsonException jsonEx) {
+                        _logger.Error(jsonEx, $"RegisterInstallToken failed to parse response (status {(int)response.StatusCode})");
+                        GsSentry.CaptureException(jsonEx, $"RegisterInstallToken: JSON parse failed (status {(int)response.StatusCode})");
                         return new RegisterInstallTokenRes { success = false };
                     }
                 }
@@ -570,6 +573,7 @@ namespace GsPlugin.Api {
                     }
                     catch (JsonException jsonEx) {
                         _logger.Error(jsonEx, $"VerifyToken failed to parse response (status {(int)response.StatusCode})");
+                        GsSentry.CaptureException(jsonEx, $"VerifyToken JSON parse failed (status {(int)response.StatusCode})");
                         return null;
                     }
 
