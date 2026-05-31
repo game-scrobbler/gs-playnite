@@ -938,10 +938,51 @@ namespace GsPlugin.Services {
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
 
+                var changedSnapshots = changed
+                    .Where(g => g.achievements != null && g.achievements.Count > 0)
+                    .ToDictionary(
+                        g => g.playnite_id,
+                        g => new GameAchievementSnapshot {
+                            playnite_id = g.playnite_id,
+                            achievements = g.achievements.Select(a => new AchievementSnapshot {
+                                name = a.name,
+                                is_unlocked = a.is_unlocked,
+                                date_unlocked = a.date_unlocked?.ToString("o"),
+                                rarity_percent = a.rarity_percent
+                            }).ToList()
+                        });
+                var allCleared = changed
+                    .Where(g => g.achievements == null || g.achievements.Count == 0)
+                    .Select(g => g.playnite_id)
+                    .Concat(clearedIds)
+                    .ToList();
+
+                // Preview post-diff hash before HTTP so the server can store the same
+                // baseline the plugin will adopt on `status: queued`.
+                var previewSnapshot = new Dictionary<string, GameAchievementSnapshot>(
+                    GsSnapshotManager.GetAchievementsSnapshot());
+                foreach (var kvp in changedSnapshots) {
+                    previewSnapshot[kvp.Key] = kvp.Value;
+                }
+                foreach (var id in allCleared) {
+                    previewSnapshot.Remove(id);
+                }
+                var resultAchievementHash = GsHashUtils.ComputeAchievementHash(
+                    previewSnapshot.Values.Select(snap => new GameAchievementsDto {
+                        playnite_id = snap.playnite_id,
+                        achievements = snap.achievements?.Select(a => new AchievementItemDto {
+                            name = a.name,
+                            is_unlocked = a.is_unlocked,
+                            date_unlocked = a.date_unlocked != null && DateTime.TryParse(a.date_unlocked, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt) ? dt : (DateTime?)null,
+                            rarity_percent = a.rarity_percent
+                        }).ToList() ?? new List<AchievementItemDto>()
+                    }).ToList());
+
                 var response = await _apiClient.SyncAchievementsDiff(new AchievementsDiffSyncReq {
                     user_id = GsDataManager.InstallIdForBody,
                     changed = changed,
-                    base_snapshot_hash = GsDataManager.Data.LastAchievementHash ?? ""
+                    base_snapshot_hash = GsDataManager.Data.LastAchievementHash ?? "",
+                    result_snapshot_hash = resultAchievementHash
                 });
 
                 if (response == null) {
@@ -959,41 +1000,8 @@ namespace GsPlugin.Services {
                 if (response.success && response.status == "queued") {
                     _logger.Info("Achievement diff sync queued successfully.");
 
-                    // Update snapshot: upsert changed games (with achievements), remove cleared ones
-                    var changedSnapshots = changed
-                        .Where(g => g.achievements != null && g.achievements.Count > 0)
-                        .ToDictionary(
-                            g => g.playnite_id,
-                            g => new GameAchievementSnapshot {
-                                playnite_id = g.playnite_id,
-                                achievements = g.achievements.Select(a => new AchievementSnapshot {
-                                    name = a.name,
-                                    is_unlocked = a.is_unlocked,
-                                    date_unlocked = a.date_unlocked?.ToString("o"),
-                                    rarity_percent = a.rarity_percent
-                                }).ToList()
-                            });
-                    // Combine games sent with empty achievements and games removed from library
-                    var allCleared = changed
-                        .Where(g => g.achievements == null || g.achievements.Count == 0)
-                        .Select(g => g.playnite_id)
-                        .Concat(clearedIds)
-                        .ToList();
                     GsSnapshotManager.ApplyAchievementsDiff(changedSnapshots, allCleared);
-
-                    // Recompute achievement hash from the full updated snapshot
-                    var updatedSnapshot = GsSnapshotManager.GetAchievementsSnapshot();
-                    var snapshotAsDtos = updatedSnapshot.Values.Select(snap => new GameAchievementsDto {
-                        playnite_id = snap.playnite_id,
-                        achievements = snap.achievements?.Select(a => new AchievementItemDto {
-                            name = a.name,
-                            is_unlocked = a.is_unlocked,
-                            date_unlocked = a.date_unlocked != null && DateTime.TryParse(a.date_unlocked, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt) ? dt : (DateTime?)null,
-                            rarity_percent = a.rarity_percent
-                        }).ToList() ?? new List<AchievementItemDto>()
-                    }).ToList();
-                    var diffAchHash = GsHashUtils.ComputeAchievementHash(snapshotAsDtos);
-                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = diffAchHash);
+                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = resultAchievementHash);
 
                     return SyncLibraryResult.Success;
                 }

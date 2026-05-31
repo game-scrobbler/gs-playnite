@@ -176,6 +176,12 @@ namespace GsPlugin.Api {
         public string user_id { get; set; }
         public List<GameAchievementsDto> changed { get; set; }
         public string base_snapshot_hash { get; set; }
+        /// <summary>
+        /// Hash of the achievement snapshot *after* this diff. Stored verbatim
+        /// as the next server baseline (mirrors library diff sync).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string result_snapshot_hash { get; set; }
     }
 
     public class AchievementSyncRes {
