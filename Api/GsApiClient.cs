@@ -46,13 +46,15 @@ namespace GsPlugin.Api {
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly GsCircuitBreaker _circuitBreaker;
 
-        public GsApiClient() : this(_defaultHttpClient) { }
+        public GsApiClient() : this(_defaultHttpClient, true) { }
 
         /// <summary>
         /// Constructor that accepts a custom HttpClient for testing.
         /// Production code uses the parameterless constructor which provides the shared Sentry-traced client.
         /// </summary>
-        internal GsApiClient(HttpClient httpClient) {
+        internal GsApiClient(HttpClient httpClient) : this(httpClient, false) { }
+
+        private GsApiClient(HttpClient httpClient, bool enableRecoveryFlush) {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _jsonOptions = new JsonSerializerOptions {
                 PropertyNameCaseInsensitive = true
@@ -61,13 +63,15 @@ namespace GsPlugin.Api {
                 failureThreshold: 3,
                 timeout: TimeSpan.FromMinutes(2),
                 retryDelay: TimeSpan.FromSeconds(10));
-            _circuitBreaker.OnCircuitClosed += () => {
-                _ = FlushPendingScrobblesAsync().ContinueWith(t => {
-                    if (t.Exception != null) {
-                        _logger.Error(t.Exception.GetBaseException(), "Unhandled exception in FlushPendingScrobblesAsync (circuit recovery)");
-                    }
-                }, TaskContinuationOptions.OnlyOnFaulted);
-            };
+            if (enableRecoveryFlush) {
+                _circuitBreaker.OnCircuitClosed += () => {
+                    _ = FlushPendingScrobblesAsync().ContinueWith(t => {
+                        if (t.Exception != null) {
+                            _logger.Error(t.Exception.GetBaseException(), "Unhandled exception in FlushPendingScrobblesAsync (circuit recovery)");
+                        }
+                    }, TaskContinuationOptions.OnlyOnFaulted);
+                };
+            }
         }
 
         #region Game Session Management
@@ -98,6 +102,11 @@ namespace GsPlugin.Api {
                 case ApiOutcome.Success when envelope.data?.session_id != null:
                     _logger.Info($"Scrobble start complete with session ID: {envelope.data.session_id}");
                     return new ScrobbleStartRes { session_id = envelope.data.session_id };
+
+                case ApiOutcome.Success:
+                case ApiOutcome.Queued:
+                    _logger.Info("Scrobble start accepted without a session ID");
+                    return new ScrobbleStartRes();
 
                 case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
                     _logger.Info($"Scrobble start skipped: {envelope.message}");
@@ -130,6 +139,7 @@ namespace GsPlugin.Api {
                 game_id = endData.game_id,
                 plugin_id = endData.plugin_id,
                 external_game_id = endData.external_game_id,
+                source_name = endData.source_name,
                 metadata = endData.metadata,
                 finished_at = endData.finished_at,
                 session_id = endData.session_id,

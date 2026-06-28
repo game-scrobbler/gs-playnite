@@ -114,6 +114,13 @@ GsPlugin (entry point, IDisposable)
 - First-run detection: when `LastSyncAt` is null and `InstallToken` is empty, progress notifications guide the user through initial setup.
 - `startup_completed` PostHog event captures elapsed time and sync result for startup performance tracking.
 
+### Allowed Library Sources
+- `GsAllowedPlugins.IsAllowed(Game)` is the single predicate for deciding whether a Playnite game can sync, scrobble, or contribute achievement counts.
+- Official Playnite library plugin GUIDs are accepted directly after `RefreshAllowedPluginsAsync` loads the backend allowlist.
+- OSS/forked library plugins can still sync when `Game.Source.Name` contains a recognized supported source fragment such as `GOG OSS`, `Legendary`, `Epic Games`, or `Amazon Games`.
+- `Guid.Empty` plugin IDs are always rejected. They represent manual/custom games and should not be sent.
+- Keep DTOs source-aware: send the raw `plugin_id` plus `source_name = g.Source?.Name`; the backend canonicalizes recognized fork GUIDs to official plugin IDs before writing rows.
+
 ### Sidebar Dashboard
 - `MySidebarView` constructor takes only `IGsApiClient` — plugin version and flags are sent server-side via the dashboard token POST body.
 - Dashboard URL passes only `theme` as a query param (cosmetic, needed for instant rendering); all other context is tamper-proof via the token.
@@ -143,7 +150,7 @@ Achievement data comes from two optional addons via an aggregator pattern:
 
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
-- Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `PlayniteAchievementsSqliteTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`
+- Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsAllowedPluginsTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `PlayniteAchievementsSqliteTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`
 - `GsDataManagerTests` and `GsDataTests` include coverage for install-token persistence, `IdentityGeneration`, `RotateInstallId()`, `SetInstallTokenIfActive()`, `InstallIdForBody`, opt-out token clearing, and `RecordShownNotifications()`/`GetShownNotificationIds()` thread-safe notification state.
 
 ## Build Environment

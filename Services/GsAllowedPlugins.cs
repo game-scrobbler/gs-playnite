@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Playnite.SDK;
+using Playnite.SDK.Models;
 using GsPlugin.Api;
 using GsPlugin.Models;
 
@@ -35,7 +36,42 @@ namespace GsPlugin.Services {
         };
 
         private static volatile HashSet<Guid> _allowedPluginIds;
+        private static volatile HashSet<string> _allowedSourceAliases;
         private static readonly object _pluginLock = new object();
+        private static readonly string[] DefaultSourceAliases = new[] {
+            "amazon",
+            "amazon games",
+            "battle.net",
+            "battlenet",
+            "bethesda",
+            "blizzard",
+            "ea",
+            "ea app",
+            "epic",
+            "epic games",
+            "epic games store",
+            "galaxy",
+            "gog",
+            "gog galaxy",
+            "gog oss",
+            "humble",
+            "humble bundle",
+            "itch",
+            "itch.io",
+            "legendary",
+            "origin",
+            "playstation",
+            "playstation network",
+            "psn",
+            "steam",
+            "steam library",
+            "twitch",
+            "ubisoft",
+            "ubisoft connect",
+            "uplay",
+            "xbox",
+            "xbox live"
+        };
 
         /// <summary>
         /// Dynamic allowed plugin set. Initialized from disk cache or hardcoded fallback.
@@ -64,6 +100,43 @@ namespace GsPlugin.Services {
             }
         }
 
+        private static HashSet<string> AllowedSourceAliases {
+            get {
+                if (_allowedSourceAliases != null) return _allowedSourceAliases;
+                lock (_pluginLock) {
+                    if (_allowedSourceAliases != null) return _allowedSourceAliases;
+                    _allowedSourceAliases = new HashSet<string>(
+                        DefaultSourceAliases.Select(NormalizeSourceName).Where(x => x != null));
+                    return _allowedSourceAliases;
+                }
+            }
+        }
+
+        public static bool IsAllowed(Game game) {
+            if (game == null || game.PluginId == Guid.Empty) {
+                return false;
+            }
+
+            if (AllowedPluginIds.Contains(game.PluginId)) {
+                return true;
+            }
+
+            return IsRecognizedSourceName(game.Source?.Name);
+        }
+
+        internal static bool IsRecognizedSourceName(string sourceName) {
+            var normalized = NormalizeSourceName(sourceName);
+            return normalized != null && AllowedSourceAliases.Contains(normalized);
+        }
+
+        private static string NormalizeSourceName(string sourceName) {
+            if (string.IsNullOrWhiteSpace(sourceName)) {
+                return null;
+            }
+
+            return string.Join(" ", sourceName.Trim().ToLowerInvariant().Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
+        }
+
         /// <summary>
         /// Fetch allowed plugins from server and update the local cache.
         /// Fallback chain: server -> disk cache (24h) -> stale cache -> hardcoded.
@@ -73,15 +146,28 @@ namespace GsPlugin.Services {
                 var response = await apiClient.GetAllowedPlugins();
                 if (response?.plugins != null && response.plugins.Count > 0) {
                     var newIds = new HashSet<Guid>();
+                    var newAliases = new HashSet<string>(
+                        DefaultSourceAliases.Select(NormalizeSourceName).Where(x => x != null));
                     foreach (var plugin in response.plugins) {
                         if (plugin.status == "active" && Guid.TryParse(plugin.pluginId, out var guid)) {
                             newIds.Add(guid);
+                        }
+                        if (plugin.status == "active" && plugin.sourceAliases != null) {
+                            foreach (var alias in plugin.sourceAliases) {
+                                var normalizedAlias = NormalizeSourceName(alias);
+                                if (normalizedAlias != null) {
+                                    newAliases.Add(normalizedAlias);
+                                }
+                            }
                         }
                     }
 
                     if (newIds.Count > 0) {
                         lock (_pluginLock) {
                             _allowedPluginIds = newIds;
+                            if (newAliases.Count > 0) {
+                                _allowedSourceAliases = newAliases;
+                            }
                         }
 
                         var pluginStrings = newIds.Select(g => g.ToString()).ToList();

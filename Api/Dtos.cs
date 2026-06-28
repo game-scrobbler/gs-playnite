@@ -14,6 +14,8 @@ namespace GsPlugin.Api {
         public string game_id { get; set; }
         public string plugin_id { get; set; }
         public string external_game_id { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string source_name { get; set; }
         public object metadata { get; set; }
         public string started_at { get; set; }
     }
@@ -24,6 +26,7 @@ namespace GsPlugin.Api {
 
     public enum ApiOutcome {
         Success,
+        Queued,
         Fail,
         Error,
     }
@@ -36,6 +39,7 @@ namespace GsPlugin.Api {
 
         public ApiOutcome Outcome =>
             status == "success" ? ApiOutcome.Success :
+            status == "queued"  ? ApiOutcome.Queued  :
             status == "fail"    ? ApiOutcome.Fail    :
                                   ApiOutcome.Error;
     }
@@ -72,6 +76,8 @@ namespace GsPlugin.Api {
         public string game_id { get; set; }
         public string plugin_id { get; set; }
         public string external_game_id { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string source_name { get; set; }
         public object metadata { get; set; }
         public string finished_at { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -162,6 +168,8 @@ namespace GsPlugin.Api {
         public string playnite_id { get; set; }
         public string game_id { get; set; }
         public string plugin_id { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string source_name { get; set; }
         public List<AchievementItemDto> achievements { get; set; }
     }
 
@@ -219,6 +227,8 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
 
     public class AllowedPluginsRes {
+        public int schemaVersion { get; set; }
+        public bool supportsSourceAliases { get; set; }
         public List<AllowedPluginEntry> plugins { get; set; }
         public string source { get; set; }
     }
@@ -228,6 +238,7 @@ namespace GsPlugin.Api {
         public string libraryName { get; set; }
         public string sourceSlug { get; set; }
         public string status { get; set; }
+        public List<string> sourceAliases { get; set; }
     }
 
     // ──────────────────────────────────────────────────────────

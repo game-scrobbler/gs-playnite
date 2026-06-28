@@ -102,7 +102,7 @@ namespace GsPlugin.Services {
                 var startedGame = args.Game;
 
                 // Skip scrobbling for unsupported plugins
-                if (startedGame.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(startedGame.PluginId)) {
+                if (!GsAllowedPlugins.IsAllowed(startedGame)) {
                     _logger.Info($"Skipping scrobble start for unsupported plugin: {startedGame.PluginId}");
                     return;
                 }
@@ -118,7 +118,8 @@ namespace GsPlugin.Services {
                     game_id = startedGame.Id.ToString(),
                     plugin_id = startedGame.PluginId.ToString(),
                     external_game_id = startedGame.GameId,
-                    metadata = new { PluginId = startedGame.PluginId.ToString() },
+                    source_name = startedGame.Source?.Name,
+                    metadata = new { PluginId = startedGame.PluginId.ToString(), SourceName = startedGame.Source?.Name },
                     started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 });
                 if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
@@ -140,7 +141,8 @@ namespace GsPlugin.Services {
                             game_id = startedGame.Id.ToString(),
                             plugin_id = startedGame.PluginId.ToString(),
                             external_game_id = startedGame.GameId,
-                            metadata = new { PluginId = startedGame.PluginId.ToString() },
+                            source_name = startedGame.Source?.Name,
+                            metadata = new { PluginId = startedGame.PluginId.ToString(), SourceName = startedGame.Source?.Name },
                             started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                         },
                         QueuedAt = localDate
@@ -188,8 +190,9 @@ namespace GsPlugin.Services {
                             game_id = stoppedGame.Id.ToString(),
                             plugin_id = stoppedGame.PluginId.ToString(),
                             external_game_id = stoppedGame.GameId,
+                            source_name = stoppedGame.Source?.Name,
                             session_id = null,
-                            metadata = new { PluginId = stoppedGame.PluginId.ToString() },
+                            metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
                             finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                         },
                         QueuedAt = localDate
@@ -204,7 +207,7 @@ namespace GsPlugin.Services {
                 }
 
                 // Skip scrobbling for unsupported plugins
-                if (stoppedGame.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(stoppedGame.PluginId)) {
+                if (!GsAllowedPlugins.IsAllowed(stoppedGame)) {
                     _logger.Info($"Skipping scrobble finish for unsupported plugin: {stoppedGame.PluginId}");
                     // Still clear the active session since we may have tracked start before this filter existed
                     ClearActiveSession();
@@ -222,8 +225,9 @@ namespace GsPlugin.Services {
                     game_id = stoppedGame.Id.ToString(),
                     plugin_id = stoppedGame.PluginId.ToString(),
                     external_game_id = stoppedGame.GameId,
+                    source_name = stoppedGame.Source?.Name,
                     session_id = GsDataManager.Data.ActiveSessionId,
-                    metadata = new { PluginId = stoppedGame.PluginId.ToString() },
+                    metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 });
                 if (finishResponse != null) {
@@ -241,8 +245,9 @@ namespace GsPlugin.Services {
                             game_id = stoppedGame.Id.ToString(),
                             plugin_id = stoppedGame.PluginId.ToString(),
                             external_game_id = stoppedGame.GameId,
+                            source_name = stoppedGame.Source?.Name,
                             session_id = GsDataManager.Data.ActiveSessionId,
-                            metadata = new { PluginId = stoppedGame.PluginId.ToString() },
+                            metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
                             finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                         },
                         QueuedAt = localDate
@@ -425,7 +430,7 @@ namespace GsPlugin.Services {
 
             var (library, libraryHash, filteredCount) = await Task.Run(() => {
                 var filtered = allGames
-                    .Where(g => g.PluginId != Guid.Empty && GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
+                    .Where(GsAllowedPlugins.IsAllowed)
                     .ToList();
 
                 var dtos = filtered.Select(g => MapGameToDto(g, syncAchievements)).ToList();
@@ -679,7 +684,7 @@ namespace GsPlugin.Services {
 
                 var games = await Task.Run(() => {
                     return allGames
-                        .Where(g => g.PluginId != Guid.Empty && GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
+                        .Where(GsAllowedPlugins.IsAllowed)
                         .Select(g => {
                             var achievements = _achievementHelper.GetAchievements(g.Id);
                             if (achievements == null || achievements.Count == 0)
@@ -702,6 +707,7 @@ namespace GsPlugin.Services {
                                 playnite_id = g.Id.ToString(),
                                 game_id = g.GameId,
                                 plugin_id = g.PluginId.ToString(),
+                                source_name = g.Source?.Name,
                                 achievements = dedupedByName.Values.ToList()
                             };
                         })
@@ -805,7 +811,7 @@ namespace GsPlugin.Services {
                     int withDataCount = 0;
 
                     foreach (var g in allGames) {
-                        if (g.PluginId == Guid.Empty || !GsAllowedPlugins.AllowedPluginIds.Contains(g.PluginId))
+                        if (!GsAllowedPlugins.IsAllowed(g))
                             continue;
 
                         filteredCount++;
@@ -845,6 +851,7 @@ namespace GsPlugin.Services {
                                 playnite_id = playniteId,
                                 game_id = g.GameId,
                                 plugin_id = g.PluginId.ToString(),
+                                source_name = g.Source?.Name,
                                 achievements = new List<AchievementItemDto>()
                             });
                             continue;
@@ -903,6 +910,7 @@ namespace GsPlugin.Services {
                                 playnite_id = playniteId,
                                 game_id = g.GameId,
                                 plugin_id = g.PluginId.ToString(),
+                                source_name = g.Source?.Name,
                                 achievements = dedupedByName.Values.ToList()
                             });
                         }

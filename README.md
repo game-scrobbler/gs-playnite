@@ -45,6 +45,8 @@ Playnite aggregates games from many launchers. GameScrobbler tracks everything P
 
 Steam, GOG, Epic Games, Xbox, PlayStation, Battle.net, Ubisoft Connect, itch.io, Humble, Amazon Games, and more.
 
+Official Playnite library plugins are supported by plugin ID. Recognized OSS/forked library plugins are also supported when Playnite exposes a known source name such as GOG OSS, Legendary, Epic Games, or Amazon Games. Manual/custom games without a library plugin are not synced.
+
 You can also link your GameScrobbler account to Steam and Discord at [gamescrobbler.com](https://gamescrobbler.com), with more platforms coming soon.
 
 ---
