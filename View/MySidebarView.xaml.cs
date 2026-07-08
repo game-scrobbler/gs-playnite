@@ -69,7 +69,11 @@ namespace GsPlugin.View {
             if (args.Uri != null) {
                 try {
                     var uri = new Uri(args.Uri);
-                    if (uri.Host != "gamescrobbler.com" && !uri.Host.EndsWith(".gamescrobbler.com")) {
+                    bool isTrustedHost = uri.Host == "gamescrobbler.com" || uri.Host.EndsWith(".gamescrobbler.com");
+                    // Require https even for the trusted host: an on-path attacker (e.g. open
+                    // Wi-Fi) could otherwise serve arbitrary content over plain http inside this
+                    // trusted, chrome-less sidebar frame.
+                    if (!isTrustedHost || uri.Scheme != "https") {
                         args.Cancel = true;
                         // Only open trusted https links in the system browser
                         if (uri.Scheme == "https" && GsPlayniteHelper.IsTrustedUrl(args.Uri)) {

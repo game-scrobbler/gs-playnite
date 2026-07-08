@@ -32,6 +32,10 @@ You can re-link anytime.</sys:String>
     <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">Your link token has expired.
 
 Would you like to open the linking page to get a new one?</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingTitle">Confirm Account Linking</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingBody">A website is requesting to link this Playnite installation to a GameScrobbler account.
+
+Only continue if you just clicked "Link Playnite" on gamescrobbler.com yourself.</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">Account Linking Success</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">Account successfully linked!
 User ID: {0}</sys:String>

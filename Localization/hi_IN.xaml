@@ -32,6 +32,10 @@
     <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">आपका लिंक टोकन समाप्त हो गया है।
 
 क्या आप नया टोकन प्राप्त करने के लिए लिंकिंग पेज खोलना चाहेंगे?</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingTitle">खाता लिंकिंग की पुष्टि करें</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingBody">एक वेबसाइट इस Playnite इंस्टॉलेशन को GameScrobbler खाते से लिंक करने का अनुरोध कर रही है।
+
+केवल तभी आगे बढ़ें जब आपने अभी-अभी gamescrobbler.com पर खुद "Playnite लिंक करें" पर क्लिक किया हो।</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">खाता लिंकिंग सफल</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">खाता सफलतापूर्वक लिंक हो गया!
 यूज़र ID: {0}</sys:String>

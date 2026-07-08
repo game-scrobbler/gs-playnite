@@ -32,6 +32,10 @@ Você pode vincular novamente a qualquer momento.</sys:String>
     <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">Seu token de vinculação expirou.
 
 Deseja abrir a página de vinculação para obter um novo?</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingTitle">Confirmar Vinculação de Conta</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingBody">Um site está solicitando vincular esta instalação do Playnite a uma conta GameScrobbler.
+
+Continue apenas se você acabou de clicar em "Vincular Playnite" no gamescrobbler.com.</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">Vinculação Bem-sucedida</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">Conta vinculada com sucesso!
 ID do usuário: {0}</sys:String>

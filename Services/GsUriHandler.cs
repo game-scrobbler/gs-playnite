@@ -94,12 +94,20 @@ namespace GsPlugin.Services {
 
                     // Check if already linked and get user confirmation if needed
                     bool isLinked = GsDataManager.IsAccountLinked;
-                    if (isLinked && !_linkingService.ShouldProceedWithRelinking()) {
+                    if (isLinked) {
+                        if (!_linkingService.ShouldProceedWithRelinking()) {
+                            return;
+                        }
+                    }
+                    else if (!ConfirmLinking()) {
+                        // Without this, any deep link (from any website, not necessarily one
+                        // the user just visited) would silently link this install to whatever
+                        // account the token belongs to — including an attacker's account.
+                        GsLogger.Info("User declined account linking confirmation for unlinked install");
                         return;
                     }
 
-                    // Show linking in progress dialog
-                    ShowLinkingInProgressDialog();
+                    LogLinkingStarted();
 
                     // Attempt to link the account
                     await ProcessAutomaticLinking(token);
@@ -200,6 +208,21 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
+        /// Asks the user to confirm linking before an unlinked install is bound to whatever
+        /// GameScrobbler account the deep-link token belongs to. A deep link can come from any
+        /// website, not just one the user just interacted with on gamescrobbler.com, so this is
+        /// the only checkpoint before the install starts sending its play data to that account.
+        /// </summary>
+        private bool ConfirmLinking() {
+            var answer = _playniteApi?.Dialogs?.ShowMessage(
+                GsLocalization.Get("LOCGsPluginConfirmLinkingBody", "A website is requesting to link this Playnite installation to a GameScrobbler account.\n\nOnly continue if you just clicked \"Link Playnite\" on gamescrobbler.com yourself."),
+                GsLocalization.Get("LOCGsPluginConfirmLinkingTitle", "Confirm Account Linking"),
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            return answer == MessageBoxResult.Yes;
+        }
+
+        /// <summary>
         /// Offers to open the linking page in the browser when a token has expired.
         /// </summary>
         private void OfferOpenLinkingPage() {
@@ -263,11 +286,10 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
-        /// Shows a dialog indicating that linking is in progress.
+        /// Logs that linking has started. Not a UI dialog — the user already confirmed via
+        /// ConfirmLinking() (or ShouldProceedWithRelinking() for an existing link) above.
         /// </summary>
-        private static void ShowLinkingInProgressDialog() {
-            // Note: This is a fire-and-forget notification
-            // In a production environment, you might want to show a proper progress dialog
+        private static void LogLinkingStarted() {
             GsLogger.Info("Account linking initiated via URI handler");
         }
 

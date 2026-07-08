@@ -32,6 +32,10 @@
     <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">您的关联令牌已过期。
 
 是否打开关联页面获取新令牌？</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingTitle">确认账户关联</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingBody">一个网站正在请求将此 Playnite 安装关联到一个 GameScrobbler 账户。
+
+仅当您刚刚自己在 gamescrobbler.com 上点击了"关联 Playnite"时才继续。</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">关联成功</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">账户关联成功！
 用户 ID：{0}</sys:String>

@@ -32,6 +32,10 @@
     <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">Ваш токен привязки истёк.
 
 Хотите открыть страницу привязки, чтобы получить новый?</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingTitle">Подтвердите привязку аккаунта</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingBody">Веб-сайт запрашивает привязку этой установки Playnite к аккаунту GameScrobbler.
+
+Продолжайте, только если вы только что сами нажали «Привязать Playnite» на gamescrobbler.com.</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">Привязка успешна</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">Учётная запись успешно привязана!
 ID пользователя: {0}</sys:String>

@@ -32,6 +32,10 @@ Vous pouvez réassocier à tout moment.</sys:String>
     <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">Votre jeton d'association a expiré.
 
 Voulez-vous ouvrir la page d'association pour en obtenir un nouveau ?</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingTitle">Confirmer l'association du compte</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingBody">Un site web demande à associer cette installation de Playnite à un compte GameScrobbler.
+
+Continuez uniquement si vous venez de cliquer vous-même sur « Associer Playnite » sur gamescrobbler.com.</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">Association réussie</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">Compte associé avec succès !
 ID utilisateur : {0}</sys:String>

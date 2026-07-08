@@ -32,6 +32,10 @@ Sie können jederzeit erneut verknüpfen.</sys:String>
     <sys:String x:Key="LOCGsPluginTokenExpiredDialogBody">Ihr Verknüpfungs-Token ist abgelaufen.
 
 Möchten Sie die Verknüpfungsseite öffnen, um einen neuen zu erhalten?</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingTitle">Kontoverknüpfung bestätigen</sys:String>
+    <sys:String x:Key="LOCGsPluginConfirmLinkingBody">Eine Website fordert an, diese Playnite-Installation mit einem GameScrobbler-Konto zu verknüpfen.
+
+Fahren Sie nur fort, wenn Sie gerade selbst auf gamescrobbler.com auf "Playnite verknüpfen" geklickt haben.</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogTitle">Kontoverknüpfung erfolgreich</sys:String>
     <sys:String x:Key="LOCGsPluginLinkSuccessDialogBody">Konto erfolgreich verknüpft!
 Benutzer-ID: {0}</sys:String>
