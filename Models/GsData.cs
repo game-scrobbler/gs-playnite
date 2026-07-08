@@ -518,5 +518,17 @@ namespace GsPlugin.Models {
             }
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
         }
+
+        /// <summary>
+        /// Increments a pending scrobble's FlushAttempts counter and persists atomically. Thread-safe.
+        /// Used by the flush path after a failed send; keeps the mutate-then-save sequence under
+        /// the same lock as every other queue mutation instead of writing to the item directly.
+        /// </summary>
+        public static void IncrementPendingScrobbleFlushAttempts(PendingScrobble item) {
+            lock (_lock) {
+                item.FlushAttempts++;
+                SaveInternal();
+            }
+        }
     }
 }

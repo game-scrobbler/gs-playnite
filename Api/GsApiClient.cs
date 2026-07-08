@@ -273,7 +273,11 @@ namespace GsPlugin.Api {
                         GsDataManager.RemovePendingScrobble(item);
                     }
                     else {
-                        item.FlushAttempts++;
+                        // Mutate-then-save under GsDataManager's lock, rather than incrementing
+                        // the field directly and calling Save() separately — keeps this in line
+                        // with every other queue mutation (see RemovePendingScrobble) instead of
+                        // racing a concurrent RotateInstallId()/PerformOptOut() that clears the queue.
+                        GsDataManager.IncrementPendingScrobbleFlushAttempts(item);
                         if (item.FlushAttempts >= MaxFlushAttempts) {
                             _logger.Warn($"Dropping pending scrobble after {item.FlushAttempts} failed flush attempts (type={item.Type}, queued={item.QueuedAt:O})");
                             GsDataManager.RemovePendingScrobble(item);
@@ -286,11 +290,8 @@ namespace GsPlugin.Api {
                                     { "queued_at", item.QueuedAt.ToString("O") }
                                 });
                         }
-                        else {
-                            // Item stays in the queue with its incremented FlushAttempts counter.
-                            // Persist the updated attempt count so the drop threshold survives a restart.
-                            GsDataManager.Save();
-                        }
+                        // else: item stays in the queue with its incremented FlushAttempts counter,
+                        // already persisted by IncrementPendingScrobbleFlushAttempts above.
                     }
                 }
             }
