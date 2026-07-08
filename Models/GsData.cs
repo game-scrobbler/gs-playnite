@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
@@ -311,16 +312,34 @@ namespace GsPlugin.Models {
                 GsLogger.Info("Saving plugin data to disk");
                 var tempPath = _filePath + ".tmp";
                 File.WriteAllText(tempPath, json);
-                if (File.Exists(_filePath)) {
-                    File.Replace(tempPath, _filePath, destinationBackupFileName: null);
-                }
-                else {
-                    File.Move(tempPath, _filePath);
-                }
+                ReplaceWithRetry(tempPath, _filePath);
             }
             catch (Exception ex) {
                 GsLogger.Error("Failed to save custom GsData", ex);
                 GsSentry.CaptureException(ex, "Failed to save GsData to disk");
+            }
+        }
+
+        /// <summary>
+        /// Moves/replaces tempPath onto destPath, retrying briefly on IOException. A just-written
+        /// file can be transiently locked (e.g. antivirus/indexer scan) on Windows; without a retry,
+        /// that sharing violation surfaces as a silently-swallowed save (the caller's outer catch
+        /// logs and continues), leaving the previous on-disk contents stale.
+        /// </summary>
+        private static void ReplaceWithRetry(string tempPath, string destPath, int maxAttempts = 3) {
+            for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    if (File.Exists(destPath)) {
+                        File.Replace(tempPath, destPath, destinationBackupFileName: null);
+                    }
+                    else {
+                        File.Move(tempPath, destPath);
+                    }
+                    return;
+                }
+                catch (IOException) when (attempt < maxAttempts) {
+                    Thread.Sleep(25 * attempt);
+                }
             }
         }
 
