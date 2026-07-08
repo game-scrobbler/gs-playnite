@@ -26,8 +26,21 @@ namespace GsPlugin.Api {
         private static readonly HttpClient _defaultHttpClient;
 
         static GsApiClient() {
-            // Enforce TLS 1.2+ to avoid negotiating insecure protocol versions on .NET Framework 4.6.2
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            // Enforce TLS 1.2+ to avoid negotiating insecure protocol versions on .NET Framework 4.6.2.
+            // Use |= rather than assignment: SecurityProtocol is process-wide and shared with every
+            // other Playnite plugin, so overwriting it would silently strip out whatever protocols
+            // another plugin or Playnite itself had already configured.
+            // Try to also opt into TLS 1.3 (SecurityProtocolType.Tls13, value 12288) via its raw
+            // numeric value since the .NET Framework 4.6.2 enum predates that member. The setter
+            // validates against a known bitmask and throws NotSupportedException on older/unpatched
+            // runtimes that don't recognize the bit — a throw here would permanently break this type
+            // (TypeInitializationException on every later access), so fall back to Tls12-only.
+            try {
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12 | (SecurityProtocolType)12288;
+            }
+            catch (NotSupportedException) {
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            }
 
             try {
                 _defaultHttpClient = new HttpClient(new SentryHttpMessageHandler()) {
