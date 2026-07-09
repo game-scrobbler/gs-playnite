@@ -165,7 +165,7 @@ namespace GsPlugin.Tests {
             try {
                 GsDataManager.Initialize(tempDir, null);
                 GsDataManager.Data.LinkedUserId = "user-123";
-                GsDataManager.Data.ActiveSessionId = "session-1";
+                GsDataManager.Data.ActiveSessionsByGameId["game-1"] = "session-1";
                 GsDataManager.Data.LastLibraryHash = "abc";
                 GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                 GsDataManager.EnqueuePendingScrobble(new PendingScrobble { Type = "start", QueuedAt = DateTime.UtcNow });
@@ -175,7 +175,7 @@ namespace GsPlugin.Tests {
                 Assert.True(GsDataManager.IsOptedOut);
                 Assert.True(GsDataManager.Data.OptedOut);
                 Assert.Null(GsDataManager.Data.LinkedUserId);
-                Assert.Null(GsDataManager.Data.ActiveSessionId);
+                Assert.Empty(GsDataManager.Data.ActiveSessionsByGameId);
                 Assert.Null(GsDataManager.Data.LastLibraryHash);
                 Assert.Null(GsDataManager.Data.LastSyncAt);
                 Assert.Empty(GsDataManager.Data.PendingScrobbles);
@@ -329,8 +329,8 @@ namespace GsPlugin.Tests {
             var tempDir = CreateTempDir();
             try {
                 GsDataManager.Initialize(tempDir, null);
-                GsDataManager.Data.ActiveSessionId = "session-1";
-                GsDataManager.Data.PendingStartGameId = "game-1";
+                GsDataManager.Data.ActiveSessionsByGameId["game-1"] = "session-1";
+                GsDataManager.Data.PendingStartGameIds.Add("game-1");
                 GsDataManager.Data.LastLibraryHash = "hash-lib";
                 GsDataManager.Data.LastAchievementHash = "hash-ach";
                 GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
@@ -343,8 +343,8 @@ namespace GsPlugin.Tests {
 
                 GsDataManager.RotateInstallId();
 
-                Assert.Null(GsDataManager.Data.ActiveSessionId);
-                Assert.Null(GsDataManager.Data.PendingStartGameId);
+                Assert.Empty(GsDataManager.Data.ActiveSessionsByGameId);
+                Assert.Empty(GsDataManager.Data.PendingStartGameIds);
                 Assert.Null(GsDataManager.Data.LastLibraryHash);
                 Assert.Null(GsDataManager.Data.LastAchievementHash);
                 Assert.Null(GsDataManager.Data.LastSyncAt);

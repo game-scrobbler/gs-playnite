@@ -34,13 +34,18 @@ namespace GsPlugin.Models {
         public const string NotLinkedValue = "not_linked";
 
         public string InstallID { get; set; } = null;
-        public string ActiveSessionId { get; set; } = null;
         /// <summary>
-        /// Game ID whose start scrobble was queued (failed to send).
-        /// Used by OnGameStoppedAsync to pair a finish with the pending start.
-        /// Cleared once the finish is queued or when the start succeeds.
+        /// Active scrobble session IDs keyed by Playnite game ID. Playnite allows
+        /// multiple games to run simultaneously, so a single shared field would let
+        /// one game's stop event finish a different game's session.
         /// </summary>
-        public string PendingStartGameId { get; set; } = null;
+        public Dictionary<string, string> ActiveSessionsByGameId { get; set; } = new Dictionary<string, string>();
+        /// <summary>
+        /// Game IDs whose start scrobble was queued (failed to send).
+        /// Used by OnGameStoppedAsync to pair a finish with the pending start.
+        /// An entry is removed once the finish is queued or when the start succeeds.
+        /// </summary>
+        public List<string> PendingStartGameIds { get; set; } = new List<string>();
         public string Theme { get; set; } = "Dark";
         public List<string> Flags { get; set; } = new List<string>();
         public string LinkedUserId { get; set; } = null;
@@ -268,12 +273,58 @@ namespace GsPlugin.Models {
 
             try {
                 var json = File.ReadAllText(_filePath);
-                return JsonSerializer.Deserialize<GsData>(json, jsonOptions) ?? new GsData();
+                var data = JsonSerializer.Deserialize<GsData>(json, jsonOptions) ?? new GsData();
+                MigrateLegacySessionFields(data, json);
+                return data;
             }
             catch (Exception ex) {
                 GsLogger.Error("Failed to load custom GsData", ex);
                 GsSentry.CaptureException(ex, "Failed to load GsData from disk");
                 return new GsData();
+            }
+        }
+
+        /// <summary>
+        /// One-time upgrade path from plugin versions that tracked a single scrobble session as
+        /// scalar fields (ActiveSessionId, PendingStartGameId) instead of per-game collections.
+        /// System.Text.Json silently ignores unmapped JSON members on deserialize, so without this
+        /// an in-flight session or queued start present at the moment of upgrade would otherwise be
+        /// dropped with no trace.
+        /// </summary>
+        private static void MigrateLegacySessionFields(GsData data, string json) {
+            try {
+                using (var doc = JsonDocument.Parse(json)) {
+                    var root = doc.RootElement;
+
+                    // PendingStartGameId (singular) was itself a bare game ID, so it migrates
+                    // 1:1 into the new per-game list.
+                    if (root.TryGetProperty("PendingStartGameId", out var pendingStartEl)
+                        && pendingStartEl.ValueKind == JsonValueKind.String) {
+                        var legacyGameId = pendingStartEl.GetString();
+                        if (!string.IsNullOrEmpty(legacyGameId) && !data.PendingStartGameIds.Contains(legacyGameId)) {
+                            data.PendingStartGameIds.Add(legacyGameId);
+                            GsLogger.Info("Migrated legacy PendingStartGameId into PendingStartGameIds");
+                        }
+                    }
+
+                    // ActiveSessionId (singular) had no per-game key, so it cannot be mapped onto
+                    // the new per-game dictionary without fabricating a game ID. Rather than
+                    // silently dropping it, surface it so we have visibility into how often an
+                    // in-flight session gets orphaned by an upgrade.
+                    if (root.TryGetProperty("ActiveSessionId", out var activeSessionIdEl)
+                        && activeSessionIdEl.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrEmpty(activeSessionIdEl.GetString())) {
+                        GsLogger.Warn("Found legacy ActiveSessionId with no game association; " +
+                            "this in-flight session cannot be migrated and will not be finished.");
+                        GsSentry.AddBreadcrumb(
+                            message: "Legacy ActiveSessionId orphaned during upgrade",
+                            category: "migration"
+                        );
+                    }
+                }
+            }
+            catch (Exception ex) {
+                GsLogger.Warn($"Failed to inspect legacy session fields: {ex.Message}");
             }
         }
 
@@ -296,6 +347,46 @@ namespace GsPlugin.Models {
             lock (_lock) {
                 action(_data);
                 SaveInternal();
+            }
+        }
+
+        /// <summary>
+        /// Returns true if there is a recorded active scrobble session for the given game ID. Thread-safe.
+        /// </summary>
+        public static bool HasActiveSession(string gameId) {
+            lock (_lock) {
+                return !string.IsNullOrEmpty(gameId) && _data.ActiveSessionsByGameId.ContainsKey(gameId);
+            }
+        }
+
+        /// <summary>
+        /// Attempts to get the active scrobble session ID for the given game ID. Thread-safe.
+        /// </summary>
+        public static bool TryGetActiveSession(string gameId, out string sessionId) {
+            lock (_lock) {
+                if (string.IsNullOrEmpty(gameId)) {
+                    sessionId = null;
+                    return false;
+                }
+                return _data.ActiveSessionsByGameId.TryGetValue(gameId, out sessionId);
+            }
+        }
+
+        /// <summary>
+        /// Returns a point-in-time copy of all active sessions keyed by game ID. Thread-safe.
+        /// </summary>
+        public static Dictionary<string, string> SnapshotActiveSessions() {
+            lock (_lock) {
+                return new Dictionary<string, string>(_data.ActiveSessionsByGameId);
+            }
+        }
+
+        /// <summary>
+        /// Returns true if the given game ID has a pending (queued) start scrobble. Thread-safe.
+        /// </summary>
+        public static bool HasPendingStart(string gameId) {
+            lock (_lock) {
+                return !string.IsNullOrEmpty(gameId) && _data.PendingStartGameIds.Contains(gameId);
             }
         }
 
@@ -375,8 +466,8 @@ namespace GsPlugin.Models {
         public static void PerformOptOut() {
             lock (_lock) {
                 _data.OptedOut = true;
-                _data.ActiveSessionId = null;
-                _data.PendingStartGameId = null;
+                _data.ActiveSessionsByGameId.Clear();
+                _data.PendingStartGameIds.Clear();
                 _data.PendingScrobbles.Clear();
                 _data.LinkedUserId = null;
                 _data.LastLibraryHash = null;
@@ -468,8 +559,8 @@ namespace GsPlugin.Models {
                 // cannot inherit stale cooldowns, hashes, baselines, queued work, or an
                 // account link that belongs to the abandoned server-side identity.
                 _data.LinkedUserId = null;
-                _data.ActiveSessionId = null;
-                _data.PendingStartGameId = null;
+                _data.ActiveSessionsByGameId.Clear();
+                _data.PendingStartGameIds.Clear();
                 _data.PendingScrobbles.Clear();
                 _data.LastLibraryHash = null;
                 _data.LastAchievementHash = null;

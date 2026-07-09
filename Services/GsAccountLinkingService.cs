@@ -262,8 +262,8 @@ namespace GsPlugin.Services {
                     // but without rotating the InstallID/InstallToken themselves.
                     GsDataManager.MutateAndSave(d => {
                         d.LinkedUserId = null;
-                        d.ActiveSessionId = null;
-                        d.PendingStartGameId = null;
+                        d.ActiveSessionsByGameId.Clear();
+                        d.PendingStartGameIds.Clear();
                         d.PendingScrobbles.Clear();
                         d.LastLibraryHash = null;
                         d.LastAchievementHash = null;

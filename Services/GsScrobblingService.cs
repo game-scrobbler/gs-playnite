@@ -32,27 +32,30 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
-        /// Manually clears the active session ID. Use with caution.
+        /// Clears the active session ID for a specific game. Playnite allows multiple
+        /// games to run simultaneously, so sessions are tracked per game ID.
         /// </summary>
-        private static void ClearActiveSession() {
-            if (!string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
-                _logger.Info("Manually clearing active session ID");
-                GsDataManager.MutateAndSave(d => d.ActiveSessionId = null);
+        private static void ClearActiveSession(string gameId) {
+            if (string.IsNullOrEmpty(gameId)) return;
+            if (GsDataManager.HasActiveSession(gameId)) {
+                _logger.Info($"Clearing active session ID for game ID: {gameId}");
+                GsDataManager.MutateAndSave(d => d.ActiveSessionsByGameId.Remove(gameId));
             }
         }
 
         /// <summary>
-        /// Sets the active session ID and persists it to storage.
+        /// Sets the active session ID for a specific game and persists it to storage.
         /// </summary>
+        /// <param name="gameId">The Playnite game ID the session belongs to.</param>
         /// <param name="sessionId">The session ID to set as active.</param>
-        private static void SetActiveSession(string sessionId) {
-            if (string.IsNullOrEmpty(sessionId)) {
-                _logger.Warn("Attempted to set empty or null session ID");
+        private static void SetActiveSession(string gameId, string sessionId) {
+            if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(sessionId)) {
+                _logger.Warn("Attempted to set active session with empty or null game ID or session ID");
                 return;
             }
 
-            _logger.Info($"Setting active session ID: {sessionId}");
-            GsDataManager.MutateAndSave(d => d.ActiveSessionId = sessionId);
+            _logger.Info($"Setting active session ID for game ID {gameId}: {sessionId}");
+            GsDataManager.MutateAndSave(d => d.ActiveSessionsByGameId[gameId] = sessionId);
         }
 
         /// <summary>
@@ -122,12 +125,14 @@ namespace GsPlugin.Services {
                     metadata = new { PluginId = startedGame.PluginId.ToString(), SourceName = startedGame.Source?.Name },
                     started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 });
+                var startedGameId = startedGame.Id.ToString();
+
                 if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
-                    SetActiveSession(sessionData.session_id);
-                    // Clear any stale pending-start marker so the stop handler uses the
-                    // normal active-session path instead of the queued-pair branch.
-                    if (GsDataManager.Data.PendingStartGameId != null) {
-                        GsDataManager.MutateAndSave(d => d.PendingStartGameId = null);
+                    SetActiveSession(startedGameId, sessionData.session_id);
+                    // Clear any stale pending-start marker for this game so the stop handler
+                    // uses the normal active-session path instead of the queued-pair branch.
+                    if (GsDataManager.HasPendingStart(startedGameId)) {
+                        GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Remove(startedGameId));
                     }
                     _logger.Info($"Successfully started scrobble session with ID: {sessionData.session_id}");
                 }
@@ -148,8 +153,10 @@ namespace GsPlugin.Services {
                         QueuedAt = localDate
                     });
                     // Mark that this game has a queued start so OnGameStoppedAsync can pair it
-                    // with a finish even though there is no ActiveSessionId.
-                    GsDataManager.MutateAndSave(d => d.PendingStartGameId = startedGame.Id.ToString());
+                    // with a finish even though there is no active session for it.
+                    if (!GsDataManager.HasPendingStart(startedGameId)) {
+                        GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Add(startedGameId));
+                    }
                 }
             }
             catch (Exception ex) {
@@ -176,11 +183,11 @@ namespace GsPlugin.Services {
 
                 DateTime localDate = DateTime.Now;
                 var stoppedGame = args.Game;
+                var stoppedGameId = stoppedGame.Id.ToString();
 
                 // If the start was queued (failed to send), queue a matching finish so the
                 // replay produces a paired session. No API call is needed here.
-                var pendingStartGameId = GsDataManager.Data.PendingStartGameId;
-                if (!string.IsNullOrEmpty(pendingStartGameId) && pendingStartGameId == stoppedGame.Id.ToString()) {
+                if (GsDataManager.HasPendingStart(stoppedGameId)) {
                     _logger.Info($"Queuing finish to pair with pending start for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
@@ -197,12 +204,15 @@ namespace GsPlugin.Services {
                         },
                         QueuedAt = localDate
                     });
-                    GsDataManager.MutateAndSave(d => d.PendingStartGameId = null);
+                    GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Remove(stoppedGameId));
                     return;
                 }
 
-                if (string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
-                    _logger.Warn("No active session ID found when stopping game");
+                // Capture the session ID for this game once, up front — re-reading shared
+                // state after the awaited network call below could observe a different
+                // game's session if OnGameStartAsync ran concurrently in the interim.
+                if (!GsDataManager.TryGetActiveSession(stoppedGameId, out var activeSessionId) || string.IsNullOrEmpty(activeSessionId)) {
+                    _logger.Warn($"No active session ID found when stopping game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
                     return;
                 }
 
@@ -210,7 +220,7 @@ namespace GsPlugin.Services {
                 if (!GsAllowedPlugins.IsAllowed(stoppedGame)) {
                     _logger.Info($"Skipping scrobble finish for unsupported plugin: {stoppedGame.PluginId}");
                     // Still clear the active session since we may have tracked start before this filter existed
-                    ClearActiveSession();
+                    ClearActiveSession(stoppedGameId);
                     return;
                 }
 
@@ -226,13 +236,13 @@ namespace GsPlugin.Services {
                     plugin_id = stoppedGame.PluginId.ToString(),
                     external_game_id = stoppedGame.GameId,
                     source_name = stoppedGame.Source?.Name,
-                    session_id = GsDataManager.Data.ActiveSessionId,
+                    session_id = activeSessionId,
                     metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
                     finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                 });
                 if (finishResponse != null) {
                     // Only clear the session ID if the request was successful
-                    ClearActiveSession();
+                    ClearActiveSession(stoppedGameId);
                     _logger.Info($"Successfully finished scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
                 }
                 else {
@@ -246,13 +256,13 @@ namespace GsPlugin.Services {
                             plugin_id = stoppedGame.PluginId.ToString(),
                             external_game_id = stoppedGame.GameId,
                             source_name = stoppedGame.Source?.Name,
-                            session_id = GsDataManager.Data.ActiveSessionId,
+                            session_id = activeSessionId,
                             metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
                             finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
                         },
                         QueuedAt = localDate
                     });
-                    // Leave ActiveSessionId in place so a manual retry still has the session ID
+                    // Leave this game's active session entry in place so a manual retry still has the session ID
                 }
             }
             catch (Exception ex) {
@@ -261,9 +271,18 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
-        /// Handles the application stopped event and cleans up any active scrobbling session.
-        /// This ensures that if Playnite is closed while a game is running, the session is properly finished.
+        /// Handles the application stopped event and cleans up any active scrobbling session(s).
+        /// This ensures that if Playnite is closed while one or more games are running, each
+        /// session is properly finished.
         /// </summary>
+        /// <remarks>
+        /// Playnite invokes this from an async-void event handler and does not wait for it to
+        /// complete before tearing down the process, so any <c>await</c> here might never resume.
+        /// To survive that, the finish for each session is durably queued to
+        /// <see cref="PendingScrobble"/> storage (a synchronous disk write) BEFORE attempting the
+        /// live network call — only removing the queued copy if the send actually completes. If
+        /// the process exits mid-call, the queued finish survives and is sent on next launch.
+        /// </remarks>
         public async Task OnApplicationStoppedAsync() {
             try {
                 if (GsDataManager.IsOptedOut) return;
@@ -272,39 +291,59 @@ namespace GsPlugin.Services {
                     _logger.Info("Scrobbling disabled, skipping application stop cleanup");
                     return;
                 }
-                if (string.IsNullOrEmpty(GsDataManager.Data.ActiveSessionId)) {
+
+                // Snapshot so we don't enumerate a collection that OnGameStoppedAsync could be
+                // concurrently mutating, and so each session's cleanup is independent below.
+                var activeSessions = GsDataManager.SnapshotActiveSessions();
+                if (activeSessions.Count == 0) {
                     _logger.Debug("No active session to clean up on application stop");
                     return;
                 }
 
-                _logger.Info("Application stopping with active session, finishing scrobble session");
-
-                // Re-check opt-out before sending data (user may have opted out mid-flight)
-                if (GsDataManager.IsOptedOut) return;
+                _logger.Info($"Application stopping with {activeSessions.Count} active session(s), finishing scrobble session(s)");
 
                 DateTime localDate = DateTime.Now;
-                var finishResponse = await _apiClient.FinishGameSession(new ScrobbleFinishReq {
-                    user_id = GsDataManager.InstallIdForBody,
-                    session_id = GsDataManager.Data.ActiveSessionId,
-                    metadata = new { reason = "application_stopped" },
-                    finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                });
-                if (finishResponse != null) {
-                    ClearActiveSession();
-                    _logger.Info("Successfully cleaned up active session on application stop");
-                }
-                else {
-                    _logger.Error("Failed to finish active session on application stop. Queuing for retry.");
-                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+
+                foreach (var kvp in activeSessions) {
+                    var gameId = kvp.Key;
+                    var sessionId = kvp.Value;
+
+                    var finishData = new ScrobbleFinishReq {
+                        user_id = GsDataManager.InstallIdForBody,
+                        session_id = sessionId,
+                        metadata = new { reason = "application_stopped" },
+                        finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                    };
+                    var pendingFinish = new PendingScrobble {
                         Type = "finish",
-                        FinishData = new ScrobbleFinishReq {
-                            user_id = GsDataManager.InstallIdForBody,
-                            session_id = GsDataManager.Data.ActiveSessionId,
-                            metadata = new { reason = "application_stopped" },
-                            finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                        },
+                        FinishData = finishData,
                         QueuedAt = localDate
-                    });
+                    };
+                    // Durable write happens before any await — see remarks above. Once the finish
+                    // is queued, the pending-scrobble queue is the source of truth for completing
+                    // it, so the active-session marker is cleared immediately rather than only on
+                    // live-send success — otherwise it lingers indefinitely (the app is shutting
+                    // down, so there is no later OnGameStoppedAsync to clear it) and a subsequent
+                    // application-stop cycle would re-enqueue a duplicate finish for this game.
+                    GsDataManager.EnqueuePendingScrobble(pendingFinish);
+                    ClearActiveSession(gameId);
+
+                    try {
+                        // Re-check opt-out before sending data (user may have opted out mid-flight)
+                        if (GsDataManager.IsOptedOut) continue;
+
+                        var finishResponse = await _apiClient.FinishGameSession(finishData);
+                        if (finishResponse != null) {
+                            GsDataManager.RemovePendingScrobble(pendingFinish);
+                            _logger.Info($"Successfully cleaned up active session on application stop for game ID: {gameId}");
+                        }
+                        else {
+                            _logger.Error($"Failed to finish active session on application stop for game ID: {gameId}. Left queued for retry.");
+                        }
+                    }
+                    catch (Exception ex) {
+                        _logger.Error(ex, $"Error finishing session on application stop for game ID: {gameId}. Left queued for retry.");
+                    }
                 }
             }
             catch (Exception ex) {
