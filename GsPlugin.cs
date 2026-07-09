@@ -54,6 +54,12 @@ namespace GsPlugin {
         private int _achievementSyncInFlight;
         private Timer _pendingFlushTimer;
         /// <summary>
+        /// Synchronizes _pendingFlushTimer creation (OnApplicationStarted, after several
+        /// awaits) with its disposal (Dispose()) so a shutdown racing startup can't leave
+        /// an orphaned timer created after _disposed was already set.
+        /// </summary>
+        private readonly object _timerLock = new object();
+        /// <summary>
         /// Unique identifier for the plugin itself.
         /// </summary>
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
@@ -232,20 +238,28 @@ namespace GsPlugin {
                 });
 
                 // Start periodic flush timer — every 5 minutes, retry any remaining queued scrobbles.
-                _pendingFlushTimer = new Timer(_ => {
-                    if (_disposed) return;
-                    var api = _apiClient;
-                    if (api == null || GsDataManager.IsOptedOut) return;
-                    try {
-                        _ = api.FlushPendingScrobblesAsync().ContinueWith(t => {
-                            if (t.IsFaulted)
-                                _logger.Warn(t.Exception?.GetBaseException(), "Periodic pending flush failed");
-                        }, TaskContinuationOptions.OnlyOnFaulted);
+                // Guarded by _timerLock so a Dispose() racing this (e.g. plugin unloaded or
+                // Playnite closed shortly after startup) can't create a timer after shutdown
+                // already ran, which would otherwise leak an un-disposed Timer for the life
+                // of the process.
+                lock (_timerLock) {
+                    if (!_disposed) {
+                        _pendingFlushTimer = new Timer(_ => {
+                            if (_disposed) return;
+                            var api = _apiClient;
+                            if (api == null || GsDataManager.IsOptedOut) return;
+                            try {
+                                _ = api.FlushPendingScrobblesAsync().ContinueWith(t => {
+                                    if (t.IsFaulted)
+                                        _logger.Warn(t.Exception?.GetBaseException(), "Periodic pending flush failed");
+                                }, TaskContinuationOptions.OnlyOnFaulted);
+                            }
+                            catch (ObjectDisposedException) {
+                                // Timer fired after Dispose() — safe to ignore
+                            }
+                        }, null, (int)TimeSpan.FromMinutes(5).TotalMilliseconds, (int)TimeSpan.FromMinutes(5).TotalMilliseconds);
                     }
-                    catch (ObjectDisposedException) {
-                        // Timer fired after Dispose() — safe to ignore
-                    }
-                }, null, (int)TimeSpan.FromMinutes(5).TotalMilliseconds, (int)TimeSpan.FromMinutes(5).TotalMilliseconds);
+                }
 
                 var startupSyncResult = await SyncLibraryWithDiffAsync();
                 if (startupSyncResult == SyncLibraryResult.Cooldown) {
@@ -648,7 +662,9 @@ namespace GsPlugin {
         /// Releases resources used by the plugin.
         /// </summary>
         public override void Dispose() {
-            if (!_disposed) {
+            bool alreadyDisposed;
+            lock (_timerLock) {
+                alreadyDisposed = _disposed;
                 _disposed = true;
 
                 try {
@@ -658,7 +674,9 @@ namespace GsPlugin {
                 catch (Exception ex) {
                     _logger.Error(ex, "Error disposing flush timer");
                 }
+            }
 
+            if (!alreadyDisposed) {
                 try {
                     GsPostHog.Shutdown();
                 }
