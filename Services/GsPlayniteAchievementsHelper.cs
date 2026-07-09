@@ -76,10 +76,6 @@ namespace GsPlugin.Services {
             }
         }
 
-        public int? GetUnlockedCount(Guid gameId) => GetCounts(gameId)?.unlocked;
-
-        public int? GetTotalCount(Guid gameId) => GetCounts(gameId)?.total;
-
         public List<AchievementItem> GetAchievements(Guid gameId) {
             try {
                 if (!File.Exists(_dbPath)) return null;

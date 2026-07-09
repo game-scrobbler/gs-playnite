@@ -39,8 +39,8 @@ namespace GsPlugin.Api {
 
         public ApiOutcome Outcome =>
             status == "success" ? ApiOutcome.Success :
-            status == "queued"  ? ApiOutcome.Queued  :
-            status == "fail"    ? ApiOutcome.Fail    :
+            status == "queued" ? ApiOutcome.Queued :
+            status == "fail" ? ApiOutcome.Fail :
                                   ApiOutcome.Error;
     }
 
@@ -190,14 +190,6 @@ namespace GsPlugin.Api {
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string result_snapshot_hash { get; set; }
-    }
-
-    public class AchievementSyncRes {
-        public bool success { get; set; }
-        public string status { get; set; }
-        public string reason { get; set; }
-        public string message { get; set; }
-        public string timestamp { get; set; }
     }
 
     // ──────────────────────────────────────────────────────────

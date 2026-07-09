@@ -34,10 +34,6 @@ namespace GsPlugin.Services {
             return null;
         }
 
-        public int? GetUnlockedCount(Guid gameId) => GetCounts(gameId)?.unlocked;
-
-        public int? GetTotalCount(Guid gameId) => GetCounts(gameId)?.total;
-
         public List<AchievementItem> GetAchievements(Guid gameId) {
             foreach (var p in _providers) {
                 if (!p.IsInstalled) continue;

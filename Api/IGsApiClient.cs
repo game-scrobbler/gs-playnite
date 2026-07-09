@@ -19,7 +19,6 @@ namespace GsPlugin.Api {
         Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req);
         Task<OptInRes> RequestOptIn(OptInReq req);
         Task<RegisterInstallTokenRes> RegisterInstallToken(string installId);
-        Task<string> ResetInstallToken(string currentToken);
         Task<string> GetDashboardToken();
         Task<PlayniteNotificationsRes> GetNotifications();
     }

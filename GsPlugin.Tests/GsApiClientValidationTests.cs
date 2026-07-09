@@ -337,20 +337,6 @@ namespace GsPlugin.Tests {
             Assert.Equal("hash123", req.base_snapshot_hash);
         }
 
-        [Fact]
-        public void AchievementSyncRes_CanBeConstructed() {
-            var res = new AchievementSyncRes {
-                success = true,
-                status = "queued",
-                reason = null,
-                message = "OK",
-                timestamp = "2025-01-01T10:00:00Z"
-            };
-
-            Assert.True(res.success);
-            Assert.Equal("queued", res.status);
-            Assert.Null(res.reason);
-        }
 
     }
 
@@ -414,9 +400,6 @@ namespace GsPlugin.Tests {
 
         public Task<RegisterInstallTokenRes> RegisterInstallToken(string installId) =>
             Task.FromResult(new RegisterInstallTokenRes { success = true, token = "mock-token" });
-
-        public Task<string> ResetInstallToken(string currentToken) =>
-            Task.FromResult("mock-new-token");
 
         public Task<string> GetDashboardToken() =>
             Task.FromResult("mock-dashboard-token");

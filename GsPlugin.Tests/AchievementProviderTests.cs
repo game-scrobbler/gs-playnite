@@ -27,9 +27,6 @@ namespace GsPlugin.Tests {
             return (list.Count(a => a.IsUnlocked), list.Count);
         }
 
-        public int? GetUnlockedCount(Guid gameId) => GetCounts(gameId)?.unlocked;
-        public int? GetTotalCount(Guid gameId) => GetCounts(gameId)?.total;
-
         public List<AchievementItem> GetAchievements(Guid gameId) {
             if (!IsInstalled || !Data.TryGetValue(gameId, out var list))
                 return null;
@@ -183,27 +180,6 @@ namespace GsPlugin.Tests {
             Assert.Equal(3, counts.Value.total);
         }
 
-        [Fact]
-        public void GetUnlockedCount_DelegatesToGetCounts() {
-            var p1 = new StubAchievementProvider {
-                IsInstalled = true,
-                Data = { [GameA] = MakeAchievements(4, 8) }
-            };
-            var agg = new GsAchievementAggregator(p1);
-
-            Assert.Equal(4, agg.GetUnlockedCount(GameA));
-        }
-
-        [Fact]
-        public void GetTotalCount_DelegatesToGetCounts() {
-            var p1 = new StubAchievementProvider {
-                IsInstalled = true,
-                Data = { [GameA] = MakeAchievements(4, 8) }
-            };
-            var agg = new GsAchievementAggregator(p1);
-
-            Assert.Equal(8, agg.GetTotalCount(GameA));
-        }
 
         [Fact]
         public void GetAchievements_ReturnsFirstProviderWithData() {

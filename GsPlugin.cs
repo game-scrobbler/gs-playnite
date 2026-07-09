@@ -115,20 +115,6 @@ namespace GsPlugin {
         }
 
         /// <summary>
-        /// Called when a game has been installed.
-        /// </summary>
-        public override void OnGameInstalled(OnGameInstalledEventArgs args) {
-            base.OnGameInstalled(args);
-        }
-
-        /// <summary>
-        /// Called when a game has started running.
-        /// </summary>
-        public override void OnGameStarted(OnGameStartedEventArgs args) {
-            base.OnGameStarted(args);
-        }
-
-        /// <summary>
         /// Called before a game is started. This happens when the user clicks Play but before the game actually launches.
         /// </summary>
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
@@ -167,13 +153,6 @@ namespace GsPlugin {
             finally {
                 base.OnGameStopped(args);
             }
-        }
-
-        /// <summary>
-        /// Called when a game has been uninstalled.
-        /// </summary>
-        public override void OnGameUninstalled(OnGameUninstalledEventArgs args) {
-            base.OnGameUninstalled(args);
         }
 
         /// <summary>
@@ -356,20 +335,6 @@ namespace GsPlugin {
             finally {
                 base.OnLibraryUpdated(args);
             }
-        }
-
-        /// <summary>
-        /// Called when game selection changes in the UI.
-        /// </summary>
-        public override void OnGameSelected(OnGameSelectedEventArgs args) {
-            base.OnGameSelected(args);
-        }
-
-        /// <summary>
-        /// Called when game startup is cancelled by the user or the system.
-        /// </summary>
-        public override void OnGameStartupCancelled(OnGameStartupCancelledEventArgs args) {
-            base.OnGameStartupCancelled(args);
         }
 
         /// <summary>

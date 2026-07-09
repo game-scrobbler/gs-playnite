@@ -53,8 +53,6 @@ namespace GsPlugin.Services {
         /// </summary>
         (int unlocked, int total)? GetCounts(Guid gameId);
 
-        int? GetUnlockedCount(Guid gameId);
-        int? GetTotalCount(Guid gameId);
         List<AchievementItem> GetAchievements(Guid gameId);
     }
 }

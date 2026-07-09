@@ -377,7 +377,8 @@ namespace GsPlugin.Api {
         /// Call once on first boot (or when InstallToken is missing from persistent storage).
         /// Returns the response body so the caller can inspect error_code.
         /// HTTP 409 (error_code PLAYNITE_TOKEN_ALREADY_REGISTERED) means the server already has
-        /// a token for this install ID — the local copy was lost; call ResetInstallToken to recover.
+        /// a token for this install ID — the local copy was lost. Recovery rotates to a fresh
+        /// InstallID (see GsDataManager.RotateInstallId) and re-registers under the new identity.
         /// </summary>
         public async Task<RegisterInstallTokenRes> RegisterInstallToken(string installId) {
             if (string.IsNullOrEmpty(installId)) {
@@ -467,6 +468,8 @@ namespace GsPlugin.Api {
             }
         }
 
+        #endregion
+
         #region Notifications
 
         /// <summary>
@@ -500,45 +503,6 @@ namespace GsPlugin.Api {
             }
             catch (Exception ex) {
                 _logger.Warn(ex, "GetNotifications HTTP error");
-                return null;
-            }
-        }
-
-        #endregion
-
-        /// <summary>
-        /// Rotates the install token by calling /v2/reset-token with the current token.
-        /// Use when the server returns PLAYNITE_TOKEN_ALREADY_REGISTERED on registration
-        /// (meaning the plugin lost its locally-stored token and needs to rotate to recover).
-        /// Returns the new raw token on success, or null on failure.
-        /// </summary>
-        public async Task<string> ResetInstallToken(string currentToken) {
-            if (string.IsNullOrEmpty(currentToken)) {
-                _logger.Error("ResetInstallToken called with null or empty currentToken");
-                return null;
-            }
-
-            string url = $"{_apiBaseUrl}/api/playnite/v2/reset-token";
-
-            try {
-                using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
-                    request.Headers.Add("x-playnite-token", currentToken);
-                    request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
-                    HttpResponseMessage response = await _httpClient.SendAsync(request).ConfigureAwait(false);
-                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                    if (!response.IsSuccessStatusCode) {
-                        _logger.Warn($"ResetInstallToken returned {(int)response.StatusCode}");
-                        return null;
-                    }
-
-                    var res = JsonSerializer.Deserialize<RegisterInstallTokenRes>(responseBody, _jsonOptions);
-                    return res?.token;
-                }
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "ResetInstallToken HTTP error");
-                GsSentry.CaptureException(ex, "ResetInstallToken HTTP error");
                 return null;
             }
         }

@@ -59,30 +59,6 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
-        /// Sets the linked user information in the data manager.
-        /// </summary>
-        /// <param name="userId">The linked user ID, or null if not linked</param>
-        private static void SetLinkedUser(string userId = null) {
-            bool oldLinked = GsDataManager.IsAccountLinked;
-            var oldId = GsDataManager.Data.LinkedUserId;
-
-            // Only set LinkedUserId if it's a valid ID (not the sentinel value)
-            var newValue = (userId == GsData.NotLinkedValue || string.IsNullOrEmpty(userId))
-                ? null : userId;
-            GsDataManager.MutateAndSave(d => d.LinkedUserId = newValue);
-
-            // Log state changes
-            bool newLinked = GsDataManager.IsAccountLinked;
-            if (oldLinked != newLinked) {
-                _logger.Info($"User link status changed: {oldLinked} -> {newLinked}");
-            }
-
-            if (oldId != GsDataManager.Data.LinkedUserId) {
-                _logger.Info($"Linked user ID changed: {oldId ?? "null"} -> {GsDataManager.Data.LinkedUserId ?? "null"}");
-            }
-        }
-
-        /// <summary>
         /// Handles the game starting event and initiates a new scrobbling session.
         /// </summary>
         /// <param name="args">Event arguments containing game information.</param>
@@ -869,7 +845,8 @@ namespace GsPlugin.Services {
                             var (achs, src) = diagAgg.GetAchievementsWithSource(g.Id);
                             achievements = achs;
                             sourceProvider = src;
-                        } else {
+                        }
+                        else {
                             achievements = _achievementHelper.GetAchievements(g.Id);
                         }
 
@@ -879,7 +856,8 @@ namespace GsPlugin.Services {
                             if (nullCount <= 3) {
                                 _logger.Debug($"Achievement diag: game '{g.Name}' (plugin={g.PluginId}) returned no achievements");
                             }
-                        } else {
+                        }
+                        else {
                             withDataCount++;
                             // Log first game with data to confirm which provider works
                             if (withDataCount == 1) {
