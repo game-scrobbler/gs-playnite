@@ -670,6 +670,17 @@ namespace GsPlugin.Services {
 
                 if (response.success && response.status == "queued") {
                     _logger.Info("Library diff sync queued successfully.");
+
+                    // Apply the snapshot BEFORE committing the hash baseline (matches the
+                    // achievements diff path). If the process crashes between the two writes,
+                    // a stale-but-unclaimed snapshot self-heals on the next diff attempt via
+                    // the hash-mismatch check; committing the hash first would instead leave
+                    // gs_data.json claiming a baseline that gs_snapshot.json doesn't reflect,
+                    // silently corrupting the next diff's base_snapshot_hash.
+                    var addedSnapshots = added.ToDictionary(g => g.playnite_id, g => BuildGameSnapshot(g));
+                    var updatedSnapshots = updated.ToDictionary(g => g.playnite_id, g => BuildGameSnapshot(g));
+                    GsSnapshotManager.ApplyLibraryDiff(addedSnapshots, updatedSnapshots, removed);
+
                     var libCount = library.Count;
                     GsDataManager.MutateAndSave(d => {
                         d.LastSyncAt = DateTime.UtcNow;
@@ -678,11 +689,6 @@ namespace GsPlugin.Services {
                         d.LastIntegrationAccountsHash = accountsHash;
                         d.LibraryDiffSyncCooldownExpiresAt = null;
                     });
-
-                    // Update snapshot with diff
-                    var addedSnapshots = added.ToDictionary(g => g.playnite_id, g => BuildGameSnapshot(g));
-                    var updatedSnapshots = updated.ToDictionary(g => g.playnite_id, g => BuildGameSnapshot(g));
-                    GsSnapshotManager.ApplyLibraryDiff(addedSnapshots, updatedSnapshots, removed);
 
                     return SyncLibraryResult.Success;
                 }
