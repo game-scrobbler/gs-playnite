@@ -35,9 +35,20 @@ $changelogMatch = [regex]::Match($changelogContent, $versionPattern, [System.Tex
 $changelogEntries = @()
 if ($changelogMatch.Success) {
     $versionChangelog = $changelogMatch.Groups[1].Value
-    # Extract bullet points from Features and Bug Fixes sections
+
+    # Prefer the curated "### Highlights" section (user-facing bullets added on
+    # the release PR by generate-release-highlights.ps1). Fall back to the raw
+    # Features/Bug Fixes bullets when no Highlights section exists.
+    $highlightsMatch = [regex]::Match($versionChangelog, "### Highlights\s*\n(.*?)(?=\n###|\n## |$)", [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    $bulletSource = $versionChangelog
+    if ($highlightsMatch.Success) {
+        Write-Host "Using curated Highlights section for changelog entries"
+        $bulletSource = $highlightsMatch.Groups[1].Value
+    }
+
+    # Extract bullet points
     $bulletPattern = "^\s*\*\s+(.+?)$"
-    $matches = [regex]::Matches($versionChangelog, $bulletPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
+    $matches = [regex]::Matches($bulletSource, $bulletPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
 
     foreach ($match in $matches) {
         $line = $match.Groups[1].Value.Trim()
@@ -49,12 +60,6 @@ if ($changelogMatch.Success) {
             $changelogEntries += $line
         }
     }
-}
-
-# Marketing note placeholder (leave empty to skip)
-$marketingNote = ""
-if ($marketingNote) {
-    $changelogEntries = @($marketingNote) + $changelogEntries
 }
 
 # If no changelog entries found, add a generic one

@@ -1,0 +1,43 @@
+name: Release Highlights
+
+# Adds an AI-drafted "### Highlights" section to CHANGELOG.md on release-please
+# PRs. The bullets are reviewed (and editable) in the release PR like any other
+# change; update-installer-manifest.ps1 prefers them for the Playnite changelog.
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  highlights:
+    # Same-repo release-please branches only. Fork PRs never receive secrets on
+    # the pull_request trigger, but this guard stops spoofed-branch-name runs
+    # from even starting.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release PR branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      - name: Generate release highlights
+        shell: pwsh
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: ./scripts/generate-release-highlights.ps1
+
+      # The generation script is idempotent (no-op when Highlights already
+      # exist), so the synchronize event triggered by this push does not loop.
+      - name: Commit highlights to release PR
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet || { git commit -m "docs: add release highlights"; git push; }
