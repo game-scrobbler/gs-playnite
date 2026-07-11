@@ -74,17 +74,21 @@ else {
         $diff = $diff.Substring(0, $MaxDiffChars) + "`n[diff truncated]"
     }
 
-    $systemPrompt = "You write user-facing release notes for Game Scrobbler, a Playnite (desktop game library manager) extension that automatically tracks play sessions, syncs the user's game library and achievements, and shows stats and dashboards on gamescrobbler.com. Your audience is gamers, not developers."
+    $systemPrompt = "You write the 'What's New' notes for Game Scrobbler, a Playnite (desktop game library manager) extension that automatically tracks play time and achievements and shows gaming stats on gamescrobbler.com. Your readers are gamers glancing at an update popup: they don't know programming, and they don't care how the plugin works internally - only what changes for them."
 
     $userPrompt = @"
-Below are the commits and code changes going into Game Scrobbler release $version. Write the "Highlights" bullets for the Playnite add-on changelog that players read before updating.
+Below are the commits and code changes going into Game Scrobbler release $version. Write the "Highlights" bullets that players read before updating.
 
 Rules:
 - Output ONLY bullet lines, each starting with "* ". No headings, intro, or closing text.
-- 2 to 6 bullets, each a single sentence under 140 characters.
-- Plain, friendly language - no technical jargon, class names, commit hashes, or commit-type prefixes.
-- Describe user-visible benefits (what's new, what works better). Merge related commits into one bullet.
-- Skip purely internal changes (refactors, CI, tests, logging) unless they have a clear user benefit; summarize such fixes as a stability/reliability improvement at most once.
+- 3 to 5 bullets, each a single sentence under 120 characters. Lead with the most exciting change; new features before fixes.
+- Describe the benefit the player notices, never the mechanism of the change.
+  - Bad: "Improved handling of transient save errors during library sync."
+  - Good: "Your play stats no longer get lost when your PC or connection hiccups."
+- Address the reader as "you"/"your" where it reads naturally.
+- Every word must make sense to a non-programmer. Never use words like: sync hash, snapshot, session, token, API, server, endpoint, DTO, retry, error handling, thread, timer, JSON, plugin ID.
+- Omit purely internal changes (refactors, CI, tests, logging, telemetry) entirely. Do NOT write a filler bullet like "various behind-the-scenes improvements".
+- Merge related commits into one bullet.
 - Never claim a feature or fix that is not supported by the commits and diff below.
 
 Commits:
