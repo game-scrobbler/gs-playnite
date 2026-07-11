@@ -8,11 +8,11 @@
     <sys:String x:Key="LOCGsPluginInstallIdCopyHint">点击上方 ID 可复制到剪贴板。</sys:String>
     <sys:String x:Key="LOCGsPluginInstallIdCopyTooltip">点击复制 ID</sys:String>
 
-    <!-- ── Section 2: Theme &amp; Dashboard ── -->
-    <sys:String x:Key="LOCGsPluginThemeSectionTitle">主题与仪表盘</sys:String>
+    <!-- ── Section 2: Theme &amp; Features ── -->
+    <sys:String x:Key="LOCGsPluginThemeSectionTitle">主题与功能</sys:String>
     <sys:String x:Key="LOCGsPluginThemeDescription">控制 Game Scrobbler 侧边栏和视图的视觉主题。</sys:String>
-    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">新仪表盘体验</sys:String>
-    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">启用具有增强功能的新仪表盘体验</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">测试通道 — 抢先体验新功能</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">加入后可在正式发布前测试新功能。功能可能尚未完善或会发生变化。</sys:String>
 
     <!-- ── Section 3: Account Linking ── -->
     <sys:String x:Key="LOCGsPluginAccountLinkingSectionTitle">账户关联</sys:String>

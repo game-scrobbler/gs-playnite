@@ -8,11 +8,11 @@
     <sys:String x:Key="LOCGsPluginInstallIdCopyHint">Klicken Sie auf die ID oben, um sie in die Zwischenablage zu kopieren.</sys:String>
     <sys:String x:Key="LOCGsPluginInstallIdCopyTooltip">Klicken, um die ID zu kopieren</sys:String>
 
-    <!-- ── Section 2: Theme &amp; Dashboard ── -->
-    <sys:String x:Key="LOCGsPluginThemeSectionTitle">Design &amp; Dashboard</sys:String>
+    <!-- ── Section 2: Theme &amp; Features ── -->
+    <sys:String x:Key="LOCGsPluginThemeSectionTitle">Design &amp; Funktionen</sys:String>
     <sys:String x:Key="LOCGsPluginThemeDescription">Steuert das visuelle Design der Game Scrobbler-Seitenleiste und -Ansichten.</sys:String>
-    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">Neues Dashboard-Design</sys:String>
-    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">Neues Dashboard-Design mit erweiterten Funktionen aktivieren</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">Beta-Kanal — neue Funktionen früh testen</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">Melden Sie sich an, um neue Funktionen zu testen, bevor sie für alle freigegeben werden. Funktionen können unvollständig sein oder sich ändern.</sys:String>
 
     <!-- ── Section 3: Account Linking ── -->
     <sys:String x:Key="LOCGsPluginAccountLinkingSectionTitle">Kontoverknüpfung</sys:String>

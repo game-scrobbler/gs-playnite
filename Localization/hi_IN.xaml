@@ -8,11 +8,11 @@
     <sys:String x:Key="LOCGsPluginInstallIdCopyHint">क्लिपबोर्ड पर कॉपी करने के लिए ऊपर दी गई ID पर क्लिक करें।</sys:String>
     <sys:String x:Key="LOCGsPluginInstallIdCopyTooltip">ID कॉपी करने के लिए क्लिक करें</sys:String>
 
-    <!-- ── Section 2: Theme &amp; Dashboard ── -->
-    <sys:String x:Key="LOCGsPluginThemeSectionTitle">थीम &amp; डैशबोर्ड</sys:String>
+    <!-- ── Section 2: Theme &amp; Features ── -->
+    <sys:String x:Key="LOCGsPluginThemeSectionTitle">थीम &amp; सुविधाएँ</sys:String>
     <sys:String x:Key="LOCGsPluginThemeDescription">Game Scrobbler साइडबार और व्यू पर लागू विज़ुअल थीम को नियंत्रित करता है।</sys:String>
-    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">नया डैशबोर्ड अनुभव</sys:String>
-    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">उन्नत सुविधाओं के साथ नया डैशबोर्ड अनुभव सक्षम करें</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">बीटा चैनल — नई सुविधाएँ जल्दी आज़माएँ</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">सभी के लिए रिलीज़ होने से पहले नई सुविधाएँ टेस्ट करने के लिए नामांकन करें। सुविधाएँ अधूरी हो सकती हैं या बदल सकती हैं।</sys:String>
 
     <!-- ── Section 3: Account Linking ── -->
     <sys:String x:Key="LOCGsPluginAccountLinkingSectionTitle">खाता लिंकिंग</sys:String>

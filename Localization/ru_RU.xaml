@@ -8,11 +8,11 @@
     <sys:String x:Key="LOCGsPluginInstallIdCopyHint">Нажмите на идентификатор выше, чтобы скопировать его в буфер обмена.</sys:String>
     <sys:String x:Key="LOCGsPluginInstallIdCopyTooltip">Нажмите, чтобы скопировать идентификатор в буфер обмена.</sys:String>
 
-    <!-- ── Section 2: Theme &amp; Dashboard ── -->
-    <sys:String x:Key="LOCGsPluginThemeSectionTitle">Тема &amp; Панель управления</sys:String>
+    <!-- ── Section 2: Theme &amp; Features ── -->
+    <sys:String x:Key="LOCGsPluginThemeSectionTitle">Тема &amp; Функции</sys:String>
     <sys:String x:Key="LOCGsPluginThemeDescription">Управляет визуальной темой, применяемой к боковой панели и к виду Game Scrobbler.</sys:String>
-    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">Новый интерфейс панели управления</sys:String>
-    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">Включить новый интерфейс панели управления с расширенными возможностями.</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceLabel">Бета-канал — пробовать новые функции раньше</sys:String>
+    <sys:String x:Key="LOCGsPluginNewDashboardExperienceTooltip">Подключитесь, чтобы тестировать новые функции до их общего выпуска. Функции могут быть незавершёнными или изменяться.</sys:String>
 
     <!-- ── Section 3: Account Linking ── -->
     <sys:String x:Key="LOCGsPluginAccountLinkingSectionTitle">Привязка учётной записи</sys:String>

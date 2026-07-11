@@ -188,7 +188,7 @@
                               ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding Settings.Theme, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <!-- New Dashboard Experience toggle (display feature, grouped with theme) -->
+                    <!-- Beta channel toggle (early feature access, grouped with theme) -->
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
                               Content="{DynamicResource LOCGsPluginNewDashboardExperienceLabel}"
                               ToolTip="{DynamicResource LOCGsPluginNewDashboardExperienceTooltip}"
