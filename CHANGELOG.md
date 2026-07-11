@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.6.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.5.0...GsPlugin-v2.6.0) (2026-07-11)
+
+
+### Features
+
+* **observability:** report sync, flush and token-parse failures to Sentry ([57531e3](https://github.com/game-scrobbler/gs-playnite/commit/57531e3200721afad9dcbdb3fac4bdb4368f7762))
+* **playnite:** allow source-aware library plugins ([7130ba2](https://github.com/game-scrobbler/gs-playnite/commit/7130ba29585ceaf1cc48eaf897c7da8a0ce89882))
+* **scrobbling:** track multiple concurrent game sessions per game ID ([67543d0](https://github.com/game-scrobbler/gs-playnite/commit/67543d04d7f951068af6696e5b4866fc7d451de0))
+* **sync:** migrate library sync to the slim v3 DTO and endpoints ([ea24584](https://github.com/game-scrobbler/gs-playnite/commit/ea24584b8cb0e01bfc99b75a0a1fb5707d27431d))
+* **sync:** send result_snapshot_hash on achievement diff sync ([aa9fe0a](https://github.com/game-scrobbler/gs-playnite/commit/aa9fe0a3f3130d68e477c992fb86e85ae9b842be))
+* **sync:** send result_snapshot_hash on v3 diff sync ([0b5f92a](https://github.com/game-scrobbler/gs-playnite/commit/0b5f92a50ad9aaa8660710fbf4e33582119f9b13))
+* wire OptBackIn to server-side /v2/opt-in endpoint ([8f8a959](https://github.com/game-scrobbler/gs-playnite/commit/8f8a9596a1cb9f3bc8b7157a10dcbe3fa6752b85))
+
+
+### Bug Fixes
+
+* **api:** don't overwrite process-wide TLS SecurityProtocol setting ([d67eb0d](https://github.com/game-scrobbler/gs-playnite/commit/d67eb0d4af55923823e545cf21165d2f17de277f))
+* **data:** increment PendingScrobble.FlushAttempts under GsDataManager lock ([a58e268](https://github.com/game-scrobbler/gs-playnite/commit/a58e2684164d615cb09e7421effe994dc235ca1c))
+* **data:** retry GsData save on transient IOException ([43a373d](https://github.com/game-scrobbler/gs-playnite/commit/43a373d2194d061514094197586fb36ba0f933a1))
+* **security:** require confirmation before deep-link account linking ([da64c0d](https://github.com/game-scrobbler/gs-playnite/commit/da64c0d1beee96a3d088134fdf51e51cb1afa5a2))
+* **startup:** prevent orphaned flush timer when Dispose races startup ([dab7ca8](https://github.com/game-scrobbler/gs-playnite/commit/dab7ca803127e5df5d2b7a3068b47f482267f311))
+* stop sending "queued" string as session_id in async scrobble start ([f03f764](https://github.com/game-scrobbler/gs-playnite/commit/f03f764c2e88f38dde119a23c4046383ee61ab7e))
+* store null instead of \"queued\" as session_id in pending finish scrobbles ([e6c7129](https://github.com/game-scrobbler/gs-playnite/commit/e6c71296cf0d7100cbde6058c56cb15659a33f40))
+* **sync:** apply library snapshot diff before committing hash baseline ([7beb594](https://github.com/game-scrobbler/gs-playnite/commit/7beb594fa24ebb2c19f5f2933e011a835716d0e2))
+* **tests:** implement RequestOptIn in MockGsApiClient ([766047f](https://github.com/game-scrobbler/gs-playnite/commit/766047f541342e0cd2dcc2550068d68ca9213130))
+
 ## [2.5.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.4.0...GsPlugin-v2.5.0) (2026-03-27)
 
 
