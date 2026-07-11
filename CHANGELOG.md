@@ -5,12 +5,11 @@
 
 ### Highlights
 
-* Fixed a bug where launching two or more games at the same time could mix up their play session tracking, so playtime and stats now stay accurate.
-* Added a security confirmation prompt before linking your Playnite install to a gamescrobbler.com account via a web link, protecting against malicious sites.
-* Improved reliability of library and achievement syncing, including better handling of temporary save errors and communication hiccups so your data stays consistent.
-* Games from supported alternate installers (like GOG OSS, Legendary, or Epic Games forks) are now recognized and synced correctly instead of being skipped.
-* Re-enabling scrobbling after opting out now properly re-activates your account on the server, not just locally.
-* Various behind-the-scenes stability and error-reporting improvements to help catch and fix issues faster.
+* Games from launchers like GOG OSS, Legendary, and Amazon Games now count toward your stats instead of being skipped.
+* Playing two games at once? Each one's playtime is now tracked correctly.
+* Safer account linking: Playnite now asks for your confirmation before connecting to a link you opened in the browser.
+* Turning scrobbling back on after opting out now works properly again.
+* Your library and achievements stay up to date more dependably, even when your connection hiccups.
 
 
 ### Features
