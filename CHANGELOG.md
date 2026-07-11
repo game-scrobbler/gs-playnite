@@ -3,6 +3,16 @@
 ## [2.6.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.5.0...GsPlugin-v2.6.0) (2026-07-11)
 
 
+### Highlights
+
+* Fixed a bug where launching two or more games at the same time could mix up their play session tracking, so playtime and stats now stay accurate.
+* Added a security confirmation prompt before linking your Playnite install to a gamescrobbler.com account via a web link, protecting against malicious sites.
+* Improved reliability of library and achievement syncing, including better handling of temporary save errors and communication hiccups so your data stays consistent.
+* Games from supported alternate installers (like GOG OSS, Legendary, or Epic Games forks) are now recognized and synced correctly instead of being skipped.
+* Re-enabling scrobbling after opting out now properly re-activates your account on the server, not just locally.
+* Various behind-the-scenes stability and error-reporting improvements to help catch and fix issues faster.
+
+
 ### Features
 
 * **observability:** report sync, flush and token-parse failures to Sentry ([57531e3](https://github.com/game-scrobbler/gs-playnite/commit/57531e3200721afad9dcbdb3fac4bdb4368f7762))
