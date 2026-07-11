@@ -194,6 +194,13 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks
 - Adding a new `.cs` file requires a `<Compile Include="Folder\FileName.cs" />` entry in `GsPlugin.csproj` (old-style non-SDK project — files are not auto-included). Place files in the appropriate namespace folder (`Api/`, `Services/`, `Models/`, `Infrastructure/`, `View/`).
 - New `.cs` files written with LF line endings will fail `dotnet format --verify-no-changes`; run `dotnet format` to auto-correct to CRLF.
 
+### Release Highlights (User-Facing Changelog)
+- Playnite shows users the `Changelog` entries from `installer_manifest.yaml`, not CHANGELOG.md. CHANGELOG.md stays technical (for developers); the Playnite-facing text is curated separately.
+- `.github/workflows/release-highlights.yml` runs on release-please PR branches (`release-please--*`): `scripts/generate-release-highlights.ps1` calls the Anthropic API (repo secret `ANTHROPIC_API_KEY`, model `claude-sonnet-5`) with the commits and diff since the last release tag, and inserts a `### Highlights` section under the new version heading in CHANGELOG.md, committed back to the release PR.
+- Highlights are reviewed/edited in the release PR like any other change — edit the bullets there before merging to change what users see in Playnite.
+- The script is idempotent (no-ops when `### Highlights` already exists for the version, which also breaks the push→synchronize workflow loop) and best-effort: missing API key, API failure, or bad output warns and exits 0 so the release PR is never blocked.
+- `scripts/update-installer-manifest.ps1` prefers `### Highlights` bullets for the manifest; when absent it falls back to the raw Features/Bug Fixes bullets.
+
 ### Sentry Release Management
 - Runtime: Plugin reports version as `GsPlugin@X.Y.Z` from AssemblyInfo
 - CI/CD: GitHub Actions creates Sentry releases, uploads portable PDB files (`--type=portablepdb`), and associates commits
