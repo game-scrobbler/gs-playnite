@@ -1,6 +1,16 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.6.0
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-07-12
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.6.0/GsPlugin-v2.6.0.pext
+    Changelog:
+      - Games from launchers like GOG OSS, Legendary, and Amazon Games now count toward your stats instead of being skipped.
+      - "Playing two games at once? Each one's playtime is now tracked correctly."
+      - "Safer account linking: Playnite now asks for your confirmation before connecting to a link you opened in the browser."
+      - Turning scrobbling back on after opting out now works properly again.
+      - Your library and achievements stay up to date more dependably, even when your connection hiccups.
   - Version: 2.5.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-27
