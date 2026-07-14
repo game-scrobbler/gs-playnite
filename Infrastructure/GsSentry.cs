@@ -13,6 +13,12 @@ namespace GsPlugin.Infrastructure {
     /// </summary>
     public class GsSentry {
         private static readonly ILogger _logger = LogManager.GetLogger();
+        private static bool _initialized;
+
+        /// <summary>
+        /// True when <see cref="Initialize"/> completed successfully.
+        /// </summary>
+        public static bool IsInitialized => _initialized;
 
         /// <summary>
         /// Initializes Sentry with appropriate configuration settings.
@@ -54,11 +60,17 @@ namespace GsPlugin.Infrastructure {
                     // Note: null means "use default", 0.0f means "disable completely"
                     options.SendDefaultPii = false;
                     options.SampleRate = disableSentryFlag ? 0.0f : 1.0f;
-                    options.TracesSampleRate = disableSentryFlag ? 0.0f : 1.0f;
-                    options.ProfilesSampleRate = disableSentryFlag ? 0.0f : 1.0f;
+                    options.TracesSampleRate = disableSentryFlag ? 0.0f : 0.1f;
+                    // Never enable continuous profiling in-process — it keeps background
+                    // workers alive and has been implicated in Playnite refusing to quit.
+                    options.ProfilesSampleRate = 0.0f;
                     options.AutoSessionTracking = !disableSentryFlag;
-                    options.CaptureFailedRequests = !disableSentryFlag;
-                    options.FailedRequestStatusCodes.Add((400, 499));
+                    // CaptureFailedRequests + FailedRequestStatusCodes.Add((400,499)) constructs
+                    // Sentry.HttpStatusCodeRange. Playnite loads all plugins into one AppDomain;
+                    // if another extension already loaded an older Sentry.dll, that Add() throws
+                    // MissingMethodException and aborts init. Keep HTTP capture on the SDK default
+                    // (5xx only) so we never touch HttpStatusCodeRange.
+                    options.CaptureFailedRequests = false;
 
                     options.StackTraceMode = StackTraceMode.Enhanced;
                     options.IsGlobalModeEnabled = false;
@@ -166,10 +178,41 @@ namespace GsPlugin.Infrastructure {
                     }
                 };
 
+                _initialized = true;
                 _logger.Info($"Sentry initialized. Tracking enabled: {!disableSentryFlag}");
             }
             catch (Exception ex) {
+                _initialized = false;
                 _logger.Error(ex, "Failed to initialize Sentry");
+            }
+        }
+
+        /// <summary>
+        /// Flushes buffered events with a hard timeout, then closes the SDK.
+        /// Safe to call when init failed — no-ops so Playnite can exit promptly.
+        /// </summary>
+        public static void Shutdown() {
+            if (!_initialized) {
+                return;
+            }
+
+            try {
+                // Bounded flush: an unbounded Close() can hang Playnite on exit when the
+                // ingest endpoint is slow/unreachable or session tracking is mid-flight.
+                SentrySdk.Flush(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception ex) {
+                try { _logger.Debug(ex, "Sentry Flush failed during shutdown (non-critical)"); } catch { }
+            }
+
+            try {
+                SentrySdk.Close();
+            }
+            catch (Exception ex) {
+                try { _logger.Debug(ex, "Sentry Close failed during shutdown (non-critical)"); } catch { }
+            }
+            finally {
+                _initialized = false;
             }
         }
 

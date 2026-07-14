@@ -9,7 +9,6 @@ using System.Windows.Media.Imaging;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
-using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
@@ -31,6 +30,13 @@ namespace GsPlugin {
             var pluginDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             AppDomain.CurrentDomain.AssemblyResolve += (sender, args) => {
                 var name = new AssemblyName(args.Name);
+                // Only resolve deps we ship next to GsPlugin.dll. Playnite's AppDomain is
+                // shared across every extension — blindly LoadFrom for arbitrary names can
+                // pull the wrong assembly (or re-enter resolve). Sentry version skew across
+                // plugins is handled by avoiding APIs that differ between versions (see GsSentry).
+                if (string.IsNullOrEmpty(name.Name) || name.Name.StartsWith("Playnite", StringComparison.OrdinalIgnoreCase)) {
+                    return null;
+                }
                 var path = Path.Combine(pluginDir, name.Name + ".dll");
                 if (File.Exists(path)) {
                     return Assembly.LoadFrom(path);
@@ -650,7 +656,7 @@ namespace GsPlugin {
                 }
 
                 try {
-                    SentrySdk.Close();
+                    GsSentry.Shutdown();
                 }
                 catch (Exception ex) {
                     _logger.Error(ex, "Error closing Sentry");
