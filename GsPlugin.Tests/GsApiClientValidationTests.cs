@@ -119,6 +119,12 @@ namespace GsPlugin.Tests {
             Assert.Null(res.queueId);
         }
 
+        [Fact]
+        public void V4BeginDtos_DoNotExposeBodyIdentity() {
+            Assert.Null(typeof(LibraryV4FullSyncBeginReq).GetProperty("user_id"));
+            Assert.Null(typeof(AchievementsV4FullSyncBeginReq).GetProperty("user_id"));
+        }
+
         // --- IGsApiClient interface contract tests via mock ---
 
         [Fact]
@@ -378,11 +384,55 @@ namespace GsPlugin.Tests {
         public Task<AsyncQueuedResponse> SyncLibraryDiff(LibraryDiffSyncReq req) =>
             Task.FromResult(new AsyncQueuedResponse { success = true, status = "queued" });
 
+        public Task<V4SyncBeginRes> SyncLibraryFullBegin(LibraryV4FullSyncBeginReq req) =>
+            Task.FromResult(new V4SyncBeginRes {
+                success = true,
+                status = "started",
+                sync_id = "mock-sync",
+                max_chunk_items = 500
+            });
+
+        public Task<V4SyncChunkRes> SyncLibraryFullChunk(LibraryV4ChunkReq req) =>
+            Task.FromResult(new V4SyncChunkRes {
+                success = true,
+                status = "accepted",
+                sync_id = req?.sync_id,
+                chunk_index = req?.chunk_index ?? 0,
+                items_accepted = req?.items?.Count ?? 0
+            });
+
+        public Task<AsyncQueuedResponse> SyncLibraryFullCommit(LibraryV4CommitReq req) =>
+            Task.FromResult(new AsyncQueuedResponse { success = true, status = "queued" });
+
+        public Task SyncLibraryFullAbort(string syncId) => Task.CompletedTask;
+
         public Task<AsyncQueuedResponse> SyncAchievementsFull(AchievementsFullSyncReq req) =>
             Task.FromResult(new AsyncQueuedResponse { success = true, status = "queued" });
 
         public Task<AsyncQueuedResponse> SyncAchievementsDiff(AchievementsDiffSyncReq req) =>
             Task.FromResult(new AsyncQueuedResponse { success = true, status = "queued" });
+
+        public Task<V4SyncBeginRes> SyncAchievementsFullBegin(AchievementsV4FullSyncBeginReq req) =>
+            Task.FromResult(new V4SyncBeginRes {
+                success = true,
+                status = "started",
+                sync_id = "mock-ach-sync",
+                max_chunk_items = 500
+            });
+
+        public Task<V4SyncChunkRes> SyncAchievementsFullChunk(AchievementsV4ChunkReq req) =>
+            Task.FromResult(new V4SyncChunkRes {
+                success = true,
+                status = "accepted",
+                sync_id = req?.sync_id,
+                chunk_index = req?.chunk_index ?? 0,
+                items_accepted = req?.items?.Count ?? 0
+            });
+
+        public Task<AsyncQueuedResponse> SyncAchievementsFullCommit(AchievementsV4CommitReq req) =>
+            Task.FromResult(new AsyncQueuedResponse { success = true, status = "queued" });
+
+        public Task SyncAchievementsFullAbort(string syncId) => Task.CompletedTask;
 
         public Task<AllowedPluginsRes> GetAllowedPlugins() =>
             Task.FromResult(new AllowedPluginsRes());

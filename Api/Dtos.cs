@@ -132,6 +132,76 @@ namespace GsPlugin.Api {
         public List<Services.IntegrationAccountDto> integration_accounts { get; set; }
     }
 
+    // ──────────────────────────────────────────────────────────
+    // v4 chunked full sync
+    // ──────────────────────────────────────────────────────────
+
+    public class LibraryV4FullSyncBeginReq {
+        public int expected_total_items { get; set; }
+        public string result_snapshot_hash { get; set; }
+        public string[] flags { get; set; }
+        public List<Services.IntegrationAccountDto> integration_accounts { get; set; }
+    }
+
+    public class LibraryV4ChunkReq {
+        public string sync_id { get; set; }
+        public int chunk_index { get; set; }
+        public List<GameSyncDto> items { get; set; }
+    }
+
+    public class LibraryV4CommitReq {
+        public string sync_id { get; set; }
+        public string result_snapshot_hash { get; set; }
+        public int chunk_count { get; set; }
+        public int item_count { get; set; }
+    }
+
+    public class AchievementsV4FullSyncBeginReq {
+        public int expected_total_items { get; set; }
+        public string result_snapshot_hash { get; set; }
+    }
+
+    public class AchievementsV4ChunkReq {
+        public string sync_id { get; set; }
+        public int chunk_index { get; set; }
+        public List<GameAchievementsDto> items { get; set; }
+    }
+
+    public class AchievementsV4CommitReq {
+        public string sync_id { get; set; }
+        public string result_snapshot_hash { get; set; }
+        public int chunk_count { get; set; }
+        public int item_count { get; set; }
+    }
+
+    public class V4SyncAbortReq {
+        public string sync_id { get; set; }
+    }
+
+    public class V4SyncBeginRes {
+        public bool success { get; set; }
+        public string status { get; set; }
+        public string sync_id { get; set; }
+        public int max_chunk_items { get; set; }
+        public string expires_at { get; set; }
+        public string timestamp { get; set; }
+        public string error { get; set; }
+        public string reason { get; set; }
+        public string message { get; set; }
+    }
+
+    public class V4SyncChunkRes {
+        public bool success { get; set; }
+        public string status { get; set; }
+        public string sync_id { get; set; }
+        public int chunk_index { get; set; }
+        public int items_accepted { get; set; }
+        public int max_chunk_items { get; set; }
+        public string timestamp { get; set; }
+        public string error { get; set; }
+        public string message { get; set; }
+    }
+
     public class LibraryDiffSyncReq {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string user_id { get; set; }

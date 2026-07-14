@@ -336,6 +336,30 @@ namespace GsPlugin.Api {
             }, maxRetries: 1, isFailure: r => r == null);
         }
 
+        public async Task<V4SyncBeginRes> SyncLibraryFullBegin(LibraryV4FullSyncBeginReq req) {
+            if (!HasInstallToken()) {
+                _logger.Error("SyncLibraryFullBegin called with no install token");
+                return null;
+            }
+            return await PostV4Async<V4SyncBeginRes>(
+                $"{_apiBaseUrl}/api/playnite/v4/library/sync-full/begin", req, nameof(SyncLibraryFullBegin));
+        }
+
+        public async Task<V4SyncChunkRes> SyncLibraryFullChunk(LibraryV4ChunkReq req) {
+            return await PostV4Async<V4SyncChunkRes>(
+                $"{_apiBaseUrl}/api/playnite/v4/library/sync-full/chunk", req, nameof(SyncLibraryFullChunk));
+        }
+
+        public async Task<AsyncQueuedResponse> SyncLibraryFullCommit(LibraryV4CommitReq req) {
+            return await PostV4Async<AsyncQueuedResponse>(
+                $"{_apiBaseUrl}/api/playnite/v4/library/sync-full/commit", req, nameof(SyncLibraryFullCommit));
+        }
+
+        public async Task SyncLibraryFullAbort(string syncId) {
+            await PostV4AbortAsync(
+                $"{_apiBaseUrl}/api/playnite/v4/library/sync-full/abort", syncId, nameof(SyncLibraryFullAbort));
+        }
+
         public async Task<AsyncQueuedResponse> SyncAchievementsFull(AchievementsFullSyncReq req) {
             if (req == null) {
                 _logger.Error("SyncAchievementsFull called with null request");
@@ -366,6 +390,66 @@ namespace GsPlugin.Api {
             return await _circuitBreaker.ExecuteAsync(async () => {
                 return await PostJsonAsync<AsyncQueuedResponse>(url, req, true);
             }, maxRetries: 1, isFailure: r => r == null);
+        }
+
+        public async Task<V4SyncBeginRes> SyncAchievementsFullBegin(AchievementsV4FullSyncBeginReq req) {
+            if (!HasInstallToken()) {
+                _logger.Error("SyncAchievementsFullBegin called with no install token");
+                return null;
+            }
+            return await PostV4Async<V4SyncBeginRes>(
+                $"{_apiBaseUrl}/api/playnite/v4/achievements/sync-full/begin", req, nameof(SyncAchievementsFullBegin));
+        }
+
+        public async Task<V4SyncChunkRes> SyncAchievementsFullChunk(AchievementsV4ChunkReq req) {
+            return await PostV4Async<V4SyncChunkRes>(
+                $"{_apiBaseUrl}/api/playnite/v4/achievements/sync-full/chunk", req, nameof(SyncAchievementsFullChunk));
+        }
+
+        public async Task<AsyncQueuedResponse> SyncAchievementsFullCommit(AchievementsV4CommitReq req) {
+            return await PostV4Async<AsyncQueuedResponse>(
+                $"{_apiBaseUrl}/api/playnite/v4/achievements/sync-full/commit", req, nameof(SyncAchievementsFullCommit));
+        }
+
+        public async Task SyncAchievementsFullAbort(string syncId) {
+            await PostV4AbortAsync(
+                $"{_apiBaseUrl}/api/playnite/v4/achievements/sync-full/abort", syncId, nameof(SyncAchievementsFullAbort));
+        }
+
+        /// <summary>
+        /// v4 is token-authenticated by contract; unlike legacy routes, the server never trusts
+        /// a body identity. Do not start a session that its chunk/commit calls cannot authenticate.
+        /// </summary>
+        private static bool HasInstallToken() =>
+            !string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken);
+
+        /// <summary>
+        /// Shared v4 begin/chunk/commit POST. Business rejections (success=false) are NOT circuit
+        /// failures — only transport failures (null) are, so a server rejecting a stale sync session
+        /// cannot trip the shared breaker and starve unrelated scrobble/diff calls. The service layer
+        /// inspects success/status itself.
+        /// </summary>
+        private async Task<TRes> PostV4Async<TRes>(string url, object req, string logName) where TRes : class {
+            if (req == null) {
+                _logger.Error($"{logName} called with null request");
+                return null;
+            }
+            return await _circuitBreaker.ExecuteAsync(async () => {
+                return await PostJsonAsync<TRes>(url, req, true);
+            }, maxRetries: 1, isFailure: r => r == null);
+        }
+
+        /// <summary>Best-effort v4 session abort — swallows failures so cleanup never surfaces an error.</summary>
+        private async Task PostV4AbortAsync(string url, string syncId, string logName) {
+            if (string.IsNullOrEmpty(syncId)) {
+                return;
+            }
+            try {
+                await PostJsonAsync<object>(url, new V4SyncAbortReq { sync_id = syncId }, true);
+            }
+            catch (Exception ex) {
+                _logger.Warn($"{logName} failed: {ex.Message}");
+            }
         }
 
         #endregion

@@ -76,9 +76,9 @@ namespace GsPlugin.Models {
 
         /// <summary>
         /// Monotonically increasing counter incremented each time the install identity is rotated.
-        /// Written into gs_snapshot.json at save time; on load, GsSnapshotManager discards any
-        /// snapshot whose generation does not match this value, making stale snapshots
-        /// self-healing after a crash between the two-file rotation write sequence.
+        /// Written into gs_library_hashes.json / gs_achievement_hashes.json at save time; on load,
+        /// GsSyncHashIndex discards any index whose generation does not match this value,
+        /// making stale baselines self-healing after a crash between the two-file rotation write.
         /// </summary>
         public int IdentityGeneration { get; set; } = 0;
 
@@ -224,7 +224,7 @@ namespace GsPlugin.Models {
                     if (string.IsNullOrEmpty(_data.InstallID)) {
                         // Generate new InstallID if not present (fresh install or corrupt/missing data file).
                         // Bumping IdentityGeneration ensures any surviving gs_snapshot.json is treated
-                        // as stale and discarded by GsSnapshotManager.Initialize().
+                        // as stale and discarded by GsSyncHashIndex.Initialize().
                         _data.InstallID = Guid.NewGuid().ToString();
                         _data.IdentityGeneration++;
                         GsLogger.Info("Generated new InstallID");
@@ -535,8 +535,8 @@ namespace GsPlugin.Models {
                 SaveInternal();
                 GsLogger.Info("InstallID rotated for lost-token recovery; identity-bound state cleared");
             }
-            // Reset snapshot outside the data lock (each manager has its own lock).
-            GsSnapshotManager.Reset();
+            // Reset hash index outside the data lock (each manager has its own lock).
+            GsSyncHashIndex.Reset();
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
             return newId;
         }

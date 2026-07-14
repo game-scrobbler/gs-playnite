@@ -80,7 +80,7 @@ namespace GsPlugin {
             GsDataManager.Initialize(GetPluginUserDataPath(), null);
 
             // Initialize snapshot manager for diff-based sync
-            GsSnapshotManager.Initialize(GetPluginUserDataPath());
+            GsSyncHashIndex.Initialize(GetPluginUserDataPath());
 
             // Initialize Sentry for error tracking
             GsSentry.Initialize();
@@ -184,10 +184,9 @@ namespace GsPlugin {
                         NotificationType.Info));
                 }
 
-                // Ensure the install has a server-issued auth token. Best-effort, fire-and-forget:
-                // registration is a one-time step on first boot and must not stall the rest of
-                // startup (plugin refresh, update check, queue flush, library sync) for up to 30 s
-                // on first run or during API outages.
+                // Start install-token registration immediately, in parallel with the independent
+                // startup work below. v4 sync is token-authenticated, so the task is joined just
+                // before the first sync rather than sending an unauthenticated begin request.
                 var tokenTask = EnsureInstallTokenAsync();
 
                 // Fire-and-forget: fetch server notifications on a background thread after token
@@ -246,6 +245,7 @@ namespace GsPlugin {
                     }
                 }
 
+                await tokenTask;
                 var startupSyncResult = await SyncLibraryWithDiffAsync();
                 if (startupSyncResult == SyncLibraryResult.Cooldown) {
                     _logger.Info("Startup library sync skipped: sync cooldown is still active.");
@@ -481,7 +481,7 @@ namespace GsPlugin {
 
         /// <summary>
         /// Ensures the install has a valid server-issued auth token stored in GsData.
-        /// Runs fire-and-forget from OnApplicationStarted so it never blocks startup.
+        /// Starts in parallel with other startup work and is awaited before the first v4 sync.
         ///
         /// Flow:
         ///   - If a token is already stored → nothing to do.
@@ -593,7 +593,7 @@ namespace GsPlugin {
                 return SyncLibraryResult.Skipped;
             }
             try {
-                if (GsSnapshotManager.HasLibraryBaseline) {
+                if (GsSyncHashIndex.HasLibraryBaseline) {
                     return await _scrobblingService.SyncLibraryDiffAsync(PlayniteApi.Database.Games);
                 }
                 return await _scrobblingService.SyncLibraryFullAsync(PlayniteApi.Database.Games);
@@ -613,7 +613,7 @@ namespace GsPlugin {
                 return;
             }
             try {
-                if (GsSnapshotManager.HasAchievementsBaseline) {
+                if (GsSyncHashIndex.HasAchievementsBaseline) {
                     await _scrobblingService.SyncAchievementsDiffAsync(PlayniteApi.Database.Games);
                 }
                 else {

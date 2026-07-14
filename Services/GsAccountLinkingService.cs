@@ -273,7 +273,7 @@ namespace GsPlugin.Services {
                         d.LibraryDiffSyncCooldownExpiresAt = null;
                         d.LastIntegrationAccountsHash = null;
                     });
-                    GsSnapshotManager.Reset();
+                    GsSyncHashIndex.Reset();
                     OnLinkingStatusChanged();
                     // Refresh diagnostics widgets (pending scrobble count, last-sync text)
                     // since MutateAndSave does not emit DiagnosticsStateChanged.

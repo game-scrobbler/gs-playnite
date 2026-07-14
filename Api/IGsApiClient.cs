@@ -10,8 +10,16 @@ namespace GsPlugin.Api {
         Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData);
         Task<AsyncQueuedResponse> SyncLibraryFull(LibraryFullSyncReq req);
         Task<AsyncQueuedResponse> SyncLibraryDiff(LibraryDiffSyncReq req);
+        Task<V4SyncBeginRes> SyncLibraryFullBegin(LibraryV4FullSyncBeginReq req);
+        Task<V4SyncChunkRes> SyncLibraryFullChunk(LibraryV4ChunkReq req);
+        Task<AsyncQueuedResponse> SyncLibraryFullCommit(LibraryV4CommitReq req);
+        Task SyncLibraryFullAbort(string syncId);
         Task<AsyncQueuedResponse> SyncAchievementsFull(AchievementsFullSyncReq req);
         Task<AsyncQueuedResponse> SyncAchievementsDiff(AchievementsDiffSyncReq req);
+        Task<V4SyncBeginRes> SyncAchievementsFullBegin(AchievementsV4FullSyncBeginReq req);
+        Task<V4SyncChunkRes> SyncAchievementsFullChunk(AchievementsV4ChunkReq req);
+        Task<AsyncQueuedResponse> SyncAchievementsFullCommit(AchievementsV4CommitReq req);
+        Task SyncAchievementsFullAbort(string syncId);
         Task<AllowedPluginsRes> GetAllowedPlugins();
         Task<TokenVerificationRes> VerifyToken(string token, string playniteId);
         Task FlushPendingScrobblesAsync();

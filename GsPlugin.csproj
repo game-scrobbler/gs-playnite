@@ -175,6 +175,7 @@
     <!-- Models -->
     <Compile Include="Models\GsData.cs" />
     <Compile Include="Models\GsSnapshot.cs" />
+    <Compile Include="Models\GsSyncHashIndex.cs" />
     <Compile Include="Models\GsPluginSettings.cs" />
     <!-- Services -->
     <Compile Include="Services\GsScrobblingService.cs" />

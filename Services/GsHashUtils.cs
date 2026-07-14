@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -18,6 +19,24 @@ namespace GsPlugin.Services {
         /// </summary>
         internal static string FormatDateForHash(DateTime? dt) =>
             dt?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") ?? "";
+
+        /// <summary>
+        /// Normalizes a date string persisted in a legacy fat snapshot (written with
+        /// DateTime.ToString("o"), i.e. fractional seconds + offset) into the same
+        /// second-precision UTC form <see cref="FormatDateForHash"/> produces for live DTOs.
+        /// Without this, a migrated fingerprint could never equal its live counterpart and
+        /// every played game would be flagged 'updated' on the first post-migration diff.
+        /// </summary>
+        internal static string NormalizeSnapshotDateForHash(string raw) {
+            if (string.IsNullOrEmpty(raw)) {
+                return "";
+            }
+            if (DateTime.TryParse(raw, CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind, out var dt)) {
+                return FormatDateForHash(dt);
+            }
+            return raw;
+        }
 
         /// <summary>
         /// Computes a SHA-256 hex digest of the library for change detection.
@@ -122,6 +141,72 @@ namespace GsPlugin.Services {
                 return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
             }
         }
+
+        /// <summary>
+        /// Per-game library fingerprint used by the local hash index for diffs.
+        /// Must stay aligned with the activity + metadata fields in ComputeLibraryHash.
+        /// </summary>
+        public static string ComputeLibraryItemFingerprint(GameSyncDto g) {
+            return $"{g.playtime_seconds}|{g.play_count}|{FormatDateForHash(g.last_activity)}|{ComputeGameMetadataHash(g)}";
+        }
+
+        /// <summary>
+        /// Rebuild fingerprint from a legacy fat GameSnapshot row (migration only).
+        /// </summary>
+        public static string LibraryFingerprintFromSnapshot(Models.GameSnapshot snap) {
+            var last = NormalizeSnapshotDateForHash(snap.last_activity);
+            var meta = snap.metadata_hash ?? "";
+            return $"{snap.playtime_seconds}|{snap.play_count}|{last}|{meta}";
+        }
+
+        /// <summary>
+        /// Per-game achievement fingerprint used by the local hash index for diff detection.
+        /// Unlike <see cref="ComputeAchievementHash"/> — which is a server contract
+        /// (createAchievementHashV2, names + counts only) and must NOT change — this local
+        /// fingerprint also folds in each achievement's unlock state and rarity so the diff path
+        /// re-sends a game when its rarity changes or its unlock set swaps without a count change.
+        /// Kept in one place so the live and migration recipes never drift apart.
+        /// </summary>
+        public static string ComputeAchievementGameFingerprint(GameAchievementsDto g) {
+            var achs = g.achievements ?? new List<AchievementItemDto>();
+            return AchievementFingerprint(
+                g.playnite_id,
+                achs.Select(a => (a.name, a.is_unlocked, a.rarity_percent)));
+        }
+
+        /// <summary>
+        /// Rebuild the local fingerprint from a legacy fat GameAchievementSnapshot (migration only).
+        /// Must produce the same value as <see cref="ComputeAchievementGameFingerprint"/> for the
+        /// same underlying achievement set.
+        /// </summary>
+        public static string AchievementFingerprintFromSnapshot(Models.GameAchievementSnapshot snap) {
+            var achs = snap.achievements ?? new List<Models.AchievementSnapshot>();
+            return AchievementFingerprint(
+                snap.playnite_id,
+                achs.Select(a => (a.name, a.is_unlocked, a.rarity_percent)));
+        }
+
+        private static string AchievementFingerprint(
+            string playniteId,
+            IEnumerable<(string name, bool unlocked, float? rarity)> achievements) {
+            var list = achievements.ToList();
+            var unlockedCount = list.Count(a => a.unlocked);
+            // Per-achievement name + unlock state + rarity, field-separated with a control
+            // character so names containing digits/delimiters cannot collide, then ordered so
+            // the digest is stable regardless of the provider's iteration order.
+            var detail = string.Join("", list
+                .Select(a => $"{a.name}{(a.unlocked ? "1" : "0")}{FormatRarity(a.rarity)}")
+                .OrderBy(s => s, StringComparer.Ordinal));
+            string detailHash;
+            using (var sha = SHA256.Create()) {
+                var bytes = Encoding.UTF8.GetBytes(detail);
+                detailHash = BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+            }
+            return $"{playniteId}:{list.Count}:{unlockedCount}:{detailHash}";
+        }
+
+        private static string FormatRarity(float? rarity) =>
+            rarity?.ToString("0.####", CultureInfo.InvariantCulture) ?? "";
 
         /// <summary>
         /// Computes a stable hash of integration account identities so we can detect

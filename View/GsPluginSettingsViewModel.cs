@@ -394,7 +394,7 @@ namespace GsPlugin.Models {
                     // Capture analytics before opt-out disables telemetry
                     GsPostHog.Capture("data_deletion_requested");
                     GsDataManager.PerformOptOut();
-                    GsSnapshotManager.ClearAll();
+                    GsSyncHashIndex.ClearAll();
                     Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteSuccess", "Your data has been deleted. The plugin is now disabled.");
                     // Notify UI to refresh connection status and button visibility
                     OnLinkingStatusChanged();
