@@ -44,10 +44,12 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │
 ├── Models/              — namespace: GsPlugin.Models
 │   ├── GsData.cs            — Persistent data (GsDataManager, GsTime, PendingScrobble)
-│   ├── GsSnapshot.cs        — Diff-based sync state (GsSnapshotManager)
+│   ├── GsSyncHashIndex.cs   — Compact per-item fingerprint index for diff baselines
+│   ├── GsSnapshot.cs        — Legacy fat snapshot POCO types (deserialized once by GsSyncHashIndex during migration; no manager)
 │   └── GsPluginSettings.cs  — Settings data model and view model
 │
 ├── Infrastructure/      — namespace: GsPlugin.Infrastructure
+│   ├── GsAtomicFile.cs      — Shared temp recovery + atomic JSON replace/retry helpers
 │   ├── GsLocalization.cs    — XAML resource string lookup helper
 │   ├── GsLogger.cs          — Logging wrapper
 │   └── GsSentry.cs          — Sentry error tracking
@@ -68,7 +70,7 @@ GsPlugin (entry point, IDisposable)
 ├── GsScrobblingService → GsApiClient → GsCircuitBreaker
 │                       → GsAchievementAggregator → GsSuccessStoryHelper (JSON file reads)
 │                       │                         → GsPlayniteAchievementsHelper (SQLite reads)
-│                       → GsSnapshotManager (diff-based sync state)
+│                       → GsSyncHashIndex (per-item fingerprint baselines for diffs)
 ├── GsAccountLinkingService → GsApiClient
 ├── GsNotificationService → GsApiClient (fire-and-forget background)
 ├── GsUriHandler → GsAccountLinkingService
@@ -76,19 +78,30 @@ GsPlugin (entry point, IDisposable)
 └── All services use GsDataManager for persistent state
 ```
 
+### Library & Achievement Sync (v4 chunked full + v3/v2 diff)
+- **Full sync (current plugin):** begin → chunk (≤500 items) → commit against `/api/playnite/v4/{library|achievements}/sync-full/*`. Never calls monolithic `/v3/library/sync-full` or `/v2/achievements/sync-full`.
+- **Diff sync:** still `POST /v3/library/sync-diff` and `POST /v2/achievements/sync-diff`. Diffs compare live DTOs against the local fingerprint index (`GsSyncHashIndex`), not fat game/achievement snapshots.
+- **Local baselines:** `gs_library_hashes.json` / `gs_achievement_hashes.json` store `{ playnite_id → fingerprint }` only. Library fingerprint = `playtime|play_count|normalized_last_activity|metadata_hash`. The local achievement fingerprint hashes each sorted `name + unlock state + rounded rarity` tuple, so rarity-only changes and same-count unlock swaps are detected. Global `LastLibraryHash` / `LastAchievementHash` in `gs_data.json` remain the server `result_snapshot_hash` / `base_snapshot_hash` values (`createLibraryHashV3` / `createAchievementHashV2` recipes — unchanged); do not substitute the richer local achievement recipe for this server contract.
+- **Commit order (anti force-full-sync loop):** on `queued`, persist the hash index for **all** items first, then write `Last*Hash`. On any chunk/commit failure → abort session; **do not** update index or global hash. Mid-failure leaves the previous good baseline intact.
+- **Migration:** if the shipped legacy `gs_snapshot.json` exists, `GsSyncHashIndex.Initialize` derives fingerprints once, writes the compact files, and deletes the fat snapshot.
+- **Crash recovery:** `GsAtomicFile` promotes a surviving `.tmp` when the destination is missing and performs JSON replacement with bounded retries for transient Windows file locks. Both `GsDataManager` and `GsSyncHashIndex` use it.
+- **Self-heal:** if global hash matches but index entry count ≠ live allowed count → rewrite index from live (no re-upload). On `force-full-sync` from diff → clear index + global hash → chunked full with `bypassCooldown`.
+- Monolithic v2/v3 full endpoints remain on the server for old plugin builds only.
+
 ### Install Token Authentication
-- `GsPlugin.OnApplicationStarted()` kicks off `EnsureInstallTokenAsync()` as a best-effort, fire-and-forget startup task so first-run registration does not block plugin startup.
+- `GsPlugin.OnApplicationStarted()` starts `EnsureInstallTokenAsync()` in parallel with refresh/update work, then awaits it before the first v4 sync because v4 is strictly token-authenticated.
 - `EnsureInstallTokenAsync()` retries up to 3 times with exponential backoff (2 s, 4 s) for transient network errors; a non-null result (success or known error code) breaks the loop immediately.
 - Each install registers with the server via `/api/playnite/v2/register`, receiving a per-install token stored in `GsData.InstallToken`.
 - Authenticated write calls use the shared `PostJsonAsync()` path, which adds the `x-playnite-token` header when `InstallToken` is present. `RequestDeleteMyData()` and `GetDashboardToken()` also attach this header explicitly.
-- `InstallIdForBody` returns `null` when a token is present, and request DTOs use `JsonIgnore(WhenWritingNull)` on `user_id`, so the server resolves identity from the header instead of the body.
+- v4 full-sync DTOs carry no body identity; begin requests require `InstallToken`, and the server resolves the install exclusively from `x-playnite-token`. Legacy request DTOs still use `InstallIdForBody` where supported.
+- If registration cannot produce a token, the v4 client fails closed before opening a sync session; it must not fall back to `user_id` because the backend's v4 routes use strict token middleware.
 - Pending scrobble DTOs still keep whatever `user_id` they were queued with, so old queued items can replay without depending on the current `InstallIdForBody` value.
-- If `/v2/register` returns `PLAYNITE_TOKEN_ALREADY_REGISTERED`, the plugin treats the local token as lost, rotates to a fresh `InstallID`, clears identity-bound state, resets snapshots, and immediately re-registers under the new identity.
-- `RotateInstallId()` clears token, linked user, sessions, pending scrobbles, sync hashes, cooldowns, and integration-account hashes before calling `GsSnapshotManager.Reset()`.
+- If `/v2/register` returns `PLAYNITE_TOKEN_ALREADY_REGISTERED`, the plugin treats the local token as lost, rotates to a fresh `InstallID`, clears identity-bound state, resets the hash index, and immediately re-registers under the new identity.
+- `RotateInstallId()` clears token, linked user, sessions, pending scrobbles, sync hashes, cooldowns, and integration-account hashes before calling `GsSyncHashIndex.Reset()`.
 - `SetInstallTokenIfActive()` atomically checks opt-out status before persisting the token, preventing races with `PerformOptOut()`.
 - Deletion requests require a valid `InstallToken`; the server resolves install identity from the `x-playnite-token` header. No `user_id` is sent in the body. `DeleteDataRes.rateLimited` is set when the server returns HTTP 429.
 - `GetDashboardToken()` sends a POST request with a dashboard context object (`plugin_version`, flags, preferences) in the body. The server stores this context alongside the token and returns it tamper-proof when the frontend resolves the token — eliminating the need for client-side URL query params. If the token fetch fails for a registered install, the dashboard fails closed instead of falling back to `user_id`.
-- `IdentityGeneration` is incremented on fresh-install `InstallID` creation and on `RotateInstallId()`. `GsSnapshotManager` stamps this generation into `gs_snapshot.json` and discards snapshots whose generation no longer matches current data.
+- `IdentityGeneration` is incremented on fresh-install `InstallID` creation and on `RotateInstallId()`. `GsSyncHashIndex` stamps this generation into the hash-index files and discards indexes whose generation no longer matches current data.
 
 ### Server Notifications
 - `GsNotificationService` fetches notifications from `GET /api/playnite/v2/notifications` at startup and displays them in Playnite's native notification tray.
@@ -149,7 +162,7 @@ Achievement data comes from two optional addons via an aggregator pattern:
 
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
-- Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsAllowedPluginsTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSnapshotTests`, `GsTimeTests`, `LinkingResultTests`, `PlayniteAchievementsSqliteTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`
+- Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsAllowedPluginsTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSyncHashIndexTests` (migration, fingerprint, clearing, and v4 begin/chunk/commit/abort coverage), `GsTimeTests`, `LinkingResultTests`, `PlayniteAchievementsSqliteTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`
 - `GsDataManagerTests` and `GsDataTests` include coverage for install-token persistence, `IdentityGeneration`, `RotateInstallId()`, `SetInstallTokenIfActive()`, `InstallIdForBody`, opt-out token clearing, and `RecordShownNotifications()`/`GetShownNotificationIds()` thread-safe notification state.
 
 ## Build Environment
@@ -181,11 +194,14 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks
 
 ### Playnite Plugin Hosting Constraints
 - Playnite loads plugins in its own AppDomain and **ignores plugin-level `app.config` binding redirects**. Assembly version mismatches must be resolved at runtime via the `AppDomain.CurrentDomain.AssemblyResolve` handler in `GsPlugin`'s static constructor.
-- When upgrading a NuGet package version, the plugin's dependencies (e.g., Sentry) may still reference the old assembly version. The `AssemblyResolve` handler in `GsPlugin.cs` handles this by loading whatever DLL version exists in the plugin's output directory.
+- When upgrading a NuGet package version, the plugin's dependencies (e.g., Sentry) may still reference the old assembly version. The `AssemblyResolve` handler in `GsPlugin.cs` resolves only DLLs shipped in the plugin output directory and refuses Playnite assemblies; never broaden it into a process-wide arbitrary loader because all extensions share the AppDomain.
 - After building, the extension folder in `%APPDATA%\Playnite\Extensions\<plugin-guid>\` must contain the updated DLLs. Stale DLLs from a previous version will cause `FileNotFoundException` at runtime.
 - `GsSentry` methods (`CaptureException`, `CaptureMessage`, `AddBreadcrumb`) use `GsDataManager.DataOrNull` instead of `GsDataManager.Data` to avoid a circular crash when called during `GsDataManager.Initialize()` before `_data` is assigned.
 - All `SentrySdk` calls are wrapped in try/catch so the plugin continues working if the Sentry SDK is unavailable (e.g., expired account). `GsApiClient` similarly falls back to a plain `HttpClient` if `SentryHttpMessageHandler` throws.
 - `MaxBreadcrumbs` is capped at 50 (default 100) to reduce per-session memory overhead.
+- Continuous profiling and failed-request capture are disabled to avoid background-worker shutdown hangs and cross-extension `HttpStatusCodeRange` version conflicts. Trace sampling is 10% when telemetry is enabled.
+- Plugin disposal calls `GsSentry.Shutdown()`, which performs a two-second bounded flush before closing. It is safe to call after failed initialization.
+- `scripts/resolve-legacy-sentry-issues.ps1` is the maintenance helper for resolving legacy Sentry issues; use `-WhatIf` before applying changes.
 
 ### Playnite SDK Type Gotchas
 - `Game.Playtime` and `Game.PlayCount` are `ulong` — cast explicitly to `long`/`int` when assigning to DTO fields (no implicit conversion).
