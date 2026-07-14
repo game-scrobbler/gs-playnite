@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Threading;
 using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
@@ -254,18 +253,7 @@ namespace GsPlugin.Models {
         /// Must be called under _lock.
         /// </summary>
         private static GsData Load() {
-            // Recover from a crash between WriteAllText and File.Replace:
-            // the .tmp file contains the most recent successful write.
-            var tempPath = _filePath + ".tmp";
-            if (!File.Exists(_filePath) && File.Exists(tempPath)) {
-                try {
-                    File.Move(tempPath, _filePath);
-                    GsLogger.Info("Recovered gs_data.json from .tmp file");
-                }
-                catch (Exception ex) {
-                    GsLogger.Warn($"Failed to recover .tmp file: {ex.Message}");
-                }
-            }
+            GsAtomicFile.RecoverTemp(_filePath);
 
             if (!File.Exists(_filePath)) {
                 return new GsData();
@@ -399,38 +387,12 @@ namespace GsPlugin.Models {
                 if (!Directory.Exists(dir)) {
                     Directory.CreateDirectory(dir);
                 }
-                var json = JsonSerializer.Serialize(_data, jsonOptions);
                 GsLogger.Info("Saving plugin data to disk");
-                var tempPath = _filePath + ".tmp";
-                File.WriteAllText(tempPath, json);
-                ReplaceWithRetry(tempPath, _filePath);
+                GsAtomicFile.WriteJson(_filePath, _data, jsonOptions);
             }
             catch (Exception ex) {
                 GsLogger.Error("Failed to save custom GsData", ex);
                 GsSentry.CaptureException(ex, "Failed to save GsData to disk");
-            }
-        }
-
-        /// <summary>
-        /// Moves/replaces tempPath onto destPath, retrying briefly on IOException. A just-written
-        /// file can be transiently locked (e.g. antivirus/indexer scan) on Windows; without a retry,
-        /// that sharing violation surfaces as a silently-swallowed save (the caller's outer catch
-        /// logs and continues), leaving the previous on-disk contents stale.
-        /// </summary>
-        private static void ReplaceWithRetry(string tempPath, string destPath, int maxAttempts = 3) {
-            for (var attempt = 1; attempt <= maxAttempts; attempt++) {
-                try {
-                    if (File.Exists(destPath)) {
-                        File.Replace(tempPath, destPath, destinationBackupFileName: null);
-                    }
-                    else {
-                        File.Move(tempPath, destPath);
-                    }
-                    return;
-                }
-                catch (IOException) when (attempt < maxAttempts) {
-                    Thread.Sleep(25 * attempt);
-                }
             }
         }
 
