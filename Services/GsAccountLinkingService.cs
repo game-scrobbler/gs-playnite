@@ -145,7 +145,9 @@ namespace GsPlugin.Services {
                     }
 
                     if (response.userId.Length > 256) {
-                        string errorMessage = "Invalid user ID format received from server";
+                        string errorMessage = GsLocalization.Get(
+                            "LOCGsPluginInvalidUserIdFormat",
+                            "Invalid user ID format received from server");
                         GsLogger.Error($"{context} linking failed: {errorMessage}");
                         return LinkingResult.CreateError(errorMessage, context);
                     }

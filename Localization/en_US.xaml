@@ -156,6 +156,7 @@ You will need to restart Playnite for all features to resume.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Error: {0} Click "Link Account" to retry.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Error: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Unknown error occurred during linking</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">Invalid user ID format received from server</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Error during linking: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Network error — could not reach the server. Please try again.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Failed to disconnect account.</sys:String>

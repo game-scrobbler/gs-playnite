@@ -156,6 +156,7 @@
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">错误：{0} 点击"关联账户"重试。</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">错误：{0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">关联过程中发生未知错误</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">从服务器收到的用户 ID 格式无效</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">关联错误：{0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">网络错误——无法连接到服务器。请重试。</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">解除关联失败。</sys:String>

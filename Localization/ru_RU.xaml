@@ -156,6 +156,7 @@ ID пользователя: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Ошибка: {0} Нажмите «Привязать учётную запись», чтобы повторить.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Ошибка: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Произошла неизвестная ошибка при привязке</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">От сервера получен неверный формат идентификатора пользователя</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Ошибка при привязке: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Сетевая ошибка — не удалось связаться с сервером. Попробуйте ещё раз.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Не удалось отвязать учётную запись.</sys:String>

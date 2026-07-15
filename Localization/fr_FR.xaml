@@ -156,6 +156,7 @@ Vous devrez redémarrer Playnite pour que toutes les fonctionnalités reprennent
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Erreur : {0} Cliquez sur « Associer le compte » pour réessayer.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Erreur : {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Erreur inconnue lors de l'association</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">Format d'identifiant utilisateur invalide reçu du serveur</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Erreur lors de l'association : {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Erreur réseau — impossible de contacter le serveur. Veuillez réessayer.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Échec de la dissociation du compte.</sys:String>

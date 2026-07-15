@@ -156,6 +156,7 @@ Sie müssen Playnite neu starten, damit alle Funktionen fortgesetzt werden.</sys
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Fehler: {0} Klicken Sie auf „Konto verknüpfen", um es erneut zu versuchen.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Fehler: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Unbekannter Fehler bei der Verknüpfung</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">Ungültiges Benutzer-ID-Format vom Server erhalten</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Fehler bei der Verknüpfung: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Netzwerkfehler — Server nicht erreichbar. Bitte versuchen Sie es erneut.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Konto konnte nicht getrennt werden.</sys:String>

@@ -156,6 +156,7 @@ Será necessário reiniciar o Playnite para retomar todas as funcionalidades.</s
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Erro: {0} Clique em "Vincular Conta" para tentar novamente.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Erro: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Ocorreu um erro desconhecido durante a vinculação</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">Formato de ID de usuário inválido recebido do servidor</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Erro durante a vinculação: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Erro de rede — não foi possível conectar ao servidor. Tente novamente.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Falha ao desvincular conta.</sys:String>
