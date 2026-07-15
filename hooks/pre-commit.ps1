@@ -13,8 +13,8 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Using .NET SDK version: $dotnetVersion" -ForegroundColor Green
 
-# Get list of staged C# files
-$stagedFiles = @(git diff --cached --name-only --diff-filter=ACM | Where-Object { $_ -match '\.(cs|vb)$' })
+# Get list of staged C# files (added, copied, modified, renamed)
+$stagedFiles = @(git diff --cached --name-only --diff-filter=ACMR | Where-Object { $_ -match '\.(cs|vb)$' })
 
 if ($stagedFiles.Count -eq 0) {
     Write-Host "No C# files to format." -ForegroundColor Green
@@ -23,6 +23,24 @@ if ($stagedFiles.Count -eq 0) {
 
 Write-Host "Found $($stagedFiles.Count) C# file(s) to check:" -ForegroundColor Cyan
 $stagedFiles | ForEach-Object { Write-Host "  - $_" -ForegroundColor Gray }
+
+# dotnet format runs against the working tree, so a staged file whose working-tree
+# content differs from its staged content (partially staged, or staged then edited
+# again) would be validated against bytes that are not what gets committed. Reject
+# those files so the pass/fail decision matches exactly what will be committed.
+$unstagedCs = @(git diff --name-only | Where-Object { $_ -match '\.(cs|vb)$' })
+$partiallyStaged = @($stagedFiles | Where-Object { $unstagedCs -contains $_ })
+if ($partiallyStaged.Count -gt 0) {
+    Write-Host "" -ForegroundColor White
+    Write-Host "ERROR: These staged C#/VB files also have unstaged changes:" -ForegroundColor Red
+    $partiallyStaged | ForEach-Object { Write-Host "  - $_" -ForegroundColor Gray }
+    Write-Host "" -ForegroundColor White
+    Write-Host "The format check runs against the working tree, so its result would not" -ForegroundColor Yellow
+    Write-Host "match what gets committed. Stage them fully (git add) or unstage them," -ForegroundColor Yellow
+    Write-Host "then commit again." -ForegroundColor Yellow
+    Write-Host "" -ForegroundColor White
+    exit 1
+}
 
 # The solution's old-style WPF .csproj can only be loaded by "dotnet format"
 # through a .NET Framework build host, which the repo-pinned .NET 8 SDK does not
@@ -86,6 +104,26 @@ if ($offending) {
     Write-Host "Then review the changes, stage them, and commit again." -ForegroundColor Yellow
     Write-Host "" -ForegroundColor White
     exit 1
+}
+
+# No staged file was flagged. A non-zero formatter exit is safe to ignore only
+# when it is fully explained by per-file diagnostics in files that are NOT staged
+# (pre-existing debt elsewhere). Fail on anything else -- diagnostics that do not
+# parse to a file, or a non-zero exit with no diagnostics at all -- rather than
+# passing an unclassified failure.
+if ($result.ExitCode -ne 0) {
+    $errorLines = @($result.Output | Where-Object { $_ -match ':\s+error ' })
+    $unclassified = @($errorLines | Where-Object { $_ -notmatch '^.+?\(\d+,\d+\):\s+error ' })
+    if ($unclassified.Count -gt 0 -or $errorLines.Count -eq 0) {
+        Write-Host "" -ForegroundColor White
+        Write-Host "ERROR: dotnet format failed (exit $($result.ExitCode)) for reasons not" -ForegroundColor Red
+        Write-Host "limited to unstaged files:" -ForegroundColor Red
+        Write-Host "" -ForegroundColor White
+        $detail = if ($unclassified.Count -gt 0) { $unclassified } else { $result.Output }
+        Write-Host ($detail -join [Environment]::NewLine) -ForegroundColor Gray
+        Write-Host "" -ForegroundColor White
+        exit 1
+    }
 }
 
 Write-Host "Code formatting check passed!" -ForegroundColor Green

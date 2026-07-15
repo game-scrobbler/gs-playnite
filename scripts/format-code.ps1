@@ -51,8 +51,9 @@ try {
             Write-Host ($output -join [Environment]::NewLine) -ForegroundColor Gray
         }
     } else {
-        Write-Host "Code formatting completed with warnings:" -ForegroundColor Yellow
+        Write-Host "Code formatting failed (dotnet format exit $($result.ExitCode)):" -ForegroundColor Red
         Write-Host ($output -join [Environment]::NewLine) -ForegroundColor Yellow
+        exit 1
     }
 } catch {
     Write-Host "Error running dotnet format: $($_.Exception.Message)" -ForegroundColor Red

@@ -19,8 +19,8 @@ else
         exit 1
     fi
 
-    # Collect staged C#/VB files (added, copied, modified).
-    staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cs|vb)$')
+    # Collect staged C#/VB files (added, copied, modified, renamed).
+    staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(cs|vb)$')
     if [ -z "$staged" ]; then
         echo "No C# files to format."
         exit 0

@@ -14,9 +14,10 @@
 
 function Get-GsFormatSdk {
     # Returns the newest installed SDK version whose dotnet-format ships a .NET
-    # Framework build host, preferring major version >= 10 (the 9.x host is
-    # present but crashes loading this WPF project). Returns $null when none
-    # qualifies -- callers should surface a clear "install a newer SDK" message.
+    # Framework build host, requiring major version >= 10. The 8.x SDK ships no
+    # working net472 host and the 9.x host crashes loading this WPF project, so
+    # neither qualifies. Returns $null when none qualifies -- callers should
+    # surface a clear "install a newer SDK" message.
     $sdks = & dotnet --list-sdks 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $sdks) { return $null }
 
@@ -25,22 +26,21 @@ function Get-GsFormatSdk {
         if ($line -match '^(?<ver>\S+)\s+\[(?<dir>.+)\]$') {
             $ver = $Matches['ver']
             $dir = $Matches['dir']
+            $major = [int]($ver.Split('.')[0])
             $host472 = Join-Path $dir (Join-Path $ver 'DotnetTools/dotnet-format/BuildHost-net472/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.exe')
-            if (Test-Path -LiteralPath $host472) {
+            if ($major -ge 10 -and (Test-Path -LiteralPath $host472)) {
                 [pscustomobject]@{
                     Version = $ver
-                    Major   = [int]($ver.Split('.')[0])
+                    # Parse the numeric prefix (drop any -prerelease tag) so
+                    # versions compare semantically: 10.0.10 outranks 10.0.9.
+                    Parsed  = [version](($ver -split '-')[0])
                 }
             }
         }
     }
     if (-not $candidates) { return $null }
 
-    # major >= 10 first, then highest version string within that group.
-    $ranked = $candidates | Sort-Object `
-        -Property @{ Expression = { $_.Major -ge 10 }; Descending = $true }, `
-                  @{ Expression = { $_.Version }; Descending = $true }
-    return $ranked[0].Version
+    return ($candidates | Sort-Object -Property Parsed -Descending | Select-Object -First 1).Version
 }
 
 function Invoke-GsDotnetFormat {
