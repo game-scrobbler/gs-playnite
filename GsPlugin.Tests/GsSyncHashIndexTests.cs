@@ -707,6 +707,54 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void CreateV4FullSyncChunks_SplitsBySerializedByteSize() {
+            var largeDescription = new string('x', 3 * 1024 * 1024);
+            var items = new List<GameAchievementsDto> {
+                new GameAchievementsDto {
+                    playnite_id = "g1",
+                    achievements = new List<AchievementItemDto> {
+                        new AchievementItemDto { name = "A", description = largeDescription }
+                    }
+                },
+                new GameAchievementsDto {
+                    playnite_id = "g2",
+                    achievements = new List<AchievementItemDto> {
+                        new AchievementItemDto { name = "B", description = largeDescription }
+                    }
+                }
+            };
+
+            var chunks = GsScrobblingService.CreateV4FullSyncChunks(items, 500);
+
+            Assert.Equal(2, chunks.Count);
+            Assert.All(chunks, chunk => Assert.Single(chunk));
+            Assert.All(chunks, chunk => Assert.True(
+                System.Text.Encoding.UTF8.GetByteCount(System.Text.Json.JsonSerializer.Serialize(chunk))
+                    <= 5 * 1024 * 1024));
+        }
+
+        [Fact]
+        public async Task UploadAchievementsFullChunked_ItemOverByteLimit_AbortsWithoutSendingChunk() {
+            var mock = new TrackingMockApiClient();
+            var items = new List<GameAchievementsDto> {
+                new GameAchievementsDto {
+                    playnite_id = "g",
+                    achievements = new List<AchievementItemDto> {
+                        new AchievementItemDto {
+                            name = "oversized",
+                            description = new string('x', 5 * 1024 * 1024)
+                        }
+                    }
+                }
+            };
+
+            var res = await CreateService(mock).UploadAchievementsFullChunkedAsync(items, "hash");
+
+            Assert.Null(res);
+            Assert.Equal(new[] { "ach-begin", "ach-abort:ach-1" }, mock.Calls);
+        }
+
+        [Fact]
         public async Task UploadAchievementsFullChunked_RejectedCommit_Aborts() {
             var mock = new TrackingMockApiClient { FailAchievementsCommit = true };
             var res = await CreateService(mock).UploadAchievementsFullChunkedAsync(

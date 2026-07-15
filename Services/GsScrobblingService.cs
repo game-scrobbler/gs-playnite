@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -402,6 +404,51 @@ namespace GsPlugin.Services {
         }
 
         private const int V4FullSyncChunkSize = 500;
+        private const int V4FullSyncMaxChunkBytes = 5 * 1024 * 1024;
+
+        /// <summary>
+        /// Splits v4 items by both the negotiated item limit and the backend's UTF-8 JSON
+        /// payload limit. The backend measures JSON.stringify(items), so measuring the array
+        /// rather than the enclosing request keeps this calculation aligned with its contract.
+        /// System.Text.Json can escape more non-ASCII characters than JSON.stringify, which
+        /// only makes this client-side calculation conservatively larger.
+        /// </summary>
+        internal static List<List<TItem>> CreateV4FullSyncChunks<TItem>(
+            List<TItem> items,
+            int negotiatedMaxChunkItems) {
+            var maxChunkItems = negotiatedMaxChunkItems > 0
+                ? Math.Min(negotiatedMaxChunkItems, V4FullSyncChunkSize)
+                : V4FullSyncChunkSize;
+            var chunks = new List<List<TItem>>();
+            var current = new List<TItem>(Math.Min(maxChunkItems, items.Count));
+            // Opening and closing brackets for the JSON array.
+            var currentBytes = 2;
+
+            foreach (var item in items) {
+                var itemBytes = Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(item));
+                if (itemBytes + 2 > V4FullSyncMaxChunkBytes) {
+                    throw new InvalidOperationException(
+                        $"A single v4 full-sync item exceeds the {V4FullSyncMaxChunkBytes}-byte payload limit.");
+                }
+
+                var separatorBytes = current.Count == 0 ? 0 : 1;
+                if (current.Count >= maxChunkItems
+                    || currentBytes + separatorBytes + itemBytes > V4FullSyncMaxChunkBytes) {
+                    chunks.Add(current);
+                    current = new List<TItem>(Math.Min(maxChunkItems, items.Count));
+                    currentBytes = 2;
+                    separatorBytes = 0;
+                }
+
+                current.Add(item);
+                currentBytes += separatorBytes + itemBytes;
+            }
+
+            if (current.Count > 0) {
+                chunks.Add(current);
+            }
+            return chunks;
+        }
 
         /// <summary>
         /// Generic v4 begin→chunk→commit upload driver shared by the library and achievement
@@ -426,14 +473,19 @@ namespace GsPlugin.Services {
                     return null;
                 }
                 syncId = begin.sync_id;
-                var chunkSize = begin.max_chunk_items > 0 ? begin.max_chunk_items : V4FullSyncChunkSize;
-                var chunkCount = items.Count == 0 ? 0 : (int)Math.Ceiling(items.Count / (double)chunkSize);
+                List<List<TItem>> chunks;
+                try {
+                    chunks = CreateV4FullSyncChunks(items, begin.max_chunk_items);
+                }
+                catch (InvalidOperationException ex) {
+                    _logger.Error(ex, $"{label} v4 payload cannot be split within the server limit");
+                    await abortAsync(syncId);
+                    return null;
+                }
+                var chunkCount = chunks.Count;
 
                 for (var i = 0; i < chunkCount; i++) {
-                    var start = i * chunkSize;
-                    // GetRange is O(chunk); Skip/Take re-walks from the start each iteration (O(n²)).
-                    var slice = items.GetRange(start, Math.Min(chunkSize, items.Count - start));
-                    var chunkRes = await chunkAsync(syncId, i, slice);
+                    var chunkRes = await chunkAsync(syncId, i, chunks[i]);
                     if (chunkRes == null || !chunkRes.success || chunkRes.status != "accepted") {
                         _logger.Error($"{label} v4 chunk {i} failed: status={chunkRes?.status}");
                         await abortAsync(syncId);
