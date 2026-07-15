@@ -100,7 +100,7 @@ namespace GsPlugin.Services {
                 return LinkingResult.CreateError("Please enter a valid token", context);
             }
 
-            GsLogger.Info($"Starting {context} account linking.");
+            GsLogger.Info($"Starting {context} account linking (install_id={GsDataManager.Data.InstallID}).");
             GsSentry.AddBreadcrumb(
                 message: $"Starting {context} account linking",
                 category: "linking",
@@ -122,21 +122,39 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success) {
-                    if (response.userId != GsData.NotLinkedValue
-                        && (string.IsNullOrWhiteSpace(response.userId) || response.userId.Length > 256)) {
+                    // A verify can succeed yet resolve to the "not_linked" sentinel (or an empty
+                    // user id): the token was accepted but the server did NOT bind this install to
+                    // an account. Reporting that as success made the settings UI show
+                    // "Successfully linked!" while the connection status stayed "Disconnected" and
+                    // the website's linking page kept polling "not linked" (issue #54). Treat it as
+                    // a failed link, clear any local link so state matches the server, and route the
+                    // user to fetch a fresh token (same recovery path as an expired token).
+                    if (!IsLinkedUserId(response.userId)) {
+                        GsDataManager.MutateAndSave(d => d.LinkedUserId = null);
+                        OnLinkingStatusChanged();
+
+                        GsLogger.Error($"{context} linking did not complete: token verified but the server returned a not-linked result (install_id={GsDataManager.Data.InstallID}, userId={response.userId ?? "null"}).");
+                        GsSentry.CaptureMessage(
+                            $"{context} linking verified but returned not-linked (install_id={GsDataManager.Data.InstallID})",
+                            SentryLevel.Warning);
+
+                        string notLinkedMessage = GsLocalization.Get(
+                            "LOCGsPluginStatusTokenExpired",
+                            "Token expired — click \"Open website to link\" to get a new one.");
+                        return LinkingResult.CreateError(notLinkedMessage, context, isTokenExpiry: true);
+                    }
+
+                    if (response.userId.Length > 256) {
                         string errorMessage = "Invalid user ID format received from server";
                         GsLogger.Error($"{context} linking failed: {errorMessage}");
                         return LinkingResult.CreateError(errorMessage, context);
                     }
-                    GsDataManager.MutateAndSave(d => {
-                        d.LinkedUserId = response.userId == GsData.NotLinkedValue
-                            ? null
-                            : response.userId;
-                    });
+
+                    GsDataManager.MutateAndSave(d => d.LinkedUserId = response.userId);
                     // Notify listeners of status change
                     OnLinkingStatusChanged();
 
-                    GsLogger.Info($"Account successfully linked via {context} to User ID: {response.userId}");
+                    GsLogger.Info($"Account successfully linked via {context} to User ID: {response.userId} (install_id={GsDataManager.Data.InstallID})");
                     GsSentry.AddBreadcrumb(
                         message: $"{context} account linking successful",
                         category: "linking",
@@ -203,6 +221,16 @@ namespace GsPlugin.Services {
             // Allow alphanumeric, hyphens, underscores, dots, plus, equals, slashes (covers JWT/base64 tokens)
             if (!Regex.IsMatch(token, @"^[a-zA-Z0-9\-_\.+=\/]+$")) return false;
             return true;
+        }
+
+        /// <summary>
+        /// Returns true when a verify response's user id represents a real linked account.
+        /// A successful verify that resolves to the <see cref="GsData.NotLinkedValue"/> sentinel
+        /// (or an empty value) means the token was accepted without actually binding the install
+        /// to an account, so callers must not treat it as a successful link (issue #54).
+        /// </summary>
+        internal static bool IsLinkedUserId(string userId) {
+            return !string.IsNullOrWhiteSpace(userId) && userId != GsData.NotLinkedValue;
         }
 
         /// <summary>
