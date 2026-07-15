@@ -4,8 +4,10 @@
 
 # Check if we're on Windows and use the appropriate script
 if [ "$OS" = "Windows_NT" ] || command -v cmd.exe >/dev/null 2>&1; then
-    # Windows environment - use PowerShell script
-    powershell.exe -ExecutionPolicy Bypass -File .git/hooks/pre-commit.ps1
+    # Windows environment - use PowerShell script.
+    # Resolve the .ps1 next to this hook via $0 so it works from linked git
+    # worktrees too (there .git is a file, so a hardcoded .git/hooks path fails).
+    powershell.exe -ExecutionPolicy Bypass -File "$(dirname "$0")/pre-commit.ps1"
     exit $?
 else
     # Unix/Linux environment
@@ -17,10 +19,31 @@ else
         exit 1
     fi
 
-    # Verify formatting without modifying files
-    dotnet format ./GsPlugin.sln --verify-no-changes 2>&1
+    # Collect staged C#/VB files (added, copied, modified).
+    staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cs|vb)$')
+    if [ -z "$staged" ]; then
+        echo "No C# files to format."
+        exit 0
+    fi
 
-    if [ $? -ne 0 ]; then
+    # Verify formatting without modifying files. The solution contains an
+    # old-style WPF .csproj that dotnet format can only load through a .NET
+    # Framework build host (BuildHost-net472). That build host is a Windows
+    # executable, so full formatting cannot be verified on Linux/macOS -- the
+    # authoritative check runs on Windows via the PowerShell branch above.
+    output=$(dotnet format ./GsPlugin.sln --verify-no-changes 2>&1)
+    status=$?
+
+    if echo "$output" | grep -qE 'Unhandled exception|build host could not be found|TypeInitializationException'; then
+        echo ""
+        echo "WARNING: Cannot verify formatting on this platform (needs the Windows"
+        echo "         .NET Framework build host). Run the check on Windows, or run"
+        echo "         'powershell -File scripts/format-code.ps1' before committing."
+        exit 0
+    fi
+
+    if [ $status -ne 0 ]; then
+        echo "$output"
         echo ""
         echo "ERROR: Code formatting issues detected!"
         echo "Run 'powershell -File scripts/format-code.ps1' to fix formatting, then stage and commit again."

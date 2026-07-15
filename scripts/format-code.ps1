@@ -12,33 +12,47 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Using .NET SDK version: $dotnetVersion" -ForegroundColor Green
 
-# Get all C# files in the project
-$csFiles = Get-ChildItem -Recurse -Include "*.cs" -Exclude "**/bin/**", "**/obj/**", "**/packages/**" | Where-Object { $_.FullName -notmatch "(bin|obj|packages)" }
+# The solution's old-style WPF .csproj can only be loaded by "dotnet format"
+# through a .NET Framework build host, which the repo-pinned .NET 8 SDK does not
+# ship. format-sdk.ps1 runs the real "dotnet format" under the newest installed
+# SDK that has a working build host, leaving the repo's SDK pin untouched.
+. "$PSScriptRoot/format-sdk.ps1"
 
-if ($csFiles.Count -eq 0) {
-    Write-Host "No C# files found to format." -ForegroundColor Yellow
-    exit 0
+$sdk = Get-GsFormatSdk
+if (-not $sdk) {
+    Write-Host "Error: No installed .NET SDK can format this solution." -ForegroundColor Red
+    Write-Host "dotnet format needs a .NET Framework build host (BuildHost-net472) that the" -ForegroundColor Yellow
+    Write-Host "pinned .NET 8 SDK does not ship. Install the .NET 10 SDK:" -ForegroundColor Yellow
+    Write-Host "  https://dotnet.microsoft.com/download/dotnet/10.0" -ForegroundColor Gray
+    exit 1
 }
 
-Write-Host "Found $($csFiles.Count) C# files to format" -ForegroundColor Green
+$repoRoot = Split-Path -Parent $PSScriptRoot
 
-# Run dotnet format on the solution with progress indication
-Write-Host "Running 'dotnet format .\GsPlugin.sln'..." -ForegroundColor Cyan
+# Run dotnet format (fix mode -no --verify-no-changes) on the whole solution.
+Write-Host "Running 'dotnet format GsPlugin.sln' via SDK $sdk..." -ForegroundColor Cyan
 Write-Host "This may take a moment..." -ForegroundColor Gray
 
 try {
-    # Run the format command and capture output
-    $output = dotnet format .\GsPlugin.sln --verbosity normal 2>&1
-    
-    if ($LASTEXITCODE -eq 0) {
+    $result = Invoke-GsDotnetFormat -RepoRoot $repoRoot -SdkVersion $sdk -ExtraArgs @('--verbosity', 'normal')
+    $output = $result.Output
+
+    $joined = ($output -join "`n")
+    if ($joined -match 'Unhandled exception|build host could not be found|TypeInitializationException') {
+        Write-Host "Error: dotnet format could not load the solution (build host failure)." -ForegroundColor Red
+        Write-Host "Install the .NET 10 SDK, then try again." -ForegroundColor Yellow
+        exit 1
+    }
+
+    if ($result.ExitCode -eq 0) {
         Write-Host "Code formatting completed successfully!" -ForegroundColor Green
         if ($output) {
             Write-Host "Output:" -ForegroundColor Gray
-            Write-Host $output -ForegroundColor Gray
+            Write-Host ($output -join [Environment]::NewLine) -ForegroundColor Gray
         }
     } else {
         Write-Host "Code formatting completed with warnings:" -ForegroundColor Yellow
-        Write-Host $output -ForegroundColor Yellow
+        Write-Host ($output -join [Environment]::NewLine) -ForegroundColor Yellow
     }
 } catch {
     Write-Host "Error running dotnet format: $($_.Exception.Message)" -ForegroundColor Red
