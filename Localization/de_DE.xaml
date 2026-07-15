@@ -169,6 +169,9 @@ Möchten Sie ein anderes Konto verknüpfen?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteSuccess">Ihre Daten wurden gelöscht. Das Plugin ist jetzt deaktiviert.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">Zu viele Löschanfragen. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">Datenlöschung fehlgeschlagen. Bitte versuchen Sie es später erneut.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">GameScrobbler konnte nicht erreicht werden, um die Löschung zu autorisieren. Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">Ihre Daten wurden bereits gelöscht. Das Plugin ist jetzt deaktiviert.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Diese Installation konnte nicht verifiziert werden. Verknüpfen Sie Ihr Konto erneut und versuchen Sie dann erneut zu löschen.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin wieder aktiviert. Bitte starten Sie Playnite neu, um die Synchronisierung fortzusetzen.</sys:String>
 

@@ -342,6 +342,22 @@ namespace GsPlugin.Api {
         public bool success { get; set; }
         public string message { get; set; }
         public bool rateLimited { get; set; }
+
+        /// <summary>
+        /// Server resolved the install as already opted out (HTTP 403). The data is
+        /// already gone — the client should sync its local opt-out state rather than
+        /// treat this as a retryable failure.
+        /// </summary>
+        [JsonIgnore]
+        public bool alreadyOptedOut { get; set; }
+
+        /// <summary>
+        /// Server rejected the install token (HTTP 401). The stored token does not
+        /// resolve to an install, so retrying with the same token cannot succeed —
+        /// the user needs to reconnect rather than keep hitting the same wall.
+        /// </summary>
+        [JsonIgnore]
+        public bool authFailed { get; set; }
     }
 
     public class OptInReq {

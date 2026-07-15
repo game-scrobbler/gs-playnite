@@ -743,6 +743,22 @@ namespace GsPlugin.Api {
                     return new DeleteDataRes { success = false, rateLimited = true };
                 }
 
+                // 403 = install already opted out server-side (data already deleted, or
+                // removed via a linked web-account deletion). Retrying can never succeed;
+                // signal the caller to sync local opt-out state instead of looping on a
+                // generic "failed" message.
+                if ((int)response.StatusCode == 403) {
+                    _logger.Warn("RequestDeleteMyData: install already opted out (403)");
+                    return new DeleteDataRes { success = false, alreadyOptedOut = true };
+                }
+
+                // 401 = stored token does not resolve to an install. Retrying with the
+                // same token is futile — surface a distinct "reconnect" signal.
+                if ((int)response.StatusCode == 401) {
+                    _logger.Warn("RequestDeleteMyData: install token rejected (401)");
+                    return new DeleteDataRes { success = false, authFailed = true };
+                }
+
                 if (!response.IsSuccessStatusCode) {
                     _logger.Warn($"RequestDeleteMyData returned {(int)response.StatusCode}");
                     return new DeleteDataRes { success = false };

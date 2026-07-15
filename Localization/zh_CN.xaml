@@ -169,6 +169,9 @@
     <sys:String x:Key="LOCGsPluginDeleteSuccess">您的数据已删除。插件已禁用。</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">删除请求过于频繁。请等待 15 分钟后重试。</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">数据删除请求失败。请稍后重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">无法连接到 GameScrobbler 以授权删除操作。请检查您的网络连接后重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">您的数据已被删除。插件现已禁用。</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">无法验证此安装。请重新关联您的账户后再尝试删除。</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">发生错误。请稍后重试。</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">插件已重新启用。请重启 Playnite 以恢复同步。</sys:String>
 

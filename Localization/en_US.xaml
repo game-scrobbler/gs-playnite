@@ -169,6 +169,9 @@ Do you want to link to a different account?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteSuccess">Your data has been deleted. The plugin is now disabled.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">Too many deletion requests. Please wait 15 minutes and try again.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">Failed to request data deletion. Please try again later.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">Couldn't reach GameScrobbler to authorize the deletion. Check your internet connection and try again.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">Your data has already been deleted. The plugin is now disabled.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">This installation couldn't be verified. Reconnect your account, then try deleting again.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">An error occurred. Please try again later.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin re-enabled. Please restart Playnite to resume syncing.</sys:String>
 

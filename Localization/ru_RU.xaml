@@ -169,6 +169,9 @@ ID пользователя: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteSuccess">Ваши данные удалены. Плагин отключён.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">Слишком много запросов на удаление. Подождите 15 минут и попробуйте снова.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">Не удалось запросить удаление данных. Попробуйте позже.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">Не удалось связаться с GameScrobbler для подтверждения удаления. Проверьте подключение к интернету и повторите попытку.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">Ваши данные уже удалены. Плагин теперь отключён.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Не удалось подтвердить эту установку. Привяжите учётную запись заново и повторите удаление.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Произошла ошибка. Попробуйте позже.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Плагин включён заново. Перезапустите Playnite для возобновления синхронизации.</sys:String>
 
