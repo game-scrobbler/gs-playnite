@@ -344,6 +344,52 @@ namespace GsPlugin.Tests {
             }
         }
 
+        [Fact]
+        public async Task RequestDeleteMyData_Forbidden_ReturnsAlreadyOptedOut() {
+            var tempDir = CreateTempDir();
+            try {
+                InitDataManager(tempDir, "valid-token");
+
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.Forbidden
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var result = await client.RequestDeleteMyData(new DeleteDataReq());
+
+                Assert.NotNull(result);
+                Assert.False(result.success);
+                Assert.True(result.alreadyOptedOut);
+                Assert.False(result.authFailed);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task RequestDeleteMyData_Unauthorized_ReturnsAuthFailed() {
+            var tempDir = CreateTempDir();
+            try {
+                InitDataManager(tempDir, "valid-token");
+
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.Unauthorized
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var result = await client.RequestDeleteMyData(new DeleteDataReq());
+
+                Assert.NotNull(result);
+                Assert.False(result.success);
+                Assert.True(result.authFailed);
+                Assert.False(result.alreadyOptedOut);
+            }
+            finally {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
         // --- UnlinkAccount Tests ---
 
         [Fact]

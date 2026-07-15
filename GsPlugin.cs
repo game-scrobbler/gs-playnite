@@ -486,6 +486,15 @@ namespace GsPlugin {
         }
 
         /// <summary>
+        /// Registers an install token on demand from a user-initiated action (e.g. the
+        /// "Delete My Data" button). Startup token registration can fail on a transient
+        /// network error and does not retry until the next Playnite restart, which would
+        /// otherwise leave a token-authenticated action failing for the whole session.
+        /// Reuses the same gated registration + rotation-recovery logic as startup.
+        /// </summary>
+        internal Task EnsureInstallTokenReadyAsync() => EnsureInstallTokenAsync();
+
+        /// <summary>
         /// Ensures the install has a valid server-issued auth token stored in GsData.
         /// Starts in parallel with other startup work and is awaited before the first v4 sync.
         ///

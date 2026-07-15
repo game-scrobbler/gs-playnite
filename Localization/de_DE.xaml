@@ -156,6 +156,7 @@ Sie müssen Playnite neu starten, damit alle Funktionen fortgesetzt werden.</sys
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Fehler: {0} Klicken Sie auf „Konto verknüpfen", um es erneut zu versuchen.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Fehler: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Unbekannter Fehler bei der Verknüpfung</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">Ungültiges Benutzer-ID-Format vom Server erhalten</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Fehler bei der Verknüpfung: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Netzwerkfehler — Server nicht erreichbar. Bitte versuchen Sie es erneut.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Konto konnte nicht getrennt werden.</sys:String>
@@ -169,6 +170,9 @@ Möchten Sie ein anderes Konto verknüpfen?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteSuccess">Ihre Daten wurden gelöscht. Das Plugin ist jetzt deaktiviert.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">Zu viele Löschanfragen. Bitte warten Sie 15 Minuten und versuchen Sie es erneut.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">Datenlöschung fehlgeschlagen. Bitte versuchen Sie es später erneut.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">GameScrobbler konnte nicht erreicht werden, um die Löschung zu autorisieren. Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">Ihre Daten wurden bereits gelöscht. Das Plugin ist jetzt deaktiviert.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Diese Installation konnte nicht verifiziert werden. Verknüpfen Sie Ihr Konto erneut und versuchen Sie dann erneut zu löschen.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin wieder aktiviert. Bitte starten Sie Playnite neu, um die Synchronisierung fortzusetzen.</sys:String>
 

@@ -18,7 +18,22 @@ namespace GsPlugin.Services {
 
         public bool IsInstalled => _providers.Any(p => p.IsInstalled);
 
+        public bool IsPluginLoaded => _providers.Any(p => p.IsPluginLoaded);
+
         public string GetVersion() => null;
+
+        /// <summary>
+        /// Installed providers in resolution order: live plugins first (their data is
+        /// kept fresh), then data-only providers whose plugin is no longer loaded but
+        /// whose data directory still lingers on disk (possibly stale). Priority order
+        /// is preserved within each group. This prevents a leftover SuccessStory data
+        /// folder from shadowing an actually-installed provider such as Playnite
+        /// Achievements.
+        /// </summary>
+        private IEnumerable<IAchievementProvider> ResolutionOrder() {
+            return _providers.Where(p => p.IsInstalled && p.IsPluginLoaded)
+                .Concat(_providers.Where(p => p.IsInstalled && !p.IsPluginLoaded));
+        }
 
         /// <summary>
         /// Returns both counts atomically from the first provider that has data,
@@ -26,8 +41,7 @@ namespace GsPlugin.Services {
         /// that return an empty game-achievements object don't block fallback.
         /// </summary>
         public (int unlocked, int total)? GetCounts(Guid gameId) {
-            foreach (var p in _providers) {
-                if (!p.IsInstalled) continue;
+            foreach (var p in ResolutionOrder()) {
                 var counts = p.GetCounts(gameId);
                 if (counts.HasValue && counts.Value.total > 0) return counts;
             }
@@ -35,8 +49,7 @@ namespace GsPlugin.Services {
         }
 
         public List<AchievementItem> GetAchievements(Guid gameId) {
-            foreach (var p in _providers) {
-                if (!p.IsInstalled) continue;
+            foreach (var p in ResolutionOrder()) {
                 var achievements = p.GetAchievements(gameId);
                 if (achievements != null) return achievements;
             }
@@ -48,8 +61,7 @@ namespace GsPlugin.Services {
         /// Used for diagnostic logging.
         /// </summary>
         public (List<AchievementItem> achievements, string providerName) GetAchievementsWithSource(Guid gameId) {
-            foreach (var p in _providers) {
-                if (!p.IsInstalled) continue;
+            foreach (var p in ResolutionOrder()) {
                 var achievements = p.GetAchievements(gameId);
                 if (achievements != null) return (achievements, p.ProviderName);
             }

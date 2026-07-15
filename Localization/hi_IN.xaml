@@ -156,6 +156,7 @@
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">त्रुटि: {0} पुनः प्रयास के लिए "खाता लिंक करें" पर क्लिक करें।</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">त्रुटि: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">लिंकिंग के दौरान अज्ञात त्रुटि हुई</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">सर्वर से अमान्य उपयोगकर्ता आईडी प्रारूप प्राप्त हुआ</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">लिंकिंग त्रुटि: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">नेटवर्क त्रुटि — सर्वर से संपर्क नहीं हो सका। कृपया पुनः प्रयास करें।</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">खाता अनलिंक करने में विफल।</sys:String>
@@ -169,6 +170,9 @@
     <sys:String x:Key="LOCGsPluginDeleteSuccess">आपका डेटा हटा दिया गया है। प्लगइन अब अक्षम है।</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">बहुत अधिक हटाने के अनुरोध। कृपया 15 मिनट प्रतीक्षा करें और पुनः प्रयास करें।</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">डेटा हटाने का अनुरोध विफल। कृपया बाद में पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">हटाने को अधिकृत करने के लिए GameScrobbler से संपर्क नहीं हो सका। कृपया अपना इंटरनेट कनेक्शन जांचें और पुनः प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">आपका डेटा पहले ही हटा दिया गया है। प्लगइन अब अक्षम है।</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">इस इंस्टॉलेशन को सत्यापित नहीं किया जा सका। अपना खाता पुनः कनेक्ट करें, फिर हटाने का पुनः प्रयास करें।</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">एक त्रुटि हुई। कृपया बाद में पुनः प्रयास करें।</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">प्लगइन फिर से सक्षम। सिंक फिर से शुरू करने के लिए Playnite रीस्टार्ट करें।</sys:String>
 

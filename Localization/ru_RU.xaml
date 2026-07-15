@@ -156,6 +156,7 @@ ID пользователя: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Ошибка: {0} Нажмите «Привязать учётную запись», чтобы повторить.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Ошибка: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Произошла неизвестная ошибка при привязке</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">От сервера получен неверный формат идентификатора пользователя</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Ошибка при привязке: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Сетевая ошибка — не удалось связаться с сервером. Попробуйте ещё раз.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Не удалось отвязать учётную запись.</sys:String>
@@ -169,6 +170,9 @@ ID пользователя: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteSuccess">Ваши данные удалены. Плагин отключён.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">Слишком много запросов на удаление. Подождите 15 минут и попробуйте снова.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">Не удалось запросить удаление данных. Попробуйте позже.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">Не удалось связаться с GameScrobbler для подтверждения удаления. Проверьте подключение к интернету и повторите попытку.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">Ваши данные уже удалены. Плагин теперь отключён.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Не удалось подтвердить эту установку. Привяжите учётную запись заново и повторите удаление.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Произошла ошибка. Попробуйте позже.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Плагин включён заново. Перезапустите Playnite для возобновления синхронизации.</sys:String>
 

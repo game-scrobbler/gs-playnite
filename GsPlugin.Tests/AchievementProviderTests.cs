@@ -10,6 +10,7 @@ namespace GsPlugin.Tests {
     /// </summary>
     internal class StubAchievementProvider : IAchievementProvider {
         public bool IsInstalled { get; set; }
+        public bool IsPluginLoaded { get; set; }
         public string ProviderName { get; set; } = "Stub";
         public string Version { get; set; }
 
@@ -306,6 +307,78 @@ namespace GsPlugin.Tests {
             var agg = new GsAchievementAggregator(p1);
 
             Assert.Null(agg.GetCounts(GameA));
+        }
+
+        [Fact]
+        public void GetAchievements_PrefersLivePluginOverStaleDataOnlyProvider() {
+            // Reproduces issue #66: a leftover SuccessStory data directory (plugin
+            // uninstalled -> IsPluginLoaded false) must not shadow the actually-installed
+            // Playnite Achievements provider, even though SuccessStory is priority 1.
+            var successStory = new StubAchievementProvider {
+                IsInstalled = true,
+                IsPluginLoaded = false,
+                ProviderName = "SuccessStory",
+                Data = { [GameA] = MakeAchievements(1, 30) } // stale
+            };
+            var playniteAch = new StubAchievementProvider {
+                IsInstalled = true,
+                IsPluginLoaded = true,
+                ProviderName = "Playnite Achievements",
+                Data = { [GameA] = MakeAchievements(12, 30) } // fresh
+            };
+            var agg = new GsAchievementAggregator(successStory, playniteAch);
+
+            var (achievements, source) = agg.GetAchievementsWithSource(GameA);
+            Assert.Equal("Playnite Achievements", source);
+            Assert.Equal(12, achievements.Count(a => a.IsUnlocked));
+
+            var counts = agg.GetCounts(GameA);
+            Assert.Equal(12, counts.Value.unlocked);
+        }
+
+        [Fact]
+        public void GetAchievements_UsesDataOnlyProvider_WhenNoLivePluginHasData() {
+            // A data-only provider is still better than nothing: if no live plugin has
+            // data for the game, fall back to the lingering on-disk data.
+            var successStory = new StubAchievementProvider {
+                IsInstalled = true,
+                IsPluginLoaded = false,
+                ProviderName = "SuccessStory",
+                Data = { [GameA] = MakeAchievements(3, 5) }
+            };
+            var playniteAch = new StubAchievementProvider {
+                IsInstalled = true,
+                IsPluginLoaded = true,
+                ProviderName = "Playnite Achievements"
+                // no data for GameA
+            };
+            var agg = new GsAchievementAggregator(successStory, playniteAch);
+
+            var (achievements, source) = agg.GetAchievementsWithSource(GameA);
+            Assert.Equal("SuccessStory", source);
+            Assert.Equal(5, achievements.Count);
+        }
+
+        [Fact]
+        public void ResolutionOrder_PreservesPriority_WhenBothPluginsLive() {
+            // Normal case: both plugins installed and loaded -> priority order preserved,
+            // SuccessStory (priority 1) wins. No regression from the stale-data fix.
+            var successStory = new StubAchievementProvider {
+                IsInstalled = true,
+                IsPluginLoaded = true,
+                ProviderName = "SuccessStory",
+                Data = { [GameA] = MakeAchievements(2, 10) }
+            };
+            var playniteAch = new StubAchievementProvider {
+                IsInstalled = true,
+                IsPluginLoaded = true,
+                ProviderName = "Playnite Achievements",
+                Data = { [GameA] = MakeAchievements(9, 10) }
+            };
+            var agg = new GsAchievementAggregator(successStory, playniteAch);
+
+            var (_, source) = agg.GetAchievementsWithSource(GameA);
+            Assert.Equal("SuccessStory", source);
         }
 
         [Fact]

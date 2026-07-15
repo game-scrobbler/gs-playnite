@@ -388,6 +388,20 @@ namespace GsPlugin.Models {
                 Settings.IsDeleting = true;
                 Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeletingRequesting", "Requesting data deletion...");
 
+                // Deletion is strictly token-authenticated. If startup registration failed
+                // (e.g. transient network error), the local token stays empty for the whole
+                // session and every delete attempt would fail before reaching the server —
+                // the "it keeps failing" symptom. Register a token on demand first.
+                if (string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                    await _plugin.EnsureInstallTokenReadyAsync();
+                }
+
+                if (string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                    Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteNoToken",
+                        "Couldn't reach GameScrobbler to authorize the deletion. Check your internet connection and try again.");
+                    return;
+                }
+
                 var result = await _apiClient.RequestDeleteMyData(new DeleteDataReq());
 
                 if (result != null && result.success) {
@@ -399,8 +413,22 @@ namespace GsPlugin.Models {
                     // Notify UI to refresh connection status and button visibility
                     OnLinkingStatusChanged();
                 }
+                else if (result != null && result.alreadyOptedOut) {
+                    // Server says this install is already opted out — the data is gone.
+                    // Sync local state so the Delete button hides instead of looping on a
+                    // failure the user can never clear by retrying.
+                    GsDataManager.PerformOptOut();
+                    GsSyncHashIndex.ClearAll();
+                    Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteAlreadyDone",
+                        "Your data has already been deleted. The plugin is now disabled.");
+                    OnLinkingStatusChanged();
+                }
                 else if (result != null && result.rateLimited) {
                     Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteRateLimited", "Too many deletion requests. Please wait 15 minutes and try again.");
+                }
+                else if (result != null && result.authFailed) {
+                    Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteAuthFailed",
+                        "This installation couldn't be verified. Reconnect your account, then try deleting again.");
                 }
                 else {
                     Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteFailed", "Failed to request data deletion. Please try again later.");
@@ -430,7 +458,8 @@ namespace GsPlugin.Models {
                 if (result == null || !result.success) {
                     if (result?.rateLimited == true) {
                         Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInRateLimited", "Too many attempts. Please wait and try again.");
-                    } else {
+                    }
+                    else {
                         Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInFailed", "Failed to re-enable. Please restart Playnite to try again.");
                     }
                     return;

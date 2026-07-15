@@ -44,6 +44,16 @@ namespace GsPlugin.Services {
     /// </summary>
     public interface IAchievementProvider {
         bool IsInstalled { get; }
+
+        /// <summary>
+        /// True when the provider's actual Playnite plugin is currently loaded
+        /// (present in <c>Addons.Plugins</c>), as opposed to only having a lingering
+        /// data directory on disk after the plugin was uninstalled or disabled.
+        /// Data reads work off-disk either way, but a live plugin keeps its data fresh,
+        /// so the aggregator prefers live providers to avoid serving stale achievements.
+        /// </summary>
+        bool IsPluginLoaded { get; }
+
         string ProviderName { get; }
         string GetVersion();
 

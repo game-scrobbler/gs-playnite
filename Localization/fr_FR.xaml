@@ -156,6 +156,7 @@ Vous devrez redémarrer Playnite pour que toutes les fonctionnalités reprennent
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Erreur : {0} Cliquez sur « Associer le compte » pour réessayer.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Erreur : {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Erreur inconnue lors de l'association</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">Format d'identifiant utilisateur invalide reçu du serveur</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Erreur lors de l'association : {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Erreur réseau — impossible de contacter le serveur. Veuillez réessayer.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Échec de la dissociation du compte.</sys:String>
@@ -169,6 +170,9 @@ Voulez-vous associer un autre compte ?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteSuccess">Vos données ont été supprimées. Le plugin est maintenant désactivé.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">Trop de demandes de suppression. Veuillez patienter 15 minutes et réessayer.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">Échec de la demande de suppression. Veuillez réessayer plus tard.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">Impossible de joindre GameScrobbler pour autoriser la suppression. Vérifiez votre connexion Internet et réessayez.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">Vos données ont déjà été supprimées. Le plugin est maintenant désactivé.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Cette installation n'a pas pu être vérifiée. Reconnectez votre compte, puis réessayez de supprimer.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Une erreur est survenue. Veuillez réessayer plus tard.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin réactivé. Veuillez redémarrer Playnite pour reprendre la synchronisation.</sys:String>
 

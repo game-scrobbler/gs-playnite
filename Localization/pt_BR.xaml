@@ -156,6 +156,7 @@ Será necessário reiniciar o Playnite para retomar todas as funcionalidades.</s
     <sys:String x:Key="LOCGsPluginErrorRetryFormat">Erro: {0} Clique em "Vincular Conta" para tentar novamente.</sys:String>
     <sys:String x:Key="LOCGsPluginErrorFormat">Erro: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginUnknownLinkingError">Ocorreu um erro desconhecido durante a vinculação</sys:String>
+    <sys:String x:Key="LOCGsPluginInvalidUserIdFormat">Formato de ID de usuário inválido recebido do servidor</sys:String>
     <sys:String x:Key="LOCGsPluginLinkingErrorFormat">Erro durante a vinculação: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginNetworkError">Erro de rede — não foi possível conectar ao servidor. Tente novamente.</sys:String>
     <sys:String x:Key="LOCGsPluginUnlinkFailed">Falha ao desvincular conta.</sys:String>
@@ -169,6 +170,9 @@ Deseja vincular a uma conta diferente?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteSuccess">Seus dados foram excluídos. O plugin está desativado.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteRateLimited">Muitas solicitações de exclusão. Aguarde 15 minutos e tente novamente.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteFailed">Falha ao solicitar exclusão de dados. Tente novamente mais tarde.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteNoToken">Não foi possível conectar ao GameScrobbler para autorizar a exclusão. Verifique sua conexão com a internet e tente novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAlreadyDone">Seus dados já foram excluídos. O plugin agora está desativado.</sys:String>
+    <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Não foi possível verificar esta instalação. Reconecte sua conta e tente excluir novamente.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Ocorreu um erro. Tente novamente mais tarde.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin reativado. Reinicie o Playnite para retomar a sincronização.</sys:String>
 

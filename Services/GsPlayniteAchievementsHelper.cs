@@ -37,9 +37,12 @@ namespace GsPlugin.Services {
         public bool IsInstalled {
             get {
                 if (File.Exists(_dbPath)) return true;
-                return _api?.Addons?.Plugins?.Any(p => p.Id == PlayniteAchievementsId) == true;
+                return IsPluginLoaded;
             }
         }
+
+        public bool IsPluginLoaded =>
+            _api?.Addons?.Plugins?.Any(p => p.Id == PlayniteAchievementsId) == true;
 
         public (int unlocked, int total)? GetCounts(Guid gameId) {
             try {
