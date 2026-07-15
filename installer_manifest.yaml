@@ -1,6 +1,15 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.7.0
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-07-15
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.7.0/GsPlugin-v2.7.0.pext
+    Changelog:
+      - Your library and achievement uploads now sync in smaller, sturdier batches, so even huge libraries upload reliably.
+      - Fixed an issue where your play stats or achievements could get out of sync after an interrupted sync.
+      - Renamed the \"new dashboard\" toggle to \"beta channel\" in settings for clarity.
+      - Made background error reporting more reliable so it can no longer cause slowdowns when Playnite closes.
   - Version: 2.6.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-07-12
