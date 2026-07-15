@@ -66,6 +66,12 @@ namespace GsPlugin {
         /// </summary>
         private readonly object _timerLock = new object();
         /// <summary>
+        /// Serializes the install-token registration flow so startup (EnsureInstallTokenAsync)
+        /// and on-demand callers (EnsureInstallTokenReadyAsync, e.g. the "Delete My Data"
+        /// button) cannot register concurrently and double-register the install.
+        /// </summary>
+        private readonly SemaphoreSlim _installTokenGate = new SemaphoreSlim(1, 1);
+        /// <summary>
         /// Unique identifier for the plugin itself.
         /// </summary>
         public override Guid Id { get; } = Guid.Parse("32975fed-6915-4dd3-a230-030cdc5265ae");
@@ -497,6 +503,30 @@ namespace GsPlugin {
                 return;
             }
 
+            // Serialize the entire registration + conflict-recovery sequence. Startup and
+            // on-demand callers can otherwise enter concurrently with an empty token and both
+            // register, producing a 409 and a RotateInstallId() that races the in-flight
+            // registration. The gate is held across registration, token storage, rotation, and retry.
+            await _installTokenGate.WaitAsync();
+            try {
+                // Re-check under the gate: a concurrent caller may have stored a token while we
+                // waited, making our registration redundant.
+                if (!string.IsNullOrEmpty(GsDataManager.Data.InstallToken)) {
+                    return;
+                }
+                await EnsureInstallTokenCoreAsync();
+            }
+            finally {
+                _installTokenGate.Release();
+            }
+        }
+
+        /// <summary>
+        /// Performs the actual token registration and 409 rotation-recovery. Always invoked
+        /// under <see cref="_installTokenGate"/> by <see cref="EnsureInstallTokenAsync"/>, so
+        /// concurrent startup and on-demand callers run one at a time.
+        /// </summary>
+        private async Task EnsureInstallTokenCoreAsync() {
             var installId = GsDataManager.Data.InstallID;
             if (string.IsNullOrEmpty(installId)) {
                 _logger.Warn("EnsureInstallTokenAsync: no InstallID available, skipping registration");
@@ -660,6 +690,13 @@ namespace GsPlugin {
                 }
                 catch (Exception ex) {
                     _logger.Error(ex, "Error closing Sentry");
+                }
+
+                try {
+                    _installTokenGate.Dispose();
+                }
+                catch (Exception ex) {
+                    _logger.Error(ex, "Error disposing install-token gate");
                 }
 
                 _apiClient = null;
