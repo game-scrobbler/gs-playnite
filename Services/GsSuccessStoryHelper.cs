@@ -37,9 +37,12 @@ namespace GsPlugin.Services {
         public bool IsInstalled {
             get {
                 if (_dataPath != null && Directory.Exists(_dataPath)) return true;
-                return _api?.Addons?.Plugins?.Any(p => p.Id == SuccessStoryId) == true;
+                return IsPluginLoaded;
             }
         }
+
+        public bool IsPluginLoaded =>
+            _api?.Addons?.Plugins?.Any(p => p.Id == SuccessStoryId) == true;
 
         public (int unlocked, int total)? GetCounts(Guid gameId) {
             var achievements = GetAchievements(gameId);

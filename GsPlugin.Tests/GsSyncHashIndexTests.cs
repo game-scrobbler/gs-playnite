@@ -606,6 +606,7 @@ namespace GsPlugin.Tests {
 
         private sealed class StubAchievementProvider : IAchievementProvider {
             public bool IsInstalled => false;
+            public bool IsPluginLoaded => false;
             public string ProviderName => "stub";
             public string GetVersion() => "0";
             public (int unlocked, int total)? GetCounts(Guid gameId) => null;

@@ -1000,7 +1000,19 @@ namespace GsPlugin.Services {
                 if (_achievementHelper is GsAchievementAggregator agg) {
                     var installed = agg.GetInstalledProviders();
                     _logger.Info($"Achievement providers installed: {installed.Count} — " +
-                        string.Join(", ", installed.Select(p => $"{p.ProviderName} (v{p.GetVersion() ?? "?"})")));
+                        string.Join(", ", installed.Select(p =>
+                            $"{p.ProviderName} (v{p.GetVersion() ?? "?"}, " +
+                            $"{(p.IsPluginLoaded ? "plugin loaded" : "data-only")})")));
+
+                    // A data-only provider (data directory present but plugin not loaded)
+                    // means the addon was uninstalled/disabled while its cache lingered.
+                    // The aggregator now deprioritizes it, but flag it so stale-data reports
+                    // are diagnosable from the log alone. See issue #66.
+                    var stale = installed.Where(p => !p.IsPluginLoaded).ToList();
+                    if (stale.Count > 0) {
+                        _logger.Warn("Achievement diag: data-only provider(s) with no loaded plugin — " +
+                            $"data may be stale: {string.Join(", ", stale.Select(p => p.ProviderName))}");
+                    }
                 }
                 _logger.Info($"Achievement diff: {allGames.Count} total games, " +
                     $"index has {achievementFingerprints.Count} entries");
