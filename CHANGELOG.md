@@ -3,6 +3,14 @@
 ## [2.7.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.6.0...GsPlugin-v2.7.0) (2026-07-15)
 
 
+### Highlights
+
+* Your library and achievement uploads now sync in smaller, sturdier batches, so even huge libraries upload reliably.
+* Fixed an issue where your play stats or achievements could get out of sync after an interrupted sync.
+* Renamed the "new dashboard" toggle to "beta channel" in settings for clarity.
+* Made background error reporting more reliable so it can no longer cause slowdowns when Playnite closes.
+
+
 ### Features
 
 * **settings:** rebrand new dashboard toggle as beta channel ([b18ca26](https://github.com/game-scrobbler/gs-playnite/commit/b18ca2661441d73538b7d23e61abb63f9574238b))
