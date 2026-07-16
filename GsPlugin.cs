@@ -124,6 +124,15 @@ namespace GsPlugin {
 
             // Initialize server notification service
             _notificationService = new GsNotificationService(api, _apiClient, Id);
+
+            // Expose the dashboard as a theme-embeddable control so theme developers can place
+            // it inside their Desktop or Fullscreen themes. Playnite renders a control named
+            // "GameScrobbler_Dashboard" in theme XAML by calling GetGameViewControl below.
+            // This is how the plugin becomes usable in Fullscreen mode, which has no sidebar.
+            AddCustomElementSupport(new AddCustomElementSupportArgs {
+                SourceName = "GameScrobbler",
+                ElementList = new List<string> { "Dashboard" }
+            });
         }
 
         /// <summary>
@@ -367,6 +376,26 @@ namespace GsPlugin {
         /// <returns>A UserControl that represents the settings view.</returns>
         public override UserControl GetSettingsView(bool firstRunSettings) {
             return new GsPluginSettingsView();
+        }
+
+        /// <summary>
+        /// Returns a theme-embeddable control by name. Playnite calls this when a theme
+        /// (Desktop or Fullscreen) contains a control named "GameScrobbler_&lt;Name&gt;", which was
+        /// registered via <see cref="Plugin.AddCustomElementSupport"/> in the constructor.
+        ///
+        /// This is the integration point that makes the plugin usable in Fullscreen mode:
+        /// Fullscreen has no sidebar, so theme developers place the dashboard control themselves.
+        /// </summary>
+        /// <param name="args">Requested element name and the current application mode.</param>
+        /// <returns>The requested control, or null when unknown/opted out.</returns>
+        public override Control GetGameViewControl(GetGameViewControlArgs args) {
+            if (GsDataManager.IsOptedOut) {
+                return null;
+            }
+            if (args.Name == "Dashboard") {
+                return new MySidebarView(_apiClient);
+            }
+            return null;
         }
 
         /// <summary>
