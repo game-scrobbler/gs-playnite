@@ -3,6 +3,14 @@
 ## [2.8.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.7.0...GsPlugin-v2.8.0) (2026-07-16)
 
 
+### Highlights
+
+* You can now enjoy Game Scrobbler while playing in Fullscreen mode, once your theme adds support for it.
+* Fixed a mix-up where achievements could show frozen or incomplete progress if you'd previously used a different achievement tracker.
+* Fixed "Delete My Data" sometimes getting stuck or failing forever, including when your data was already deleted.
+* Fixed account linking sometimes showing "Successfully linked!" while your account was actually still disconnected.
+
+
 ### Features
 
 * **theme:** embeddable dashboard control for Fullscreen/Desktop themes ([#74](https://github.com/game-scrobbler/gs-playnite/issues/74)) ([c44f3d1](https://github.com/game-scrobbler/gs-playnite/commit/c44f3d15a1ee028e8ecb4c9ddb81319f7c00d544))
