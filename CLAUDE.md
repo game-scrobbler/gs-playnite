@@ -139,6 +139,12 @@ GsPlugin (entry point, IDisposable)
 - Auto-refreshes the dashboard token when the sidebar becomes visible after 8+ minutes (tokens have a 10-minute TTL).
 - Handles `gs:refresh-token` postMessage from the frontend for manual retry when the session expires.
 
+### Theme Integration (Desktop & Fullscreen)
+- The dashboard is exposed as a theme-embeddable custom element so it works in **Fullscreen mode**, which has no sidebar. The sidebar (`GetSidebarItems`) and the Extensions menu (`GetMainMenuItems`) are Desktop-only surfaces.
+- Registered in the `GsPlugin` constructor via `AddCustomElementSupport(SourceName = "GameScrobbler", ElementList = ["Dashboard"])`. Theme developers embed it with `<ContentControl x:Name="GameScrobbler_Dashboard" />` in either a Desktop or Fullscreen theme.
+- `GsPlugin.GetGameViewControl(GetGameViewControlArgs)` returns a fresh `MySidebarView(_apiClient)` when `args.Name == "Dashboard"`; returns `null` for unknown names or when opted out. `args.Mode` distinguishes `Desktop`/`Fullscreen` if mode-specific controls are ever needed. The same WebView2 dashboard is reused for all surfaces.
+- The returned `MySidebarView` self-disposes on `Unloaded`, so Playnite creating/destroying the control on theme reloads or view changes is safe.
+
 ### Achievement Provider Architecture
 Achievement data comes from two optional addons via an aggregator pattern:
 - `IAchievementProvider` — common interface (`GetCounts`, `GetAchievements`, `IsInstalled`)
