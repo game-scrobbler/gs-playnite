@@ -464,6 +464,9 @@ namespace GsPlugin.Tests {
         public Task<PlayniteNotificationsRes> GetNotifications() =>
             Task.FromResult(new PlayniteNotificationsRes());
 
+        public Task<GameDataRes> GetGameData(string playniteGameId) =>
+            Task.FromResult(new GameDataRes { success = true });
+
         public Task<UnlinkRes> UnlinkAccount() =>
             Task.FromResult(new UnlinkRes { success = true });
 

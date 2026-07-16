@@ -475,6 +475,47 @@ namespace GsPlugin.Api {
             }
         }
 
+        /// <summary>
+        /// Fetches this install's synced data for a single game, keyed by the raw
+        /// Playnite game id. Returns null on any failure, and a response whose
+        /// <c>game</c> is null when the game has never been synced.
+        ///
+        /// Like GetNotifications, this deliberately bypasses the shared circuit
+        /// breaker: it feeds a passive theme surface, so a failure here must not
+        /// affect scrobbling or sync.
+        /// </summary>
+        public async Task<GameDataRes> GetGameData(string playniteGameId) {
+            if (string.IsNullOrEmpty(playniteGameId)) {
+                return null;
+            }
+
+            var installToken = GsDataManager.DataOrNull?.InstallToken;
+            if (string.IsNullOrEmpty(installToken)) {
+                return null;
+            }
+
+            string url = $"{_apiBaseUrl}/api/playnite/v2/game-data?playnite_id={Uri.EscapeDataString(playniteGameId)}";
+
+            try {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url)) {
+                    request.Headers.Add("x-playnite-token", installToken);
+                    HttpResponseMessage response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                    if (!response.IsSuccessStatusCode) {
+                        _logger.Warn($"GetGameData returned {(int)response.StatusCode}");
+                        return null;
+                    }
+
+                    return JsonSerializer.Deserialize<GameDataRes>(responseBody, _jsonOptions);
+                }
+            }
+            catch (Exception ex) {
+                _logger.Warn(ex, "GetGameData HTTP error");
+                return null;
+            }
+        }
+
         #endregion
 
         /// <summary>

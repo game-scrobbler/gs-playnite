@@ -289,4 +289,34 @@ namespace GsPlugin.Api {
         public bool success { get; set; }
         public List<PlayniteNotificationDto> notifications { get; set; }
     }
+
+    /// <summary>
+    /// Per-game data for one game in this install's synced library.
+    /// Mirrors GET /api/playnite/v2/game-data.
+    /// </summary>
+    public class GameDataDto {
+        public string playnite_id { get; set; }
+        public string name { get; set; }
+        public long playtime_sec { get; set; }
+        public long play_count { get; set; }
+        public string last_activity { get; set; }
+        public string completion_status_name { get; set; }
+        public int? user_score { get; set; }
+        public bool is_favorite { get; set; }
+        public bool is_hidden { get; set; }
+        public int? achievement_count_unlocked { get; set; }
+        public int? achievement_count_total { get; set; }
+        public string source_name { get; set; }
+    }
+
+    /// <summary>
+    /// Response for GET /api/playnite/v2/game-data.
+    /// <c>game</c> is null when the server has no synced record for the game,
+    /// in which case <c>reason</c> explains why (e.g. "not_synced").
+    /// </summary>
+    public class GameDataRes {
+        public bool success { get; set; }
+        public GameDataDto game { get; set; }
+        public string reason { get; set; }
+    }
 }

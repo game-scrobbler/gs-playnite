@@ -22,5 +22,6 @@ namespace GsPlugin.Api {
         Task<string> ResetInstallToken(string currentToken);
         Task<string> GetDashboardToken();
         Task<PlayniteNotificationsRes> GetNotifications();
+        Task<GameDataRes> GetGameData(string playniteGameId);
     }
 }

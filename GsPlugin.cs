@@ -293,6 +293,28 @@ namespace GsPlugin {
             return null;
         }
 
+        /// <summary>
+        /// Supplies this install's Game Scrobbler data for a single game so themes can
+        /// bind to it (see <see cref="GsGameDataPresenter"/> for the binding shape).
+        /// This is the Playnite 11 replacement for the Playnite 10 custom-element and
+        /// PluginSettings-binding surfaces, which no longer exist in the v11 SDK.
+        ///
+        /// Returns null when opted out, or for games we would never have synced, so
+        /// themes get no presenter at all rather than one that is permanently empty.
+        /// </summary>
+        public override PluginGameDataPresenter? GetPluginGameDataPresenter(GetPluginGameDataPresenterArgs args) {
+            if (GsDataManager.IsOptedOut) return null;
+
+            var game = args.Game;
+            if (game == null || string.IsNullOrEmpty(game.Id)) return null;
+            if (string.IsNullOrEmpty(game.LibraryId)
+                || !GsAllowedPlugins.AllowedPluginIds.Contains(game.LibraryId)) {
+                return null;
+            }
+
+            return new GsGameDataPresenter(_apiClient, game.Id);
+        }
+
         public override async Task<PluginSettingsHandler?> GetSettingsHandlerAsync(GetSettingsHandlerArgs args) {
             return new GsPluginSettingsHandler(_settings);
         }
