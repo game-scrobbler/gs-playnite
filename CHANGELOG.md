@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.8.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.7.0...GsPlugin-v2.8.0) (2026-07-16)
+
+
+### Highlights
+
+* You can now enjoy Game Scrobbler while playing in Fullscreen mode, once your theme adds support for it.
+* Fixed a mix-up where achievements could show frozen or incomplete progress if you'd previously used a different achievement tracker.
+* Fixed "Delete My Data" sometimes getting stuck or failing forever, including when your data was already deleted.
+* Fixed account linking sometimes showing "Successfully linked!" while your account was actually still disconnected.
+
+
+### Features
+
+* **theme:** embeddable dashboard control for Fullscreen/Desktop themes ([#74](https://github.com/game-scrobbler/gs-playnite/issues/74)) ([c44f3d1](https://github.com/game-scrobbler/gs-playnite/commit/c44f3d15a1ee028e8ecb4c9ddb81319f7c00d544))
+* **theme:** expose dashboard as embeddable control for Fullscreen/Desktop themes ([d94bbff](https://github.com/game-scrobbler/gs-playnite/commit/d94bbff7dc1ae3f76806ef4213df3e81ab2c97b5))
+
+
+### Bug Fixes
+
+* **achievements:** prefer live plugin over stale on-disk provider data ([cfb58db](https://github.com/game-scrobbler/gs-playnite/commit/cfb58db9bd0c9eb9afd24d7c50bb7b04e5e9cab3))
+* **achievements:** prefer live plugin over stale on-disk provider data ([192f620](https://github.com/game-scrobbler/gs-playnite/commit/192f620aa624fd37acc684d47792c440935202b1)), closes [#66](https://github.com/game-scrobbler/gs-playnite/issues/66)
+* **hooks:** address review feedback on the format check ([4566ec3](https://github.com/game-scrobbler/gs-playnite/commit/4566ec3d46c18f86069827f76c6b0177abc27111))
+* **hooks:** run format check under a capable .NET SDK ([562af21](https://github.com/game-scrobbler/gs-playnite/commit/562af21101cff53c9648e5a2bb372ad93cf14f76))
+* **hooks:** run pre-commit format check under a capable .NET SDK ([fa124e2](https://github.com/game-scrobbler/gs-playnite/commit/fa124e24ee7c5d0fda6bb58c1585aeecdcc5d617))
+* **linking:** localize invalid user ID error message ([be9888f](https://github.com/game-scrobbler/gs-playnite/commit/be9888f2da31610c3afee4319f87b616c5d5ff0a))
+* **linking:** stop reporting success when verify returns not-linked ([ffdd5f2](https://github.com/game-scrobbler/gs-playnite/commit/ffdd5f254ff708376893f7ac116b0a1dbe446001))
+* **privacy:** make Delete My Data resilient to token and opt-out states ([331c148](https://github.com/game-scrobbler/gs-playnite/commit/331c1481091525ca8b6e3e2ca697668701922914)), closes [#61](https://github.com/game-scrobbler/gs-playnite/issues/61)
+* **token:** serialize install-token registration across concurrent callers ([1974510](https://github.com/game-scrobbler/gs-playnite/commit/1974510f2ae9c1a9896136fb828b68355654e0de))
+* **token:** serialize install-token registration across concurrent callers ([46bf711](https://github.com/game-scrobbler/gs-playnite/commit/46bf7113ba54f7b265427d138ecab7b02237888e))
+
 ## [2.7.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.6.0...GsPlugin-v2.7.0) (2026-07-15)
 
 
