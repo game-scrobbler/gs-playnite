@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Playnite.SDK;
 using PostHog;
@@ -91,9 +92,21 @@ namespace GsPlugin.Infrastructure {
         /// Shuts down the PostHog client and releases resources.
         /// </summary>
         public static void Shutdown() {
+            var client = _client;
+            _client = null;
+            if (client == null) {
+                return;
+            }
+
             try {
-                _client?.Dispose();
-                _client = null;
+                // Bounded flush: PostHogClient.Dispose() blocks synchronously on an unbounded
+                // async flush (DisposeAsync().GetAwaiter().GetResult()), which can hang Playnite
+                // on exit when the ingest endpoint is slow/unreachable. Race it against a timeout
+                // instead of waiting on it directly.
+                var disposeTask = Task.Run(() => client.Dispose());
+                if (!disposeTask.Wait(TimeSpan.FromSeconds(2))) {
+                    _logger.Warn("PostHog dispose timed out during shutdown; abandoning");
+                }
             }
             catch (Exception ex) {
                 try { _logger.Debug(ex, "PostHog shutdown failed (non-critical)"); } catch { }
