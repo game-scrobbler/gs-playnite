@@ -106,6 +106,12 @@ namespace GsPlugin.Infrastructure {
                 var disposeTask = Task.Run(() => client.Dispose());
                 if (!disposeTask.Wait(TimeSpan.FromSeconds(2))) {
                     _logger.Warn("PostHog dispose timed out during shutdown; abandoning");
+                    // Dispose keeps running in the background after we give up waiting on it —
+                    // observe any fault it eventually throws so it doesn't surface later as an
+                    // unobserved task exception.
+                    disposeTask.ContinueWith(t => {
+                        try { _logger.Warn(t.Exception?.GetBaseException(), "PostHog dispose failed after shutdown timeout (non-critical)"); } catch { }
+                    }, TaskContinuationOptions.OnlyOnFaulted);
                 }
             }
             catch (Exception ex) {
