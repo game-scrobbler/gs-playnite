@@ -567,6 +567,65 @@ namespace GsPlugin.Services {
                 syncId => _apiClient.SyncAchievementsFullAbort(syncId));
         }
 
+        /// <summary>Polling cadence for <see cref="TryConfirmQueueCompletionAsync"/>.</summary>
+        private static readonly TimeSpan QueueStatusPollInterval = TimeSpan.FromSeconds(1.5);
+
+        /// <summary>
+        /// Total time budget for <see cref="TryConfirmQueueCompletionAsync"/>. Matches the server's
+        /// documented "1-5 seconds" typical processing time with margin, so a poll never meaningfully
+        /// delays startup/library-updated callbacks that await these sync methods.
+        /// </summary>
+        private static readonly TimeSpan QueueStatusPollBudget = TimeSpan.FromSeconds(8);
+
+        /// <summary>
+        /// Best-effort check of a queued sync job's terminal status via GET /queue/status/:queueId.
+        /// A "queued" admission only means the request was accepted onto the async queue, not that
+        /// the server applied it — see gs-playnite#83, where a job that failed after admission left
+        /// the client believing it had synced. Bounded to a short budget: if the job hasn't reached a
+        /// terminal state in time (large library, slow backend), returns null so the caller falls back
+        /// to the pre-existing behavior of trusting the "queued" admission. This only tightens the
+        /// common case — a job that fails fast (validation error, immediate crash) is now caught
+        /// instead of silently treated as success.
+        /// </summary>
+        /// <returns>true if the job completed successfully, false if it failed/partially applied,
+        /// or null if no terminal status was observed within the budget.</returns>
+        private async Task<bool?> TryConfirmQueueCompletionAsync(string label, string queueId) {
+            if (string.IsNullOrEmpty(queueId)) {
+                return null;
+            }
+
+            var deadline = DateTime.UtcNow + QueueStatusPollBudget;
+            do {
+                await Task.Delay(QueueStatusPollInterval);
+
+                QueueStatusRes res;
+                try {
+                    res = await _apiClient.GetQueueStatus(queueId);
+                }
+                catch (Exception ex) {
+                    _logger.Warn(ex, $"{label}: queue status poll failed for {queueId}");
+                    continue;
+                }
+
+                switch (res?.data?.status) {
+                    case "completed":
+                        return true;
+                    case "partial":
+                    case "failed":
+                        _logger.Error($"{label}: server job {queueId} ended with status={res.data.status}" +
+                            (string.IsNullOrEmpty(res.data.errorMessage) ? "" : $" ({res.data.errorMessage})"));
+                        return false;
+                    default:
+                        // pending / processing / retrying / no response yet — keep waiting.
+                        break;
+                }
+            } while (DateTime.UtcNow < deadline);
+
+            _logger.Info($"{label}: job {queueId} still processing after {QueueStatusPollBudget.TotalSeconds:F0}s — " +
+                "committing baseline optimistically (server may still be working on a large library).");
+            return null;
+        }
+
         /// <summary>
         /// Sends the full library via v4 chunked sync and writes the local hash index.
         /// </summary>
@@ -630,6 +689,10 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success && response.status == "queued") {
+                    if (await TryConfirmQueueCompletionAsync("Full library sync", response.queueId) == false) {
+                        return SyncLibraryResult.Error;
+                    }
+
                     _logger.Info($"Full library sync queued ({library.Count} games).");
 
                     var indexDict = library.ToDictionary(
@@ -813,6 +876,10 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success && response.status == "queued") {
+                    if (await TryConfirmQueueCompletionAsync("Library diff sync", response.queueId) == false) {
+                        return SyncLibraryResult.Error;
+                    }
+
                     _logger.Info("Library diff sync queued successfully.");
 
                     var upserted = added.Concat(updated).ToDictionary(
@@ -947,6 +1014,10 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success && response.status == "queued") {
+                    if (await TryConfirmQueueCompletionAsync("Full achievements sync", response.queueId) == false) {
+                        return SyncLibraryResult.Error;
+                    }
+
                     _logger.Info("Full achievements sync queued successfully.");
 
                     var indexDict = games.ToDictionary(
@@ -1162,6 +1233,10 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success && response.status == "queued") {
+                    if (await TryConfirmQueueCompletionAsync("Achievement diff sync", response.queueId) == false) {
+                        return SyncLibraryResult.Error;
+                    }
+
                     _logger.Info("Achievement diff sync queued successfully.");
 
                     if (!GsSyncHashIndex.ApplyAchievementDiff(upsertedFingerprints, allCleared)) {

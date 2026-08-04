@@ -598,6 +598,11 @@ namespace GsPlugin.Tests {
             public Task<string> GetDashboardToken() => Task.FromResult("tok");
             public Task<PlayniteNotificationsRes> GetNotifications() =>
                 Task.FromResult(new PlayniteNotificationsRes());
+            public Task<QueueStatusRes> GetQueueStatus(string queueId) =>
+                Task.FromResult(new QueueStatusRes {
+                    success = true,
+                    data = new QueueStatusData { status = "completed" }
+                });
         }
 
         private static GsScrobblingService CreateService(IGsApiClient client) {
