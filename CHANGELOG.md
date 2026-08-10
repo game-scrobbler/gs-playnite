@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.8.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.0...GsPlugin-v2.8.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* **sync:** confirm queue completion before committing sync baseline ([8f3568c](https://github.com/game-scrobbler/gs-playnite/commit/8f3568c38b721bf44132af02fe667b36e4b72bed))
+* **sync:** confirm queue completion before committing sync baseline ([cdb43bd](https://github.com/game-scrobbler/gs-playnite/commit/cdb43bd9d82a167cf54e82e54df46a7387077256))
+* **telemetry:** bound PostHog client dispose during shutdown ([a775fd7](https://github.com/game-scrobbler/gs-playnite/commit/a775fd70a24a0cd78f9bc7cfd67f4a1b33233bef))
+* **telemetry:** bound PostHog client dispose during shutdown ([625154c](https://github.com/game-scrobbler/gs-playnite/commit/625154cded28948ea49076bc5c82499255d6bc4c)), closes [#84](https://github.com/game-scrobbler/gs-playnite/issues/84)
+* **telemetry:** observe PostHog dispose fault after shutdown timeout ([1176e0f](https://github.com/game-scrobbler/gs-playnite/commit/1176e0f3fe59bc2f98d320e31a3538fa65d3780a))
+
 ## [2.8.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.7.0...GsPlugin-v2.8.0) (2026-07-16)
 
 
