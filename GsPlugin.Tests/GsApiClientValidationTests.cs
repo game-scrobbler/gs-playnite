@@ -457,6 +457,12 @@ namespace GsPlugin.Tests {
         public Task<PlayniteNotificationsRes> GetNotifications() =>
             Task.FromResult(new PlayniteNotificationsRes());
 
+        public Task<QueueStatusRes> GetQueueStatus(string queueId) =>
+            Task.FromResult(new QueueStatusRes {
+                success = true,
+                data = new QueueStatusData { status = "completed" }
+            });
+
         public Task<UnlinkRes> UnlinkAccount() =>
             Task.FromResult(new UnlinkRes { success = true });
     }

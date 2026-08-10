@@ -591,6 +591,20 @@ namespace GsPlugin.Api {
             }
         }
 
+        /// <summary>
+        /// Polls the terminal status of a previously queued sync job. Unauthenticated on the
+        /// server (keyed by the opaque queueId returned at enqueue time) and intentionally
+        /// bypasses the shared circuit breaker — a poll loop can call this several times per
+        /// sync attempt, and transient failures here must not burn the failure budget shared
+        /// with core sync/scrobble calls.
+        /// </summary>
+        public async Task<QueueStatusRes> GetQueueStatus(string queueId) {
+            if (string.IsNullOrEmpty(queueId)) {
+                return null;
+            }
+            return await GetJsonAsync<QueueStatusRes>($"{_apiBaseUrl}/api/playnite/queue/status/{queueId}");
+        }
+
         #endregion
 
         #region Allowed Plugins

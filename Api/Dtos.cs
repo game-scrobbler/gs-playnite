@@ -69,6 +69,23 @@ namespace GsPlugin.Api {
         public string lastSyncAt { get; set; }
     }
 
+    /// <summary>
+    /// Response from GET /api/playnite/queue/status/{queueId}. Polled after a
+    /// "queued" response so the client can wait for terminal worker state
+    /// (completed/failed) instead of treating queue admission as completion.
+    /// </summary>
+    public class QueueStatusRes {
+        public bool success { get; set; }
+        public QueueStatusData data { get; set; }
+    }
+
+    public class QueueStatusData {
+        public string id { get; set; }
+        /// <summary>pending | processing | completed | partial | failed | retrying</summary>
+        public string status { get; set; }
+        public string errorMessage { get; set; }
+    }
+
     public class ScrobbleFinishReq {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string user_id { get; set; }
