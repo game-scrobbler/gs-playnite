@@ -3,6 +3,12 @@
 ## [2.8.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.0...GsPlugin-v2.8.1) (2026-08-10)
 
 
+### Highlights
+
+* Your library and achievement syncs are now double-checked, so stats no longer look "synced" if the upload actually failed on our end.
+* Fixed a rare issue where Playnite could hang on exit while closing in the background.
+
+
 ### Bug Fixes
 
 * **sync:** confirm queue completion before committing sync baseline ([8f3568c](https://github.com/game-scrobbler/gs-playnite/commit/8f3568c38b721bf44132af02fe667b36e4b72bed))
