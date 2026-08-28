@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.8.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.1...GsPlugin-v2.8.2) (2026-08-28)
+
+
+### Bug Fixes
+
+* **sync:** serialize hashed dates in the form they are hashed ([2ae8ae4](https://github.com/game-scrobbler/gs-playnite/commit/2ae8ae43073f4d2cb0d9b4a6a21f7cbc72968064))
+* **sync:** serialize hashed dates in the form they are hashed ([4abe345](https://github.com/game-scrobbler/gs-playnite/commit/4abe345ec0c9c3c94a96317983602a709762ebb7))
+
 ## [2.8.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.0...GsPlugin-v2.8.1) (2026-08-10)
 
 
