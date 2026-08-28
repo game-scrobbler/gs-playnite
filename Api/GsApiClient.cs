@@ -479,32 +479,20 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/register";
-            var req = new RegisterInstallTokenReq { playnite_user_id = installId };
-
-            try {
-                string jsonData = JsonSerializer.Serialize(req, _jsonOptions);
-                using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
-                    request.Content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-                    HttpResponseMessage response = await _httpClient.SendAsync(request).ConfigureAwait(false);
-                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                    try {
-                        return JsonSerializer.Deserialize<RegisterInstallTokenRes>(responseBody, _jsonOptions)
-                            ?? new RegisterInstallTokenRes { success = false };
-                    }
-                    catch (JsonException jsonEx) {
-                        _logger.Error(jsonEx, $"RegisterInstallToken failed to parse response (status {(int)response.StatusCode})");
-                        GsSentry.CaptureException(jsonEx, $"RegisterInstallToken: JSON parse failed (status {(int)response.StatusCode})");
-                        return new RegisterInstallTokenRes { success = false };
-                    }
-                }
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "RegisterInstallToken HTTP error");
-                GsSentry.CaptureException(ex, "RegisterInstallToken HTTP error");
-                return null;
-            }
+            // No onNonSuccess mapping: the body is parsed on every status code so the caller can
+            // read error_code (HTTP 409 carries PLAYNITE_TOKEN_ALREADY_REGISTERED).
+            // attachToken is false because this call mints the token, and during lost-token
+            // recovery a stale local token must not travel with the new install id.
+            return await SendAndParseAsync<RegisterInstallTokenRes>(
+                HttpMethod.Post,
+                $"{_apiBaseUrl}/api/playnite/v2/register",
+                new RegisterInstallTokenReq { playnite_user_id = installId },
+                attachToken: false,
+                logName: nameof(RegisterInstallToken),
+                // An unreadable body still means the server answered: returning an empty failure
+                // rather than null tells EnsureInstallTokenAsync to stop retrying. Only a
+                // transport exception (null from the helper) keeps the retry loop going.
+                onParsed: (response, res) => res ?? new RegisterInstallTokenRes { success = false });
         }
 
         /// <summary>
@@ -524,41 +512,28 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/dashboard-token";
+            var data = GsDataManager.DataOrNull;
+            var context = new {
+                plugin_version = GsSentry.GetPluginVersion(),
+                scrobbling_disabled = data?.Flags?.Contains("no-scrobble") ?? false,
+                sentry_disabled = data?.Flags?.Contains("no-sentry") ?? false,
+                posthog_disabled = data?.Flags?.Contains("no-posthog") ?? false,
+                new_dashboard = data?.NewDashboardExperience ?? false,
+                sync_achievements = data?.SyncAchievements ?? false,
+            };
 
-            try {
-                var data = GsDataManager.DataOrNull;
-                var context = new {
-                    plugin_version = GsSentry.GetPluginVersion(),
-                    scrobbling_disabled = data?.Flags?.Contains("no-scrobble") ?? false,
-                    sentry_disabled = data?.Flags?.Contains("no-sentry") ?? false,
-                    posthog_disabled = data?.Flags?.Contains("no-posthog") ?? false,
-                    new_dashboard = data?.NewDashboardExperience ?? false,
-                    sync_achievements = data?.SyncAchievements ?? false,
-                };
+            var tokenRes = await SendAndParseAsync<DashboardTokenRes>(
+                HttpMethod.Post,
+                $"{_apiBaseUrl}/api/playnite/v2/dashboard-token",
+                new { context },
+                attachToken: true,
+                logName: nameof(GetDashboardToken),
+                onNonSuccess: (response, responseBody) => {
+                    _logger.Warn($"GetDashboardToken returned {(int)response.StatusCode}");
+                    return null;
+                });
 
-                string jsonBody = JsonSerializer.Serialize(new { context }, _jsonOptions);
-
-                using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
-                    request.Headers.Add("x-playnite-token", installToken);
-                    request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-                    HttpResponseMessage response = await _httpClient.SendAsync(request).ConfigureAwait(false);
-                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                    if (!response.IsSuccessStatusCode) {
-                        _logger.Warn($"GetDashboardToken returned {(int)response.StatusCode}");
-                        return null;
-                    }
-
-                    var res = JsonSerializer.Deserialize<DashboardTokenRes>(responseBody, _jsonOptions);
-                    return res?.token;
-                }
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "GetDashboardToken HTTP error");
-                GsSentry.CaptureException(ex, "GetDashboardToken HTTP error");
-                return null;
-            }
+            return tokenRes?.token;
         }
 
         #endregion
@@ -578,26 +553,19 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/notifications";
-
-            try {
-                using (var request = new HttpRequestMessage(HttpMethod.Get, url)) {
-                    request.Headers.Add("x-playnite-token", installToken);
-                    HttpResponseMessage response = await _httpClient.SendAsync(request).ConfigureAwait(false);
-                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                    if (!response.IsSuccessStatusCode) {
-                        _logger.Warn($"GetNotifications returned {(int)response.StatusCode}");
-                        return null;
-                    }
-
-                    return JsonSerializer.Deserialize<PlayniteNotificationsRes>(responseBody, _jsonOptions);
-                }
-            }
-            catch (Exception ex) {
-                _logger.Warn(ex, "GetNotifications HTTP error");
-                return null;
-            }
+            // Deliberately not wrapped in _circuitBreaker (see the summary above), and
+            // captureExceptions is false so a flaky notifications endpoint stays out of Sentry.
+            return await SendAndParseAsync<PlayniteNotificationsRes>(
+                HttpMethod.Get,
+                $"{_apiBaseUrl}/api/playnite/v2/notifications",
+                body: null,
+                attachToken: true,
+                logName: nameof(GetNotifications),
+                onNonSuccess: (response, responseBody) => {
+                    _logger.Warn($"GetNotifications returned {(int)response.StatusCode}");
+                    return null;
+                },
+                captureExceptions: false);
         }
 
         /// <summary>
@@ -645,34 +613,21 @@ namespace GsPlugin.Api {
                 playniteId = playniteId,
             };
 
-            string url = $"{_nextApiBaseUrl}/api/auth/playnite/verify";
-
-            try {
-                string jsonData = JsonSerializer.Serialize(payload, _jsonOptions);
-                using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
-                    request.Content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-                    HttpResponseMessage response = await _httpClient.SendAsync(request).ConfigureAwait(false);
-                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                    if (string.IsNullOrWhiteSpace(responseBody)) {
-                        _logger.Warn($"VerifyToken received empty response body (status {(int)response.StatusCode})");
+            // Targets _nextApiBaseUrl (the web app), not the plugin API, and stays anonymous:
+            // the token being verified is the credential here.
+            // No onNonSuccess mapping, so the body is parsed even on non-2xx status codes and the
+            // caller receives the actual server error message (e.g. "Token expired") instead of a
+            // generic "network error". An unusable body yields null, as does a transport error.
+            return await SendAndParseAsync<TokenVerificationRes>(
+                HttpMethod.Post,
+                $"{_nextApiBaseUrl}/api/auth/playnite/verify",
+                payload,
+                attachToken: false,
+                logName: nameof(VerifyToken),
+                onParsed: (response, res) => {
+                    if (res == null) {
                         return null;
                     }
-
-                    // Parse response body even on non-2xx status codes so the caller
-                    // receives the actual server error message (e.g. "Token expired")
-                    // instead of a generic "network error".
-                    TokenVerificationRes res;
-                    try {
-                        res = JsonSerializer.Deserialize<TokenVerificationRes>(responseBody, _jsonOptions);
-                    }
-                    catch (JsonException jsonEx) {
-                        _logger.Error(jsonEx, $"VerifyToken failed to parse response (status {(int)response.StatusCode})");
-                        GsSentry.CaptureException(jsonEx, $"VerifyToken JSON parse failed (status {(int)response.StatusCode})");
-                        return null;
-                    }
-
-                    if (res == null) return null;
 
                     // On non-2xx, mark as failed and surface the server error message
                     if (!response.IsSuccessStatusCode) {
@@ -686,13 +641,7 @@ namespace GsPlugin.Api {
                     }
 
                     return res;
-                }
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "VerifyToken HTTP error");
-                GsSentry.CaptureException(ex, "VerifyToken HTTP error");
-                return null; // True network error — caller will show network error message
-            }
+                });
         }
 
         #endregion
@@ -706,22 +655,19 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/unlink";
-
-            try {
-                using (var request = new HttpRequestMessage(HttpMethod.Post, url)) {
-                    request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
-                    request.Headers.Add("x-playnite-token", installToken);
-                    var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
-                    string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                    if (string.IsNullOrWhiteSpace(responseBody)) {
-                        _logger.Warn($"UnlinkAccount received empty response (status {(int)response.StatusCode})");
+            // The install is identified by the token header alone, so the body is an empty JSON
+            // object. No onNonSuccess mapping: the body is parsed on every status so the server's
+            // error text survives. An unusable body yields null, as does a transport error.
+            return await SendAndParseAsync<UnlinkRes>(
+                HttpMethod.Post,
+                $"{_apiBaseUrl}/api/playnite/v2/unlink",
+                new { },
+                attachToken: true,
+                logName: nameof(UnlinkAccount),
+                onParsed: (response, res) => {
+                    if (res == null) {
                         return null;
                     }
-
-                    var res = JsonSerializer.Deserialize<UnlinkRes>(responseBody, _jsonOptions);
-                    if (res == null) return null;
 
                     if (!response.IsSuccessStatusCode) {
                         res.success = false;
@@ -729,13 +675,7 @@ namespace GsPlugin.Api {
                     }
 
                     return res;
-                }
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "UnlinkAccount HTTP error");
-                GsSentry.CaptureException(ex, "UnlinkAccount HTTP error");
-                return null;
-            }
+                });
         }
 
         #endregion
@@ -749,52 +689,40 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            string url = $"{_apiBaseUrl}/api/playnite/v2/delete-data";
-            string jsonData = JsonSerializer.Serialize(req, _jsonOptions);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+            // The request DTO carries no identity: the server resolves the install from the
+            // x-playnite-token header alone. Only a transport error returns null.
+            return await SendAndParseAsync<DeleteDataRes>(
+                HttpMethod.Post,
+                $"{_apiBaseUrl}/api/playnite/v2/delete-data",
+                req,
+                attachToken: true,
+                logName: nameof(RequestDeleteMyData),
+                onNonSuccess: (response, responseBody) => {
+                    switch ((int)response.StatusCode) {
+                        case 429:
+                            _logger.Warn("RequestDeleteMyData rate limited by server");
+                            return new DeleteDataRes { success = false, rateLimited = true };
 
-            try {
-                HttpResponseMessage response;
-                using (var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content }) {
-                    request.Headers.Add("x-playnite-token", installToken);
-                    response = await _httpClient.SendAsync(request).ConfigureAwait(false);
-                }
-                string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        // 403 = install already opted out server-side (data already deleted, or
+                        // removed via a linked web-account deletion). Retrying can never succeed;
+                        // signal the caller to sync local opt-out state instead of looping on a
+                        // generic "failed" message.
+                        case 403:
+                            _logger.Warn("RequestDeleteMyData: install already opted out (403)");
+                            return new DeleteDataRes { success = false, alreadyOptedOut = true };
 
-                if ((int)response.StatusCode == 429) {
-                    _logger.Warn("RequestDeleteMyData rate limited by server");
-                    return new DeleteDataRes { success = false, rateLimited = true };
-                }
+                        // 401 = stored token does not resolve to an install. Retrying with the
+                        // same token is futile, so surface a distinct "reconnect" signal.
+                        case 401:
+                            _logger.Warn("RequestDeleteMyData: install token rejected (401)");
+                            return new DeleteDataRes { success = false, authFailed = true };
 
-                // 403 = install already opted out server-side (data already deleted, or
-                // removed via a linked web-account deletion). Retrying can never succeed;
-                // signal the caller to sync local opt-out state instead of looping on a
-                // generic "failed" message.
-                if ((int)response.StatusCode == 403) {
-                    _logger.Warn("RequestDeleteMyData: install already opted out (403)");
-                    return new DeleteDataRes { success = false, alreadyOptedOut = true };
-                }
-
-                // 401 = stored token does not resolve to an install. Retrying with the
-                // same token is futile — surface a distinct "reconnect" signal.
-                if ((int)response.StatusCode == 401) {
-                    _logger.Warn("RequestDeleteMyData: install token rejected (401)");
-                    return new DeleteDataRes { success = false, authFailed = true };
-                }
-
-                if (!response.IsSuccessStatusCode) {
-                    _logger.Warn($"RequestDeleteMyData returned {(int)response.StatusCode}");
-                    return new DeleteDataRes { success = false };
-                }
-
-                return JsonSerializer.Deserialize<DeleteDataRes>(responseBody, _jsonOptions)
-                    ?? new DeleteDataRes { success = false };
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "RequestDeleteMyData HTTP error");
-                GsSentry.CaptureException(ex, "RequestDeleteMyData HTTP error");
-                return null;
-            }
+                        default:
+                            _logger.Warn($"RequestDeleteMyData returned {(int)response.StatusCode}");
+                            return new DeleteDataRes { success = false };
+                    }
+                },
+                onParsed: (response, res) => res ?? new DeleteDataRes { success = false });
         }
 
         public async Task<OptInRes> RequestOptIn(OptInReq req) {
@@ -805,32 +733,25 @@ namespace GsPlugin.Api {
             }
 
             req.user_id = installId;
-            string url = $"{_apiBaseUrl}/api/playnite/v2/opt-in";
-            string jsonData = JsonSerializer.Serialize(req, _jsonOptions);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
 
-            try {
-                HttpResponseMessage response = await _httpClient.PostAsync(url, content).ConfigureAwait(false);
-                string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            // Stays unauthenticated: opt-in runs while the install is opted out, when the local
+            // token has been cleared, so the server keys off the body user_id instead.
+            return await SendAndParseAsync<OptInRes>(
+                HttpMethod.Post,
+                $"{_apiBaseUrl}/api/playnite/v2/opt-in",
+                req,
+                attachToken: false,
+                logName: nameof(RequestOptIn),
+                onNonSuccess: (response, responseBody) => {
+                    if ((int)response.StatusCode == 429) {
+                        _logger.Warn("RequestOptIn rate limited by server");
+                        return new OptInRes { success = false, rateLimited = true };
+                    }
 
-                if ((int)response.StatusCode == 429) {
-                    _logger.Warn("RequestOptIn rate limited by server");
-                    return new OptInRes { success = false, rateLimited = true };
-                }
-
-                if (!response.IsSuccessStatusCode) {
                     _logger.Warn($"RequestOptIn returned {(int)response.StatusCode}");
                     return new OptInRes { success = false };
-                }
-
-                return JsonSerializer.Deserialize<OptInRes>(responseBody, _jsonOptions)
-                    ?? new OptInRes { success = false };
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "RequestOptIn HTTP error");
-                GsSentry.CaptureException(ex, "RequestOptIn HTTP error");
-                return null;
-            }
+                },
+                onParsed: (response, res) => res ?? new OptInRes { success = false });
         }
 
         #endregion
@@ -909,27 +830,32 @@ namespace GsPlugin.Api {
         /// </summary>
         private const int GzipThresholdBytes = 4096;
 
+        /// <summary>
+        /// Builds the request body for a JSON payload, gzipping it once it reaches
+        /// <see cref="GzipThresholdBytes"/>. The caller owns the returned content.
+        /// </summary>
+        private static HttpContent CreateJsonContent(string jsonData) {
+            byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonData);
+            if (jsonBytes.Length < GzipThresholdBytes) {
+                return new StringContent(jsonData, Encoding.UTF8, "application/json");
+            }
+
+            var compressedStream = new MemoryStream();
+            using (var gzip = new GZipStream(compressedStream, CompressionLevel.Fastest, leaveOpen: true)) {
+                gzip.Write(jsonBytes, 0, jsonBytes.Length);
+            }
+            compressedStream.Position = 0;
+            var content = new StreamContent(compressedStream);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
+            content.Headers.ContentEncoding.Add("gzip");
+            return content;
+        }
+
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
             where TResponse : class {
             string jsonData = JsonSerializer.Serialize(payload, _jsonOptions);
 
-            HttpContent content;
-            byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonData);
-            if (jsonBytes.Length >= GzipThresholdBytes) {
-                var compressedStream = new MemoryStream();
-                using (var gzip = new GZipStream(compressedStream, CompressionLevel.Fastest, leaveOpen: true)) {
-                    gzip.Write(jsonBytes, 0, jsonBytes.Length);
-                }
-                compressedStream.Position = 0;
-                content = new StreamContent(compressedStream);
-                content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
-                content.Headers.ContentEncoding.Add("gzip");
-            }
-            else {
-                content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            }
-
-            using (content) {
+            using (HttpContent content = CreateJsonContent(jsonData)) {
                 HttpResponseMessage response = null;
                 string responseBody = null;
 
@@ -1002,6 +928,117 @@ namespace GsPlugin.Api {
                     CaptureHttpException(ex, url, jsonData, response, responseBody);
                     return null;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Shared send-and-parse path for the one-off endpoints whose status-code mapping is too
+        /// specific for <see cref="PostJsonAsync{TResponse}"/>. Centralizes serialization (with the
+        /// same gzip rule), the optional x-playnite-token header, the HTTP debug box, HTML
+        /// proxy-error detection, deserialization, and the transport catch, so those endpoints no
+        /// longer hand-roll a second HTTP path. Returns null on transport failure.
+        /// </summary>
+        /// <param name="body">Request payload. Null sends no content (e.g. a GET).</param>
+        /// <param name="attachToken">
+        /// Attaches x-playnite-token when a token is available. Endpoints that must stay anonymous
+        /// (registration, token verification, opt-in) pass false so a stale local token is never
+        /// sent to a route that would reject it.
+        /// </param>
+        /// <param name="logName">Endpoint name used in every log and Sentry message.</param>
+        /// <param name="onNonSuccess">
+        /// Maps a non-2xx response to a result, and its return value is final. When null, the body
+        /// is parsed regardless of status so the caller can read the server's error payload.
+        /// </param>
+        /// <param name="onParsed">
+        /// Post-processes the deserialized value together with the response, e.g. to flip success
+        /// on a non-2xx status. The value is null when the body was empty, HTML, or unparseable,
+        /// which lets a caller substitute an empty failure object instead of null.
+        /// </param>
+        /// <param name="captureExceptions">
+        /// False for best-effort endpoints: failures log at Warn and are not sent to Sentry.
+        /// </param>
+        private async Task<TRes> SendAndParseAsync<TRes>(
+            HttpMethod method,
+            string url,
+            object body,
+            bool attachToken,
+            string logName,
+            Func<HttpResponseMessage, string, TRes> onNonSuccess = null,
+            Func<HttpResponseMessage, TRes, TRes> onParsed = null,
+            bool captureExceptions = true) where TRes : class {
+            string jsonData = body != null ? JsonSerializer.Serialize(body, _jsonOptions) : null;
+            string requestSummary = jsonData != null
+                ? $"URL: {url}\nMethod: {method}\nPayload: {jsonData}"
+                : $"URL: {url}\nMethod: {method}";
+
+            HttpResponseMessage response = null;
+            string responseBody = null;
+
+            try {
+                using (var request = new HttpRequestMessage(method, url)) {
+                    if (jsonData != null) {
+                        request.Content = CreateJsonContent(jsonData);
+                    }
+                    if (attachToken) {
+                        var installToken = GsDataManager.DataOrNull?.InstallToken;
+                        if (!string.IsNullOrEmpty(installToken)) {
+                            request.Headers.Add("x-playnite-token", installToken);
+                        }
+                    }
+
+                    response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+                    responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                }
+
+                GsLogger.ShowHTTPDebugBox(
+                    requestData: requestSummary,
+                    responseData: $"Status: {response.StatusCode}\nBody: {responseBody}");
+
+                if (!response.IsSuccessStatusCode && onNonSuccess != null) {
+                    return onNonSuccess(response, responseBody);
+                }
+
+                TRes parsed = null;
+                var contentType = response.Content?.Headers?.ContentType?.MediaType;
+                if (string.IsNullOrWhiteSpace(responseBody)) {
+                    _logger.Warn($"{logName} received empty response body (status {(int)response.StatusCode})");
+                }
+                else if (contentType != null && contentType.Contains("html")) {
+                    // Reverse proxies (Cloudflare, nginx) can answer with an HTML error page,
+                    // sometimes even under a 200 status code.
+                    _logger.Warn($"{logName}: {url} returned HTML content-type instead of JSON, likely a proxy error page");
+                }
+                else {
+                    try {
+                        parsed = JsonSerializer.Deserialize<TRes>(responseBody, _jsonOptions);
+                    }
+                    catch (JsonException jsonEx) {
+                        if (captureExceptions) {
+                            _logger.Error(jsonEx, $"{logName} failed to parse response (status {(int)response.StatusCode})");
+                            GsSentry.CaptureException(jsonEx, $"{logName}: JSON parse failed (status {(int)response.StatusCode})");
+                        }
+                        else {
+                            _logger.Warn(jsonEx, $"{logName} failed to parse response (status {(int)response.StatusCode})");
+                        }
+                    }
+                }
+
+                return onParsed != null ? onParsed(response, parsed) : parsed;
+            }
+            catch (Exception ex) {
+                GsLogger.ShowHTTPDebugBox(
+                    requestData: requestSummary,
+                    responseData: $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}",
+                    isError: true);
+
+                if (captureExceptions) {
+                    _logger.Error(ex, $"{logName} HTTP error");
+                    GsSentry.CaptureException(ex, $"{logName} HTTP error");
+                }
+                else {
+                    _logger.Warn(ex, $"{logName} HTTP error");
+                }
+                return null;
             }
         }
 
