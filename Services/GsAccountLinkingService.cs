@@ -288,21 +288,9 @@ namespace GsPlugin.Services {
 
                 if (response.success) {
                     // Clear all identity-bound state to prevent data from bleeding
-                    // across accounts after a re-link. Same fields as RotateInstallId
-                    // but without rotating the InstallID/InstallToken themselves.
-                    GsDataManager.MutateAndSave(d => {
-                        d.LinkedUserId = null;
-                        d.ActiveSessionsByGameId.Clear();
-                        d.PendingStartGameIds.Clear();
-                        d.PendingScrobbles.Clear();
-                        d.LastLibraryHash = null;
-                        d.LastAchievementHash = null;
-                        d.LastSyncAt = null;
-                        d.LastSyncGameCount = null;
-                        d.SyncCooldownExpiresAt = null;
-                        d.LibraryDiffSyncCooldownExpiresAt = null;
-                        d.LastIntegrationAccountsHash = null;
-                    });
+                    // across accounts after a re-link. Base set only: the install stays
+                    // registered, so neither the InstallID nor its token is touched.
+                    GsDataManager.MutateAndSave(d => d.ClearIdentityBoundState(IdentityClearScope.None));
                     GsSyncHashIndex.Reset();
                     OnLinkingStatusChanged();
                     // Refresh diagnostics widgets (pending scrobble count, last-sync text)
