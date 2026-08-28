@@ -83,17 +83,49 @@ namespace GsPlugin.Api {
             }
         }
 
+        #region Request Preconditions
+
+        /// <summary>
+        /// Legacy v2/v3 write routes resolve the install from either the x-playnite-token header
+        /// or the body user_id, so a request is sendable when at least one of them is present.
+        /// v4 routes are strictly token-authenticated, see <see cref="HasInstallToken"/>.
+        /// </summary>
+        private static bool HasIdentity(string userId) =>
+            !string.IsNullOrEmpty(userId) || !string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken);
+
+        /// <summary>
+        /// Rejects (and logs) a request that carries neither a user_id nor an install token.
+        /// Returns true when the caller may proceed.
+        /// </summary>
+        private static bool RequireIdentity(string userId, string caller) {
+            if (HasIdentity(userId)) {
+                return true;
+            }
+            _logger.Error($"{caller} called with no user_id and no install token");
+            return false;
+        }
+
+        /// <summary>
+        /// Rejects (and logs) a null request DTO. <paramref name="argName"/> keeps each endpoint's
+        /// own wording, e.g. "startData" rather than the generic "request".
+        /// Returns true when the caller may proceed.
+        /// </summary>
+        private static bool RequireRequest<TReq>(TReq req, string caller, string argName = "request") where TReq : class {
+            if (req != null) {
+                return true;
+            }
+            _logger.Error($"{caller} called with null {argName}");
+            return false;
+        }
+
+        #endregion
+
         #region Game Session Management
 
         public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) {
             // Validate input before making API call
-            if (startData == null) {
-                _logger.Error("StartGameSession called with null startData");
-                return null;
-            }
-
-            if (string.IsNullOrEmpty(startData.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
-                _logger.Error("StartGameSession called with no user_id and no install token");
+            if (!RequireRequest(startData, nameof(StartGameSession), "startData") ||
+                !RequireIdentity(startData.user_id, nameof(StartGameSession))) {
                 return null;
             }
 
@@ -135,8 +167,7 @@ namespace GsPlugin.Api {
 
         public async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData) {
             // Validate input before making API call
-            if (endData == null) {
-                _logger.Error("FinishGameSession called with null endData");
+            if (!RequireRequest(endData, nameof(FinishGameSession), "endData")) {
                 return null;
             }
 
@@ -172,8 +203,7 @@ namespace GsPlugin.Api {
                 return null;
             }
 
-            if (string.IsNullOrEmpty(sendData.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
-                _logger.Error("FinishGameSession called with no user_id and no install token");
+            if (!RequireIdentity(sendData.user_id, nameof(FinishGameSession))) {
                 return null;
             }
 
@@ -301,12 +331,8 @@ namespace GsPlugin.Api {
         #region Library Synchronization
 
         public async Task<AsyncQueuedResponse> SyncLibraryFull(LibraryFullSyncReq req) {
-            if (req == null) {
-                _logger.Error("SyncLibraryFull called with null request");
-                return null;
-            }
-            if (string.IsNullOrEmpty(req.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
-                _logger.Error("SyncLibraryFull called with no user_id and no install token");
+            if (!RequireRequest(req, nameof(SyncLibraryFull)) ||
+                !RequireIdentity(req.user_id, nameof(SyncLibraryFull))) {
                 return null;
             }
 
@@ -317,12 +343,8 @@ namespace GsPlugin.Api {
         }
 
         public async Task<AsyncQueuedResponse> SyncLibraryDiff(LibraryDiffSyncReq req) {
-            if (req == null) {
-                _logger.Error("SyncLibraryDiff called with null request");
-                return null;
-            }
-            if (string.IsNullOrEmpty(req.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
-                _logger.Error("SyncLibraryDiff called with no user_id and no install token");
+            if (!RequireRequest(req, nameof(SyncLibraryDiff)) ||
+                !RequireIdentity(req.user_id, nameof(SyncLibraryDiff))) {
                 return null;
             }
 
@@ -357,12 +379,8 @@ namespace GsPlugin.Api {
         }
 
         public async Task<AsyncQueuedResponse> SyncAchievementsFull(AchievementsFullSyncReq req) {
-            if (req == null) {
-                _logger.Error("SyncAchievementsFull called with null request");
-                return null;
-            }
-            if (string.IsNullOrEmpty(req.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
-                _logger.Error("SyncAchievementsFull called with no user_id and no install token");
+            if (!RequireRequest(req, nameof(SyncAchievementsFull)) ||
+                !RequireIdentity(req.user_id, nameof(SyncAchievementsFull))) {
                 return null;
             }
 
@@ -373,12 +391,8 @@ namespace GsPlugin.Api {
         }
 
         public async Task<AsyncQueuedResponse> SyncAchievementsDiff(AchievementsDiffSyncReq req) {
-            if (req == null) {
-                _logger.Error("SyncAchievementsDiff called with null request");
-                return null;
-            }
-            if (string.IsNullOrEmpty(req.user_id) && string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
-                _logger.Error("SyncAchievementsDiff called with no user_id and no install token");
+            if (!RequireRequest(req, nameof(SyncAchievementsDiff)) ||
+                !RequireIdentity(req.user_id, nameof(SyncAchievementsDiff))) {
                 return null;
             }
 
@@ -426,8 +440,7 @@ namespace GsPlugin.Api {
         /// inspects success/status itself.
         /// </summary>
         private async Task<TRes> PostV4Async<TRes>(string url, object req, string logName) where TRes : class {
-            if (req == null) {
-                _logger.Error($"{logName} called with null request");
+            if (!RequireRequest(req, logName)) {
                 return null;
             }
             return await _circuitBreaker.ExecuteAsync(async () => {
