@@ -186,6 +186,7 @@
     <Compile Include="Services\SyncLibraryResult.cs" />
     <Compile Include="Services\GsAccountLinkingService.cs" />
     <Compile Include="Services\IAchievementProvider.cs" />
+    <Compile Include="Services\AchievementProviderBase.cs" />
     <Compile Include="Services\GsSuccessStoryHelper.cs" />
     <Compile Include="Services\GsPlayniteAchievementsHelper.cs" />
     <Compile Include="Services\GsAchievementAggregator.cs" />

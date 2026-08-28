@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
-using System.Linq;
 using Playnite.SDK;
-using Playnite.SDK.Plugins;
-using GsPlugin.Infrastructure;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -13,39 +10,28 @@ namespace GsPlugin.Services {
     /// The database is at {ExtensionsDataPath}/{PluginGuid}/achievement_cache.db.
     /// All methods return null if Playnite Achievements is not installed or the game has no data.
     /// </summary>
-    public class GsPlayniteAchievementsHelper : IAchievementProvider {
+    public class GsPlayniteAchievementsHelper : AchievementProviderBase {
         private static readonly Guid PlayniteAchievementsId = new Guid(
             "e6aad2c9-6e06-4d8d-ac55-ac3b252b5f7b"
         );
 
-        private readonly IPlayniteAPI _api;
         private readonly string _dbPath;
 
-        public GsPlayniteAchievementsHelper(IPlayniteAPI api) {
-            _api = api;
+        public GsPlayniteAchievementsHelper(IPlayniteAPI api) : base(PlayniteAchievementsId, api) {
             _dbPath = Path.Combine(api.Paths.ExtensionsDataPath,
                 PlayniteAchievementsId.ToString(), "achievement_cache.db");
         }
 
-        internal GsPlayniteAchievementsHelper(string dbPathOverride) {
-            _api = null;
+        internal GsPlayniteAchievementsHelper(string dbPathOverride) : base(PlayniteAchievementsId, null) {
             _dbPath = dbPathOverride;
         }
 
-        public string ProviderName => "Playnite Achievements";
+        public override string ProviderName => "Playnite Achievements";
 
-        public bool IsInstalled {
-            get {
-                if (File.Exists(_dbPath)) return true;
-                return IsPluginLoaded;
-            }
-        }
+        protected override bool HasLocalData => File.Exists(_dbPath);
 
-        public bool IsPluginLoaded =>
-            _api?.Addons?.Plugins?.Any(p => p.Id == PlayniteAchievementsId) == true;
-
-        public (int unlocked, int total)? GetCounts(Guid gameId) {
-            try {
+        public override (int unlocked, int total)? GetCounts(Guid gameId) {
+            return SafeReadValue<(int unlocked, int total)>("Count lookup", gameId, () => {
                 if (!File.Exists(_dbPath)) return null;
 
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Read Only=True;Pooling=True;")) {
@@ -72,15 +58,11 @@ namespace GsPlugin.Services {
                     }
                 }
                 return null;
-            }
-            catch (Exception ex) {
-                GsLogger.Warn($"[GsPlayniteAchievementsHelper] Count lookup failed for game {gameId}: {ex.Message}");
-                return null;
-            }
+            });
         }
 
-        public List<AchievementItem> GetAchievements(Guid gameId) {
-            try {
+        public override List<AchievementItem> GetAchievements(Guid gameId) {
+            return SafeRead("Achievement lookup", gameId, DescribeReadFailure, () => {
                 if (!File.Exists(_dbPath)) return null;
 
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Read Only=True;Pooling=True;")) {
@@ -142,34 +124,17 @@ namespace GsPlugin.Services {
                         return result.Count > 0 ? result : null;
                     }
                 }
-            }
-            catch (SQLiteException ex) {
-                GsLogger.Warn($"[GsPlayniteAchievementsHelper] SQLite error for game {gameId}: {ex.Message}");
-                return null;
-            }
-            catch (IOException ex) {
-                GsLogger.Warn($"[GsPlayniteAchievementsHelper] DB file access error for game {gameId}: {ex.Message}");
-                return null;
-            }
-            catch (Exception ex) {
-                GsLogger.Warn($"[GsPlayniteAchievementsHelper] Achievement lookup failed for game {gameId}: {ex.Message}");
-                return null;
-            }
+            });
         }
 
-        public string GetVersion() {
-            try {
-                var plugin = _api?.Addons?.Plugins?.FirstOrDefault(p => p.Id == PlayniteAchievementsId);
-                if (plugin == null) return null;
-                return PluginVersionHelper.GetExtensionYamlVersion(plugin)
-                    ?? plugin.GetType().Assembly.GetName().Version?.ToString(3);
-            }
-            catch (Exception ex) {
-                GsLogger.Warn(
-                    $"[GsPlayniteAchievementsHelper] Version lookup failed: {ex.Message}"
-                );
-                return null;
-            }
+        /// <summary>
+        /// Wording for the failure types these database reads distinguish; null means the
+        /// generic "{operation} failed" message applies.
+        /// </summary>
+        private static string DescribeReadFailure(Exception ex) {
+            if (ex is SQLiteException) return "SQLite error";
+            if (ex is IOException) return "DB file access error";
+            return null;
         }
     }
 }
