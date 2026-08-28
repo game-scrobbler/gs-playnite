@@ -434,10 +434,27 @@ namespace GsPlugin.Api {
                 _logger.Error($"{logName} called with null request");
                 return null;
             }
-            return await _circuitBreaker.ExecuteAsync(async () => {
-                return await PostJsonAsync<TRes>(url, req, true);
-            }, maxRetries: 1, isFailure: r => r == null);
+            // 0 until a response arrives, so a transport failure stays retryable.
+            var lastStatus = 0;
+            return await _circuitBreaker.ExecuteAsync(
+                async () => {
+                    lastStatus = 0;
+                    return await PostJsonAsync<TRes>(url, req, true, status => lastStatus = status);
+                },
+                maxRetries: 1,
+                isFailure: r => r == null,
+                isPermanent: () => IsPermanentRejection(lastStatus));
         }
+
+        /// <summary>
+        /// A status that will come back identically however many times we ask, so
+        /// retrying only doubles the load and the noise. 408 and 429 are excluded
+        /// because both explicitly invite a later retry.
+        /// </summary>
+        private static bool IsPermanentRejection(int status) =>
+            status >= 400 && status < 500
+            && status != (int)HttpStatusCode.RequestTimeout
+            && status != 429;
 
         /// <summary>Best-effort v4 session abort — swallows failures so cleanup never surfaces an error.</summary>
         private async Task PostV4AbortAsync(string url, string syncId, string logName) {
@@ -900,7 +917,15 @@ namespace GsPlugin.Api {
         /// </summary>
         private const int GzipThresholdBytes = 4096;
 
-        private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false)
+        /// <summary>
+        /// How much of an error response body reaches the local log. Enough to
+        /// carry the server's reason phrase without pasting a whole payload into
+        /// a log the user may share for support.
+        /// </summary>
+        private const int MaxLoggedBodyChars = 512;
+
+        private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false,
+            Action<int> onStatus = null)
             where TResponse : class {
             string jsonData = JsonSerializer.Serialize(payload, _jsonOptions);
 
@@ -939,6 +964,11 @@ namespace GsPlugin.Api {
                     else {
                         response = await _httpClient.PostAsync(url, content).ConfigureAwait(false);
                     }
+                    // Report the status before reading the body: if the body read
+                    // throws, the server still answered, and a 4xx must stay
+                    // classified as a permanent rejection rather than falling back
+                    // to the retryable transport-failure path.
+                    onStatus?.Invoke((int)response.StatusCode);
                     responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                     GsLogger.ShowHTTPDebugBox(
@@ -946,14 +976,25 @@ namespace GsPlugin.Api {
                         responseData: $"Status: {response.StatusCode}\nBody: {responseBody}");
 
                     if (!response.IsSuccessStatusCode) {
+                        // Always write the status to the local log. This used to be
+                        // the else-branch only: with ensureSuccess the status went to
+                        // Sentry and nowhere else, so a user reading their own log saw
+                        // a failure with no status attached and could not report what
+                        // had actually come back. The more serious path was the quieter
+                        // one.
+                        var body = responseBody == null
+                            ? "(no body)"
+                            : responseBody.Length > MaxLoggedBodyChars
+                                ? responseBody.Substring(0, MaxLoggedBodyChars) + "..."
+                                : responseBody;
+                        _logger.Warn(
+                            $"POST {url} returned {(int)response.StatusCode} ({response.StatusCode}): {body}");
+
                         if (ensureSuccess) {
                             var httpEx = new HttpRequestException(
                                 $"Request failed with status {(int)response.StatusCode} ({response.StatusCode}) for URL {url}");
 
                             CaptureHttpException(httpEx, url, jsonData, response, responseBody);
-                        }
-                        else {
-                            _logger.Warn($"POST {url} returned {(int)response.StatusCode} ({response.StatusCode})");
                         }
                         return null;
                     }
