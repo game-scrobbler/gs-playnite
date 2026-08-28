@@ -5,8 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Playnite.SDK;
-using Playnite.SDK.Plugins;
-using GsPlugin.Infrastructure;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -14,44 +12,33 @@ namespace GsPlugin.Services {
     /// Each game's achievements are stored in {ExtensionsDataPath}/{PluginGuid}/SuccessStory/{GameId}.json.
     /// All methods return null if SuccessStory is not installed or the game has no data.
     /// </summary>
-    public class GsSuccessStoryHelper : IAchievementProvider {
+    public class GsSuccessStoryHelper : AchievementProviderBase {
         private static readonly Guid SuccessStoryId = new Guid(
             "cebe6d32-8c46-4459-b993-5a5189d60788"
         );
 
-        private readonly IPlayniteAPI _api;
         private readonly string _dataPath;
 
-        public GsSuccessStoryHelper(IPlayniteAPI api) {
-            _api = api;
+        public GsSuccessStoryHelper(IPlayniteAPI api) : base(SuccessStoryId, api) {
             _dataPath = ResolveDataPath(api.Paths.ExtensionsDataPath);
         }
 
-        internal GsSuccessStoryHelper(string dataPathOverride) {
-            _api = null;
+        internal GsSuccessStoryHelper(string dataPathOverride) : base(SuccessStoryId, null) {
             _dataPath = dataPathOverride;
         }
 
-        public string ProviderName => "SuccessStory";
+        public override string ProviderName => "SuccessStory";
 
-        public bool IsInstalled {
-            get {
-                if (_dataPath != null && Directory.Exists(_dataPath)) return true;
-                return IsPluginLoaded;
-            }
-        }
+        protected override bool HasLocalData => _dataPath != null && Directory.Exists(_dataPath);
 
-        public bool IsPluginLoaded =>
-            _api?.Addons?.Plugins?.Any(p => p.Id == SuccessStoryId) == true;
-
-        public (int unlocked, int total)? GetCounts(Guid gameId) {
+        public override (int unlocked, int total)? GetCounts(Guid gameId) {
             var achievements = GetAchievements(gameId);
             if (achievements == null || achievements.Count == 0) return null;
             return (achievements.Count(a => a.IsUnlocked), achievements.Count);
         }
 
-        public List<AchievementItem> GetAchievements(Guid gameId) {
-            try {
+        public override List<AchievementItem> GetAchievements(Guid gameId) {
+            return SafeRead("Achievement lookup", gameId, DescribeReadFailure, () => {
                 if (_dataPath == null || !Directory.Exists(_dataPath)) return null;
 
                 var filePath = Path.Combine(_dataPath, $"{gameId}.json");
@@ -106,32 +93,17 @@ namespace GsPlugin.Services {
 
                     return result.Count > 0 ? result : null;
                 }
-            }
-            catch (JsonException ex) {
-                GsLogger.Warn($"[GsSuccessStoryHelper] JSON parse error for game {gameId}: {ex.Message}");
-                return null;
-            }
-            catch (IOException ex) {
-                GsLogger.Warn($"[GsSuccessStoryHelper] File read error for game {gameId}: {ex.Message}");
-                return null;
-            }
-            catch (Exception ex) {
-                GsLogger.Warn($"[GsSuccessStoryHelper] Achievement lookup failed for game {gameId}: {ex.Message}");
-                return null;
-            }
+            });
         }
 
-        public string GetVersion() {
-            try {
-                var plugin = _api?.Addons?.Plugins?.FirstOrDefault(p => p.Id == SuccessStoryId);
-                if (plugin == null) return null;
-                return PluginVersionHelper.GetExtensionYamlVersion(plugin)
-                    ?? plugin.GetType().Assembly.GetName().Version?.ToString(3);
-            }
-            catch (Exception ex) {
-                GsLogger.Warn($"[GsSuccessStoryHelper] Version lookup failed: {ex.Message}");
-                return null;
-            }
+        /// <summary>
+        /// Wording for the failure types these file reads distinguish; null means the
+        /// generic "{operation} failed" message applies.
+        /// </summary>
+        private static string DescribeReadFailure(Exception ex) {
+            if (ex is JsonException) return "JSON parse error";
+            if (ex is IOException) return "File read error";
+            return null;
         }
 
         private static string ResolveDataPath(string extensionsDataPath) {

@@ -34,6 +34,7 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 ├── Services/            — namespace: GsPlugin.Services
 │   ├── GsScrobblingService.cs       — Game session tracking and library/achievement sync
 │   ├── IAchievementProvider.cs      — Achievement provider interface
+│   ├── AchievementProviderBase.cs   — Shared provider base (plugin id, IsInstalled, GetVersion, safe-read wrappers)
 │   ├── GsAchievementAggregator.cs   — Multi-provider achievement aggregation
 │   ├── GsSuccessStoryHelper.cs      — SuccessStory addon integration (direct JSON file reads)
 │   ├── GsPlayniteAchievementsHelper.cs — Playnite Achievements addon integration (direct SQLite reads)
@@ -44,7 +45,8 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │
 ├── Models/              — namespace: GsPlugin.Models
 │   ├── GsData.cs            — Persistent data (GsDataManager, GsTime, PendingScrobble)
-│   ├── GsSyncHashIndex.cs   — Compact per-item fingerprint index for diff baselines
+│   ├── GsSyncHashIndex.cs   — Static facade over the two hash index stores (library, achievements)
+│   ├── GsHashIndexStore.cs  — Per-half index store instance (load/migrate/save/replace/diff/clear)
 │   ├── GsSnapshot.cs        — Legacy fat snapshot POCO types (deserialized once by GsSyncHashIndex during migration; no manager)
 │   └── GsPluginSettings.cs  — Settings data model and view model
 │
@@ -52,10 +54,12 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │   ├── GsAtomicFile.cs      — Shared temp recovery + atomic JSON replace/retry helpers
 │   ├── GsLocalization.cs    — XAML resource string lookup helper
 │   ├── GsLogger.cs          — Logging wrapper
+│   ├── GsTaskExtensions.cs  — LogFaults() fire-and-forget fault observer
 │   └── GsSentry.cs          — Sentry error tracking
 │
 ├── View/                — namespace: GsPlugin.View
 │   ├── GsPluginSettingsView.xaml/.cs — Settings UI
+│   ├── GsConverters.cs               — StringToVisibilityConverter for binding-driven visibility
 │   └── MySidebarView.xaml/.cs        — Sidebar with WebView2
 │
 ├── scripts/             — PowerShell build/dev scripts
@@ -85,6 +89,7 @@ GsPlugin (entry point, IDisposable)
 - **Hashed values must serialize exactly as hashed.** `result_snapshot_hash` can only be recomputed from the payload, so anything feeding the hash has to go on the wire in its hashed form. `GameSyncDto`'s three date fields carry `[JsonConverter(typeof(CanonicalDateTimeConverter))]` for this reason: System.Text.Json preserves `DateTimeKind` and would otherwise emit `2025-02-19T14:51:26.897-08:00` for a value hashed as `2025-02-19T22:51:26Z`, leaving the recipient to infer a normalization the payload never states. Never add a `DateTime` to a hashed DTO without the converter, and land any recipe change in `GsPlugin.Tests/Fixtures/playnite-hash-vectors.json`, whose twin in the backend repo asserts the same digests.
 - **Permanent rejections are not retried.** `PostV4Async` passes `isPermanent` to the circuit breaker so a 4xx (other than 408/429) returns immediately and does not count toward the failure threshold — retrying cannot change the answer, and letting it trip the breaker takes scrobbles down with it. Such a response still marks the service responsive, so it resolves a HalfOpen probe rather than leaving the breaker mid-probe.
 - **Commit order (anti force-full-sync loop):** on `queued`, persist the hash index for **all** items first, then write `Last*Hash`. On any chunk/commit failure → abort session; **do not** update index or global hash. Mid-failure leaves the previous good baseline intact.
+- This invariant is enforced in exactly one place: `GsScrobblingService.CommitSyncBaselineAsync(label, queueId, persistIndex, persistHashes)`. All four sync paths (library full/diff, achievements full/diff) route through it, so do not re-implement the confirm-then-index-then-hash sequence at a call site. `SkipOrRepairIndex` likewise owns the "hash matches but index count diverged" repair for all three paths.
 - **Migration:** if the shipped legacy `gs_snapshot.json` exists, `GsSyncHashIndex.Initialize` derives fingerprints once, writes the compact files, and deletes the fat snapshot.
 - **Crash recovery:** `GsAtomicFile` promotes a surviving `.tmp` when the destination is missing and performs JSON replacement with bounded retries for transient Windows file locks. Both `GsDataManager` and `GsSyncHashIndex` use it.
 - **Self-heal:** if global hash matches but index entry count ≠ live allowed count → rewrite index from live (no re-upload). On `force-full-sync` from diff → clear index + global hash → chunked full with `bypassCooldown`.
@@ -150,6 +155,7 @@ GsPlugin (entry point, IDisposable)
 ### Achievement Provider Architecture
 Achievement data comes from two optional addons via an aggregator pattern:
 - `IAchievementProvider` — common interface (`GetCounts`, `GetAchievements`, `IsInstalled`)
+- `AchievementProviderBase` — abstract base both providers derive from. Owns the plugin `Guid`, `IsPluginLoaded`, `IsInstalled` (delegating to an abstract `HasLocalData`), the single `GetVersion()` implementation, and the `SafeRead`/`SafeReadValue` wrappers that log and return null on failure. Subclasses contain only their real read logic. `LogPrefix` is derived from `GetType().Name`, so each provider keeps its own log prefix without duplicating the literal.
 - `GsSuccessStoryHelper` — reads SuccessStory's per-game JSON files from `{ExtensionsDataPath}/{pluginGuid}/SuccessStory/{gameId}.json` (priority 1)
 - `GsPlayniteAchievementsHelper` — reads Playnite Achievements' SQLite database at `{ExtensionsDataPath}/{pluginGuid}/achievement_cache.db` via `System.Data.SQLite` in read-only mode (priority 2)
 - `GsAchievementAggregator` — iterates providers in order; first with data wins. Skips `(0, 0)` results to allow fallback.
@@ -161,7 +167,7 @@ Achievement data comes from two optional addons via an aggregator pattern:
 - All user-facing strings are localized via XAML resource dictionaries in `Localization/` and accessed from C# via `GsLocalization.Get()`/`Format()` in `Infrastructure/GsLocalization.cs`.
 - Playnite auto-discovers locale files by naming convention (`Localization/{locale}.xaml`). The `en_US.xaml` is the fallback; locale-specific files override it.
 - Supported locales: `en_US` (English, default), `ru_RU` (Russian), `pt_BR` (Portuguese), `de_DE` (German), `fr_FR` (French), `zh_CN` (Chinese Simplified), `hi_IN` (Hindi).
-- All locale files must have the same set of keys (currently 117). When adding a new key, add it to **all 7 files**.
+- All locale files must have the same set of keys (currently 123). When adding a new key, add it to **all 7 files**. `LocalizationKeyParityTests` enforces this: it fails with the missing/extra key names per locale, and also rejects duplicate keys within a file.
 - `GsLocalization.Get(key, fallback)` looks up from `Application.Current.Resources`; returns the fallback when no WPF app is running (e.g., in tests). `GsLocalization.Format(key, fallback, args)` wraps `string.Format()` on the resolved template.
 - For format strings with English pluralization (e.g., elapsed time), the code-behind fallback uses inline plural logic so tests see `"5 minutes ago"` while the XAML template is used at runtime for non-English locales (e.g., `"{0} мин. назад"`).
 - Settings view uses localized strings from `Localization/en_US.xaml` resource dictionary, organized into card-based sections.
@@ -170,7 +176,8 @@ Achievement data comes from two optional addons via an aggregator pattern:
 
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
-- Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsAllowedPluginsTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSyncHashIndexTests` (migration, fingerprint, clearing, and v4 begin/chunk/commit/abort coverage), `GsTimeTests`, `LinkingResultTests`, `PlayniteAchievementsSqliteTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`
+- Test classes: `AchievementProviderTests`, `ApiResultTests`, `GsAllowedPluginsTests`, `GsApiClientValidationTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsSyncHashIndexTests` (migration, fingerprint, clearing, and v4 begin/chunk/commit/abort coverage), `GsTimeTests`, `LinkingResultTests`, `PlayniteAchievementsSqliteTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`, `LocalizationKeyParityTests`
+- `TempPluginDir` is the shared temp-directory fixture (`Create`, `CreateWithDataManager`, `CreateWithHashIndex`, `CreateWithDataManagerAndHashIndex`). Use it instead of hand-rolling `Path.GetTempPath()` setup so directories are always cleaned up. The factory variants exist because `GsDataManager` and `GsSyncHashIndex` are static singletons and several tests deliberately depend on ambient identity generation rather than re-initializing.
 - `GsDataManagerTests` and `GsDataTests` include coverage for install-token persistence, `IdentityGeneration`, `RotateInstallId()`, `SetInstallTokenIfActive()`, `InstallIdForBody`, opt-out token clearing, and `RecordShownNotifications()`/`GetShownNotificationIds()` thread-safe notification state.
 
 ## Build Environment

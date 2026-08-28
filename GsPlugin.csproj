@@ -167,6 +167,7 @@
     <Compile Include="Infrastructure\GsPostHog.cs" />
     <Compile Include="Infrastructure\GsPlayniteHelper.cs" />
     <Compile Include="Infrastructure\GsSentry.cs" />
+    <Compile Include="Infrastructure\GsTaskExtensions.cs" />
     <!-- Api -->
     <Compile Include="Api\CanonicalDateTimeConverter.cs" />
     <Compile Include="Api\Dtos.cs" />
@@ -177,6 +178,7 @@
     <Compile Include="Models\GsData.cs" />
     <Compile Include="Models\GsSnapshot.cs" />
     <Compile Include="Models\GsSyncHashIndex.cs" />
+    <Compile Include="Models\GsHashIndexStore.cs" />
     <Compile Include="Models\GsPluginSettings.cs" />
     <!-- Services -->
     <Compile Include="Services\GsScrobblingService.cs" />
@@ -185,6 +187,7 @@
     <Compile Include="Services\SyncLibraryResult.cs" />
     <Compile Include="Services\GsAccountLinkingService.cs" />
     <Compile Include="Services\IAchievementProvider.cs" />
+    <Compile Include="Services\AchievementProviderBase.cs" />
     <Compile Include="Services\GsSuccessStoryHelper.cs" />
     <Compile Include="Services\GsPlayniteAchievementsHelper.cs" />
     <Compile Include="Services\GsAchievementAggregator.cs" />
@@ -196,6 +199,7 @@
     <Compile Include="GsPlugin.cs" />
     <!-- View -->
     <Compile Include="View\GsPluginSettingsViewModel.cs" />
+    <Compile Include="View\GsConverters.cs" />
     <Compile Include="View\GsPluginSettingsView.xaml.cs">
       <DependentUpon>GsPluginSettingsView.xaml</DependentUpon>
     </Compile>

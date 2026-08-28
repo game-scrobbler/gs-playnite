@@ -136,44 +136,55 @@ namespace GsPlugin {
         }
 
         /// <summary>
+        /// Shared wrapper for the Playnite event-handler overrides. Skips <paramref name="body"/>
+        /// when the user has opted out, turns any unhandled exception into a log entry plus a
+        /// Sentry report so nothing escapes an "async void" handler and crashes Playnite, and
+        /// always invokes <paramref name="callBase"/> afterwards, on every path.
+        /// </summary>
+        /// <param name="name">Handler name used in the log and Sentry messages.</param>
+        /// <param name="callBase">Invokes base.OnXxx(args). Must run on every path.</param>
+        /// <param name="body">Handler work, run only when the user has not opted out.</param>
+        private static async Task GuardedAsync(string name, Action callBase, Func<Task> body) {
+            try {
+                if (GsDataManager.IsOptedOut) {
+                    return;
+                }
+                try {
+                    await body();
+                }
+                catch (Exception ex) {
+                    _logger.Error(ex, $"Unhandled exception in {name}");
+                    GsSentry.CaptureException(ex, $"Unhandled exception in {name}");
+                }
+            }
+            finally {
+                callBase();
+            }
+        }
+
+        /// <summary>
         /// Called before a game is started. This happens when the user clicks Play but before the game actually launches.
         /// </summary>
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
-            if (GsDataManager.IsOptedOut) { base.OnGameStarting(args); return; }
-            try {
+            await GuardedAsync("OnGameStarting", () => base.OnGameStarting(args), async () => {
                 GsPostHog.Capture("game_session_started", new Dictionary<string, object> {
                     { "platform_id", args.Game?.PluginId.ToString() ?? "unknown" }
                 });
                 await _scrobblingService.OnGameStartAsync(args);
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "Unhandled exception in OnGameStarting");
-                GsSentry.CaptureException(ex, "Unhandled exception in OnGameStarting");
-            }
-            finally {
-                base.OnGameStarting(args);
-            }
+            });
         }
 
         /// <summary>
         /// Called when a game stops running. This happens when the game process exits.
         /// </summary>
         public override async void OnGameStopped(OnGameStoppedEventArgs args) {
-            if (GsDataManager.IsOptedOut) { base.OnGameStopped(args); return; }
-            try {
+            await GuardedAsync("OnGameStopped", () => base.OnGameStopped(args), async () => {
                 GsPostHog.Capture("game_session_ended", new Dictionary<string, object> {
                     { "elapsed_seconds", args.ElapsedSeconds },
                     { "platform_id", args.Game?.PluginId.ToString() ?? "unknown" }
                 });
                 await _scrobblingService.OnGameStoppedAsync(args);
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "Unhandled exception in OnGameStopped");
-                GsSentry.CaptureException(ex, "Unhandled exception in OnGameStopped");
-            }
-            finally {
-                base.OnGameStopped(args);
-            }
+            });
         }
 
         /// <summary>
@@ -215,26 +226,24 @@ namespace GsPlugin {
                 // Run refresh and update check in parallel — they are independent network calls.
                 // Best-effort: failures are logged but do not block library sync.
                 var refreshTask = GsAllowedPlugins.RefreshAsync(_apiClient)
-                    .ContinueWith(t => {
-                        if (t.IsFaulted)
-                            _logger.Warn(t.Exception.GetBaseException(), "Plugin refresh failed, continuing with cached/hardcoded list");
-                    });
+                    .LogFaults("Plugin refresh failed, continuing with cached/hardcoded list");
                 var updateTask = _updateChecker.CheckForUpdateAsync()
-                    .ContinueWith(t => {
-                        if (t.IsFaulted)
-                            _logger.Warn(t.Exception.GetBaseException(), "Update check failed");
-                    });
-                await Task.WhenAll(refreshTask, updateTask);
+                    .LogFaults("Update check failed");
+                try {
+                    await Task.WhenAll(refreshTask, updateTask);
+                }
+                catch (Exception) {
+                    // Both tasks are best-effort and LogFaults already logged the failure.
+                    // Swallow here so a failed refresh or update check cannot abort the
+                    // startup work below.
+                }
 
                 // Re-check opt-out after async steps (user may have opted out during startup)
                 if (GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
 
                 // Flush pending scrobbles fire-and-forget so library sync starts immediately.
                 // The periodic timer below catches any items not flushed by the time it fires.
-                _ = _apiClient.FlushPendingScrobblesAsync().ContinueWith(t => {
-                    if (t.IsFaulted)
-                        _logger.Warn(t.Exception.GetBaseException(), "Startup flush failed");
-                });
+                _ = _apiClient.FlushPendingScrobblesAsync().LogFaults("Startup flush failed");
 
                 // Start periodic flush timer — every 5 minutes, retry any remaining queued scrobbles.
                 // Guarded by _timerLock so a Dispose() racing this (e.g. plugin unloaded or
@@ -248,10 +257,7 @@ namespace GsPlugin {
                             var api = _apiClient;
                             if (api == null || GsDataManager.IsOptedOut) return;
                             try {
-                                _ = api.FlushPendingScrobblesAsync().ContinueWith(t => {
-                                    if (t.IsFaulted)
-                                        _logger.Warn(t.Exception?.GetBaseException(), "Periodic pending flush failed");
-                                }, TaskContinuationOptions.OnlyOnFaulted);
+                                _ = api.FlushPendingScrobblesAsync().LogFaults("Periodic pending flush failed");
                             }
                             catch (ObjectDisposedException) {
                                 // Timer fired after Dispose() — safe to ignore
@@ -286,10 +292,7 @@ namespace GsPlugin {
                 // Cooldown/Skipped mean library items already exist in the DB,
                 // so achievement FK references are valid.
                 if (startupSyncResult != SyncLibraryResult.Error) {
-                    _ = SyncAchievementsWithDiffAsync().ContinueWith(t => {
-                        if (t.IsFaulted)
-                            _logger.Warn(t.Exception?.GetBaseException(), "Startup achievement sync failed");
-                    }, TaskContinuationOptions.OnlyOnFaulted);
+                    _ = SyncAchievementsWithDiffAsync().LogFaults("Startup achievement sync failed");
                 }
 
                 sw.Stop();
@@ -314,26 +317,17 @@ namespace GsPlugin {
         /// Called when the application is shutting down. This is the place to clean up resources.
         /// </summary>
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
-            if (GsDataManager.IsOptedOut) { base.OnApplicationStopped(args); return; }
-            try {
+            await GuardedAsync("OnApplicationStopped", () => base.OnApplicationStopped(args), async () => {
                 GsPostHog.Capture("plugin_stopped");
                 await _scrobblingService.OnApplicationStoppedAsync();
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "Unhandled exception in OnApplicationStopped");
-                GsSentry.CaptureException(ex, "Unhandled exception in OnApplicationStopped");
-            }
-            finally {
-                base.OnApplicationStopped(args);
-            }
+            });
         }
 
         /// <summary>
         /// Called when a library update has been finished. This happens after games are imported or metadata is updated.
         /// </summary>
         public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
-            if (GsDataManager.IsOptedOut) { base.OnLibraryUpdated(args); return; }
-            try {
+            await GuardedAsync("OnLibraryUpdated", () => base.OnLibraryUpdated(args), async () => {
                 GsPostHog.Capture("library_synced", new Dictionary<string, object> {
                     { "game_count", PlayniteApi.Database.Games?.Count ?? 0 }
                 });
@@ -343,19 +337,9 @@ namespace GsPlugin {
                 }
 
                 if (librarySyncResult != SyncLibraryResult.Error) {
-                    _ = SyncAchievementsWithDiffAsync().ContinueWith(t => {
-                        if (t.IsFaulted)
-                            _logger.Warn(t.Exception?.GetBaseException(), "Library-update achievement sync failed");
-                    }, TaskContinuationOptions.OnlyOnFaulted);
+                    _ = SyncAchievementsWithDiffAsync().LogFaults("Library-update achievement sync failed");
                 }
-            }
-            catch (Exception ex) {
-                _logger.Error(ex, "Unhandled exception in OnLibraryUpdated");
-                GsSentry.CaptureException(ex, "Unhandled exception in OnLibraryUpdated");
-            }
-            finally {
-                base.OnLibraryUpdated(args);
-            }
+            });
         }
 
         /// <summary>
@@ -492,10 +476,7 @@ namespace GsPlugin {
                         }
 
                         if (result != SyncLibraryResult.Error) {
-                            _ = SyncAchievementsWithDiffAsync().ContinueWith(t => {
-                                if (t.IsFaulted)
-                                    _logger.Warn(t.Exception?.GetBaseException(), "Manual achievement sync failed");
-                            }, TaskContinuationOptions.OnlyOnFaulted);
+                            _ = SyncAchievementsWithDiffAsync().LogFaults("Manual achievement sync failed");
                         }
                         PlayniteApi.Dialogs.ShowMessage(message, "Game Scrobbler");
                     }

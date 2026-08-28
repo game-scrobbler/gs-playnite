@@ -61,6 +61,49 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
+        /// The scrobble timestamp format. Local time (not UTC) on purpose: the server
+        /// stores the offset carried by "K" and reports sessions in the player's own clock.
+        /// </summary>
+        private const string ScrobbleTimestampFormat = "yyyy-MM-ddTHH:mm:ssK";
+
+        /// <summary>
+        /// Builds the session-start payload for a Playnite game. Shared by the live send and the
+        /// queued-retry copy so a replayed start is byte-identical to the one that failed.
+        /// <c>user_id</c> resolves at call time, matching the per-call-site evaluation it replaces.
+        /// </summary>
+        private static ScrobbleStartReq BuildStartReq(Playnite.SDK.Models.Game g, DateTime at) {
+            return new ScrobbleStartReq {
+                user_id = GsDataManager.InstallIdForBody,
+                game_name = g.Name,
+                game_id = g.Id.ToString(),
+                plugin_id = g.PluginId.ToString(),
+                external_game_id = g.GameId,
+                source_name = g.Source?.Name,
+                metadata = new { PluginId = g.PluginId.ToString(), SourceName = g.Source?.Name },
+                started_at = at.ToString(ScrobbleTimestampFormat)
+            };
+        }
+
+        /// <summary>
+        /// Builds the session-finish payload for a Playnite game. Shared by the live send and the
+        /// queued-retry copy. Pass a null <paramref name="sessionId"/> for the queued-start pairing
+        /// path, where no server session exists yet.
+        /// </summary>
+        private static ScrobbleFinishReq BuildFinishReq(Playnite.SDK.Models.Game g, string sessionId, DateTime at) {
+            return new ScrobbleFinishReq {
+                user_id = GsDataManager.InstallIdForBody,
+                game_name = g.Name,
+                game_id = g.Id.ToString(),
+                plugin_id = g.PluginId.ToString(),
+                external_game_id = g.GameId,
+                source_name = g.Source?.Name,
+                session_id = sessionId,
+                metadata = new { PluginId = g.PluginId.ToString(), SourceName = g.Source?.Name },
+                finished_at = at.ToString(ScrobbleTimestampFormat)
+            };
+        }
+
+        /// <summary>
         /// Handles the game starting event and initiates a new scrobbling session.
         /// </summary>
         /// <param name="args">Event arguments containing game information.</param>
@@ -93,16 +136,7 @@ namespace GsPlugin.Services {
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
                 if (GsDataManager.IsOptedOut) return;
 
-                var sessionData = await _apiClient.StartGameSession(new ScrobbleStartReq {
-                    user_id = GsDataManager.InstallIdForBody,
-                    game_name = startedGame.Name,
-                    game_id = startedGame.Id.ToString(),
-                    plugin_id = startedGame.PluginId.ToString(),
-                    external_game_id = startedGame.GameId,
-                    source_name = startedGame.Source?.Name,
-                    metadata = new { PluginId = startedGame.PluginId.ToString(), SourceName = startedGame.Source?.Name },
-                    started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                });
+                var sessionData = await _apiClient.StartGameSession(BuildStartReq(startedGame, localDate));
                 var startedGameId = startedGame.Id.ToString();
 
                 if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
@@ -118,16 +152,7 @@ namespace GsPlugin.Services {
                     _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id}). Queuing start for retry.");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "start",
-                        StartData = new ScrobbleStartReq {
-                            user_id = GsDataManager.InstallIdForBody,
-                            game_name = startedGame.Name,
-                            game_id = startedGame.Id.ToString(),
-                            plugin_id = startedGame.PluginId.ToString(),
-                            external_game_id = startedGame.GameId,
-                            source_name = startedGame.Source?.Name,
-                            metadata = new { PluginId = startedGame.PluginId.ToString(), SourceName = startedGame.Source?.Name },
-                            started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                        },
+                        StartData = BuildStartReq(startedGame, localDate),
                         QueuedAt = localDate
                     });
                     // Mark that this game has a queued start so OnGameStoppedAsync can pair it
@@ -169,17 +194,7 @@ namespace GsPlugin.Services {
                     _logger.Info($"Queuing finish to pair with pending start for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
-                        FinishData = new ScrobbleFinishReq {
-                            user_id = GsDataManager.InstallIdForBody,
-                            game_name = stoppedGame.Name,
-                            game_id = stoppedGame.Id.ToString(),
-                            plugin_id = stoppedGame.PluginId.ToString(),
-                            external_game_id = stoppedGame.GameId,
-                            source_name = stoppedGame.Source?.Name,
-                            session_id = null,
-                            metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
-                            finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                        },
+                        FinishData = BuildFinishReq(stoppedGame, null, localDate),
                         QueuedAt = localDate
                     });
                     GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Remove(stoppedGameId));
@@ -207,17 +222,8 @@ namespace GsPlugin.Services {
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
                 if (GsDataManager.IsOptedOut) return;
 
-                var finishResponse = await _apiClient.FinishGameSession(new ScrobbleFinishReq {
-                    user_id = GsDataManager.InstallIdForBody,
-                    game_name = stoppedGame.Name,
-                    game_id = stoppedGame.Id.ToString(),
-                    plugin_id = stoppedGame.PluginId.ToString(),
-                    external_game_id = stoppedGame.GameId,
-                    source_name = stoppedGame.Source?.Name,
-                    session_id = activeSessionId,
-                    metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
-                    finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                });
+                var finishResponse = await _apiClient.FinishGameSession(
+                    BuildFinishReq(stoppedGame, activeSessionId, localDate));
                 if (finishResponse != null) {
                     // Only clear the session ID if the request was successful
                     ClearActiveSession(stoppedGameId);
@@ -227,17 +233,7 @@ namespace GsPlugin.Services {
                     _logger.Error($"Failed to finish game session for {stoppedGame.Name} (ID: {stoppedGame.Id}). Queuing for retry.");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
-                        FinishData = new ScrobbleFinishReq {
-                            user_id = GsDataManager.InstallIdForBody,
-                            game_name = stoppedGame.Name,
-                            game_id = stoppedGame.Id.ToString(),
-                            plugin_id = stoppedGame.PluginId.ToString(),
-                            external_game_id = stoppedGame.GameId,
-                            source_name = stoppedGame.Source?.Name,
-                            session_id = activeSessionId,
-                            metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
-                            finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                        },
+                        FinishData = BuildFinishReq(stoppedGame, activeSessionId, localDate),
                         QueuedAt = localDate
                     });
                     // Leave this game's active session entry in place so a manual retry still has the session ID
@@ -286,11 +282,13 @@ namespace GsPlugin.Services {
                     var gameId = kvp.Key;
                     var sessionId = kvp.Value;
 
+                    // Deliberately not BuildFinishReq: the shutdown finish carries no game fields,
+                    // only the session and a shutdown reason.
                     var finishData = new ScrobbleFinishReq {
                         user_id = GsDataManager.InstallIdForBody,
                         session_id = sessionId,
                         metadata = new { reason = "application_stopped" },
-                        finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                        finished_at = localDate.ToString(ScrobbleTimestampFormat)
                     };
                     var pendingFinish = new PendingScrobble {
                         Type = "finish",
@@ -370,6 +368,26 @@ namespace GsPlugin.Services {
             };
         }
 
+
+        /// <summary>
+        /// Builds a full { playnite_id, fingerprint } map for the library, the shape the local
+        /// hash index stores as its baseline.
+        /// </summary>
+        private static Dictionary<string, string> BuildLibraryFingerprints(List<GameSyncDto> library) {
+            return library.ToDictionary(
+                g => g.playnite_id,
+                g => GsHashUtils.ComputeLibraryItemFingerprint(g));
+        }
+
+        /// <summary>
+        /// Builds a full { playnite_id, fingerprint } map for achievements, the shape the local
+        /// hash index stores as its baseline.
+        /// </summary>
+        private static Dictionary<string, string> BuildAchievementFingerprints(List<GameAchievementsDto> games) {
+            return games.ToDictionary(
+                g => g.playnite_id,
+                g => GsHashUtils.ComputeAchievementGameFingerprint(g));
+        }
 
         /// <summary>
         /// Computes the diff between the current library DTOs and the local fingerprint index.
@@ -627,6 +645,77 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
+        /// Handles the "global hash is unchanged since the last sync" branch shared by every sync
+        /// path. Normally that means there is nothing to send. If the local per-item index has
+        /// drifted out of step with the live item count, the index is rewritten from live data
+        /// instead: a self-heal that uploads nothing, since the server-side baseline is already
+        /// correct (that is what the matching global hash proves).
+        /// </summary>
+        /// <param name="label">Sync path name used to prefix log lines.</param>
+        /// <param name="indexCount">Entry count currently held in the local hash index.</param>
+        /// <param name="liveCount">Item count computed from the live Playnite data.</param>
+        /// <param name="replaceIndex">Rewrites the index from live data; returns false if the save failed.</param>
+        private static SyncLibraryResult SkipOrRepairIndex(
+            string label,
+            int indexCount,
+            int liveCount,
+            Func<bool> replaceIndex) {
+            if (indexCount == liveCount) {
+                _logger.Info($"{label}: hash unchanged since last sync — skipping.");
+                return SyncLibraryResult.Skipped;
+            }
+
+            _logger.Warn($"{label}: hash matches but index count ({indexCount}) != live count ({liveCount}) — " +
+                "repairing local hash index.");
+            if (!replaceIndex()) {
+                _logger.Error($"{label}: failed to repair local hash index.");
+                return SyncLibraryResult.Error;
+            }
+            return SyncLibraryResult.Success;
+        }
+
+        /// <summary>
+        /// Commits local sync baselines after the server accepted a job onto its async queue.
+        /// This is the single place the baseline-ordering invariant is enforced, for every sync path:
+        /// <list type="number">
+        /// <item>confirm the queued job actually completed (a "queued" admission is not success),</item>
+        /// <item>persist the per-item hash index for ALL items,</item>
+        /// <item>only then write the global Last*Hash and the rest of the sync bookkeeping.</item>
+        /// </list>
+        /// Any step failing returns <see cref="SyncLibraryResult.Error"/> without touching the
+        /// steps after it, so a mid-failure leaves the previous good baseline intact and the next
+        /// run re-syncs rather than trusting a baseline that was never durably written.
+        /// </summary>
+        /// <param name="label">Sync path name used to prefix log lines.</param>
+        /// <param name="queueId">Server queue job id from the "queued" response.</param>
+        /// <param name="persistIndex">Writes the per-item hash index; returns false if the save failed.</param>
+        /// <param name="persistHashes">Writes the global hash and sync bookkeeping into <see cref="GsData"/>.</param>
+        /// <param name="queuedDetail">Optional detail appended to the "queued successfully" log line.</param>
+        private async Task<SyncLibraryResult> CommitSyncBaselineAsync(
+            string label,
+            string queueId,
+            Func<bool> persistIndex,
+            Action<GsData> persistHashes,
+            string queuedDetail = null) {
+            if (await TryConfirmQueueCompletionAsync(label, queueId) == false) {
+                return SyncLibraryResult.Error;
+            }
+
+            _logger.Info(string.IsNullOrEmpty(queuedDetail)
+                ? $"{label} queued successfully."
+                : $"{label} queued successfully ({queuedDetail}).");
+
+            if (!persistIndex()) {
+                _logger.Error($"{label} queued but local hash index save failed — " +
+                    "not committing hash baseline. Will retry next run.");
+                return SyncLibraryResult.Error;
+            }
+
+            GsDataManager.MutateAndSave(persistHashes);
+            return SyncLibraryResult.Success;
+        }
+
+        /// <summary>
         /// Sends the full library via v4 chunked sync and writes the local hash index.
         /// </summary>
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
@@ -652,21 +741,11 @@ namespace GsPlugin.Services {
                 var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
 
                 if (libraryHash == GsDataManager.Data.LastLibraryHash && GsSyncHashIndex.HasLibraryBaseline && !accountsChanged) {
-                    var indexCount = GsSyncHashIndex.LibraryEntryCount;
-                    if (indexCount == library.Count) {
-                        _logger.Info("Library hash unchanged since last sync — skipping full sync.");
-                        return SyncLibraryResult.Skipped;
-                    }
-
-                    _logger.Warn($"Library hash matches but index count ({indexCount}) != library ({library.Count}) — repairing local hash index.");
-                    var repairDict = library.ToDictionary(
-                        g => g.playnite_id,
-                        g => GsHashUtils.ComputeLibraryItemFingerprint(g));
-                    if (!GsSyncHashIndex.ReplaceLibraryIndex(repairDict)) {
-                        _logger.Error("Failed to repair local library hash index.");
-                        return SyncLibraryResult.Error;
-                    }
-                    return SyncLibraryResult.Success;
+                    return SkipOrRepairIndex(
+                        "Full library sync",
+                        GsSyncHashIndex.LibraryEntryCount,
+                        library.Count,
+                        () => GsSyncHashIndex.ReplaceLibraryIndex(BuildLibraryFingerprints(library)));
                 }
 
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
@@ -689,31 +768,19 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success && response.status == "queued") {
-                    if (await TryConfirmQueueCompletionAsync("Full library sync", response.queueId) == false) {
-                        return SyncLibraryResult.Error;
-                    }
-
-                    _logger.Info($"Full library sync queued ({library.Count} games).");
-
-                    var indexDict = library.ToDictionary(
-                        g => g.playnite_id,
-                        g => GsHashUtils.ComputeLibraryItemFingerprint(g));
-                    if (!GsSyncHashIndex.ReplaceLibraryIndex(indexDict)) {
-                        _logger.Error("Full library sync queued but local hash index save failed — " +
-                            "not committing hash baseline. Will retry full sync next run.");
-                        return SyncLibraryResult.Error;
-                    }
-
                     var libCount = library.Count;
-                    GsDataManager.MutateAndSave(d => {
-                        d.LastSyncAt = DateTime.UtcNow;
-                        d.LastSyncGameCount = libCount;
-                        d.LastLibraryHash = libraryHash;
-                        d.LastIntegrationAccountsHash = accountsHash;
-                        d.SyncCooldownExpiresAt = null;
-                    });
-
-                    return SyncLibraryResult.Success;
+                    return await CommitSyncBaselineAsync(
+                        "Full library sync",
+                        response.queueId,
+                        () => GsSyncHashIndex.ReplaceLibraryIndex(BuildLibraryFingerprints(library)),
+                        d => {
+                            d.LastSyncAt = DateTime.UtcNow;
+                            d.LastSyncGameCount = libCount;
+                            d.LastLibraryHash = libraryHash;
+                            d.LastIntegrationAccountsHash = accountsHash;
+                            d.SyncCooldownExpiresAt = null;
+                        },
+                        queuedDetail: $"{libCount} games");
                 }
 
                 _logger.Error($"Unexpected response from full library sync: status={response.status}");
@@ -806,21 +873,11 @@ namespace GsPlugin.Services {
                 var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
 
                 if (libraryHash == GsDataManager.Data.LastLibraryHash && !accountsChanged) {
-                    var indexCount = GsSyncHashIndex.LibraryEntryCount;
-                    if (indexCount == library.Count) {
-                        _logger.Info("Library hash unchanged since last sync — skipping diff sync.");
-                        return SyncLibraryResult.Skipped;
-                    }
-
-                    _logger.Warn($"Library hash matches but index count ({indexCount}) != library ({library.Count}) — repairing local hash index.");
-                    var repairDict = library.ToDictionary(
-                        g => g.playnite_id,
-                        g => GsHashUtils.ComputeLibraryItemFingerprint(g));
-                    if (!GsSyncHashIndex.ReplaceLibraryIndex(repairDict)) {
-                        _logger.Error("Failed to repair local library hash index.");
-                        return SyncLibraryResult.Error;
-                    }
-                    return SyncLibraryResult.Success;
+                    return SkipOrRepairIndex(
+                        "Library diff sync",
+                        GsSyncHashIndex.LibraryEntryCount,
+                        library.Count,
+                        () => GsSyncHashIndex.ReplaceLibraryIndex(BuildLibraryFingerprints(library)));
                 }
 
                 var fingerprints = GsSyncHashIndex.GetLibraryFingerprints();
@@ -876,31 +933,22 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success && response.status == "queued") {
-                    if (await TryConfirmQueueCompletionAsync("Library diff sync", response.queueId) == false) {
-                        return SyncLibraryResult.Error;
-                    }
-
-                    _logger.Info("Library diff sync queued successfully.");
-
-                    var upserted = added.Concat(updated).ToDictionary(
-                        g => g.playnite_id,
-                        g => currentFingerprints[g.playnite_id]);
-                    if (!GsSyncHashIndex.ApplyLibraryDiff(upserted, removed)) {
-                        _logger.Error("Library diff queued but local hash index save failed — " +
-                            "not committing hash baseline.");
-                        return SyncLibraryResult.Error;
-                    }
-
                     var libCount = library.Count;
-                    GsDataManager.MutateAndSave(d => {
-                        d.LastSyncAt = DateTime.UtcNow;
-                        d.LastSyncGameCount = libCount;
-                        d.LastLibraryHash = libraryHash;
-                        d.LastIntegrationAccountsHash = accountsHash;
-                        d.LibraryDiffSyncCooldownExpiresAt = null;
-                    });
-
-                    return SyncLibraryResult.Success;
+                    return await CommitSyncBaselineAsync(
+                        "Library diff sync",
+                        response.queueId,
+                        () => GsSyncHashIndex.ApplyLibraryDiff(
+                            added.Concat(updated).ToDictionary(
+                                g => g.playnite_id,
+                                g => currentFingerprints[g.playnite_id]),
+                            removed),
+                        d => {
+                            d.LastSyncAt = DateTime.UtcNow;
+                            d.LastSyncGameCount = libCount;
+                            d.LastLibraryHash = libraryHash;
+                            d.LastIntegrationAccountsHash = accountsHash;
+                            d.LibraryDiffSyncCooldownExpiresAt = null;
+                        });
                 }
 
                 _logger.Error($"Unexpected response from library diff sync: status={response.status}");
@@ -983,18 +1031,11 @@ namespace GsPlugin.Services {
                 }
 
                 if (achHash == GsDataManager.Data.LastAchievementHash && GsSyncHashIndex.HasAchievementsBaseline) {
-                    if (GsSyncHashIndex.AchievementEntryCount == games.Count) {
-                        _logger.Info("Achievement hash unchanged since last sync — skipping full sync.");
-                        return SyncLibraryResult.Skipped;
-                    }
-                    _logger.Warn("Achievement hash matches but index count diverged — repairing local index.");
-                    var repair = games.ToDictionary(
-                        g => g.playnite_id,
-                        g => GsHashUtils.ComputeAchievementGameFingerprint(g));
-                    if (!GsSyncHashIndex.ReplaceAchievementIndex(repair)) {
-                        return SyncLibraryResult.Error;
-                    }
-                    return SyncLibraryResult.Success;
+                    return SkipOrRepairIndex(
+                        "Full achievements sync",
+                        GsSyncHashIndex.AchievementEntryCount,
+                        games.Count,
+                        () => GsSyncHashIndex.ReplaceAchievementIndex(BuildAchievementFingerprints(games)));
                 }
 
                 _logger.Info($"Sending full achievements for {games.Count} games.");
@@ -1014,24 +1055,11 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success && response.status == "queued") {
-                    if (await TryConfirmQueueCompletionAsync("Full achievements sync", response.queueId) == false) {
-                        return SyncLibraryResult.Error;
-                    }
-
-                    _logger.Info("Full achievements sync queued successfully.");
-
-                    var indexDict = games.ToDictionary(
-                        g => g.playnite_id,
-                        g => GsHashUtils.ComputeAchievementGameFingerprint(g));
-                    if (!GsSyncHashIndex.ReplaceAchievementIndex(indexDict)) {
-                        _logger.Error("Full achievements sync queued but local hash index save failed — " +
-                            "not committing hash baseline.");
-                        return SyncLibraryResult.Error;
-                    }
-
-                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = achHash);
-
-                    return SyncLibraryResult.Success;
+                    return await CommitSyncBaselineAsync(
+                        "Full achievements sync",
+                        response.queueId,
+                        () => GsSyncHashIndex.ReplaceAchievementIndex(BuildAchievementFingerprints(games)),
+                        d => d.LastAchievementHash = achHash);
                 }
 
                 _logger.Error($"Unexpected response from full achievements sync: status={response.status}");
@@ -1233,20 +1261,11 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success && response.status == "queued") {
-                    if (await TryConfirmQueueCompletionAsync("Achievement diff sync", response.queueId) == false) {
-                        return SyncLibraryResult.Error;
-                    }
-
-                    _logger.Info("Achievement diff sync queued successfully.");
-
-                    if (!GsSyncHashIndex.ApplyAchievementDiff(upsertedFingerprints, allCleared)) {
-                        _logger.Error("Achievement diff queued but local hash index save failed — " +
-                            "not committing hash baseline.");
-                        return SyncLibraryResult.Error;
-                    }
-                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = resultAchievementHash);
-
-                    return SyncLibraryResult.Success;
+                    return await CommitSyncBaselineAsync(
+                        "Achievement diff sync",
+                        response.queueId,
+                        () => GsSyncHashIndex.ApplyAchievementDiff(upsertedFingerprints, allCleared),
+                        d => d.LastAchievementHash = resultAchievementHash);
                 }
 
                 _logger.Error($"Unexpected response from achievements diff sync: status={response.status}");

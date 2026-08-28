@@ -24,6 +24,29 @@ namespace GsPlugin.Models {
     }
 
     /// <summary>
+    /// Selects the optional extras cleared by <see cref="GsData.ClearIdentityBoundState"/>
+    /// on top of the base set that every identity reset clears.
+    /// Declared at namespace level (not nested) so it stays off the JSON-serialized shape of
+    /// <see cref="GsData"/>.
+    /// </summary>
+    [Flags]
+    public enum IdentityClearScope {
+        /// <summary>Clear only the base set: link, sessions, queued scrobbles, sync hashes and cooldowns.</summary>
+        None = 0,
+        /// <summary>
+        /// Also clear <see cref="GsData.InstallToken"/>. Used when the install identity itself
+        /// goes away (opt-out invalidates the token server-side, rotation abandons it).
+        /// Not used by unlink, where the install stays registered under the same token.
+        /// </summary>
+        InstallToken = 1 << 0,
+        /// <summary>
+        /// Also clear <see cref="GsData.ShownNotificationIds"/> so the new identity can be
+        /// shown notifications it has already seen under the old one.
+        /// </summary>
+        ShownNotifications = 1 << 1
+    }
+
+    /// <summary>
     /// Holds custom persistent data.
     /// </summary>
     public class GsData {
@@ -111,6 +134,46 @@ namespace GsPlugin.Models {
         /// Displayed in the settings diagnostics section. Reset on successful flush or manual sync.
         /// </summary>
         public int DroppedScrobbleCount { get; set; } = 0;
+
+        /// <summary>
+        /// Clears the state bound to the current install/account identity so it cannot bleed into
+        /// the next one. Single source of truth for opt-out, install-id rotation and account
+        /// unlink; add any new identity-bound field here rather than at the call sites.
+        /// </summary>
+        /// <remarks>
+        /// Neither locks nor saves, so it is safe to call from inside GsDataManager's lock
+        /// (PerformOptOut / RotateInstallId) and from within a MutateAndSave action (unlink).
+        /// Callers are responsible for persisting afterwards.
+        /// Collections are cleared in place rather than reassigned because other code holds
+        /// references to the same instances.
+        /// </remarks>
+        /// <param name="scope">Extras to clear beyond the base set.</param>
+        public void ClearIdentityBoundState(IdentityClearScope scope) {
+            LinkedUserId = null;
+            ActiveSessionsByGameId.Clear();
+            PendingStartGameIds.Clear();
+            PendingScrobbles.Clear();
+            LastLibraryHash = null;
+            LastAchievementHash = null;
+            LastSyncAt = null;
+            LastSyncGameCount = null;
+            SyncCooldownExpiresAt = null;
+            LibraryDiffSyncCooldownExpiresAt = null;
+            LastIntegrationAccountsHash = null;
+
+            if ((scope & IdentityClearScope.InstallToken) != 0) {
+                InstallToken = null;
+            }
+
+            // Asymmetry preserved from the three hand-written copies this method replaced:
+            // only install-id rotation cleared ShownNotificationIds, and none of them cleared
+            // DroppedScrobbleCount (a lifetime diagnostics counter, not identity-bound state).
+            // Both are recorded as observed behavior, not as a deliberate design conclusion;
+            // a future reader should decide intentionally rather than assume it was reasoned.
+            if ((scope & IdentityClearScope.ShownNotifications) != 0) {
+                ShownNotificationIds.Clear();
+            }
+        }
 
         public void UpdateFlags(bool disableSentry, bool disableScrobbling, bool disablePostHog = false) {
             // Build a new list and swap atomically to avoid IndexOutOfRangeException
@@ -428,18 +491,8 @@ namespace GsPlugin.Models {
         public static void PerformOptOut() {
             lock (_lock) {
                 _data.OptedOut = true;
-                _data.ActiveSessionsByGameId.Clear();
-                _data.PendingStartGameIds.Clear();
-                _data.PendingScrobbles.Clear();
-                _data.LinkedUserId = null;
-                _data.LastLibraryHash = null;
-                _data.LastAchievementHash = null;
-                _data.LastSyncAt = null;
-                _data.LastSyncGameCount = null;
-                _data.SyncCooldownExpiresAt = null;
-                _data.LibraryDiffSyncCooldownExpiresAt = null;
-                _data.LastIntegrationAccountsHash = null;
-                _data.InstallToken = null; // Token is invalidated server-side on opt-out
+                // Token is invalidated server-side on opt-out, so clear it too.
+                _data.ClearIdentityBoundState(IdentityClearScope.InstallToken);
                 SaveInternal();
             }
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
@@ -515,23 +568,12 @@ namespace GsPlugin.Models {
             lock (_lock) {
                 newId = Guid.NewGuid().ToString();
                 _data.InstallID = newId;
-                _data.InstallToken = null;
                 _data.IdentityGeneration++;
                 // Clear all identity-bound sync and linking state so the recovered install
                 // cannot inherit stale cooldowns, hashes, baselines, queued work, or an
                 // account link that belongs to the abandoned server-side identity.
-                _data.LinkedUserId = null;
-                _data.ActiveSessionsByGameId.Clear();
-                _data.PendingStartGameIds.Clear();
-                _data.PendingScrobbles.Clear();
-                _data.LastLibraryHash = null;
-                _data.LastAchievementHash = null;
-                _data.LastSyncAt = null;
-                _data.LastSyncGameCount = null;
-                _data.SyncCooldownExpiresAt = null;
-                _data.LibraryDiffSyncCooldownExpiresAt = null;
-                _data.LastIntegrationAccountsHash = null;
-                _data.ShownNotificationIds.Clear();
+                _data.ClearIdentityBoundState(
+                    IdentityClearScope.InstallToken | IdentityClearScope.ShownNotifications);
                 SaveInternal();
                 GsLogger.Info("InstallID rotated for lost-token recovery; identity-bound state cleared");
             }

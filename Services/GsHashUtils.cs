@@ -50,16 +50,7 @@ namespace GsPlugin.Services {
                 .OrderBy(k => k, StringComparer.Ordinal)
                 .ToArray();
 
-            var separator = new byte[] { (byte)'|' };
-            using (var sha256 = SHA256.Create()) {
-                foreach (var key in keys) {
-                    var bytes = Encoding.UTF8.GetBytes(key);
-                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
-                    sha256.TransformBlock(separator, 0, 1, null, 0);
-                }
-                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
-            }
+            return Sha256HexOfKeys(keys);
         }
 
         /// <summary>
@@ -100,11 +91,7 @@ namespace GsPlugin.Services {
             sb.Append('|');
             sb.Append(g.achievement_count_total?.ToString() ?? "");
 
-            using (var sha256 = SHA256.Create()) {
-                var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-                var hash = sha256.ComputeHash(bytes);
-                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-            }
+            return Sha256Hex(sb.ToString());
         }
 
         /// <summary>
@@ -119,27 +106,13 @@ namespace GsPlugin.Services {
                     var achs = g.achievements ?? new List<AchievementItemDto>();
                     var unlockedCount = achs.Count(a => a.is_unlocked);
                     var sortedNames = string.Join(",", achs.Select(a => a.name).OrderBy(n => n, StringComparer.Ordinal));
-                    string namesHash;
-                    using (var sha = SHA256.Create()) {
-                        var bytes = Encoding.UTF8.GetBytes(sortedNames);
-                        var hash = sha.ComputeHash(bytes);
-                        namesHash = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                    }
+                    var namesHash = Sha256Hex(sortedNames);
                     return $"{g.playnite_id}:{achs.Count}:{unlockedCount}:{namesHash}";
                 })
                 .OrderBy(k => k, StringComparer.Ordinal)
                 .ToArray();
 
-            var separator = new byte[] { (byte)'|' };
-            using (var sha256 = SHA256.Create()) {
-                foreach (var key in keys) {
-                    var bytes = Encoding.UTF8.GetBytes(key);
-                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
-                    sha256.TransformBlock(separator, 0, 1, null, 0);
-                }
-                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
-            }
+            return Sha256HexOfKeys(keys);
         }
 
         /// <summary>
@@ -197,11 +170,7 @@ namespace GsPlugin.Services {
             var detail = string.Join("", list
                 .Select(a => $"{a.name}{(a.unlocked ? "1" : "0")}{FormatRarity(a.rarity)}")
                 .OrderBy(s => s, StringComparer.Ordinal));
-            string detailHash;
-            using (var sha = SHA256.Create()) {
-                var bytes = Encoding.UTF8.GetBytes(detail);
-                detailHash = BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
-            }
+            var detailHash = Sha256Hex(detail);
             return $"{playniteId}:{list.Count}:{unlockedCount}:{detailHash}";
         }
 
@@ -221,9 +190,39 @@ namespace GsPlugin.Services {
             foreach (var a in sorted) {
                 sb.Append(a.provider_id).Append(':').Append(a.account_id).Append(';');
             }
-            using (var sha = SHA256.Create()) {
-                var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
-                return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+            return Sha256Hex(sb.ToString());
+        }
+
+        /// <summary>
+        /// SHA-256 of a single UTF-8 string, rendered as lowercase hex with no separators.
+        /// Server contract: the digest input is the string exactly as supplied, so callers
+        /// own the pre-image construction and this helper must never alter it.
+        /// </summary>
+        private static string Sha256Hex(string input) {
+            using (var sha256 = SHA256.Create()) {
+                var bytes = Encoding.UTF8.GetBytes(input);
+                var hash = sha256.ComputeHash(bytes);
+                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
+        /// SHA-256 of an already-ordered key sequence, rendered as lowercase hex with no separators.
+        /// Server contract: each key is fed as UTF-8 bytes followed by a single '|' byte, including
+        /// after the final key, so the digest input always ends with '|'. That trailing separator is
+        /// part of the contract with createLibraryHashV3 / createAchievementHashV2; do not replace
+        /// this with a string join. Callers are responsible for ordering (StringComparer.Ordinal).
+        /// </summary>
+        private static string Sha256HexOfKeys(IEnumerable<string> orderedKeys) {
+            var separator = new byte[] { (byte)'|' };
+            using (var sha256 = SHA256.Create()) {
+                foreach (var key in orderedKeys) {
+                    var bytes = Encoding.UTF8.GetBytes(key);
+                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
+                    sha256.TransformBlock(separator, 0, 1, null, 0);
+                }
+                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
             }
         }
     }

@@ -10,25 +10,100 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
 
         <!-- Brand accent color — intentionally fixed, not theme-driven -->
         <SolidColorBrush x:Key="AccentBrush" Color="#5B9CF6"/>
 
-        <!-- Card container — uses Playnite's popup/panel background so it follows the active theme -->
-        <Style x:Key="CardBorderStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource GridItemBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource NormalBorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="16"/>
-            <Setter Property="Margin" Value="0,0,0,10"/>
-        </Style>
+        <!-- Severity palette shared by every status row, badge and warning strip -->
+        <SolidColorBrush x:Key="SuccessBrush" Color="#4CAF50"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="#FFA500"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#E53935"/>
+        <SolidColorBrush x:Key="DangerAccentBrush" Color="#E53E3E"/>
+        <SolidColorBrush x:Key="DangerHoverBrush" Color="#FC5656"/>
 
         <!-- Section header label -->
         <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Left accent bar for section headers — brand color, always fixed -->
+        <Style x:Key="AccentBarStyle" TargetType="Rectangle">
+            <Setter Property="Width" Value="3"/>
+            <Setter Property="RadiusX" Value="1.5"/>
+            <Setter Property="RadiusY" Value="1.5"/>
+            <Setter Property="Fill" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+        </Style>
+
+        <!--
+            Card section chrome: themed panel, left accent bar and header label.
+            Only the chrome lives in the ControlTemplate. Each section supplies its
+            own body as Content, so every x:Name inside a card stays in the page
+            namescope and remains reachable from the code-behind.
+            Tag carries the accent bar brush, Foreground the header text brush.
+        -->
+        <Style x:Key="CardSectionStyle" TargetType="HeaderedContentControl">
+            <Setter Property="Background" Value="{DynamicResource GridItemBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource NormalBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="Tag" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="HeaderedContentControl">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <Rectangle Style="{StaticResource AccentBarStyle}"
+                                               Fill="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                    <TextBlock Style="{StaticResource SectionTitleStyle}"
+                                               Foreground="{TemplateBinding Foreground}"
+                                               Text="{Binding Header, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </StackPanel>
+                                <ContentPresenter/>
+                            </StackPanel>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Danger zone variant: identical chrome, red border, accent bar and title -->
+        <Style x:Key="DangerCardSectionStyle" TargetType="HeaderedContentControl" BasedOn="{StaticResource CardSectionStyle}">
+            <Setter Property="BorderBrush" Value="{StaticResource DangerAccentBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DangerAccentBrush}"/>
+            <Setter Property="Tag" Value="{StaticResource DangerAccentBrush}"/>
+        </Style>
+
+        <!-- Bordered inset box used for code blocks, badges and status strips -->
+        <Style x:Key="InsetBoxStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource TextBoxBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource NormalBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+
+        <!-- Leading glyph of a status row (check mark, warning sign) -->
+        <Style x:Key="StatusIconStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Text that follows a status glyph -->
+        <Style x:Key="StatusTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
@@ -74,6 +149,17 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Destructive action button: same shape as primary, red palette -->
+        <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource DangerAccentBrush}"/>
+            <Setter Property="MinWidth" Value="160"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource DangerHoverBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Secondary outline button -->
         <Style x:Key="SecondaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
@@ -100,16 +186,6 @@
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
-        <!-- Left accent bar for section headers — brand color, always fixed -->
-        <Style x:Key="AccentBarStyle" TargetType="Rectangle">
-            <Setter Property="Width" Value="3"/>
-            <Setter Property="RadiusX" Value="1.5"/>
-            <Setter Property="RadiusY" Value="1.5"/>
-            <Setter Property="Fill" Value="{StaticResource AccentBrush}"/>
-            <Setter Property="Margin" Value="0,0,10,0"/>
-            <Setter Property="VerticalAlignment" Value="Stretch"/>
-        </Style>
-
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -119,23 +195,16 @@
             <!-- ─────────────────────────────────────────
                  SECTION 1 — INSTALLATION ID
             ───────────────────────────────────────── -->
-            <Border Style="{StaticResource CardBorderStyle}">
+            <HeaderedContentControl Style="{StaticResource CardSectionStyle}"
+                                    Header="{DynamicResource LOCGsPluginInstallIdSectionTitle}">
                 <StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginInstallIdSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
-                    </StackPanel>
 
                     <TextBlock Style="{StaticResource MutedTextStyle}"
                                Margin="0,0,0,8"
                                Text="{DynamicResource LOCGsPluginInstallIdDescription}"/>
 
                     <!-- Code-block styled ID display -->
-                    <Border Background="{DynamicResource TextBoxBackgroundBrush}"
-                            BorderBrush="{DynamicResource NormalBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="4"
+                    <Border Style="{StaticResource InsetBoxStyle}"
                             Padding="10,8">
                         <TextBlock x:Name="IDTextBlock"
                                    FontFamily="Consolas, Courier New"
@@ -158,18 +227,14 @@
                     </StackPanel>
 
                 </StackPanel>
-            </Border>
+            </HeaderedContentControl>
 
             <!-- ─────────────────────────────────────────
                  SECTION 2 — THEME & DASHBOARD
             ───────────────────────────────────────── -->
-            <Border Style="{StaticResource CardBorderStyle}">
+            <HeaderedContentControl Style="{StaticResource CardSectionStyle}"
+                                    Header="{DynamicResource LOCGsPluginThemeSectionTitle}">
                 <StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginThemeSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
-                    </StackPanel>
 
                     <TextBlock Style="{StaticResource MutedTextStyle}"
                                Margin="0,0,0,8"
@@ -196,18 +261,14 @@
                               Margin="0,0,0,0"/>
 
                 </StackPanel>
-            </Border>
+            </HeaderedContentControl>
 
             <!-- ─────────────────────────────────────────
                  SECTION 3 — ACCOUNT LINKING
             ───────────────────────────────────────── -->
-            <Border Style="{StaticResource CardBorderStyle}">
+            <HeaderedContentControl Style="{StaticResource CardSectionStyle}"
+                                    Header="{DynamicResource LOCGsPluginAccountLinkingSectionTitle}">
                 <StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginAccountLinkingSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
-                    </StackPanel>
 
                     <!-- Hint with hyperlink -->
                     <TextBlock FontSize="12"
@@ -232,9 +293,7 @@
                                    Foreground="{DynamicResource TextBrushDarker}"
                                    VerticalAlignment="Center"
                                    Margin="0,0,8,0"/>
-                        <Border Background="{DynamicResource TextBoxBackgroundBrush}"
-                                BorderBrush="{DynamicResource NormalBorderBrush}"
-                                BorderThickness="1"
+                        <Border Style="{StaticResource InsetBoxStyle}"
                                 CornerRadius="10"
                                 Padding="10,4">
                             <TextBlock x:Name="ConnectionStatusTextBlock"
@@ -309,33 +368,29 @@
                                 Click="LinkAccount_Click"/>
                     </Grid>
 
-                    <!-- Token expiry countdown (Visibility driven by code-behind) -->
-                    <TextBlock x:Name="TokenCountdownTextBlock"
-                               Foreground="{DynamicResource TextBrushDarker}"
+                    <!-- Token expiry countdown, hidden while there is nothing to say -->
+                    <TextBlock Foreground="{DynamicResource TextBrushDarker}"
                                FontSize="11"
-                               Visibility="Collapsed"
-                               Margin="0,0,0,4"/>
+                               Margin="0,0,0,4"
+                               Text="{Binding Settings.TokenCountdown}"
+                               Visibility="{Binding Settings.TokenCountdown, Converter={StaticResource StringToVisibilityConverter}, FallbackValue=Collapsed}"/>
 
-                    <!-- Link status message (Visibility driven by code-behind) -->
-                    <TextBlock x:Name="LinkStatusTextBlock"
-                               Foreground="#FFA500"
+                    <!-- Link status message, hidden while there is nothing to say -->
+                    <TextBlock Foreground="{StaticResource WarningBrush}"
                                FontSize="12"
-                               Visibility="Collapsed"
-                               TextWrapping="Wrap"/>
+                               TextWrapping="Wrap"
+                               Text="{Binding Settings.LinkStatusMessage}"
+                               Visibility="{Binding Settings.LinkStatusMessage, Converter={StaticResource StringToVisibilityConverter}, FallbackValue=Collapsed}"/>
 
                 </StackPanel>
-            </Border>
+            </HeaderedContentControl>
 
             <!-- ─────────────────────────────────────────
                  SECTION 4 — SYNC SETTINGS
             ───────────────────────────────────────── -->
-            <Border Style="{StaticResource CardBorderStyle}">
+            <HeaderedContentControl Style="{StaticResource CardSectionStyle}"
+                                    Header="{DynamicResource LOCGsPluginSyncSettingsSectionTitle}">
                 <StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginSyncSettingsSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
-                    </StackPanel>
 
                     <!-- Achievement sync -->
                     <StackPanel Margin="0,0,0,4">
@@ -350,15 +405,12 @@
                                     Margin="20,0,0,4"
                                     Visibility="{Binding IsAnyAchievementProviderInstalled,
                                         Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <TextBlock Text="&#10003;"
-                                       Foreground="#4CAF50"
-                                       FontSize="12"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding AchievementProviderStatusText}"
-                                       Foreground="#4CAF50"
-                                       FontSize="11"
-                                       VerticalAlignment="Center"/>
+                            <TextBlock Style="{StaticResource StatusIconStyle}"
+                                       Foreground="{StaticResource SuccessBrush}"
+                                       Text="&#10003;"/>
+                            <TextBlock Style="{StaticResource StatusTextStyle}"
+                                       Foreground="{StaticResource SuccessBrush}"
+                                       Text="{Binding AchievementProviderStatusText}"/>
                         </StackPanel>
 
                         <!-- No achievement provider installed -->
@@ -366,14 +418,11 @@
                                     Margin="20,0,0,0"
                                     Visibility="{Binding IsAllAchievementProvidersMissing,
                                         Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <TextBlock Text="&#9888;"
-                                       Foreground="#FFA500"
-                                       FontSize="12"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Foreground="#FFA500"
-                                       FontSize="11"
-                                       VerticalAlignment="Center"
+                            <TextBlock Style="{StaticResource StatusIconStyle}"
+                                       Foreground="{StaticResource WarningBrush}"
+                                       Text="&#9888;"/>
+                            <TextBlock Style="{StaticResource StatusTextStyle}"
+                                       Foreground="{StaticResource WarningBrush}"
                                        TextWrapping="Wrap">
                                 <Run Text="{DynamicResource LOCGsPluginAchievementProviderMissingWarning}"/>
                                 <Run Text=" "/>
@@ -387,10 +436,7 @@
                     </StackPanel>
 
                     <!-- Library sync status -->
-                    <Border Background="{DynamicResource TextBoxBackgroundBrush}"
-                            BorderBrush="{DynamicResource NormalBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="4"
+                    <Border Style="{StaticResource InsetBoxStyle}"
                             Padding="10,6"
                             Margin="0,8,0,4">
                         <StackPanel Orientation="Horizontal">
@@ -400,69 +446,54 @@
                                        Margin="0,0,6,0"
                                        VerticalAlignment="Center"/>
                             <TextBlock x:Name="LastSyncStatusTextBlock"
-                                       FontSize="11"
-                                       Foreground="{DynamicResource TextBrush}"
-                                       VerticalAlignment="Center"/>
+                                       Style="{StaticResource StatusTextStyle}"
+                                       Foreground="{DynamicResource TextBrush}"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Pending scrobbles indicator — only visible when queue is non-empty -->
                     <Border x:Name="PendingScrobblesBorder"
-                            Background="{DynamicResource TextBoxBackgroundBrush}"
-                            BorderBrush="#FFA500"
-                            BorderThickness="1"
-                            CornerRadius="4"
+                            Style="{StaticResource InsetBoxStyle}"
+                            BorderBrush="{StaticResource WarningBrush}"
                             Padding="10,6"
                             Margin="0,4,0,0"
                             Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#9888;"
-                                       Foreground="#FFA500"
-                                       FontSize="12"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"/>
+                            <TextBlock Style="{StaticResource StatusIconStyle}"
+                                       Foreground="{StaticResource WarningBrush}"
+                                       Text="&#9888;"/>
                             <TextBlock x:Name="PendingScrobblesTextBlock"
-                                       FontSize="11"
-                                       Foreground="#FFA500"
-                                       VerticalAlignment="Center"/>
+                                       Style="{StaticResource StatusTextStyle}"
+                                       Foreground="{StaticResource WarningBrush}"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Dropped scrobbles indicator — only visible when scrobbles were lost -->
                     <Border x:Name="DroppedScrobblesBorder"
-                            Background="{DynamicResource TextBoxBackgroundBrush}"
-                            BorderBrush="#E53935"
-                            BorderThickness="1"
-                            CornerRadius="4"
+                            Style="{StaticResource InsetBoxStyle}"
+                            BorderBrush="{StaticResource DangerBrush}"
                             Padding="10,6"
                             Margin="0,4,0,0"
                             Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#9888;"
-                                       Foreground="#E53935"
-                                       FontSize="12"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"/>
+                            <TextBlock Style="{StaticResource StatusIconStyle}"
+                                       Foreground="{StaticResource DangerBrush}"
+                                       Text="&#9888;"/>
                             <TextBlock x:Name="DroppedScrobblesTextBlock"
-                                       FontSize="11"
-                                       Foreground="#E53935"
-                                       VerticalAlignment="Center"/>
+                                       Style="{StaticResource StatusTextStyle}"
+                                       Foreground="{StaticResource DangerBrush}"/>
                         </StackPanel>
                     </Border>
 
                 </StackPanel>
-            </Border>
+            </HeaderedContentControl>
 
             <!-- ─────────────────────────────────────────
                  SECTION 5 — NOTIFICATIONS
             ───────────────────────────────────────── -->
-            <Border Style="{StaticResource CardBorderStyle}">
+            <HeaderedContentControl Style="{StaticResource CardSectionStyle}"
+                                    Header="{DynamicResource LOCGsPluginNotificationsSectionTitle}">
                 <StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginNotificationsSectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
-                    </StackPanel>
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
                               Content="{DynamicResource LOCGsPluginShowUpdateNotificationsLabel}"
@@ -475,18 +506,14 @@
                               IsChecked="{Binding Settings.ShowImportantNotifications, Mode=TwoWay}"/>
 
                 </StackPanel>
-            </Border>
+            </HeaderedContentControl>
 
             <!-- ─────────────────────────────────────────
                  SECTION 6 — PRIVACY CONTROLS
             ───────────────────────────────────────── -->
-            <Border Style="{StaticResource CardBorderStyle}">
+            <HeaderedContentControl Style="{StaticResource CardSectionStyle}"
+                                    Header="{DynamicResource LOCGsPluginPrivacySectionTitle}">
                 <StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Rectangle Style="{StaticResource AccentBarStyle}"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginPrivacySectionTitle}" Style="{StaticResource SectionTitleStyle}"/>
-                    </StackPanel>
 
                     <CheckBox Style="{StaticResource CheckBoxStyle}"
                               Content="{DynamicResource LOCGsPluginDisableSentryLabel}"
@@ -510,70 +537,40 @@
                                 Margin="20,0,0,0"
                                 Visibility="{Binding Settings.DisableScrobbling,
                                     Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="&#9888;"
-                                   Foreground="#FFA500"
+                        <TextBlock Style="{StaticResource StatusIconStyle}"
+                                   Foreground="{StaticResource WarningBrush}"
                                    FontSize="13"
                                    Margin="0,0,8,0"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginScrobblingDisabledWarning}"
-                                   Foreground="#FFA500"
-                                   FontSize="11"
+                                   Text="&#9888;"/>
+                        <TextBlock Style="{StaticResource StatusTextStyle}"
+                                   Foreground="{StaticResource WarningBrush}"
                                    FontStyle="Italic"
                                    TextWrapping="Wrap"
-                                   VerticalAlignment="Center"/>
+                                   Text="{DynamicResource LOCGsPluginScrobblingDisabledWarning}"/>
                     </StackPanel>
 
                 </StackPanel>
-            </Border>
+            </HeaderedContentControl>
 
             <!-- ─────────────────────────────────────────
                  SECTION 7 — DANGER ZONE
             ───────────────────────────────────────── -->
-            <Border Style="{StaticResource CardBorderStyle}"
-                    BorderBrush="#E53E3E">
+            <HeaderedContentControl Style="{StaticResource DangerCardSectionStyle}"
+                                    Header="{DynamicResource LOCGsPluginDangerZoneSectionTitle}">
                 <StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Rectangle Style="{StaticResource AccentBarStyle}"
-                                   Fill="#E53E3E"/>
-                        <TextBlock Text="{DynamicResource LOCGsPluginDangerZoneSectionTitle}"
-                                   Style="{StaticResource SectionTitleStyle}"
-                                   Foreground="#E53E3E"/>
-                    </StackPanel>
-
-                    <TextBlock Foreground="#FFA500"
+                    <TextBlock Foreground="{StaticResource WarningBrush}"
                                FontSize="11"
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"
                                Text="{DynamicResource LOCGsPluginDangerZoneWarning}"/>
 
                     <Button x:Name="DeleteMyDataButton"
+                            Style="{StaticResource DangerButtonStyle}"
                             Content="{DynamicResource LOCGsPluginDeleteMyDataButton}"
                             HorizontalAlignment="Left"
                             Margin="0,0,0,8"
-                            Padding="14,7"
-                            FontSize="12"
-                            FontWeight="SemiBold"
-                            Cursor="Hand"
-                            MinWidth="160"
-                            Background="#E53E3E"
-                            Foreground="White"
-                            BorderThickness="0"
-                            Click="DeleteMyData_Click">
-                        <Button.Style>
-                            <Style TargetType="Button">
-                                <Style.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#FC5656"/>
-                                    </Trigger>
-                                    <Trigger Property="IsEnabled" Value="False">
-                                        <Setter Property="Background" Value="{DynamicResource NormalBorderBrush}"/>
-                                        <Setter Property="Foreground" Value="{DynamicResource TextBrushDarker}"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
+                            Click="DeleteMyData_Click"/>
 
                     <Button x:Name="OptBackInButton"
                             Style="{StaticResource PrimaryButtonStyle}"
@@ -584,14 +581,15 @@
                             Click="OptBackIn_Click"
                             ToolTip="{DynamicResource LOCGsPluginOptBackInTooltip}"/>
 
-                    <TextBlock x:Name="DeleteStatusTextBlock"
-                               Foreground="#FFA500"
+                    <!-- Deletion status message, hidden while there is nothing to say -->
+                    <TextBlock Foreground="{StaticResource WarningBrush}"
                                FontSize="12"
-                               Visibility="Collapsed"
-                               TextWrapping="Wrap"/>
+                               TextWrapping="Wrap"
+                               Text="{Binding Settings.DeleteStatusMessage}"
+                               Visibility="{Binding Settings.DeleteStatusMessage, Converter={StaticResource StringToVisibilityConverter}, FallbackValue=Collapsed}"/>
 
                 </StackPanel>
-            </Border>
+            </HeaderedContentControl>
 
         </StackPanel>
     </ScrollViewer>

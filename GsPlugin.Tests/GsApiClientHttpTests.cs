@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -17,19 +16,6 @@ namespace GsPlugin.Tests {
     /// </summary>
     [Collection("StaticManagerTests")]
     public class GsApiClientHttpTests {
-        private string CreateTempDir() {
-            var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(dir);
-            return dir;
-        }
-
-        private void InitDataManager(string tempDir, string installToken = null) {
-            GsDataManager.Initialize(tempDir, null);
-            if (installToken != null) {
-                GsDataManager.SetInstallTokenIfActive(installToken);
-            }
-        }
-
         /// <summary>
         /// A test HttpMessageHandler that returns a preconfigured response.
         /// Captures the last request for assertion.
@@ -69,10 +55,7 @@ namespace GsPlugin.Tests {
 
         [Fact]
         public async Task StartGameSession_Successful_ReturnsSessionId() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "test-token-abc");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token-abc")) {
                 var sessionId = Guid.NewGuid().ToString();
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
@@ -96,17 +79,11 @@ namespace GsPlugin.Tests {
                 Assert.Equal(sessionId, result.session_id);
                 Assert.True(handler.CallCount > 0);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task StartGameSession_ServerError_ReturnsNull() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "test-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token")) {
                 var handler = new MockHttpHandler {
                     StatusCode = HttpStatusCode.InternalServerError,
                     ResponseBody = "{\"error\":\"internal\"}"
@@ -122,19 +99,13 @@ namespace GsPlugin.Tests {
 
                 Assert.Null(result);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         // --- FinishGameSession Tests ---
 
         [Fact]
         public async Task FinishGameSession_NullSessionId_ProceedsWithNameBasedMatching() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "test-token-abc");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token-abc")) {
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
                         status = "success",
@@ -156,17 +127,11 @@ namespace GsPlugin.Tests {
                 Assert.Contains("\"game_name\":\"Test Game\"", handler.LastRequestBody ?? "");
                 Assert.DoesNotContain("\"session_id\"", handler.LastRequestBody ?? "");
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task FinishGameSession_NonUuidSessionId_ClearsToNull() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "test-token-abc");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token-abc")) {
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
                         status = "success",
@@ -189,9 +154,6 @@ namespace GsPlugin.Tests {
                 Assert.True(handler.CallCount > 0);
                 Assert.Contains("\"game_name\":\"Test Game\"", handler.LastRequestBody ?? "");
                 Assert.DoesNotContain("\"session_id\"", handler.LastRequestBody ?? ""); // null fields are omitted
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
@@ -261,9 +223,7 @@ namespace GsPlugin.Tests {
 
         [Fact]
         public async Task GetDashboardToken_NoInstallToken_ReturnsNull() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir); // no token
+            using (var temp = TempPluginDir.CreateWithDataManager()) { // no token
                 var handler = new MockHttpHandler();
                 var client = new GsApiClient(new HttpClient(handler));
 
@@ -272,17 +232,11 @@ namespace GsPlugin.Tests {
                 Assert.Null(result);
                 Assert.Equal(0, handler.CallCount);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task GetDashboardToken_WithToken_ReturnsToken() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-install-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-install-token")) {
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
                         success = true,
@@ -297,18 +251,13 @@ namespace GsPlugin.Tests {
                 Assert.Equal("short-lived-dashboard-token", result);
                 Assert.Contains("x-playnite-token", handler.LastRequest.Headers.ToString());
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         // --- RequestDeleteMyData Tests ---
 
         [Fact]
         public async Task RequestDeleteMyData_NoInstallToken_ReturnsNull() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir); // no token
+            using (var temp = TempPluginDir.CreateWithDataManager()) { // no token
                 var handler = new MockHttpHandler();
                 var client = new GsApiClient(new HttpClient(handler));
 
@@ -317,17 +266,11 @@ namespace GsPlugin.Tests {
                 Assert.Null(result);
                 Assert.Equal(0, handler.CallCount);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task RequestDeleteMyData_RateLimited_ReturnsFlaggedResult() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 var handler = new MockHttpHandler {
                     StatusCode = (HttpStatusCode)429
                 };
@@ -339,17 +282,11 @@ namespace GsPlugin.Tests {
                 Assert.False(result.success);
                 Assert.True(result.rateLimited);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task RequestDeleteMyData_Forbidden_ReturnsAlreadyOptedOut() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 var handler = new MockHttpHandler {
                     StatusCode = HttpStatusCode.Forbidden
                 };
@@ -362,17 +299,11 @@ namespace GsPlugin.Tests {
                 Assert.True(result.alreadyOptedOut);
                 Assert.False(result.authFailed);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task RequestDeleteMyData_Unauthorized_ReturnsAuthFailed() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 var handler = new MockHttpHandler {
                     StatusCode = HttpStatusCode.Unauthorized
                 };
@@ -385,18 +316,13 @@ namespace GsPlugin.Tests {
                 Assert.True(result.authFailed);
                 Assert.False(result.alreadyOptedOut);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         // --- UnlinkAccount Tests ---
 
         [Fact]
         public async Task UnlinkAccount_NoInstallToken_ReturnsNull() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir); // no token
+            using (var temp = TempPluginDir.CreateWithDataManager()) { // no token
                 var handler = new MockHttpHandler();
                 var client = new GsApiClient(new HttpClient(handler));
 
@@ -405,17 +331,11 @@ namespace GsPlugin.Tests {
                 Assert.Null(result);
                 Assert.Equal(0, handler.CallCount);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task UnlinkAccount_WithToken_ReturnsSuccessAndAttachesHeader() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
                         success = true
@@ -432,17 +352,11 @@ namespace GsPlugin.Tests {
                 Assert.True(handler.LastRequest.Headers.Contains("x-playnite-token"));
                 Assert.Equal("{}", handler.LastRequestBody);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task UnlinkAccount_ServerError_PreservesErrorMessage() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 var handler = new MockHttpHandler {
                     StatusCode = HttpStatusCode.BadRequest,
                     ResponseBody = JsonSerializer.Serialize(new {
@@ -458,18 +372,13 @@ namespace GsPlugin.Tests {
                 Assert.False(result.success);
                 Assert.Equal("Already disconnected", result.error);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         // --- GetNotifications Tests ---
 
         [Fact]
         public async Task GetNotifications_NoInstallToken_ReturnsNull() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir); // no token
+            using (var temp = TempPluginDir.CreateWithDataManager()) { // no token
                 var handler = new MockHttpHandler();
                 var client = new GsApiClient(new HttpClient(handler));
 
@@ -478,17 +387,11 @@ namespace GsPlugin.Tests {
                 Assert.Null(result);
                 Assert.Equal(0, handler.CallCount);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task GetNotifications_WithToken_ReturnsNotifications() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
                         success = true,
@@ -506,18 +409,13 @@ namespace GsPlugin.Tests {
                 Assert.Single(result.notifications);
                 Assert.Equal("n1", result.notifications[0].id);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         // --- FlushPendingScrobblesAsync Tests ---
 
         [Fact]
         public async Task FlushPendingScrobblesAsync_EmptyQueue_DoesNothing() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 var handler = new MockHttpHandler();
                 var client = new GsApiClient(new HttpClient(handler));
 
@@ -525,16 +423,11 @@ namespace GsPlugin.Tests {
 
                 Assert.Equal(0, handler.CallCount);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task FlushPendingScrobblesAsync_WithPendingItems_SendsAndRemoves() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                     Type = "start",
                     StartData = new ScrobbleStartReq {
@@ -560,16 +453,11 @@ namespace GsPlugin.Tests {
                 Assert.True(handler.CallCount > 0);
                 Assert.Empty(GsDataManager.PeekPendingScrobbles());
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task FlushPendingScrobblesAsync_FailedItem_IncrementsAttempts() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                     Type = "start",
                     StartData = new ScrobbleStartReq {
@@ -595,16 +483,11 @@ namespace GsPlugin.Tests {
                 Assert.Single(remaining);
                 Assert.Equal(1, remaining[0].FlushAttempts);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task FlushPendingScrobblesAsync_MaxAttempts_DropsItem() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                     Type = "start",
                     StartData = new ScrobbleStartReq {
@@ -628,16 +511,11 @@ namespace GsPlugin.Tests {
                 // Item should be dropped after reaching max attempts
                 Assert.Empty(GsDataManager.PeekPendingScrobbles());
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task FlushPendingScrobblesAsync_InvalidType_DropsItem() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "valid-token");
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
                 GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                     Type = "unknown",
                     QueuedAt = DateTime.UtcNow
@@ -651,19 +529,13 @@ namespace GsPlugin.Tests {
                 Assert.Empty(GsDataManager.PeekPendingScrobbles());
                 Assert.Equal(0, handler.CallCount); // No HTTP call for invalid type
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         // --- PostJsonAsync gzip behavior ---
 
         [Fact]
         public async Task StartGameSession_AttachesInstallTokenHeader() {
-            var tempDir = CreateTempDir();
-            try {
-                InitDataManager(tempDir, "my-secret-token");
-
+            using (var temp = TempPluginDir.CreateWithDataManager("my-secret-token")) {
                 var handler = new MockHttpHandler {
                     ResponseBody = JsonSerializer.Serialize(new {
                         success = true,
@@ -681,9 +553,6 @@ namespace GsPlugin.Tests {
 
                 Assert.NotNull(handler.LastRequest);
                 Assert.True(handler.LastRequest.Headers.Contains("x-playnite-token"));
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
     }

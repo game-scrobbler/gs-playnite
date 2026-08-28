@@ -183,6 +183,8 @@ namespace GsPlugin.View {
 
         /// <summary>
         /// Handles property changes on the settings object.
+        /// Status message text and visibility are bound directly in XAML, so only
+        /// the in-progress flags need to be reflected here.
         /// </summary>
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e) {
             switch (e.PropertyName) {
@@ -194,20 +196,8 @@ namespace GsPlugin.View {
                     }
                     break;
 
-                case nameof(GsPluginSettings.LinkStatusMessage):
-                    UpdateStatusMessage();
-                    break;
-
-                case nameof(GsPluginSettings.TokenCountdown):
-                    UpdateCountdownDisplay();
-                    break;
-
                 case nameof(GsPluginSettings.IsDeleting):
                     UpdateDeletingState();
-                    break;
-
-                case nameof(GsPluginSettings.DeleteStatusMessage):
-                    UpdateDeleteStatusMessage();
                     break;
             }
         }
@@ -260,34 +250,20 @@ namespace GsPlugin.View {
                 : GsLocalization.Get("LOCGsPluginLinkAccountButton", "Link Account");
         }
 
-        /// <summary>
-        /// Updates the status message display.
-        /// </summary>
-        private void UpdateStatusMessage() {
-            if (_viewModel?.Settings == null) return;
-
-            string message = _viewModel.Settings.LinkStatusMessage;
-            LinkStatusTextBlock.Text = message;
-            LinkStatusTextBlock.Visibility = string.IsNullOrEmpty(message)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-        }
-
-        /// <summary>
-        /// Updates the token countdown display.
-        /// </summary>
-        private void UpdateCountdownDisplay() {
-            if (_viewModel?.Settings == null) return;
-
-            string countdown = _viewModel.Settings.TokenCountdown;
-            TokenCountdownTextBlock.Text = countdown;
-            TokenCountdownTextBlock.Visibility = string.IsNullOrEmpty(countdown)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-        }
         #endregion
 
         #region User Interaction Handlers
+        /// <summary>
+        /// Shows the standard localized error dialog for a failed user action.
+        /// </summary>
+        private static void ShowErrorDialog(string message) {
+            MessageBox.Show(
+                message,
+                GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+
         /// <summary>
         /// Handles the link account button click event.
         /// </summary>
@@ -322,11 +298,7 @@ namespace GsPlugin.View {
                 });
             }
             catch (Exception ex) {
-                MessageBox.Show(
-                    GsLocalization.Format("LOCGsPluginOpenUrlFailedFormat", "Failed to open URL: {0}", ex.Message),
-                    GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ShowErrorDialog(GsLocalization.Format("LOCGsPluginOpenUrlFailedFormat", "Failed to open URL: {0}", ex.Message));
             }
         }
 
@@ -345,11 +317,7 @@ namespace GsPlugin.View {
                     MessageBoxImage.Information);
             }
             catch (Exception ex) {
-                MessageBox.Show(
-                    GsLocalization.Format("LOCGsPluginCopyFailedFormat", "Failed to copy text: {0}", ex.Message),
-                    GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ShowErrorDialog(GsLocalization.Format("LOCGsPluginCopyFailedFormat", "Failed to copy text: {0}", ex.Message));
             }
         }
 
@@ -424,19 +392,6 @@ namespace GsPlugin.View {
         }
 
         /// <summary>
-        /// Updates the delete status message display.
-        /// </summary>
-        private void UpdateDeleteStatusMessage() {
-            if (_viewModel?.Settings == null) return;
-
-            string message = _viewModel.Settings.DeleteStatusMessage;
-            DeleteStatusTextBlock.Text = message;
-            DeleteStatusTextBlock.Visibility = string.IsNullOrEmpty(message)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-        }
-
-        /// <summary>
         /// Handles hyperlink navigation requests.
         /// </summary>
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e) {
@@ -448,11 +403,7 @@ namespace GsPlugin.View {
                 e.Handled = true;
             }
             catch (Exception ex) {
-                MessageBox.Show(
-                    GsLocalization.Format("LOCGsPluginOpenUrlFailedFormat", "Failed to open URL: {0}", ex.Message),
-                    GsLocalization.Get("LOCGsPluginErrorDialogTitle", "Error"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ShowErrorDialog(GsLocalization.Format("LOCGsPluginOpenUrlFailedFormat", "Failed to open URL: {0}", ex.Message));
             }
         }
         #endregion
