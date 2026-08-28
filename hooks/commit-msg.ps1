@@ -1,4 +1,4 @@
-# PowerShell commit-msg hook for Conventional Commits validation
+﻿# PowerShell commit-msg hook for Conventional Commits validation
 # This script validates that commit messages follow the Conventional Commits specification
 # See: https://www.conventionalcommits.org/
 
@@ -17,14 +17,17 @@ if (-not (Test-Path $CommitMsgFile)) {
 
 $commitMsg = Get-Content $CommitMsgFile -Raw
 
-# Skip validation for merge commits
-if ($commitMsg -match "^Merge") {
+# Skip validation for the merge and revert commits git generates itself, which are
+# always capitalized.
+# -cmatch, not -match: PowerShell's -match is case-INSENSITIVE, so these guards
+# also fired on lowercase text. A conventional "revert: undo X" commit skipped
+# validation entirely because of it.
+if ($commitMsg -cmatch "^Merge") {
     Write-Host "Merge commit detected, skipping validation." -ForegroundColor Green
     exit 0
 }
 
-# Skip validation for revert commits
-if ($commitMsg -match "^Revert") {
+if ($commitMsg -cmatch "^Revert") {
     Write-Host "Revert commit detected, skipping validation." -ForegroundColor Green
     exit 0
 }
@@ -34,8 +37,11 @@ if ($commitMsg -match "^Revert") {
 # Optional: body and footer with BREAKING CHANGE
 $conventionalCommitPattern = '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\(.+\))?(!)?:\s.+'
 
-# Check if commit message matches the pattern
-if ($commitMsg -notmatch $conventionalCommitPattern) {
+# Check if commit message matches the pattern.
+# -cnotmatch, not -notmatch: the type must be lowercase. Case-insensitive matching
+# accepted "Feat: x" here, which release-please does not parse as a release-worthy
+# commit, so the version bump would go missing with nothing reporting an error.
+if ($commitMsg -cnotmatch $conventionalCommitPattern) {
     Write-Host "" -ForegroundColor White
     Write-Host "============================================" -ForegroundColor Red
     Write-Host "  COMMIT MESSAGE DOES NOT FOLLOW" -ForegroundColor Red
@@ -84,8 +90,11 @@ $firstLine = ($commitMsg -split "`n")[0]
 $description = ($firstLine -split ':\s+', 2)[1]
 
 if ($description) {
-    # Check if description starts with uppercase (should be lowercase)
-    if ($description -match '^[A-Z]') {
+    # Check if description starts with uppercase (should be lowercase).
+    # -cmatch, not -match: with -match this '^[A-Z]' test is true for EVERY
+    # description, so the warning fired on correctly-lowercased subjects and
+    # became noise everyone learned to ignore.
+    if ($description -cmatch '^[A-Z]') {
         Write-Host "" -ForegroundColor White
         Write-Host "Warning: Commit description should start with lowercase letter" -ForegroundColor Yellow
         Write-Host "Current: $description" -ForegroundColor Gray
