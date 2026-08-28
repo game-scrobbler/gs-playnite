@@ -29,4 +29,15 @@
     <ProjectReference Include="..\GsPlugin.csproj" />
   </ItemGroup>
 
+  <!--
+    Cross-repo hash contract fixture. Content twin of the fixture in the backend
+    repo's Playnite hash utils tests (line endings follow each repo's
+    .gitattributes). See HashContractTests.cs.
+  -->
+  <ItemGroup>
+    <None Include="Fixtures\playnite-hash-vectors.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,87 @@
+{
+  "$comment": [
+    "CROSS-REPO CONTRACT FIXTURE. The twin of this file lives in the backend repo",
+    "under the Playnite hash utils tests.",
+    "",
+    "Both sides assert these digests against their own implementation of the",
+    "recipe. Either one drifting turns one suite red. Never re-baseline a digest to",
+    "make a test pass -- a changed digest means the two implementations no longer",
+    "agree, which is exactly the failure this file exists to catch.",
+    "",
+    "`wire` is what System.Text.Json puts on the wire for a C# DateTime. `csharp`",
+    "is the canonical form that value must hash to on both sides:",
+    "dt.ToUniversalTime().ToString(\"yyyy-MM-ddTHH:mm:ssZ\").",
+    "",
+    "The offset-bearing rows are the load-bearing ones. A Kind=Local DateTime",
+    "serializes with its offset, and that is the shape two independent normalizers",
+    "are most likely to disagree on. Vectors that only cover the already-canonical",
+    "'...T12:00:00.000Z' shape prove nothing."
+  ],
+  "dateNormalization": [
+    {
+      "name": "local negative offset with fractional seconds (production shape)",
+      "wire": "2025-02-19T14:51:26.897-08:00",
+      "csharp": "2025-02-19T22:51:26Z"
+    },
+    {
+      "name": "local negative offset, no fractional seconds (production shape)",
+      "wire": "2021-05-08T22:19:45-07:00",
+      "csharp": "2021-05-09T05:19:45Z"
+    },
+    {
+      "name": "local negative offset crossing into the next UTC day",
+      "wire": "2026-06-08T16:50:04.486-07:00",
+      "csharp": "2026-06-08T23:50:04Z"
+    },
+    {
+      "name": "local positive offset",
+      "wire": "2026-08-05T22:54:44.116+03:00",
+      "csharp": "2026-08-05T19:54:44Z"
+    },
+    {
+      "name": "utc with milliseconds",
+      "wire": "2026-01-15T12:00:00.000Z",
+      "csharp": "2026-01-15T12:00:00Z"
+    },
+    {
+      "name": "utc with seven fractional digits (DateTime.ToString round-trip)",
+      "wire": "2026-01-15T12:00:00.1234567Z",
+      "csharp": "2026-01-15T12:00:00Z"
+    },
+    {
+      "name": "already canonical",
+      "wire": "2026-01-15T12:00:00Z",
+      "csharp": "2026-01-15T12:00:00Z"
+    },
+    {
+      "name": "absent",
+      "wire": null,
+      "csharp": ""
+    }
+  ],
+  "library": {
+    "$comment": "One game carrying realistic date shapes. Digests are asserted identically in both repos.",
+    "games": [
+      {
+        "playnite_id": "0be09bbf-183e-4d47-a50c-4fab37251ceb",
+        "game_name": "NieR Replicant ver.1.22474487139...",
+        "playtime_seconds": 149280,
+        "play_count": 0,
+        "last_activity": "2021-05-08T22:19:45-07:00",
+        "is_installed": false,
+        "completion_status_id": "dd8190fb-ee13-4c29-9e41-2fb3c3ba5beb",
+        "completion_status_name": "Completed",
+        "user_score": null,
+        "source_name": "Steam",
+        "is_favorite": false,
+        "is_hidden": false,
+        "date_added": "2025-02-19T14:51:26.926-08:00",
+        "modified": "2025-02-20T11:08:17.528-08:00",
+        "achievement_count_unlocked": 29,
+        "achievement_count_total": 47
+      }
+    ],
+    "metadataHashV3": "6dde75868bbe4679874821267326bfd6e56253664aa36679b7db4a0507993e1e",
+    "libraryHashV3": "4d059c3c1e3a07c30ff38bc6e15d3b013f16b8421346ce0dfa1cbfcfaf1f0403"
+  }
+}

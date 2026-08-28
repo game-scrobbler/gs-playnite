@@ -61,8 +61,19 @@ namespace GsPlugin.Api {
         /// (e.g. null return from an HTTP call that swallows errors). When supplied, matching
         /// results count toward the failure threshold and trigger retries.</param>
         /// <returns>Result of the function or default(T) if all attempts fail</returns>
+        /// <param name="isPermanent">
+        /// Consulted only when <paramref name="isFailure"/> reports a failure.
+        /// Returns true when the last attempt failed for a reason retrying cannot
+        /// change — a 4xx the server will answer identically next time. Such a
+        /// result is returned immediately and, deliberately, does NOT count toward
+        /// the failure threshold: a rejected request says nothing about whether the
+        /// service is healthy, and letting it trip the breaker takes unrelated
+        /// calls (scrobbles) down with it. Without this, a permanently-rejected
+        /// library commit burned every retry and pushed the circuit open on repeat.
+        /// </param>
         public async Task<T> ExecuteAsync<T>(Func<Task<T>> func, int maxRetries = 3,
-            TimeSpan? baseDelay = null, Func<T, bool> isFailure = null) {
+            TimeSpan? baseDelay = null, Func<T, bool> isFailure = null,
+            Func<bool> isPermanent = null) {
             var delay = baseDelay ?? TimeSpan.FromSeconds(1);
 
             for (int attempt = 0; attempt <= maxRetries; attempt++) {
@@ -78,6 +89,16 @@ namespace GsPlugin.Api {
                     // If the caller supplied a failure predicate and the result indicates failure,
                     // treat it the same as a thrown exception for circuit breaker purposes.
                     if (isFailure != null && isFailure(result)) {
+                        if (isPermanent != null && isPermanent()) {
+                            _logger.Warn(
+                                $"API call attempt {attempt + 1} was rejected permanently; not retrying");
+                            // The service answered, so the circuit is healthy even though
+                            // this request was refused. Resolve a HalfOpen probe rather
+                            // than returning with the state machine still mid-probe.
+                            OnServiceResponsive();
+                            return result;
+                        }
+
                         _logger.Warn($"API call attempt {attempt + 1} returned a failure result");
                         OnFailure();
 
@@ -155,6 +176,21 @@ namespace GsPlugin.Api {
         }
 
         private void OnSuccess() {
+            OnServiceResponsive();
+        }
+
+        /// <summary>
+        /// Records that the service answered. Resets the failure count and resolves a
+        /// HalfOpen probe to Closed, firing <see cref="OnCircuitClosed"/> so recovery
+        /// work (the pending-scrobble flush) runs.
+        ///
+        /// Called for a successful call and for a permanently rejected one. A rejection
+        /// is still proof the service is reachable and deciding, so it must not leave a
+        /// HalfOpen breaker unresolved: that would strand the failure count, skip the
+        /// recovery event, and let the next unrelated failure re-open the circuit
+        /// straight from HalfOpen.
+        /// </summary>
+        private void OnServiceResponsive() {
             bool recovered = false;
             lock (_lock) {
                 _failureCount = 0;
