@@ -61,6 +61,49 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
+        /// The scrobble timestamp format. Local time (not UTC) on purpose: the server
+        /// stores the offset carried by "K" and reports sessions in the player's own clock.
+        /// </summary>
+        private const string ScrobbleTimestampFormat = "yyyy-MM-ddTHH:mm:ssK";
+
+        /// <summary>
+        /// Builds the session-start payload for a Playnite game. Shared by the live send and the
+        /// queued-retry copy so a replayed start is byte-identical to the one that failed.
+        /// <c>user_id</c> resolves at call time, matching the per-call-site evaluation it replaces.
+        /// </summary>
+        private static ScrobbleStartReq BuildStartReq(Playnite.SDK.Models.Game g, DateTime at) {
+            return new ScrobbleStartReq {
+                user_id = GsDataManager.InstallIdForBody,
+                game_name = g.Name,
+                game_id = g.Id.ToString(),
+                plugin_id = g.PluginId.ToString(),
+                external_game_id = g.GameId,
+                source_name = g.Source?.Name,
+                metadata = new { PluginId = g.PluginId.ToString(), SourceName = g.Source?.Name },
+                started_at = at.ToString(ScrobbleTimestampFormat)
+            };
+        }
+
+        /// <summary>
+        /// Builds the session-finish payload for a Playnite game. Shared by the live send and the
+        /// queued-retry copy. Pass a null <paramref name="sessionId"/> for the queued-start pairing
+        /// path, where no server session exists yet.
+        /// </summary>
+        private static ScrobbleFinishReq BuildFinishReq(Playnite.SDK.Models.Game g, string sessionId, DateTime at) {
+            return new ScrobbleFinishReq {
+                user_id = GsDataManager.InstallIdForBody,
+                game_name = g.Name,
+                game_id = g.Id.ToString(),
+                plugin_id = g.PluginId.ToString(),
+                external_game_id = g.GameId,
+                source_name = g.Source?.Name,
+                session_id = sessionId,
+                metadata = new { PluginId = g.PluginId.ToString(), SourceName = g.Source?.Name },
+                finished_at = at.ToString(ScrobbleTimestampFormat)
+            };
+        }
+
+        /// <summary>
         /// Handles the game starting event and initiates a new scrobbling session.
         /// </summary>
         /// <param name="args">Event arguments containing game information.</param>
@@ -93,16 +136,7 @@ namespace GsPlugin.Services {
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
                 if (GsDataManager.IsOptedOut) return;
 
-                var sessionData = await _apiClient.StartGameSession(new ScrobbleStartReq {
-                    user_id = GsDataManager.InstallIdForBody,
-                    game_name = startedGame.Name,
-                    game_id = startedGame.Id.ToString(),
-                    plugin_id = startedGame.PluginId.ToString(),
-                    external_game_id = startedGame.GameId,
-                    source_name = startedGame.Source?.Name,
-                    metadata = new { PluginId = startedGame.PluginId.ToString(), SourceName = startedGame.Source?.Name },
-                    started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                });
+                var sessionData = await _apiClient.StartGameSession(BuildStartReq(startedGame, localDate));
                 var startedGameId = startedGame.Id.ToString();
 
                 if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
@@ -118,16 +152,7 @@ namespace GsPlugin.Services {
                     _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id}). Queuing start for retry.");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "start",
-                        StartData = new ScrobbleStartReq {
-                            user_id = GsDataManager.InstallIdForBody,
-                            game_name = startedGame.Name,
-                            game_id = startedGame.Id.ToString(),
-                            plugin_id = startedGame.PluginId.ToString(),
-                            external_game_id = startedGame.GameId,
-                            source_name = startedGame.Source?.Name,
-                            metadata = new { PluginId = startedGame.PluginId.ToString(), SourceName = startedGame.Source?.Name },
-                            started_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                        },
+                        StartData = BuildStartReq(startedGame, localDate),
                         QueuedAt = localDate
                     });
                     // Mark that this game has a queued start so OnGameStoppedAsync can pair it
@@ -169,17 +194,7 @@ namespace GsPlugin.Services {
                     _logger.Info($"Queuing finish to pair with pending start for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
-                        FinishData = new ScrobbleFinishReq {
-                            user_id = GsDataManager.InstallIdForBody,
-                            game_name = stoppedGame.Name,
-                            game_id = stoppedGame.Id.ToString(),
-                            plugin_id = stoppedGame.PluginId.ToString(),
-                            external_game_id = stoppedGame.GameId,
-                            source_name = stoppedGame.Source?.Name,
-                            session_id = null,
-                            metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
-                            finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                        },
+                        FinishData = BuildFinishReq(stoppedGame, null, localDate),
                         QueuedAt = localDate
                     });
                     GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Remove(stoppedGameId));
@@ -207,17 +222,8 @@ namespace GsPlugin.Services {
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
                 if (GsDataManager.IsOptedOut) return;
 
-                var finishResponse = await _apiClient.FinishGameSession(new ScrobbleFinishReq {
-                    user_id = GsDataManager.InstallIdForBody,
-                    game_name = stoppedGame.Name,
-                    game_id = stoppedGame.Id.ToString(),
-                    plugin_id = stoppedGame.PluginId.ToString(),
-                    external_game_id = stoppedGame.GameId,
-                    source_name = stoppedGame.Source?.Name,
-                    session_id = activeSessionId,
-                    metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
-                    finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                });
+                var finishResponse = await _apiClient.FinishGameSession(
+                    BuildFinishReq(stoppedGame, activeSessionId, localDate));
                 if (finishResponse != null) {
                     // Only clear the session ID if the request was successful
                     ClearActiveSession(stoppedGameId);
@@ -227,17 +233,7 @@ namespace GsPlugin.Services {
                     _logger.Error($"Failed to finish game session for {stoppedGame.Name} (ID: {stoppedGame.Id}). Queuing for retry.");
                     GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                         Type = "finish",
-                        FinishData = new ScrobbleFinishReq {
-                            user_id = GsDataManager.InstallIdForBody,
-                            game_name = stoppedGame.Name,
-                            game_id = stoppedGame.Id.ToString(),
-                            plugin_id = stoppedGame.PluginId.ToString(),
-                            external_game_id = stoppedGame.GameId,
-                            source_name = stoppedGame.Source?.Name,
-                            session_id = activeSessionId,
-                            metadata = new { PluginId = stoppedGame.PluginId.ToString(), SourceName = stoppedGame.Source?.Name },
-                            finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
-                        },
+                        FinishData = BuildFinishReq(stoppedGame, activeSessionId, localDate),
                         QueuedAt = localDate
                     });
                     // Leave this game's active session entry in place so a manual retry still has the session ID
@@ -286,11 +282,13 @@ namespace GsPlugin.Services {
                     var gameId = kvp.Key;
                     var sessionId = kvp.Value;
 
+                    // Deliberately not BuildFinishReq: the shutdown finish carries no game fields,
+                    // only the session and a shutdown reason.
                     var finishData = new ScrobbleFinishReq {
                         user_id = GsDataManager.InstallIdForBody,
                         session_id = sessionId,
                         metadata = new { reason = "application_stopped" },
-                        finished_at = localDate.ToString("yyyy-MM-ddTHH:mm:ssK")
+                        finished_at = localDate.ToString(ScrobbleTimestampFormat)
                     };
                     var pendingFinish = new PendingScrobble {
                         Type = "finish",
