@@ -198,6 +198,7 @@
     <Compile Include="GsPlugin.cs" />
     <!-- View -->
     <Compile Include="View\GsPluginSettingsViewModel.cs" />
+    <Compile Include="View\GsConverters.cs" />
     <Compile Include="View\GsPluginSettingsView.xaml.cs">
       <DependentUpon>GsPluginSettingsView.xaml</DependentUpon>
     </Compile>
