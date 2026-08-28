@@ -6,15 +6,16 @@ using GsPlugin.Services;
 
 namespace GsPlugin.Tests {
     public class SuccessStoryFileReaderTests : IDisposable {
+        private readonly TempPluginDir _temp;
         private readonly string _tempDir;
 
         public SuccessStoryFileReaderTests() {
-            _tempDir = Path.Combine(Path.GetTempPath(), "gs-test-ss-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(_tempDir);
+            _temp = TempPluginDir.Create("gs-test-ss-");
+            _tempDir = _temp.Path;
         }
 
         public void Dispose() {
-            try { Directory.Delete(_tempDir, true); } catch { }
+            _temp.Dispose();
         }
 
         private GsSuccessStoryHelper CreateHelper() {

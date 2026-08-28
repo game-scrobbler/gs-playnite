@@ -7,17 +7,16 @@ using GsPlugin.Services;
 
 namespace GsPlugin.Tests {
     public class PlayniteAchievementsSqliteTests : IDisposable {
-        private readonly string _tempDir;
+        private readonly TempPluginDir _temp;
         private readonly string _dbPath;
 
         public PlayniteAchievementsSqliteTests() {
-            _tempDir = Path.Combine(Path.GetTempPath(), "gs-test-pa-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(_tempDir);
-            _dbPath = Path.Combine(_tempDir, "achievement_cache.db");
+            _temp = TempPluginDir.Create("gs-test-pa-");
+            _dbPath = Path.Combine(_temp.Path, "achievement_cache.db");
         }
 
         public void Dispose() {
-            try { Directory.Delete(_tempDir, true); } catch { }
+            _temp.Dispose();
         }
 
         private GsPlayniteAchievementsHelper CreateHelper() {
@@ -131,7 +130,7 @@ namespace GsPlugin.Tests {
 
         [Fact]
         public void IsInstalled_ReturnsFalseWhenDbMissing() {
-            var helper = new GsPlayniteAchievementsHelper(Path.Combine(_tempDir, "nonexistent.db"));
+            var helper = new GsPlayniteAchievementsHelper(Path.Combine(_temp.Path, "nonexistent.db"));
             Assert.False(helper.IsInstalled);
         }
 
@@ -229,7 +228,7 @@ namespace GsPlugin.Tests {
 
         [Fact]
         public void GetCounts_ReturnsNullWhenDbMissing() {
-            var helper = new GsPlayniteAchievementsHelper(Path.Combine(_tempDir, "nonexistent.db"));
+            var helper = new GsPlayniteAchievementsHelper(Path.Combine(_temp.Path, "nonexistent.db"));
             Assert.Null(helper.GetCounts(Guid.NewGuid()));
         }
 

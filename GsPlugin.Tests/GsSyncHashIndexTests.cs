@@ -11,18 +11,9 @@ using GsPlugin.Services;
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]
     public class GsSyncHashIndexTests {
-        private static string NewTempDir() {
-            var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(dir);
-            return dir;
-        }
-
         [Fact]
         public void Initialize_DiscardsIndexWhenIdentityGenerationMismatches() {
-            var tempDir = NewTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
                 Assert.True(GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> {
                     { "g1", "fp" }
                 }));
@@ -30,47 +21,32 @@ namespace GsPlugin.Tests {
 
                 // Bump identity generation as RotateInstallId would
                 GsDataManager.MutateAndSave(d => d.IdentityGeneration = d.IdentityGeneration + 1);
-                GsSyncHashIndex.Initialize(tempDir);
+                GsSyncHashIndex.Initialize(temp.Path);
 
                 Assert.False(GsSyncHashIndex.HasLibraryBaseline);
                 Assert.Equal(0, GsSyncHashIndex.LibraryEntryCount);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void HasLibraryBaseline_EmptyIndexWithTimestamp_ReturnsTrue() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 Assert.True(GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string>()));
                 Assert.True(GsSyncHashIndex.HasLibraryBaseline);
                 Assert.Equal(0, GsSyncHashIndex.LibraryEntryCount);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void HasLibraryBaseline_NoSync_ReturnsFalse() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 Assert.False(GsSyncHashIndex.HasLibraryBaseline);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void GetLibraryFingerprints_ReturnsShallowCopy() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> {
                     { "game1", "fp1" }
                 });
@@ -85,16 +61,11 @@ namespace GsPlugin.Tests {
                 Assert.True(fresh.ContainsKey("game1"));
                 Assert.False(fresh.ContainsKey("game99"));
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void ApplyLibraryDiff_UpsertsAndRemoves() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> {
                     { "keep", "a" },
                     { "update", "b" },
@@ -115,16 +86,11 @@ namespace GsPlugin.Tests {
                 Assert.Equal("d", fps["new"]);
                 Assert.False(fps.ContainsKey("remove"));
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void ClearLibraryIndex_ResetsBaseline() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> {
                     { "game1", "fp" }
                 });
@@ -132,16 +98,11 @@ namespace GsPlugin.Tests {
                 Assert.True(GsSyncHashIndex.ClearLibraryIndex());
                 Assert.False(GsSyncHashIndex.HasLibraryBaseline);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void Persistence_SurvivesReinitialize() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 Assert.True(GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> {
                     { "game1", "42|1||meta" }
                 }));
@@ -149,28 +110,24 @@ namespace GsPlugin.Tests {
                     { "game1", "game1:1:0:abc" }
                 }));
 
-                GsSyncHashIndex.Initialize(tempDir);
+                GsSyncHashIndex.Initialize(temp.Path);
 
                 Assert.True(GsSyncHashIndex.HasLibraryBaseline);
                 Assert.True(GsSyncHashIndex.HasAchievementsBaseline);
                 Assert.Equal("42|1||meta", GsSyncHashIndex.GetLibraryFingerprints()["game1"]);
                 Assert.Equal("game1:1:0:abc", GsSyncHashIndex.GetAchievementFingerprints()["game1"]);
-                Assert.True(File.Exists(Path.Combine(tempDir, "gs_library_hashes.json")));
-                Assert.True(File.Exists(Path.Combine(tempDir, "gs_achievement_hashes.json")));
-            }
-            finally {
-                Directory.Delete(tempDir, true);
+                Assert.True(File.Exists(Path.Combine(temp.Path, "gs_library_hashes.json")));
+                Assert.True(File.Exists(Path.Combine(temp.Path, "gs_achievement_hashes.json")));
             }
         }
 
         [Fact]
         public void Persistence_MigratesLegacyCombinedSnapshot() {
-            var tempDir = NewTempDir();
-            try {
+            using (var temp = TempPluginDir.Create()) {
                 // The snapshot's generation must match the current install identity or the
                 // migration is (correctly) discarded. Read the current generation rather than
                 // re-initializing GsDataManager, which would pollute this shared-static test
-                // collection with a data folder that gets deleted in the finally block.
+                // collection with a data folder that gets deleted when the fixture disposes.
                 var gen = GsDataManager.DataOrNull?.IdentityGeneration ?? 0;
                 var legacy = new GsSnapshot {
                     IdentityGeneration = gen,
@@ -200,10 +157,10 @@ namespace GsPlugin.Tests {
                         }
                     }
                 };
-                var legacyPath = Path.Combine(tempDir, "gs_snapshot.json");
+                var legacyPath = Path.Combine(temp.Path, "gs_snapshot.json");
                 File.WriteAllText(legacyPath, System.Text.Json.JsonSerializer.Serialize(legacy));
 
-                GsSyncHashIndex.Initialize(tempDir);
+                GsSyncHashIndex.Initialize(temp.Path);
 
                 Assert.True(GsSyncHashIndex.HasLibraryBaseline);
                 Assert.True(GsSyncHashIndex.HasAchievementsBaseline);
@@ -211,18 +168,14 @@ namespace GsPlugin.Tests {
                 Assert.Equal(expectedLib, GsSyncHashIndex.GetLibraryFingerprints()["legacy-game"]);
                 var expectedAch = GsHashUtils.AchievementFingerprintFromSnapshot(legacy.Achievements["legacy-game"]);
                 Assert.Equal(expectedAch, GsSyncHashIndex.GetAchievementFingerprints()["legacy-game"]);
-                Assert.True(File.Exists(Path.Combine(tempDir, "gs_library_hashes.json")));
-                Assert.True(File.Exists(Path.Combine(tempDir, "gs_achievement_hashes.json")));
-            }
-            finally {
-                Directory.Delete(tempDir, true);
+                Assert.True(File.Exists(Path.Combine(temp.Path, "gs_library_hashes.json")));
+                Assert.True(File.Exists(Path.Combine(temp.Path, "gs_achievement_hashes.json")));
             }
         }
 
         [Fact]
         public void Persistence_RecoversAndMigratesLegacyCombinedSnapshotTempFile() {
-            var tempDir = NewTempDir();
-            try {
+            using (var temp = TempPluginDir.Create()) {
                 var legacy = new GsSnapshot {
                     IdentityGeneration = GsDataManager.DataOrNull?.IdentityGeneration ?? 0,
                     LibraryFullSyncAt = DateTime.UtcNow,
@@ -241,21 +194,18 @@ namespace GsPlugin.Tests {
                         } }
                     }
                 };
-                var legacyPath = Path.Combine(tempDir, "gs_snapshot.json");
+                var legacyPath = Path.Combine(temp.Path, "gs_snapshot.json");
                 File.WriteAllText(
                     legacyPath + ".tmp",
                     System.Text.Json.JsonSerializer.Serialize(legacy));
 
-                GsSyncHashIndex.Initialize(tempDir);
+                GsSyncHashIndex.Initialize(temp.Path);
 
                 Assert.True(GsSyncHashIndex.HasLibraryBaseline);
                 Assert.True(GsSyncHashIndex.HasAchievementsBaseline);
                 Assert.Contains("recovered", GsSyncHashIndex.GetLibraryFingerprints().Keys);
                 Assert.False(File.Exists(legacyPath));
                 Assert.False(File.Exists(legacyPath + ".tmp"));
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
@@ -345,9 +295,7 @@ namespace GsPlugin.Tests {
 
         [Fact]
         public void ApplyAchievementDiff_UpsertsAndRemoves() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> {
                     { "keep", "a" },
                     { "update", "b" },
@@ -368,16 +316,11 @@ namespace GsPlugin.Tests {
                 Assert.Equal("d", fps["new"]);
                 Assert.False(fps.ContainsKey("remove"));
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void ClearAchievementIndex_ResetsBaseline() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> {
                     { "g", "fp" }
                 });
@@ -385,16 +328,11 @@ namespace GsPlugin.Tests {
                 Assert.True(GsSyncHashIndex.ClearAchievementIndex());
                 Assert.False(GsSyncHashIndex.HasAchievementsBaseline);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void ClearAll_ResetsBothBaselines() {
-            var tempDir = NewTempDir();
-            try {
-                GsSyncHashIndex.Initialize(tempDir);
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
                 GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> { { "g", "fp" } });
                 GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { { "g", "fp" } });
                 Assert.True(GsSyncHashIndex.HasLibraryBaseline);
@@ -404,9 +342,6 @@ namespace GsPlugin.Tests {
 
                 Assert.False(GsSyncHashIndex.HasLibraryBaseline);
                 Assert.False(GsSyncHashIndex.HasAchievementsBaseline);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
@@ -621,10 +556,7 @@ namespace GsPlugin.Tests {
 
         [Fact]
         public async Task UploadLibraryFullChunked_OrdersBeginChunksCommit() {
-            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(tempDir);
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 var mock = new TrackingMockApiClient();
                 var svc = CreateService(mock);
                 var items = Enumerable.Range(0, 5)
@@ -649,17 +581,11 @@ namespace GsPlugin.Tests {
                     "commit:3:5"
                 }, mock.Calls);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task UploadLibraryFullChunked_FailedChunk_AbortsAndDoesNotCommit() {
-            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(tempDir);
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 var mock = new TrackingMockApiClient {
                     FailOnChunkIndex = true,
                     FailChunkAt = 1
@@ -685,17 +611,11 @@ namespace GsPlugin.Tests {
                 }, mock.Calls);
                 Assert.DoesNotContain(mock.Calls, c => c.StartsWith("commit:"));
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public async Task UploadLibraryFullChunked_FailedCommit_Aborts() {
-            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(tempDir);
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 var mock = new TrackingMockApiClient { FailLibraryCommit = true };
                 var res = await CreateService(mock).UploadLibraryFullChunkedAsync(
                     new List<GameSyncDto> { new GameSyncDto { playnite_id = "g" } },
@@ -706,9 +626,6 @@ namespace GsPlugin.Tests {
                 Assert.Equal(new[] {
                     "begin", "chunk:0:1", "commit:1:1", "abort:sync-1"
                 }, mock.Calls);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 

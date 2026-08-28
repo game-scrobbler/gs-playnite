@@ -1,24 +1,18 @@
 using System;
-using System.IO;
 using Xunit;
 using GsPlugin.Models;
 
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]
     public class GsPluginSettingsViewModelTests : IDisposable {
-        private readonly string _tempDir;
+        private readonly TempPluginDir _temp;
 
         public GsPluginSettingsViewModelTests() {
-            _tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(_tempDir);
-            GsDataManager.Initialize(_tempDir, null);
+            _temp = TempPluginDir.CreateWithDataManager();
         }
 
         public void Dispose() {
-            try {
-                Directory.Delete(_tempDir, recursive: true);
-            }
-            catch { }
+            _temp.Dispose();
         }
 
         private void SetSyncData(DateTime? lastSyncAt, int? lastSyncGameCount) {
