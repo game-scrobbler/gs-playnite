@@ -167,6 +167,7 @@
     <Compile Include="Infrastructure\GsPostHog.cs" />
     <Compile Include="Infrastructure\GsPlayniteHelper.cs" />
     <Compile Include="Infrastructure\GsSentry.cs" />
+    <Compile Include="Infrastructure\GsTaskExtensions.cs" />
     <!-- Api -->
     <Compile Include="Api\Dtos.cs" />
     <Compile Include="Api\GsApiClient.cs" />

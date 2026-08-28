@@ -78,11 +78,7 @@ namespace GsPlugin.Api {
                 retryDelay: TimeSpan.FromSeconds(10));
             if (enableRecoveryFlush) {
                 _circuitBreaker.OnCircuitClosed += () => {
-                    _ = FlushPendingScrobblesAsync().ContinueWith(t => {
-                        if (t.Exception != null) {
-                            _logger.Error(t.Exception.GetBaseException(), "Unhandled exception in FlushPendingScrobblesAsync (circuit recovery)");
-                        }
-                    }, TaskContinuationOptions.OnlyOnFaulted);
+                    _ = FlushPendingScrobblesAsync().LogFaults("Unhandled exception in FlushPendingScrobblesAsync (circuit recovery)", asError: true);
                 };
             }
         }
