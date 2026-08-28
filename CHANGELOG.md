@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.8.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.1...GsPlugin-v2.8.2) (2026-08-28)
+
+
+### Highlights
+
+* Fixed an issue that could cause your library updates to be silently rejected, so your stats stay accurate and in sync with gamescrobbler.com.
+* Repeatedly rejected updates could wrongly disable tracking for other games, sometimes even pausing your live scrobbles — that's now resolved.
+* Failed uploads now leave clearer details in your log, making it easier to get help if something goes wrong.
+
+
+### Bug Fixes
+
+* **sync:** serialize hashed dates in the form they are hashed ([2ae8ae4](https://github.com/game-scrobbler/gs-playnite/commit/2ae8ae43073f4d2cb0d9b4a6a21f7cbc72968064))
+* **sync:** serialize hashed dates in the form they are hashed ([4abe345](https://github.com/game-scrobbler/gs-playnite/commit/4abe345ec0c9c3c94a96317983602a709762ebb7))
+
 ## [2.8.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.0...GsPlugin-v2.8.1) (2026-08-10)
 
 
