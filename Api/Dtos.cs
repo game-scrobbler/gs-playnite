@@ -127,6 +127,7 @@ namespace GsPlugin.Api {
         public string playnite_id { get; set; }
         public long playtime_seconds { get; set; }
         public int play_count { get; set; }
+        [JsonConverter(typeof(CanonicalDateTimeConverter))]
         public DateTime? last_activity { get; set; }
         public bool is_installed { get; set; }
         public string completion_status_id { get; set; }
@@ -134,10 +135,12 @@ namespace GsPlugin.Api {
         public int? achievement_count_unlocked { get; set; }
         public int? achievement_count_total { get; set; }
         public int? user_score { get; set; }
+        [JsonConverter(typeof(CanonicalDateTimeConverter))]
         public DateTime? date_added { get; set; }
         public bool is_favorite { get; set; }
         public bool is_hidden { get; set; }
         public string source_name { get; set; }
+        [JsonConverter(typeof(CanonicalDateTimeConverter))]
         public DateTime? modified { get; set; }
     }
 
