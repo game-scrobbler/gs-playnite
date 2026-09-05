@@ -135,6 +135,17 @@ namespace GsPlugin.Models {
         /// </summary>
         public int DroppedScrobbleCount { get; set; } = 0;
 
+        internal GsData CreateRollbackSnapshot() {
+            var copy = (GsData)MemberwiseClone();
+            copy.ActiveSessionsByGameId = new Dictionary<string, string>(ActiveSessionsByGameId);
+            copy.PendingStartGameIds = new List<string>(PendingStartGameIds);
+            copy.PendingScrobbles = new List<PendingScrobble>(PendingScrobbles);
+            copy.Flags = new List<string>(Flags);
+            copy.AllowedPlugins = new List<string>(AllowedPlugins);
+            copy.ShownNotificationIds = new List<string>(ShownNotificationIds);
+            return copy;
+        }
+
         /// <summary>
         /// Clears the state bound to the current install/account identity so it cannot bleed into
         /// the next one. Single source of truth for opt-out, install-id rotation and account
@@ -266,6 +277,9 @@ namespace GsPlugin.Models {
         /// Lock object for thread-safe access to _data and file operations.
         /// </summary>
         private static readonly object _lock = new object();
+        // Live event handlers own these durable queue items until their HTTP attempt ends.
+        // Claims are process-local: after a crash all persisted items become replayable.
+        private static readonly HashSet<PendingScrobble> _claimedScrobbles = new HashSet<PendingScrobble>();
 
         private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
             WriteIndented = true
@@ -281,31 +295,27 @@ namespace GsPlugin.Models {
         public static void Initialize(string folderPath, string oldID) {
             lock (_lock) {
                 _filePath = Path.Combine(folderPath, "gs_data.json");
-                _data = Load();
-
+                // Never leave an earlier identity usable after a failed initialization.
+                // In particular, an unreadable file is not permission to create a new install.
+                _data = null;
+                _claimedScrobbles.Clear();
                 try {
-                    if (string.IsNullOrEmpty(_data.InstallID)) {
-                        // Generate new InstallID if not present (fresh install or corrupt/missing data file).
-                        // Bumping IdentityGeneration ensures any surviving gs_snapshot.json is treated
-                        // as stale and discarded by GsSyncHashIndex.Initialize().
-                        _data.InstallID = Guid.NewGuid().ToString();
-                        _data.IdentityGeneration++;
+                    var loaded = Load();
+                    if (string.IsNullOrEmpty(loaded.InstallID)) {
+                        loaded.InstallID = Guid.NewGuid().ToString();
+                        loaded.IdentityGeneration++;
+                        Directory.CreateDirectory(folderPath);
+                        GsAtomicFile.WriteJson(_filePath, loaded, jsonOptions);
                         GsLogger.Info("Generated new InstallID");
-                        GsSentry.AddBreadcrumb(
-                            message: "Generated new InstallID",
-                            category: "initialization",
-                            data: new Dictionary<string, string> { { "InstallID", _data.InstallID } }
-                        );
-                        SaveInternal();
                     }
+                    _data = loaded;
                 }
                 catch (Exception ex) {
-                    GsLogger.Error("Failed to initialize GsData", ex);
-                    GsSentry.CaptureException(ex, "Failed to initialize GsData");
-                    // Fallback to new GUID if initialization fails; bump generation for same reason.
-                    _data.InstallID = Guid.NewGuid().ToString();
-                    _data.IdentityGeneration++;
-                    SaveInternal();
+                    // Consent is in the unreadable file, so report locally only. Throwing stops
+                    // plugin construction before registration, telemetry, or sync can run.
+                    _filePath = null;
+                    GsLogger.Error("Cannot load plugin data; preserving the existing file and stopping initialization", ex);
+                    throw;
                 }
             }
         }
@@ -318,20 +328,26 @@ namespace GsPlugin.Models {
         private static GsData Load() {
             GsAtomicFile.RecoverTemp(_filePath);
 
-            if (!File.Exists(_filePath)) {
-                return new GsData();
-            }
-
-            try {
-                var json = File.ReadAllText(_filePath);
-                var data = JsonSerializer.Deserialize<GsData>(json, jsonOptions) ?? new GsData();
-                MigrateLegacySessionFields(data, json);
-                return data;
-            }
-            catch (Exception ex) {
-                GsLogger.Error("Failed to load custom GsData", ex);
-                GsSentry.CaptureException(ex, "Failed to load GsData from disk");
-                return new GsData();
+            for (var attempt = 0; ; attempt++) {
+                try {
+                    var json = File.ReadAllText(_filePath);
+                    var data = JsonSerializer.Deserialize<GsData>(json, jsonOptions);
+                    if (data == null) {
+                        throw new JsonException("Plugin data must contain an object, not null.");
+                    }
+                    MigrateLegacySessionFields(data, json);
+                    return data;
+                }
+                catch (FileNotFoundException) when (!File.Exists(_filePath + ".tmp")) {
+                    return new GsData();
+                }
+                catch (DirectoryNotFoundException) {
+                    return new GsData();
+                }
+                catch (Exception ex) when (attempt < 2 &&
+                    (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)) {
+                    System.Threading.Thread.Sleep(50 * (attempt + 1));
+                }
             }
         }
 
@@ -396,9 +412,105 @@ namespace GsPlugin.Models {
         /// <param name="action">Action that modifies the <see cref="GsData"/> instance.</param>
         public static void MutateAndSave(Action<GsData> action) {
             lock (_lock) {
-                action(_data);
+                action(Data);
                 SaveInternal();
             }
+        }
+
+        /// <summary>Rejects responses that belong to a deleted or replaced installation.</summary>
+        public static bool TryMutateIfActiveIdentity(string expectedInstallId, int expectedGeneration, Action<GsData> action) {
+            bool saved;
+            lock (_lock) {
+                if (_data == null || _data.OptedOut || _data.InstallID != expectedInstallId
+                    || _data.IdentityGeneration != expectedGeneration) {
+                    return false;
+                }
+                saved = PersistMutation(action);
+            }
+            if (saved) NotifyDiagnosticsChanged();
+            return saved;
+        }
+
+        // Preserve queue item identity across rollback: an in-flight sender holds those same
+        // objects. Only the session ID of a paired finish is edited by these transactions.
+        private static bool PersistMutation(Action<GsData> action) {
+            var before = _data;
+            var claims = new HashSet<PendingScrobble>(_claimedScrobbles);
+            var finishIds = _data.PendingScrobbles.Where(p => p.FinishData != null)
+                .Select(p => p.FinishData).Distinct().ToDictionary(f => f, f => f.session_id);
+            bool saved = false;
+            try {
+                // Work on copied collections so a failed write preserves existing references
+                // as well as their contents. Pending items stay shared for live/replay pairing.
+                _data = before.CreateRollbackSnapshot();
+                action(_data);
+                saved = SaveInternal();
+                return saved;
+            }
+            finally {
+                if (!saved) {
+                    _data = before;
+                    foreach (var finish in finishIds) finish.Key.session_id = finish.Value;
+                    _claimedScrobbles.Clear();
+                    _claimedScrobbles.UnionWith(claims);
+                }
+            }
+        }
+
+        private static bool MutatePendingScrobble(PendingScrobble item, Action<GsData> action) {
+            bool saved;
+            lock (_lock) {
+                if (_data == null || _data.OptedOut || !_data.PendingScrobbles.Contains(item)) return false;
+                saved = PersistMutation(action);
+            }
+            if (saved) NotifyDiagnosticsChanged();
+            return saved;
+        }
+
+        /// <summary>
+        /// Persists every shutdown finish and removes only the corresponding active sessions
+        /// in one write. On a failed write the original collections remain available for retry.
+        /// </summary>
+        public static bool QueueSessionFinishesAndClearActive(Dictionary<string, string> sessions, List<PendingScrobble> finishes,
+            string expectedInstallId = null, int? expectedGeneration = null) {
+            bool saved;
+            lock (_lock) {
+                if (_data == null || _data.OptedOut) return false;
+                if ((expectedInstallId != null && _data.InstallID != expectedInstallId)
+                    || (expectedGeneration.HasValue && _data.IdentityGeneration != expectedGeneration.Value)) return false;
+                saved = PersistMutation(d => {
+                    foreach (var pending in finishes) {
+                        var finish = pending.FinishData;
+                        if (string.IsNullOrEmpty(finish.session_id)
+                            && !d.PendingScrobbles.Any(p => p.Type == "start"
+                                && IsSameGame(p, finish.game_id, finish.plugin_id))) {
+                            // A start can complete after shutdown takes its active-session
+                            // snapshot. Resolve that response within the same durable write.
+                            if (d.ActiveSessionsByGameId.TryGetValue(finish.game_id, out var completedSession)) {
+                                finish.session_id = completedSession;
+                            }
+                            else if (!d.PendingStartGameIds.Contains(finish.game_id)) {
+                                continue; // The start was already dropped or the game stopped.
+                            }
+                        }
+                        d.PendingScrobbles.Add(pending);
+                        d.PendingStartGameIds.Remove(finish.game_id);
+                        if (!string.IsNullOrEmpty(finish.session_id)
+                            && d.ActiveSessionsByGameId.TryGetValue(finish.game_id, out var active)
+                            && active == finish.session_id) {
+                            d.ActiveSessionsByGameId.Remove(finish.game_id);
+                        }
+                    }
+                    foreach (var session in sessions) {
+                        if (d.ActiveSessionsByGameId.TryGetValue(session.Key, out var current)
+                            && current == session.Value) {
+                            d.ActiveSessionsByGameId.Remove(session.Key);
+                        }
+                    }
+                });
+            }
+            if (saved) NotifyDiagnosticsChanged();
+            return saved;
         }
 
         /// <summary>
@@ -444,7 +556,8 @@ namespace GsPlugin.Models {
         /// <summary>
         /// Internal save implementation. Must be called under _lock.
         /// </summary>
-        private static void SaveInternal() {
+        private static bool SaveInternal() {
+            if (_data == null || string.IsNullOrEmpty(_filePath)) return false;
             try {
                 var dir = Path.GetDirectoryName(_filePath);
                 if (!Directory.Exists(dir)) {
@@ -452,10 +565,12 @@ namespace GsPlugin.Models {
                 }
                 GsLogger.Info("Saving plugin data to disk");
                 GsAtomicFile.WriteJson(_filePath, _data, jsonOptions);
+                return true;
             }
             catch (Exception ex) {
                 GsLogger.Error("Failed to save custom GsData", ex);
                 GsSentry.CaptureException(ex, "Failed to save GsData to disk");
+                return false;
             }
         }
 
@@ -491,6 +606,7 @@ namespace GsPlugin.Models {
         public static void PerformOptOut() {
             lock (_lock) {
                 _data.OptedOut = true;
+                _data.IdentityGeneration++;
                 // Token is invalidated server-side on opt-out, so clear it too.
                 _data.ClearIdentityBoundState(IdentityClearScope.InstallToken);
                 SaveInternal();
@@ -617,8 +733,104 @@ namespace GsPlugin.Models {
         /// </summary>
         public static List<PendingScrobble> PeekPendingScrobbles() {
             lock (_lock) {
-                return new List<PendingScrobble>(_data.PendingScrobbles);
+                // A claimed start can already have a durable matching finish behind it.
+                // Replay only the available prefix, so that finish cannot overtake its start.
+                return _data.PendingScrobbles.TakeWhile(item => !_claimedScrobbles.Contains(item)).ToList();
             }
+        }
+
+        public static void ClaimPendingScrobble(PendingScrobble item) {
+            lock (_lock) {
+                _claimedScrobbles.Add(item);
+            }
+        }
+
+        public static void ReleasePendingScrobble(PendingScrobble item) {
+            lock (_lock) {
+                _claimedScrobbles.Remove(item);
+            }
+        }
+
+        private static bool IsSameGame(PendingScrobble item, string gameId, string pluginId) =>
+            item.Type == "start"
+                ? item.StartData?.game_id == gameId && item.StartData?.plugin_id == pluginId
+                : item.FinishData?.game_id == gameId && item.FinishData?.plugin_id == pluginId;
+
+        public static bool HasEarlierPendingScrobble(PendingScrobble item) {
+            lock (_lock) {
+                var index = _data.PendingScrobbles.IndexOf(item);
+                var gameId = item.StartData?.game_id ?? item.FinishData?.game_id;
+                var pluginId = item.StartData?.plugin_id ?? item.FinishData?.plugin_id;
+                return _data.PendingScrobbles.Take(Math.Max(0, index))
+                    .Any(p => IsSameGame(p, gameId, pluginId));
+            }
+        }
+
+        // A second start belongs to another launch: never attach its finish to this start.
+        private static PendingScrobble FindPairedFinish(PendingScrobble start) {
+            var startIndex = _data.PendingScrobbles.IndexOf(start);
+            for (var i = startIndex + 1; i < _data.PendingScrobbles.Count; i++) {
+                var candidate = _data.PendingScrobbles[i];
+                if (!IsSameGame(candidate, start.StartData.game_id, start.StartData.plugin_id)) continue;
+                return candidate.Type == "finish" ? candidate : null;
+            }
+            return null;
+        }
+
+        public static bool CompletePendingStart(PendingScrobble item, string sessionId) {
+            if (item?.StartData == null) return false;
+            return MutatePendingScrobble(item, d => {
+                var gameId = item.StartData.game_id;
+                var pluginId = item.StartData.plugin_id;
+                var pairedFinish = FindPairedFinish(item);
+                var laterStart = _data.PendingScrobbles.Skip(_data.PendingScrobbles.IndexOf(item) + 1)
+                    .Any(p => p.Type == "start" && IsSameGame(p, gameId, pluginId));
+                if (pairedFinish != null && string.IsNullOrEmpty(pairedFinish.FinishData.session_id)) {
+                    pairedFinish.FinishData.session_id = sessionId;
+                }
+                if (pairedFinish == null && !laterStart && !string.IsNullOrEmpty(gameId)
+                    && !string.IsNullOrEmpty(sessionId)) {
+                    _data.ActiveSessionsByGameId[gameId] = sessionId;
+                }
+                if (!laterStart && (pairedFinish != null || !string.IsNullOrEmpty(sessionId))) {
+                    _data.PendingStartGameIds.Remove(gameId);
+                }
+                _data.PendingScrobbles.Remove(item);
+                _claimedScrobbles.Remove(item);
+            });
+        }
+
+        public static bool CompletePendingScrobble(PendingScrobble item) {
+            return MutatePendingScrobble(item, d => {
+                var finish = item.FinishData;
+                if (!string.IsNullOrEmpty(finish?.game_id)
+                    && _data.ActiveSessionsByGameId.TryGetValue(finish.game_id, out var active)
+                    && active == finish.session_id) {
+                    _data.ActiveSessionsByGameId.Remove(finish.game_id);
+                }
+                _data.PendingScrobbles.Remove(item);
+                _claimedScrobbles.Remove(item);
+            });
+        }
+
+        public static bool DropPendingScrobble(PendingScrobble item) {
+            return MutatePendingScrobble(item, d => {
+                if (item.Type == "start" && item.StartData != null) {
+                    var pairedFinish = FindPairedFinish(item);
+                    if (pairedFinish != null) {
+                        _data.PendingScrobbles.Remove(pairedFinish);
+                        _claimedScrobbles.Remove(pairedFinish);
+                        _data.DroppedScrobbleCount++;
+                    }
+                    if (!_data.PendingScrobbles.Any(p => p != item && p.Type == "start"
+                        && IsSameGame(p, item.StartData.game_id, item.StartData.plugin_id))) {
+                        _data.PendingStartGameIds.Remove(item.StartData.game_id);
+                    }
+                }
+                _data.PendingScrobbles.Remove(item);
+                _claimedScrobbles.Remove(item);
+                _data.DroppedScrobbleCount++;
+            });
         }
 
         /// <summary>
@@ -628,6 +840,7 @@ namespace GsPlugin.Models {
         public static void RemovePendingScrobble(PendingScrobble item) {
             lock (_lock) {
                 _data.PendingScrobbles.Remove(item);
+                _claimedScrobbles.Remove(item);
                 SaveInternal();
             }
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);

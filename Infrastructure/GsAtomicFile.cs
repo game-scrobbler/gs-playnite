@@ -62,6 +62,12 @@ namespace GsPlugin.Infrastructure {
             var tempPath = filePath + ".tmp";
             using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None)) {
                 JsonSerializer.Serialize(stream, value, options);
+                // Force the bytes to the physical disk before the replace below. File.Replace is
+                // atomic for the directory-entry swap, but without this the temp file's contents may
+                // still be sitting in the OS write cache, so a power loss can commit the rename over
+                // a zero-length or truncated file. RecoverTemp cannot help there: the destination now
+                // exists, so it is never promoted.
+                stream.Flush(flushToDisk: true);
             }
             ReplaceWithRetry(tempPath, filePath);
         }
