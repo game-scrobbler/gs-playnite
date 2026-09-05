@@ -88,7 +88,7 @@ GsPlugin (entry point, IDisposable)
 - **Local baselines:** `gs_library_hashes.json` / `gs_achievement_hashes.json` store `{ playnite_id → fingerprint }` only. Library fingerprint = `playtime|play_count|normalized_last_activity|metadata_hash`. The local achievement fingerprint hashes each sorted `name + unlock state + rounded rarity` tuple, so rarity-only changes and same-count unlock swaps are detected. Global `LastLibraryHash` / `LastAchievementHash` in `gs_data.json` remain the server `result_snapshot_hash` / `base_snapshot_hash` values (`createLibraryHashV3` / `createAchievementHashV2` recipes — unchanged); do not substitute the richer local achievement recipe for this server contract.
 - **Hashed values must serialize exactly as hashed.** `result_snapshot_hash` can only be recomputed from the payload, so anything feeding the hash has to go on the wire in its hashed form. `GameSyncDto`'s three date fields carry `[JsonConverter(typeof(CanonicalDateTimeConverter))]` for this reason: System.Text.Json preserves `DateTimeKind` and would otherwise emit `2025-02-19T14:51:26.897-08:00` for a value hashed as `2025-02-19T22:51:26Z`, leaving the recipient to infer a normalization the payload never states. Never add a `DateTime` to a hashed DTO without the converter, and land any recipe change in `GsPlugin.Tests/Fixtures/playnite-hash-vectors.json`, whose twin in the backend repo asserts the same digests.
 - **Permanent rejections are not retried.** `PostV4Async` passes `isPermanent` to the circuit breaker so a 4xx (other than 408/429) returns immediately and does not count toward the failure threshold — retrying cannot change the answer, and letting it trip the breaker takes scrobbles down with it. Such a response still marks the service responsive, so it resolves a HalfOpen probe rather than leaving the breaker mid-probe.
-- **Commit order (anti force-full-sync loop):** on `queued`, persist the hash index for **all** items first, then write `Last*Hash`. On any chunk/commit failure → abort session; **do not** update index or global hash. Mid-failure leaves the previous good baseline intact.
+- **Commit order:** a `queued` response is admission, not completion. Poll for `completed` before saving the index and then `Last*Hash`. Failed/partial jobs, missing job IDs, unavailable status, and jobs still pending after the bounded poll retain the prior baseline and return an error so the next sync retries. No pending-job reconciliation is persisted. The captured install identity/generation fences both baseline writes against deletion or rotation during the request.
 - This invariant is enforced in exactly one place: `GsScrobblingService.CommitSyncBaselineAsync(label, queueId, persistIndex, persistHashes)`. All four sync paths (library full/diff, achievements full/diff) route through it, so do not re-implement the confirm-then-index-then-hash sequence at a call site. `SkipOrRepairIndex` likewise owns the "hash matches but index count diverged" repair for all three paths.
 - **Migration:** if the shipped legacy `gs_snapshot.json` exists, `GsSyncHashIndex.Initialize` derives fingerprints once, writes the compact files, and deletes the fat snapshot.
 - **Crash recovery:** `GsAtomicFile` promotes a surviving `.tmp` when the destination is missing and performs JSON replacement with bounded retries for transient Windows file locks. Both `GsDataManager` and `GsSyncHashIndex` use it.
@@ -122,9 +122,11 @@ GsPlugin (entry point, IDisposable)
 - Two user-facing settings (`ShowUpdateNotifications`, `ShowImportantNotifications`) control whether update and server notifications appear. Both default to `true` and are synced to `GsData` via `GsPluginSettingsViewModel.EndEdit()` and `LoadExistingSettings()`.
 
 ### Pending Scrobble Flush
-- Flush uses a peek-then-remove strategy: `PeekPendingScrobbles()` returns a snapshot without clearing, each item stays on disk until its send is confirmed, then `RemovePendingScrobble()` removes it atomically. A mid-flush crash loses nothing.
+- Starts and stops are persisted before waiting for HTTP. Per-game gates serialize live requests; process-local queue claims prevent replay from duplicating those requests. `PeekPendingScrobbles()` returns only the unclaimed prefix so finishes cannot overtake a pending start. Claims disappear on restart.
+- Successful starts atomically attach their session ID to the matching queued finish, stopping at the next start for that game. Accepted starts without a session ID retain the pending marker when no finish exists. Finish completion clears only a matching active session. Failed queue writes roll back local transitions.
+- Shutdown persists all active and pending-start finishes in one identity-checked write before the first network await.
 - `_flushInFlight` Interlocked guard prevents concurrent flush invocations (circuit recovery + periodic timer + startup can overlap).
-- Failed items stay in the queue with an incremented `FlushAttempts` counter (persisted via `Save()`) and are dropped after `MaxFlushAttempts` (5).
+- Failed items stay queued with an incremented `FlushAttempts` counter. A blocked circuit consumes no attempt; an expired open circuit permits a recovery probe. A failed send stops the pass, and dropping a start after five attempts also drops its paired finish before the next same-game start.
 - A periodic 5-minute timer (`_pendingFlushTimer`) retries queued scrobbles independently of circuit breaker recovery. Disposed in `Dispose()`.
 
 ### Startup Flow
@@ -155,6 +157,7 @@ GsPlugin (entry point, IDisposable)
 ### Achievement Provider Architecture
 Achievement data comes from two optional addons via an aggregator pattern:
 - `IAchievementProvider` — common interface (`GetCounts`, `GetAchievements`, `IsInstalled`)
+- `IReliableAchievementProvider.ReadAchievements` reports successful reads (including confirmed empty results) separately from unavailable data. The aggregator preserves failures from the preferred provider, and full/diff achievement sync aborts an unavailable snapshot without changing the baseline.
 - `AchievementProviderBase` — abstract base both providers derive from. Owns the plugin `Guid`, `IsPluginLoaded`, `IsInstalled` (delegating to an abstract `HasLocalData`), the single `GetVersion()` implementation, and the `SafeRead`/`SafeReadValue` wrappers that log and return null on failure. Subclasses contain only their real read logic. `LogPrefix` is derived from `GetType().Name`, so each provider keeps its own log prefix without duplicating the literal.
 - `GsSuccessStoryHelper` — reads SuccessStory's per-game JSON files from `{ExtensionsDataPath}/{pluginGuid}/SuccessStory/{gameId}.json` (priority 1)
 - `GsPlayniteAchievementsHelper` — reads Playnite Achievements' SQLite database at `{ExtensionsDataPath}/{pluginGuid}/achievement_cache.db` via `System.Data.SQLite` in read-only mode (priority 2)
@@ -192,7 +195,8 @@ Achievement data comes from two optional addons via an aggregator pattern:
 
 ### Thread-Safe Data Mutations
 - Use `GsDataManager.MutateAndSave(d => { ... })` instead of directly modifying `GsDataManager.Data` fields followed by `GsDataManager.Save()`. The `MutateAndSave` method acquires the lock, executes the action, and persists atomically — preventing concurrent threads from interleaving mutations.
-- Direct field access via `GsDataManager.Data` is still available for reads, but all write-then-save sequences should use `MutateAndSave`.
+- Direct field access via `GsDataManager.Data` is still available for reads, but all write-then-save sequences should use `MutateAndSave`. Identity-bound asynchronous completions use `TryMutateIfActiveIdentity`; its persistence failure restores the prior state.
+- Initialization retries transient read failures and throws if existing data remains unreadable or invalid. It preserves the file, leaves data unavailable, and stops plugin construction before registration or telemetry. Only a missing file creates a fresh installation.
 
 ### API DTOs
 - All API request/response DTOs live in `Api/Dtos.cs` at namespace level (`GsPlugin.Api`), not nested inside `GsApiClient`. Reference them directly (e.g., `new ScrobbleStartReq { ... }`) — no `GsApiClient.` prefix needed.
@@ -215,7 +219,8 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks
 - All `SentrySdk` calls are wrapped in try/catch so the plugin continues working if the Sentry SDK is unavailable (e.g., expired account). `GsApiClient` similarly falls back to a plain `HttpClient` if `SentryHttpMessageHandler` throws.
 - `MaxBreadcrumbs` is capped at 50 (default 100) to reduce per-session memory overhead.
 - Continuous profiling and failed-request capture are disabled to avoid background-worker shutdown hangs and cross-extension `HttpStatusCodeRange` version conflicts. Trace sampling is 10% when telemetry is enabled.
-- Plugin disposal calls `GsSentry.Shutdown()`, which performs a two-second bounded flush before closing. It is safe to call after failed initialization.
+- Telemetry starts after saved preferences are loaded. Settings save, deletion, and opt-in reconcile SDK lifetimes. Consent handlers check every outgoing batch, including automatic sessions; a retired SDK lifetime stays revoked even after preferences are re-enabled.
+- Plugin disposal calls `GsSentry.Shutdown()`, which disposes only its owned initialization handle with a two-second shutdown timeout. It does not globally flush or close another addon's newer hub. Global exception handlers are unsubscribed on shutdown.
 - `scripts/resolve-legacy-sentry-issues.ps1` is the maintenance helper for resolving legacy Sentry issues; use `-WhatIf` before applying changes.
 
 ### Playnite SDK Type Gotchas
