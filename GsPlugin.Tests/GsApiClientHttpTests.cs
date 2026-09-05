@@ -26,6 +26,7 @@ namespace GsPlugin.Tests {
             public HttpRequestMessage LastRequest { get; private set; }
             public string LastRequestBody { get; private set; }
             public int CallCount { get; private set; }
+            public Func<int, HttpResponseMessage> ResponseFactory { get; set; }
 
             protected override async Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request, CancellationToken cancellationToken) {
@@ -34,7 +35,7 @@ namespace GsPlugin.Tests {
                 if (request.Content != null) {
                     LastRequestBody = await request.Content.ReadAsStringAsync();
                 }
-                return new HttpResponseMessage(StatusCode) {
+                return ResponseFactory?.Invoke(CallCount) ?? new HttpResponseMessage(StatusCode) {
                     Content = new StringContent(ResponseBody, System.Text.Encoding.UTF8, "application/json")
                 };
             }
@@ -532,6 +533,225 @@ namespace GsPlugin.Tests {
         }
 
         // --- PostJsonAsync gzip behavior ---
+
+        [Fact]
+        public async Task FlushPendingScrobblesAsync_OpenCooldownPreservesAttempts() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                var pending = new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game-1", game_name = "Game" },
+                    FlushAttempts = 4
+                };
+                GsDataManager.EnqueuePendingScrobble(pending);
+                var breaker = new GsCircuitBreaker(failureThreshold: 1, timeout: TimeSpan.FromHours(1));
+                await breaker.ExecuteAsync(() => Task.FromResult(false), maxRetries: 0, isFailure: r => !r);
+                var handler = new MockHttpHandler();
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                await client.FlushPendingScrobblesAsync();
+
+                Assert.Equal(0, handler.CallCount);
+                Assert.Equal(4, Assert.Single(GsDataManager.PeekPendingScrobbles()).FlushAttempts);
+            }
+        }
+
+        [Fact]
+        public async Task FlushPendingScrobblesAsync_ExpiredOpenCircuitProbesWithoutOtherCalls() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game-1", game_name = "Game" },
+                    FlushAttempts = 4
+                });
+                var breaker = new GsCircuitBreaker(failureThreshold: 1, timeout: TimeSpan.Zero);
+                await breaker.ExecuteAsync(() => Task.FromResult(false), maxRetries: 0, isFailure: r => !r);
+                Assert.Equal(GsCircuitBreaker.CircuitState.Open, breaker.State);
+                var handler = new MockHttpHandler { ResponseBody = "{\"status\":\"success\"}" };
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                await client.FlushPendingScrobblesAsync();
+
+                Assert.Equal(1, handler.CallCount);
+                Assert.Equal(GsCircuitBreaker.CircuitState.Closed, breaker.State);
+                Assert.Empty(GsDataManager.PeekPendingScrobbles());
+            }
+        }
+
+        [Fact]
+        public async Task FlushPendingScrobblesAsync_CircuitOpeningDoesNotBurnLaterItemAttempts() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                for (var i = 0; i < 2; i++) {
+                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                        Type = "start",
+                        StartData = new ScrobbleStartReq { game_id = "game-" + i, game_name = "Game " + i }
+                    });
+                }
+                var breaker = new GsCircuitBreaker(failureThreshold: 1, timeout: TimeSpan.FromHours(1));
+                var handler = new MockHttpHandler { StatusCode = HttpStatusCode.ServiceUnavailable };
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                await client.FlushPendingScrobblesAsync();
+
+                var pending = GsDataManager.PeekPendingScrobbles();
+                Assert.Equal(1, handler.CallCount);
+                Assert.Equal(1, pending[0].FlushAttempts);
+                Assert.Equal(0, pending[1].FlushAttempts);
+            }
+        }
+
+        [Fact]
+        public async Task FlushPendingScrobblesAsync_FailedStartCannotBeOvertakenAndRecoveryPairsFinish() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                var sessionId = Guid.NewGuid().ToString();
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game-1", plugin_id = "plugin-1", game_name = "Game" }
+                });
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                    Type = "finish",
+                    FinishData = new ScrobbleFinishReq { game_id = "game-1", plugin_id = "plugin-1", game_name = "Game" }
+                });
+                var handler = new MockHttpHandler {
+                    ResponseFactory = call => new HttpResponseMessage(HttpStatusCode.OK) {
+                        Content = new StringContent(call == 1
+                            ? "{\"status\":\"fail\",\"code\":\"TRY_LATER\"}"
+                            : call == 2
+                                ? "{\"status\":\"success\",\"data\":{\"session_id\":\"" + sessionId + "\"}}"
+                                : "{\"status\":\"success\",\"data\":{\"duration_seconds\":30}}",
+                            System.Text.Encoding.UTF8, "application/json")
+                    }
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                await client.FlushPendingScrobblesAsync();
+
+                var pending = GsDataManager.PeekPendingScrobbles();
+                Assert.Equal(1, handler.CallCount);
+                Assert.Equal(2, pending.Count);
+                Assert.Equal(1, pending[0].FlushAttempts);
+                Assert.Equal(0, pending[1].FlushAttempts);
+
+                await client.FlushPendingScrobblesAsync();
+
+                Assert.Equal(3, handler.CallCount);
+                Assert.Contains(sessionId, handler.LastRequestBody);
+                Assert.Empty(GsDataManager.PeekPendingScrobbles());
+            }
+        }
+
+        [Fact]
+        public async Task FlushPendingScrobblesAsync_TerminalStartFailureDropsDependentFinishTogether() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game-1", plugin_id = "plugin-1", game_name = "Game" },
+                    FlushAttempts = 4
+                });
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                    Type = "finish",
+                    FinishData = new ScrobbleFinishReq { game_id = "game-1", plugin_id = "plugin-1", game_name = "Game" }
+                });
+                var nextStart = new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game-1", plugin_id = "plugin-1", game_name = "Game" }
+                };
+                GsDataManager.EnqueuePendingScrobble(nextStart);
+                var handler = new MockHttpHandler { ResponseBody = "{\"status\":\"fail\",\"code\":\"REJECTED\"}" };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                await client.FlushPendingScrobblesAsync();
+
+                Assert.Equal(1, handler.CallCount);
+                Assert.Same(nextStart, Assert.Single(GsDataManager.PeekPendingScrobbles()));
+                Assert.Equal(0, nextStart.FlushAttempts);
+                Assert.Equal(2, GsDataManager.Data.DroppedScrobbleCount);
+            }
+        }
+
+        [Fact]
+        public async Task FlushPendingScrobblesAsync_RecoveredStartWithoutStopBecomesActiveSession() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                var sessionId = Guid.NewGuid().ToString();
+                GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Add("game-1"));
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game-1", plugin_id = "plugin-1", game_name = "Game" }
+                });
+                var handler = new MockHttpHandler {
+                    ResponseBody = "{\"status\":\"success\",\"data\":{\"session_id\":\"" + sessionId + "\"}}"
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                await client.FlushPendingScrobblesAsync();
+
+                Assert.Empty(GsDataManager.PeekPendingScrobbles());
+                Assert.Equal(sessionId, GsDataManager.Data.ActiveSessionsByGameId["game-1"]);
+                Assert.DoesNotContain("game-1", GsDataManager.Data.PendingStartGameIds);
+            }
+        }
+
+        [Theory]
+        [InlineData(408)]
+        [InlineData(429)]
+        [InlineData(500)]
+        [InlineData(503)]
+        public async Task V4TransientJsonResponse_RetriesAndReturnsRecovery(int status) {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                var handler = new MockHttpHandler {
+                    ResponseFactory = call => new HttpResponseMessage(call == 1 ? (HttpStatusCode)status : HttpStatusCode.OK) {
+                        Content = new StringContent(call == 1
+                            ? "{\"success\":false,\"status\":\"force-full-sync\"}"
+                            : "{\"success\":true,\"sync_id\":\"recovered\"}", System.Text.Encoding.UTF8, "application/json")
+                    }
+                };
+                var breaker = new GsCircuitBreaker();
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                var result = await client.SyncLibraryFullBegin(new LibraryV4FullSyncBeginReq());
+
+                Assert.True(result.success);
+                Assert.Equal("recovered", result.sync_id);
+                Assert.Equal(2, handler.CallCount);
+                Assert.Equal(GsCircuitBreaker.CircuitState.Closed, breaker.State);
+            }
+        }
+
+        [Fact]
+        public async Task V4PermanentBusinessRejection_PreservesOutcomeWithoutRetryOrCircuitFailure() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ResponseBody = "{\"success\":false,\"status\":\"force-full-sync\",\"reason\":\"hash_mismatch\"}"
+                };
+                var breaker = new GsCircuitBreaker(failureThreshold: 1);
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                var result = await client.SyncLibraryFullCommit(new LibraryV4CommitReq());
+
+                Assert.False(result.success);
+                Assert.Equal("force-full-sync", result.status);
+                Assert.Equal(1, handler.CallCount);
+                Assert.Equal(GsCircuitBreaker.CircuitState.Closed, breaker.State);
+            }
+        }
+
+        [Fact]
+        public async Task V4RepeatedJsonServerErrors_OpenCircuit() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.ServiceUnavailable,
+                    ResponseBody = "{\"success\":false}"
+                };
+                var breaker = new GsCircuitBreaker(failureThreshold: 3);
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                Assert.Null(await client.SyncLibraryFullBegin(new LibraryV4FullSyncBeginReq()));
+                Assert.Null(await client.SyncLibraryFullBegin(new LibraryV4FullSyncBeginReq()));
+
+                Assert.Equal(3, handler.CallCount);
+                Assert.Equal(GsCircuitBreaker.CircuitState.Open, breaker.State);
+            }
+        }
 
         [Fact]
         public async Task StartGameSession_AttachesInstallTokenHeader() {

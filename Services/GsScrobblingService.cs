@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -20,6 +23,23 @@ namespace GsPlugin.Services {
         private readonly IGsApiClient _apiClient;
         private readonly IAchievementProvider _achievementHelper;
         private readonly GsIntegrationAccountReader _integrationAccountReader;
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _sessionGates =
+            new ConcurrentDictionary<string, SemaphoreSlim>();
+        private readonly ConcurrentDictionary<string, Playnite.SDK.Models.Game> _runningGames =
+            new ConcurrentDictionary<string, Playnite.SDK.Models.Game>();
+
+        private sealed class AchievementReadUnavailableException : Exception {
+            public AchievementReadUnavailableException(string providerName, Guid gameId)
+                : base($"Achievement snapshot unavailable from {providerName ?? "provider"} for {gameId}; keeping the previous baseline.") { }
+        }
+
+        private AchievementReadResult ReadAchievementsForSync(Guid gameId) {
+            var result = AchievementReadResult.Read(_achievementHelper, gameId);
+            if (!result.IsAvailable) {
+                throw new AchievementReadUnavailableException(result.ProviderName, gameId);
+            }
+            return result;
+        }
 
         /// <summary>
         /// Initializes a new instance of the GsScrobblingService.
@@ -34,37 +54,21 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
-        /// Clears the active session ID for a specific game. Playnite allows multiple
-        /// games to run simultaneously, so sessions are tracked per game ID.
-        /// </summary>
-        private static void ClearActiveSession(string gameId) {
-            if (string.IsNullOrEmpty(gameId)) return;
-            if (GsDataManager.HasActiveSession(gameId)) {
-                _logger.Info($"Clearing active session ID for game ID: {gameId}");
-                GsDataManager.MutateAndSave(d => d.ActiveSessionsByGameId.Remove(gameId));
-            }
-        }
-
-        /// <summary>
-        /// Sets the active session ID for a specific game and persists it to storage.
-        /// </summary>
-        /// <param name="gameId">The Playnite game ID the session belongs to.</param>
-        /// <param name="sessionId">The session ID to set as active.</param>
-        private static void SetActiveSession(string gameId, string sessionId) {
-            if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(sessionId)) {
-                _logger.Warn("Attempted to set active session with empty or null game ID or session ID");
-                return;
-            }
-
-            _logger.Info($"Setting active session ID for game ID {gameId}: {sessionId}");
-            GsDataManager.MutateAndSave(d => d.ActiveSessionsByGameId[gameId] = sessionId);
-        }
-
-        /// <summary>
         /// The scrobble timestamp format. Local time (not UTC) on purpose: the server
         /// stores the offset carried by "K" and reports sessions in the player's own clock.
         /// </summary>
         private const string ScrobbleTimestampFormat = "yyyy-MM-ddTHH:mm:ssK";
+
+        /// <summary>
+        /// Renders a scrobble timestamp in <see cref="ScrobbleTimestampFormat"/>, always with
+        /// <see cref="CultureInfo.InvariantCulture"/>. In a custom format string "-" and ":" are the
+        /// culture's date/time separator specifiers and "yyyy" renders through the culture's calendar,
+        /// so under th-TH (ThaiBuddhist) the year would serialize as 2569 and under fi-FI the time as
+        /// "14.47.53" - values the server cannot parse. Call sites must go through this helper rather
+        /// than formatting inline, so a new one cannot silently reintroduce the bug.
+        /// </summary>
+        internal static string FormatScrobbleTimestamp(DateTime at) =>
+            at.ToString(ScrobbleTimestampFormat, CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Builds the session-start payload for a Playnite game. Shared by the live send and the
@@ -80,7 +84,7 @@ namespace GsPlugin.Services {
                 external_game_id = g.GameId,
                 source_name = g.Source?.Name,
                 metadata = new { PluginId = g.PluginId.ToString(), SourceName = g.Source?.Name },
-                started_at = at.ToString(ScrobbleTimestampFormat)
+                started_at = FormatScrobbleTimestamp(at)
             };
         }
 
@@ -99,151 +103,133 @@ namespace GsPlugin.Services {
                 source_name = g.Source?.Name,
                 session_id = sessionId,
                 metadata = new { PluginId = g.PluginId.ToString(), SourceName = g.Source?.Name },
-                finished_at = at.ToString(ScrobbleTimestampFormat)
+                finished_at = FormatScrobbleTimestamp(at)
             };
         }
 
-        /// <summary>
-        /// Handles the game starting event and initiates a new scrobbling session.
-        /// </summary>
-        /// <param name="args">Event arguments containing game information.</param>
+        private static bool IsCurrentIdentity(string installId, int generation) =>
+            !GsDataManager.IsOptedOut && GsDataManager.Data.InstallID == installId
+            && GsDataManager.Data.IdentityGeneration == generation;
+
+        /// <summary>Persists the start before attempting its live send.</summary>
         public async Task OnGameStartAsync(OnGameStartingEventArgs args) {
+            var at = DateTime.Now;
+            PendingScrobble pending = null;
+            SemaphoreSlim gate = null;
+            var enteredGate = false;
             try {
-                if (GsDataManager.IsOptedOut) return;
+                if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")
+                    || args?.Game == null || !GsAllowedPlugins.IsAllowed(args.Game)) return;
 
-                // Skip scrobbling if disabled
-                if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
-                    _logger.Info("Scrobbling disabled, skipping game start tracking");
-                    return;
-                }
+                var game = args.Game;
+                var gameId = game.Id.ToString();
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
+                pending = new PendingScrobble {
+                    Type = "start",
+                    StartData = BuildStartReq(game, at),
+                    QueuedAt = at
+                };
+                GsDataManager.ClaimPendingScrobble(pending);
+                // Persist the event before any await. Claims prevent the background flusher
+                // from sending this same item while the live handler owns it.
+                if (!GsDataManager.TryMutateIfActiveIdentity(installId, generation, d => {
+                    d.PendingScrobbles.Add(pending);
+                    if (!d.PendingStartGameIds.Contains(gameId)) d.PendingStartGameIds.Add(gameId);
+                })) return;
+                _runningGames[gameId] = game;
 
-                if (args?.Game == null) {
-                    _logger.Warn("OnGameStartAsync called with null game; skipping.");
-                    return;
-                }
+                gate = _sessionGates.GetOrAdd(gameId, _ => new SemaphoreSlim(1, 1));
+                await gate.WaitAsync();
+                enteredGate = true;
+                if (!IsCurrentIdentity(installId, generation)) return;
+                if (GsDataManager.HasEarlierPendingScrobble(pending)) return;
 
-                DateTime localDate = DateTime.Now;
-                var startedGame = args.Game;
-
-                // Skip scrobbling for unsupported plugins
-                if (!GsAllowedPlugins.IsAllowed(startedGame)) {
-                    _logger.Info($"Skipping scrobble start for unsupported plugin: {startedGame.PluginId}");
-                    return;
-                }
-
-                _logger.Info($"Starting scrobble session for game: {startedGame.Name} (ID: {startedGame.Id})");
-
-                // Re-check opt-out before sending data (user may have opted out mid-flight)
-                if (GsDataManager.IsOptedOut) return;
-
-                var sessionData = await _apiClient.StartGameSession(BuildStartReq(startedGame, localDate));
-                var startedGameId = startedGame.Id.ToString();
-
-                if (sessionData != null && !string.IsNullOrEmpty(sessionData.session_id)) {
-                    SetActiveSession(startedGameId, sessionData.session_id);
-                    // Clear any stale pending-start marker for this game so the stop handler
-                    // uses the normal active-session path instead of the queued-pair branch.
-                    if (GsDataManager.HasPendingStart(startedGameId)) {
-                        GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Remove(startedGameId));
-                    }
-                    _logger.Info($"Successfully started scrobble session with ID: {sessionData.session_id}");
+                var response = await _apiClient.StartGameSession(pending.StartData);
+                if (response != null) {
+                    // Atomically associate an already-queued stop with the returned session,
+                    // or record an active session if this game has not stopped yet.
+                    GsDataManager.CompletePendingStart(pending, response.session_id);
                 }
                 else {
-                    _logger.Error($"Failed to start scrobble session for game: {startedGame.Name} (ID: {startedGame.Id}). Queuing start for retry.");
-                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
-                        Type = "start",
-                        StartData = BuildStartReq(startedGame, localDate),
-                        QueuedAt = localDate
-                    });
-                    // Mark that this game has a queued start so OnGameStoppedAsync can pair it
-                    // with a finish even though there is no active session for it.
-                    if (!GsDataManager.HasPendingStart(startedGameId)) {
-                        GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Add(startedGameId));
-                    }
+                    _logger.Warn($"Start for game {gameId} remains queued for retry.");
                 }
             }
             catch (Exception ex) {
-                _logger.Error(ex, $"Error starting scrobble session for game: {args?.Game?.Name ?? "<null>"} (ID: {(args?.Game != null ? args.Game.Id.ToString() : "<null>")})");
+                _logger.Error(ex, "Error starting scrobble session; any persisted event remains queued.");
+            }
+            finally {
+                if (enteredGate) gate.Release();
+                if (pending != null) GsDataManager.ReleasePendingScrobble(pending);
             }
         }
 
         /// <summary>
-        /// Handles the game stopped event and finishes the active scrobbling session.
+        /// Captures and persists the stop timestamp immediately, then waits for an earlier
+        /// start of this game to resolve. A slow start cannot discard a short session's stop.
         /// </summary>
-        /// <param name="args">Event arguments containing game information.</param>
         public async Task OnGameStoppedAsync(OnGameStoppedEventArgs args) {
+            var at = DateTime.Now;
+            PendingScrobble pending = null;
+            SemaphoreSlim gate = null;
+            var enteredGate = false;
             try {
-                if (GsDataManager.IsOptedOut) return;
+                if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")
+                    || args?.Game == null || !GsAllowedPlugins.IsAllowed(args.Game)) return;
 
-                if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
-                    _logger.Info("Scrobbling disabled, skipping game stop tracking");
-                    return;
-                }
-                if (args?.Game == null) {
-                    _logger.Warn("OnGameStoppedAsync called with null game; skipping.");
-                    return;
-                }
+                var game = args.Game;
+                var gameId = game.Id.ToString();
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
+                var startPending = GsDataManager.HasPendingStart(gameId);
+                GsDataManager.TryGetActiveSession(gameId, out var sessionId);
+                if (!startPending && string.IsNullOrEmpty(sessionId)) return;
 
-                DateTime localDate = DateTime.Now;
-                var stoppedGame = args.Game;
-                var stoppedGameId = stoppedGame.Id.ToString();
+                pending = new PendingScrobble {
+                    Type = "finish",
+                    FinishData = BuildFinishReq(game, startPending ? null : sessionId, at),
+                    QueuedAt = at
+                };
+                GsDataManager.ClaimPendingScrobble(pending);
+                if (!GsDataManager.TryMutateIfActiveIdentity(installId, generation, d => {
+                    // The start may have completed between the initial snapshot and this
+                    // transaction. Resolve its session here before appending the stop.
+                    if (string.IsNullOrEmpty(pending.FinishData.session_id)
+                        && !d.PendingScrobbles.Any(item => item.Type == "start" && item.StartData?.game_id == gameId)
+                        && d.ActiveSessionsByGameId.TryGetValue(gameId, out var completedSession)) {
+                        pending.FinishData.session_id = completedSession;
+                    }
+                    d.PendingScrobbles.Add(pending);
+                    d.PendingStartGameIds.Remove(gameId);
+                    // The durable finish owns completion from now on. Never erase a newer
+                    // session merely because it uses the same Playnite game ID.
+                    if (!string.IsNullOrEmpty(pending.FinishData.session_id)
+                        && d.ActiveSessionsByGameId.TryGetValue(gameId, out var current) && current == pending.FinishData.session_id) {
+                        d.ActiveSessionsByGameId.Remove(gameId);
+                    }
+                })) return;
+                _runningGames.TryRemove(gameId, out _);
 
-                // If the start was queued (failed to send), queue a matching finish so the
-                // replay produces a paired session. No API call is needed here.
-                if (GsDataManager.HasPendingStart(stoppedGameId)) {
-                    _logger.Info($"Queuing finish to pair with pending start for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
-                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
-                        Type = "finish",
-                        FinishData = BuildFinishReq(stoppedGame, null, localDate),
-                        QueuedAt = localDate
-                    });
-                    GsDataManager.MutateAndSave(d => d.PendingStartGameIds.Remove(stoppedGameId));
-                    return;
-                }
+                gate = _sessionGates.GetOrAdd(gameId, _ => new SemaphoreSlim(1, 1));
+                await gate.WaitAsync();
+                enteredGate = true;
+                if (!IsCurrentIdentity(installId, generation)) return;
+                if (GsDataManager.HasEarlierPendingScrobble(pending)) return;
+                // A failed start is still ahead of this finish in the durable queue. Replay
+                // must resolve it first; sending the finish now could finish an older session.
+                if (string.IsNullOrEmpty(pending.FinishData.session_id)) return;
 
-                // Capture the session ID for this game once, up front — re-reading shared
-                // state after the awaited network call below could observe a different
-                // game's session if OnGameStartAsync ran concurrently in the interim.
-                if (!GsDataManager.TryGetActiveSession(stoppedGameId, out var activeSessionId) || string.IsNullOrEmpty(activeSessionId)) {
-                    _logger.Warn($"No active session ID found when stopping game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
-                    return;
-                }
-
-                // Skip scrobbling for unsupported plugins
-                if (!GsAllowedPlugins.IsAllowed(stoppedGame)) {
-                    _logger.Info($"Skipping scrobble finish for unsupported plugin: {stoppedGame.PluginId}");
-                    // Still clear the active session since we may have tracked start before this filter existed
-                    ClearActiveSession(stoppedGameId);
-                    return;
-                }
-
-                _logger.Info($"Stopping scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
-
-                // Re-check opt-out before sending data (user may have opted out mid-flight)
-                if (GsDataManager.IsOptedOut) return;
-
-                var finishResponse = await _apiClient.FinishGameSession(
-                    BuildFinishReq(stoppedGame, activeSessionId, localDate));
-                if (finishResponse != null) {
-                    // Only clear the session ID if the request was successful
-                    ClearActiveSession(stoppedGameId);
-                    _logger.Info($"Successfully finished scrobble session for game: {stoppedGame.Name} (ID: {stoppedGame.Id})");
-                }
-                else {
-                    _logger.Error($"Failed to finish game session for {stoppedGame.Name} (ID: {stoppedGame.Id}). Queuing for retry.");
-                    GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
-                        Type = "finish",
-                        FinishData = BuildFinishReq(stoppedGame, activeSessionId, localDate),
-                        QueuedAt = localDate
-                    });
-                    // Leave this game's active session entry in place so a manual retry still has the session ID
-                }
+                var response = await _apiClient.FinishGameSession(pending.FinishData);
+                if (response != null) GsDataManager.CompletePendingScrobble(pending);
             }
             catch (Exception ex) {
-                _logger.Error(ex, $"Error stopping scrobble session for game: {args?.Game?.Name ?? "<null>"} (ID: {(args?.Game != null ? args.Game.Id.ToString() : "<null>")})");
+                _logger.Error(ex, "Error stopping scrobble session; any persisted event remains queued.");
+            }
+            finally {
+                if (enteredGate) gate.Release();
+                if (pending != null) GsDataManager.ReleasePendingScrobble(pending);
             }
         }
-
         /// <summary>
         /// Handles the application stopped event and cleans up any active scrobbling session(s).
         /// This ensures that if Playnite is closed while one or more games are running, each
@@ -258,77 +244,62 @@ namespace GsPlugin.Services {
         /// the process exits mid-call, the queued finish survives and is sent on next launch.
         /// </remarks>
         public async Task OnApplicationStoppedAsync() {
+            var pendingFinishes = new List<PendingScrobble>();
             try {
-                if (GsDataManager.IsOptedOut) return;
-
-                if (GsDataManager.Data.Flags.Contains("no-scrobble")) {
-                    _logger.Info("Scrobbling disabled, skipping application stop cleanup");
-                    return;
-                }
-
-                // Snapshot so we don't enumerate a collection that OnGameStoppedAsync could be
-                // concurrently mutating, and so each session's cleanup is independent below.
+                if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")) return;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
+                var at = DateTime.Now;
                 var activeSessions = GsDataManager.SnapshotActiveSessions();
-                if (activeSessions.Count == 0) {
-                    _logger.Debug("No active session to clean up on application stop");
-                    return;
-                }
-
-                _logger.Info($"Application stopping with {activeSessions.Count} active session(s), finishing scrobble session(s)");
-
-                DateTime localDate = DateTime.Now;
-
-                foreach (var kvp in activeSessions) {
-                    var gameId = kvp.Key;
-                    var sessionId = kvp.Value;
-
-                    // Deliberately not BuildFinishReq: the shutdown finish carries no game fields,
-                    // only the session and a shutdown reason.
-                    var finishData = new ScrobbleFinishReq {
-                        user_id = GsDataManager.InstallIdForBody,
-                        session_id = sessionId,
-                        metadata = new { reason = "application_stopped" },
-                        finished_at = localDate.ToString(ScrobbleTimestampFormat)
-                    };
-                    var pendingFinish = new PendingScrobble {
+                foreach (var entry in activeSessions) {
+                    pendingFinishes.Add(new PendingScrobble {
                         Type = "finish",
-                        FinishData = finishData,
-                        QueuedAt = localDate
-                    };
-                    // Durable write happens before any await — see remarks above. Once the finish
-                    // is queued, the pending-scrobble queue is the source of truth for completing
-                    // it, so the active-session marker is cleared immediately rather than only on
-                    // live-send success — otherwise it lingers indefinitely (the app is shutting
-                    // down, so there is no later OnGameStoppedAsync to clear it) and a subsequent
-                    // application-stop cycle would re-enqueue a duplicate finish for this game.
-                    GsDataManager.EnqueuePendingScrobble(pendingFinish);
-                    ClearActiveSession(gameId);
+                        QueuedAt = at,
+                        FinishData = new ScrobbleFinishReq {
+                            user_id = GsDataManager.InstallIdForBody,
+                            game_id = entry.Key,
+                            session_id = entry.Value,
+                            metadata = new { reason = "application_stopped" },
+                            finished_at = FormatScrobbleTimestamp(at)
+                        }
+                    });
+                }
+                // Starts can still be awaiting the server during shutdown. Their durable
+                // finishes pair with those queued starts on response or on the next launch.
+                foreach (var entry in _runningGames.ToArray()) {
+                    if (activeSessions.ContainsKey(entry.Key)) continue;
+                    pendingFinishes.Add(new PendingScrobble {
+                        Type = "finish",
+                        QueuedAt = at,
+                        FinishData = BuildFinishReq(entry.Value, null, at)
+                    });
+                }
+                if (pendingFinishes.Count == 0) return;
 
+                foreach (var pending in pendingFinishes) GsDataManager.ClaimPendingScrobble(pending);
+                // This single durable write covers every session before the first await.
+                if (!GsDataManager.QueueSessionFinishesAndClearActive(activeSessions, pendingFinishes, installId, generation)) return;
+                _runningGames.Clear();
+                foreach (var pending in pendingFinishes) {
+                    if (!IsCurrentIdentity(installId, generation)) break;
+                    if (string.IsNullOrEmpty(pending.FinishData.session_id)
+                        || GsDataManager.HasEarlierPendingScrobble(pending)) continue;
                     try {
-                        // Re-check opt-out before sending data (user may have opted out mid-flight)
-                        if (GsDataManager.IsOptedOut) continue;
-
-                        var finishResponse = await _apiClient.FinishGameSession(finishData);
-                        if (finishResponse != null) {
-                            GsDataManager.RemovePendingScrobble(pendingFinish);
-                            _logger.Info($"Successfully cleaned up active session on application stop for game ID: {gameId}");
-                        }
-                        else {
-                            _logger.Error($"Failed to finish active session on application stop for game ID: {gameId}. Left queued for retry.");
-                        }
+                        var response = await _apiClient.FinishGameSession(pending.FinishData);
+                        if (response != null) GsDataManager.CompletePendingScrobble(pending);
                     }
                     catch (Exception ex) {
-                        _logger.Error(ex, $"Error finishing session on application stop for game ID: {gameId}. Left queued for retry.");
+                        _logger.Error(ex, "Shutdown finish remains queued for retry.");
                     }
                 }
             }
             catch (Exception ex) {
-                _logger.Error(ex, "Error cleaning up active session on application stop");
+                _logger.Error(ex, "Error preparing shutdown scrobbles.");
+            }
+            finally {
+                foreach (var pending in pendingFinishes) GsDataManager.ReleasePendingScrobble(pending);
             }
         }
-
-
-
         #region v3 Sync Methods
 
         /// <summary>
@@ -515,9 +486,21 @@ namespace GsPlugin.Services {
                 if (commit == null || !commit.success) {
                     // A commit that never resolved (null transport failure) or that the server
                     // rejected leaves the session open; abort so the next attempt can begin anew.
-                    _logger.Error($"{label} v4 commit failed: status={commit?.status}");
+                    //
+                    // force-full-sync is a business outcome, not a failure: the server answers a
+                    // snapshot-hash mismatch with success=false and a reason the caller acts on.
+                    // Collapsing it to null here would keep the caller's recovery branch unreachable
+                    // even though the body now survives the HTTP layer, so propagate it. The session
+                    // is still aborted either way -- nothing was committed.
+                    var isForceFullSync = commit != null && commit.status == "force-full-sync";
+                    if (isForceFullSync) {
+                        _logger.Warn($"{label} v4 commit rejected: force-full-sync (reason: {commit.reason})");
+                    }
+                    else {
+                        _logger.Error($"{label} v4 commit failed: status={commit?.status}");
+                    }
                     await abortAsync(syncId);
-                    return null;
+                    return isForceFullSync ? commit : null;
                 }
                 return commit;
             }
@@ -586,24 +569,23 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>Polling cadence for <see cref="TryConfirmQueueCompletionAsync"/>.</summary>
-        private static readonly TimeSpan QueueStatusPollInterval = TimeSpan.FromSeconds(1.5);
+        internal TimeSpan QueueStatusPollInterval { get; set; } = TimeSpan.FromSeconds(1.5);
 
         /// <summary>
         /// Total time budget for <see cref="TryConfirmQueueCompletionAsync"/>. Matches the server's
         /// documented "1-5 seconds" typical processing time with margin, so a poll never meaningfully
         /// delays startup/library-updated callbacks that await these sync methods.
         /// </summary>
-        private static readonly TimeSpan QueueStatusPollBudget = TimeSpan.FromSeconds(8);
+        internal TimeSpan QueueStatusPollBudget { get; set; } = TimeSpan.FromSeconds(8);
 
         /// <summary>
         /// Best-effort check of a queued sync job's terminal status via GET /queue/status/:queueId.
         /// A "queued" admission only means the request was accepted onto the async queue, not that
         /// the server applied it — see gs-playnite#83, where a job that failed after admission left
         /// the client believing it had synced. Bounded to a short budget: if the job hasn't reached a
-        /// terminal state in time (large library, slow backend), returns null so the caller falls back
-        /// to the pre-existing behavior of trusting the "queued" admission. This only tightens the
-        /// common case — a job that fails fast (validation error, immediate crash) is now caught
-        /// instead of silently treated as success.
+        /// terminal state in time (large library, slow backend), returns null and leaves the
+        /// previous baseline intact. The next sync can retry or recover through force-full-sync;
+        /// an admission without confirmed completion must never suppress that retry.
         /// </summary>
         /// <returns>true if the job completed successfully, false if it failed/partially applied,
         /// or null if no terminal status was observed within the budget.</returns>
@@ -639,8 +621,8 @@ namespace GsPlugin.Services {
                 }
             } while (DateTime.UtcNow < deadline);
 
-            _logger.Info($"{label}: job {queueId} still processing after {QueueStatusPollBudget.TotalSeconds:F0}s — " +
-                "committing baseline optimistically (server may still be working on a large library).");
+            _logger.Info($"{label}: no confirmed completion for job {queueId} after {QueueStatusPollBudget.TotalSeconds:F0}s — " +
+                "keeping the previous baseline so a later sync can retry.");
             return null;
         }
 
@@ -694,10 +676,12 @@ namespace GsPlugin.Services {
         private async Task<SyncLibraryResult> CommitSyncBaselineAsync(
             string label,
             string queueId,
+            string expectedInstallId,
+            int expectedGeneration,
             Func<bool> persistIndex,
             Action<GsData> persistHashes,
             string queuedDetail = null) {
-            if (await TryConfirmQueueCompletionAsync(label, queueId) == false) {
+            if (await TryConfirmQueueCompletionAsync(label, queueId) != true) {
                 return SyncLibraryResult.Error;
             }
 
@@ -705,13 +689,18 @@ namespace GsPlugin.Services {
                 ? $"{label} queued successfully."
                 : $"{label} queued successfully ({queuedDetail}).");
 
-            if (!persistIndex()) {
+            var indexSaved = false;
+            // The data lock also fences the index write. Index stores read DataOrNull
+            // without taking this lock, so this does not invert their lock order.
+            var saved = GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration, d => {
+                indexSaved = persistIndex();
+                if (indexSaved) persistHashes(d);
+            });
+            if (!saved || !indexSaved) {
                 _logger.Error($"{label} queued but local hash index save failed — " +
-                    "not committing hash baseline. Will retry next run.");
+                    "or the installation changed; will retry next run.");
                 return SyncLibraryResult.Error;
             }
-
-            GsDataManager.MutateAndSave(persistHashes);
             return SyncLibraryResult.Success;
         }
 
@@ -724,6 +713,8 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
 
                 if (!bypassCooldown) {
                     var cooldownExpiry = GsDataManager.Data.SyncCooldownExpiresAt;
@@ -736,6 +727,7 @@ namespace GsPlugin.Services {
                 _logger.Info("Starting full library sync (v4 chunked)");
                 var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 var integrationAccounts = ReadIntegrationAccountsSafe();
                 var accountsHash = GsHashUtils.ComputeIntegrationAccountsHash(integrationAccounts);
                 var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
@@ -752,6 +744,7 @@ namespace GsPlugin.Services {
 
                 var response = await UploadLibraryFullChunkedAsync(library, libraryHash, integrationAccounts);
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (response == null) {
                     _logger.Error("Failed to queue full library sync.");
                     return SyncLibraryResult.Error;
@@ -771,7 +764,7 @@ namespace GsPlugin.Services {
                     var libCount = library.Count;
                     return await CommitSyncBaselineAsync(
                         "Full library sync",
-                        response.queueId,
+                        response.queueId, installId, generation,
                         () => GsSyncHashIndex.ReplaceLibraryIndex(BuildLibraryFingerprints(library)),
                         d => {
                             d.LastSyncAt = DateTime.UtcNow;
@@ -858,6 +851,8 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
 
                 var cooldownExpiry = GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt;
                 if (cooldownExpiry.HasValue && DateTime.UtcNow < cooldownExpiry.Value) {
@@ -868,6 +863,7 @@ namespace GsPlugin.Services {
                 _logger.Info("Starting diff library sync (v2)");
                 var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 var integrationAccounts = ReadIntegrationAccountsSafe();
                 var accountsHash = GsHashUtils.ComputeIntegrationAccountsHash(integrationAccounts);
                 var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
@@ -884,6 +880,7 @@ namespace GsPlugin.Services {
                 var (added, updated, removed, currentFingerprints) = await Task.Run(() =>
                     ComputeLibraryDiff(library, fingerprints));
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 // If only integration accounts changed (no library diff), still send the request
                 // with empty diff so the backend can process the new accounts.
                 if (added.Count == 0 && updated.Count == 0 && removed.Count == 0 && !accountsChanged) {
@@ -911,6 +908,7 @@ namespace GsPlugin.Services {
                     integration_accounts = integrationAccounts.Count > 0 ? integrationAccounts : null
                 });
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (response == null) {
                     _logger.Error("Failed to queue library diff sync.");
                     return SyncLibraryResult.Error;
@@ -936,7 +934,7 @@ namespace GsPlugin.Services {
                     var libCount = library.Count;
                     return await CommitSyncBaselineAsync(
                         "Library diff sync",
-                        response.queueId,
+                        response.queueId, installId, generation,
                         () => GsSyncHashIndex.ApplyLibraryDiff(
                             added.Concat(updated).ToDictionary(
                                 g => g.playnite_id,
@@ -970,6 +968,8 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
 
                 if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
                     _logger.Info("Achievement sync skipped: disabled or no achievement provider installed.");
@@ -989,7 +989,7 @@ namespace GsPlugin.Services {
                     return allGames
                         .Where(GsAllowedPlugins.IsAllowed)
                         .Select(g => {
-                            var achievements = _achievementHelper.GetAchievements(g.Id);
+                            var achievements = ReadAchievementsForSync(g.Id).Achievements;
                             if (achievements == null || achievements.Count == 0)
                                 return null;
 
@@ -998,7 +998,9 @@ namespace GsPlugin.Services {
                             var dedupedByName = new Dictionary<string, AchievementItemDto>();
                             foreach (var a in achievements) {
                                 dedupedByName[a.Name ?? ""] = new AchievementItemDto {
-                                    name = a.Name,
+                                    // See the diff-sync site: "" not null, so the C# and JS sort
+                                    // orders agree on empty achievement names.
+                                    name = a.Name ?? "",
                                     description = a.Description,
                                     date_unlocked = a.DateUnlocked,
                                     is_unlocked = a.IsUnlocked,
@@ -1018,17 +1020,8 @@ namespace GsPlugin.Services {
                         .ToList();
                 });
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 var achHash = GsHashUtils.ComputeAchievementHash(games);
-
-                if (games.Count == 0) {
-                    _logger.Info("No games with achievements found — setting empty baseline.");
-                    if (!GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string>())) {
-                        _logger.Error("Failed to persist empty achievements baseline.");
-                        return SyncLibraryResult.Error;
-                    }
-                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = achHash);
-                    return SyncLibraryResult.Skipped;
-                }
 
                 if (achHash == GsDataManager.Data.LastAchievementHash && GsSyncHashIndex.HasAchievementsBaseline) {
                     return SkipOrRepairIndex(
@@ -1044,6 +1037,7 @@ namespace GsPlugin.Services {
 
                 var response = await UploadAchievementsFullChunkedAsync(games, achHash);
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (response == null) {
                     _logger.Error("Failed to queue full achievements sync.");
                     return SyncLibraryResult.Error;
@@ -1057,12 +1051,16 @@ namespace GsPlugin.Services {
                 if (response.success && response.status == "queued") {
                     return await CommitSyncBaselineAsync(
                         "Full achievements sync",
-                        response.queueId,
+                        response.queueId, installId, generation,
                         () => GsSyncHashIndex.ReplaceAchievementIndex(BuildAchievementFingerprints(games)),
                         d => d.LastAchievementHash = achHash);
                 }
 
                 _logger.Error($"Unexpected response from full achievements sync: status={response.status}");
+                return SyncLibraryResult.Error;
+            }
+            catch (AchievementReadUnavailableException ex) {
+                _logger.Warn(ex.Message);
                 return SyncLibraryResult.Error;
             }
             catch (Exception ex) {
@@ -1080,6 +1078,8 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
 
                 if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
                     _logger.Info("Achievement diff sync skipped: disabled or no achievement provider installed.");
@@ -1133,17 +1133,9 @@ namespace GsPlugin.Services {
 
                         filteredCount++;
                         var playniteId = g.Id.ToString();
-                        List<AchievementItem> achievements;
-                        string sourceProvider = null;
-
-                        if (_achievementHelper is GsAchievementAggregator diagAgg) {
-                            var (achs, src) = diagAgg.GetAchievementsWithSource(g.Id);
-                            achievements = achs;
-                            sourceProvider = src;
-                        }
-                        else {
-                            achievements = _achievementHelper.GetAchievements(g.Id);
-                        }
+                        var read = ReadAchievementsForSync(g.Id);
+                        var achievements = read.Achievements;
+                        var sourceProvider = read.ProviderName;
 
                         if (achievements == null || achievements.Count == 0) {
                             nullCount++;
@@ -1180,7 +1172,12 @@ namespace GsPlugin.Services {
                         var dedupedByName = new Dictionary<string, AchievementItemDto>();
                         foreach (var a in achievements) {
                             dedupedByName[a.Name ?? ""] = new AchievementItemDto {
-                                name = a.Name,
+                                // "" not null: the hash joins names with string.Join, which renders a
+                                // null as "", but JS Array.sort coerces null via ToString to the
+                                // literal "null" and orders it among the n's. Same characters, different
+                                // order, different digest -- a permanent hash mismatch. Normalizing here
+                                // leaves the C# digest unchanged and makes both sides agree.
+                                name = a.Name ?? "",
                                 description = a.Description,
                                 date_unlocked = a.DateUnlocked,
                                 is_unlocked = a.IsUnlocked,
@@ -1215,6 +1212,7 @@ namespace GsPlugin.Services {
                     return (result, cleared, live, changedFps);
                 });
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (changed.Count == 0 && clearedIds.Count == 0) {
                     _logger.Info("Achievement diff is empty — skipping.");
                     return SyncLibraryResult.Skipped;
@@ -1248,6 +1246,7 @@ namespace GsPlugin.Services {
                     result_snapshot_hash = resultAchievementHash
                 });
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (response == null) {
                     _logger.Error("Failed to queue achievements diff sync.");
                     return SyncLibraryResult.Error;
@@ -1263,12 +1262,16 @@ namespace GsPlugin.Services {
                 if (response.success && response.status == "queued") {
                     return await CommitSyncBaselineAsync(
                         "Achievement diff sync",
-                        response.queueId,
+                        response.queueId, installId, generation,
                         () => GsSyncHashIndex.ApplyAchievementDiff(upsertedFingerprints, allCleared),
                         d => d.LastAchievementHash = resultAchievementHash);
                 }
 
                 _logger.Error($"Unexpected response from achievements diff sync: status={response.status}");
+                return SyncLibraryResult.Error;
+            }
+            catch (AchievementReadUnavailableException ex) {
+                _logger.Warn(ex.Message);
                 return SyncLibraryResult.Error;
             }
             catch (Exception ex) {
@@ -1284,7 +1287,7 @@ namespace GsPlugin.Services {
         private static void HandleCooldownResponse(AsyncQueuedResponse response, bool isDiffSync = false) {
             DateTime? expiresAt = null;
             if (!string.IsNullOrEmpty(response.cooldownExpiresAt)
-                && DateTime.TryParse(response.cooldownExpiresAt, null,
+                && DateTime.TryParse(response.cooldownExpiresAt, CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)) {
                 expiresAt = parsed.ToUniversalTime();
             }

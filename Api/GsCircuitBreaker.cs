@@ -51,6 +51,19 @@ namespace GsPlugin.Api {
         }
 
         /// <summary>
+        /// True while the open-circuit cooldown still prevents a request. Once the cooldown
+        /// expires, a caller must be allowed into ExecuteAsync to probe for recovery; merely
+        /// reading State never transitions the circuit out of Open.
+        /// </summary>
+        internal bool IsBlocking {
+            get {
+                lock (_lock) {
+                    return _state == CircuitState.Open && DateTime.UtcNow - _lastFailureTime < _timeout;
+                }
+            }
+        }
+
+        /// <summary>
         /// Executes a function with circuit breaker protection and retry logic.
         /// </summary>
         /// <typeparam name="T">Return type of the function</typeparam>

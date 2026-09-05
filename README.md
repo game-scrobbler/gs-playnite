@@ -137,6 +137,9 @@ Link your GameScrobbler account to connect data from other platforms (Steam, Xbo
 - Full library and achievement uploads are divided into chunks, preventing large Playnite libraries from producing oversized requests.
 - Later syncs compare compact local fingerprints and send only added, changed, or removed entries.
 - Failed chunked uploads are aborted without replacing the last known-good local baseline, so the next sync can retry safely.
+- A queued upload is confirmed before its local baseline is accepted. Failed or unconfirmed jobs retain the previous baseline for the next sync attempt.
+- Session starts and stops are saved before network requests, and shutdown saves all active sessions before waiting on the server.
+- Achievement read failures postpone the upload instead of clearing previously synced achievements.
 - Existing installations migrate their legacy local sync snapshot automatically. This migration affects only plugin state on your computer and does not delete library or achievement data.
 - Sync writes use the server-issued install token. On first startup, registration completes before the initial library sync begins.
 

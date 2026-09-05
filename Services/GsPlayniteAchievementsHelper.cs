@@ -61,77 +61,78 @@ namespace GsPlugin.Services {
             });
         }
 
-        public override List<AchievementItem> GetAchievements(Guid gameId) {
-            return SafeRead("Achievement lookup", gameId, DescribeReadFailure, () => {
-                if (!File.Exists(_dbPath)) return null;
+        protected override List<AchievementItem> ReadAchievementsCore(Guid gameId) {
+            if (!File.Exists(_dbPath)) return null;
 
-                using (var conn = new SQLiteConnection($"Data Source={_dbPath};Read Only=True;Pooling=True;")) {
-                    conn.Open();
-                    using (var cmd = conn.CreateCommand()) {
-                        cmd.CommandText = @"
-                            SELECT
-                                ad.DisplayName,
-                                ad.Description,
-                                ua.Unlocked,
-                                ua.UnlockTimeUtc,
-                                ad.GlobalPercentUnlocked
-                            FROM UserAchievements ua
-                            INNER JOIN AchievementDefinitions ad
-                                ON ua.AchievementDefinitionId = ad.Id
-                            INNER JOIN UserGameProgress ugp
-                                ON ua.UserGameProgressId = ugp.Id
-                            INNER JOIN Users u
-                                ON ugp.UserId = u.Id
-                            WHERE ugp.CacheKey = @playniteId
-                              AND u.IsCurrentUser = 1
-                              AND ugp.HasAchievements = 1
-                        ";
-                        cmd.Parameters.AddWithValue("@playniteId", gameId.ToString());
+            using (var conn = new SQLiteConnection($"Data Source={_dbPath};Read Only=True;Pooling=True;")) {
+                conn.Open();
+                using (var cmd = conn.CreateCommand()) {
+                    cmd.CommandText = @"
+                        SELECT
+                            ad.DisplayName,
+                            ad.Description,
+                            ua.Unlocked,
+                            ua.UnlockTimeUtc,
+                            ad.GlobalPercentUnlocked
+                        FROM UserAchievements ua
+                        INNER JOIN AchievementDefinitions ad
+                            ON ua.AchievementDefinitionId = ad.Id
+                        INNER JOIN UserGameProgress ugp
+                            ON ua.UserGameProgressId = ugp.Id
+                        INNER JOIN Users u
+                            ON ugp.UserId = u.Id
+                        WHERE ugp.CacheKey = @playniteId
+                          AND u.IsCurrentUser = 1
+                          AND ugp.HasAchievements = 1
+                    ";
+                    cmd.Parameters.AddWithValue("@playniteId", gameId.ToString());
 
-                        var result = new List<AchievementItem>();
-                        using (var reader = cmd.ExecuteReader()) {
-                            while (reader.Read()) {
-                                var displayName = reader.IsDBNull(0) ? null : reader.GetString(0);
-                                var description = reader.IsDBNull(1) ? null : reader.GetString(1);
-                                var unlocked = !reader.IsDBNull(2) && reader.GetBoolean(2);
+                    var result = new List<AchievementItem>();
+                    using (var reader = cmd.ExecuteReader()) {
+                        while (reader.Read()) {
+                            var displayName = reader.IsDBNull(0) ? null : reader.GetString(0);
+                            var description = reader.IsDBNull(1) ? null : reader.GetString(1);
+                            var unlocked = !reader.IsDBNull(2) && reader.GetBoolean(2);
 
-                                DateTime? dateUnlocked = null;
-                                if (!reader.IsDBNull(3)) {
-                                    var unlockStr = reader.GetString(3);
-                                    if (DateTime.TryParse(unlockStr, null,
-                                            System.Globalization.DateTimeStyles.RoundtripKind,
-                                            out var parsed)
-                                        && parsed > DateTime.MinValue && parsed.Year > 1) {
-                                        dateUnlocked = parsed;
-                                    }
+                            DateTime? dateUnlocked = null;
+                            if (!reader.IsDBNull(3)) {
+                                var unlockStr = reader.GetString(3);
+                                // InvariantCulture, not null: a null provider means CurrentCulture,
+                                // so an ISO timestamp read under a non-Gregorian calendar (th-TH,
+                                // ar-SA) parses to a wildly wrong year and is then uploaded.
+                                if (DateTime.TryParse(unlockStr, System.Globalization.CultureInfo.InvariantCulture,
+                                        System.Globalization.DateTimeStyles.RoundtripKind,
+                                        out var parsed)
+                                    && parsed > DateTime.MinValue && parsed.Year > 1) {
+                                    dateUnlocked = parsed;
                                 }
-
-                                float? rarityPercent = null;
-                                if (!reader.IsDBNull(4)) {
-                                    rarityPercent = (float)reader.GetDouble(4);
-                                }
-
-                                result.Add(new AchievementItem {
-                                    Name = displayName,
-                                    Description = description,
-                                    DateUnlocked = unlocked ? dateUnlocked : null,
-                                    IsUnlocked = unlocked,
-                                    RarityPercent = rarityPercent
-                                });
                             }
-                        }
 
-                        return result.Count > 0 ? result : null;
+                            float? rarityPercent = null;
+                            if (!reader.IsDBNull(4)) {
+                                rarityPercent = (float)reader.GetDouble(4);
+                            }
+
+                            result.Add(new AchievementItem {
+                                Name = displayName,
+                                Description = description,
+                                DateUnlocked = unlocked ? dateUnlocked : null,
+                                IsUnlocked = unlocked,
+                                RarityPercent = rarityPercent
+                            });
+                        }
                     }
+
+                    return result.Count > 0 ? result : null;
                 }
-            });
+            }
         }
 
         /// <summary>
         /// Wording for the failure types these database reads distinguish; null means the
         /// generic "{operation} failed" message applies.
         /// </summary>
-        private static string DescribeReadFailure(Exception ex) {
+        protected override string DescribeAchievementReadFailure(Exception ex) {
             if (ex is SQLiteException) return "SQLite error";
             if (ex is IOException) return "DB file access error";
             return null;

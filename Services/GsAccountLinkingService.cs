@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using Playnite.SDK;
@@ -66,6 +67,9 @@ namespace GsPlugin.Services {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private readonly IGsApiClient _apiClient;
         private readonly IPlayniteAPI _playniteApi;
+        // Deep links and settings can both change the account. Serialize their requests so a
+        // slower response cannot reverse a newer link/unlink operation on the same install.
+        private static readonly SemaphoreSlim IdentityOperations = new SemaphoreSlim(1, 1);
 
         /// <summary>
         /// Event triggered when account linking status changes.
@@ -100,6 +104,23 @@ namespace GsPlugin.Services {
                 return LinkingResult.CreateError("Please enter a valid token", context);
             }
 
+            var expectedInstallId = GsDataManager.Data.InstallID;
+            var expectedGeneration = GsDataManager.Data.IdentityGeneration;
+            await IdentityOperations.WaitAsync();
+            try {
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
+                    return IdentityChangedResult(context);
+                }
+                return await LinkAccountCoreAsync(token, context, expectedInstallId, expectedGeneration);
+            }
+            finally {
+                IdentityOperations.Release();
+            }
+        }
+
+        private async Task<LinkingResult> LinkAccountCoreAsync(string token, LinkingContext context,
+            string expectedInstallId, int expectedGeneration) {
+
             GsLogger.Info($"Starting {context} account linking (install_id={GsDataManager.Data.InstallID}).");
             GsSentry.AddBreadcrumb(
                 message: $"Starting {context} account linking",
@@ -113,7 +134,11 @@ namespace GsPlugin.Services {
 
             try {
                 // Verify token with API
-                var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
+                var response = await _apiClient.VerifyToken(token, expectedInstallId);
+
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
+                    return IdentityChangedResult(context);
+                }
 
                 if (response == null) {
                     string errorMessage = "Network error — could not reach the server. Please check your connection and try again.";
@@ -130,7 +155,10 @@ namespace GsPlugin.Services {
                     // a failed link, clear any local link so state matches the server, and route the
                     // user to fetch a fresh token (same recovery path as an expired token).
                     if (!IsLinkedUserId(response.userId)) {
-                        GsDataManager.MutateAndSave(d => d.LinkedUserId = null);
+                        if (!GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration,
+                            d => d.LinkedUserId = null)) {
+                            return IdentityChangedResult(context);
+                        }
                         OnLinkingStatusChanged();
 
                         GsLogger.Error($"{context} linking did not complete: token verified but the server returned a not-linked result (install_id={GsDataManager.Data.InstallID}, userId={response.userId ?? "null"}).");
@@ -152,7 +180,10 @@ namespace GsPlugin.Services {
                         return LinkingResult.CreateError(errorMessage, context);
                     }
 
-                    GsDataManager.MutateAndSave(d => d.LinkedUserId = response.userId);
+                    if (!GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration,
+                        d => d.LinkedUserId = response.userId)) {
+                        return IdentityChangedResult(context);
+                    }
                     // Notify listeners of status change
                     OnLinkingStatusChanged();
 
@@ -220,8 +251,10 @@ namespace GsPlugin.Services {
         public static bool ValidateToken(string token) {
             if (string.IsNullOrWhiteSpace(token)) return false;
             if (token.Length > 512) return false;
-            // Allow alphanumeric, hyphens, underscores, dots, plus, equals, slashes (covers JWT/base64 tokens)
-            if (!Regex.IsMatch(token, @"^[a-zA-Z0-9\-_\.+=\/]+$")) return false;
+            // Allow alphanumeric, hyphens, underscores, dots, plus, equals, slashes (covers JWT/base64 tokens).
+            // Anchor with \z, not $: in .NET $ also matches immediately before a trailing newline, so
+            // a token with a trailing newline would otherwise pass and be sent to the server verbatim.
+            if (!Regex.IsMatch(token, @"^[a-zA-Z0-9\-_\.+=\/]+\z")) return false;
             return true;
         }
 
@@ -234,6 +267,16 @@ namespace GsPlugin.Services {
         internal static bool IsLinkedUserId(string userId) {
             return !string.IsNullOrWhiteSpace(userId) && userId != GsData.NotLinkedValue;
         }
+
+        private static bool IsActiveIdentity(string expectedInstallId, int expectedGeneration) {
+            var data = GsDataManager.DataOrNull;
+            return data != null && !data.OptedOut && data.InstallID == expectedInstallId
+                && data.IdentityGeneration == expectedGeneration;
+        }
+
+        private static LinkingResult IdentityChangedResult(LinkingContext context) =>
+            LinkingResult.CreateError(GsLocalization.Get("LOCGsPluginIdentityChangedDuringRequest",
+                "The installation changed or was disabled during this request. Please try again."), context);
 
         /// <summary>
         /// Checks if the user wants to proceed with relinking to a different account.
@@ -267,6 +310,9 @@ namespace GsPlugin.Services {
                     LinkingContext.ManualSettings);
             }
 
+            var expectedInstallId = GsDataManager.Data.InstallID;
+            var expectedGeneration = GsDataManager.Data.IdentityGeneration;
+
             var confirm = _playniteApi.Dialogs.ShowMessage(
                 GsLocalization.Get("LOCGsPluginDisconnectDialogBody", "Disconnect your account? Your game data will be kept on the server.\nYou can re-link anytime."),
                 GsLocalization.Get("LOCGsPluginDisconnectDialogTitle", "Disconnect Account"),
@@ -277,8 +323,26 @@ namespace GsPlugin.Services {
                 return LinkingResult.CreateError("Cancelled", LinkingContext.ManualSettings);
             }
 
+            await IdentityOperations.WaitAsync();
+            try {
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
+                    return IdentityChangedResult(LinkingContext.ManualSettings);
+                }
+                return await UnlinkAccountCoreAsync(expectedInstallId, expectedGeneration);
+            }
+            finally {
+                IdentityOperations.Release();
+            }
+        }
+
+        private async Task<LinkingResult> UnlinkAccountCoreAsync(string expectedInstallId, int expectedGeneration) {
+
             try {
                 var response = await _apiClient.UnlinkAccount();
+
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
+                    return IdentityChangedResult(LinkingContext.ManualSettings);
+                }
 
                 if (response == null) {
                     return LinkingResult.CreateError(
@@ -290,7 +354,10 @@ namespace GsPlugin.Services {
                     // Clear all identity-bound state to prevent data from bleeding
                     // across accounts after a re-link. Base set only: the install stays
                     // registered, so neither the InstallID nor its token is touched.
-                    GsDataManager.MutateAndSave(d => d.ClearIdentityBoundState(IdentityClearScope.None));
+                    if (!GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration,
+                        d => d.ClearIdentityBoundState(IdentityClearScope.None))) {
+                        return IdentityChangedResult(LinkingContext.ManualSettings);
+                    }
                     GsSyncHashIndex.Reset();
                     OnLinkingStatusChanged();
                     // Refresh diagnostics widgets (pending scrobble count, last-sync text)

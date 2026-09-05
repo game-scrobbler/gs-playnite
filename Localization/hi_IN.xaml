@@ -192,4 +192,5 @@
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">अभी लाइब्रेरी सिंक करें</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">सेटिंग्स खोलें</sys:String>
 
+    <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">इस अनुरोध के दौरान इंस्टॉलेशन बदल गया या अक्षम कर दिया गया। कृपया फिर से प्रयास करें।</sys:String>
 </ResourceDictionary>

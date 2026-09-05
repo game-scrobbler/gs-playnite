@@ -10,7 +10,7 @@ namespace GsPlugin.Services {
     /// on-disk data: addon presence, version lookup, and the "log a warning and report no
     /// data" wrapper that guards every read. Subclasses supply only the read logic.
     /// </summary>
-    public abstract class AchievementProviderBase : IAchievementProvider {
+    public abstract class AchievementProviderBase : IAchievementProvider, IReliableAchievementProvider {
         /// <summary>
         /// Id of the Playnite addon this provider reads data from.
         /// </summary>
@@ -55,7 +55,24 @@ namespace GsPlugin.Services {
 
         public abstract (int unlocked, int total)? GetCounts(Guid gameId);
 
-        public abstract List<AchievementItem> GetAchievements(Guid gameId);
+        protected abstract List<AchievementItem> ReadAchievementsCore(Guid gameId);
+
+        protected virtual string DescribeAchievementReadFailure(Exception ex) => null;
+
+        public List<AchievementItem> GetAchievements(Guid gameId) {
+            var result = ReadAchievements(gameId);
+            return result.IsAvailable && result.Achievements.Count > 0 ? result.Achievements : null;
+        }
+
+        public AchievementReadResult ReadAchievements(Guid gameId) {
+            try {
+                return AchievementReadResult.Available(ReadAchievementsCore(gameId), ProviderName);
+            }
+            catch (Exception ex) {
+                LogReadFailure("Achievement lookup", gameId, ex, DescribeAchievementReadFailure);
+                return AchievementReadResult.Unavailable(ProviderName);
+            }
+        }
 
         public string GetVersion() {
             try {

@@ -18,7 +18,7 @@ namespace GsPlugin.Services {
         /// Both sides normalize to "yyyy-MM-ddTHH:mm:ssZ" (no fractional seconds, UTC).
         /// </summary>
         internal static string FormatDateForHash(DateTime? dt) =>
-            dt?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") ?? "";
+            dt?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture) ?? "";
 
         /// <summary>
         /// Normalizes a date string persisted in a legacy fat snapshot (written with
@@ -185,7 +185,12 @@ namespace GsPlugin.Services {
             if (accounts == null || accounts.Count == 0) {
                 return "";
             }
-            var sorted = accounts.OrderBy(a => a.provider_id).ThenBy(a => a.account_id);
+            // StringComparer.Ordinal, matching every other hash recipe in this file: the default
+            // string comparer is CurrentCulture-linguistic, so a Windows locale change would reorder
+            // these and flip the hash, spuriously flagging integration accounts as changed.
+            var sorted = accounts
+                .OrderBy(a => a.provider_id, StringComparer.Ordinal)
+                .ThenBy(a => a.account_id, StringComparer.Ordinal);
             var sb = new StringBuilder();
             foreach (var a in sorted) {
                 sb.Append(a.provider_id).Append(':').Append(a.account_id).Append(';');

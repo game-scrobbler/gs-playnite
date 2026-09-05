@@ -1,72 +1,48 @@
 <#
 .SYNOPSIS
-    Pester tests for scripts/update-installer-manifest.ps1, focused on the
-    changes introduced in this PR: preferring a curated "### Highlights"
-    changelog section over the raw Features/Bug Fixes bullets (falling back
-    to the raw bullets when no Highlights section exists), and the removal of
-    the dead "marketing note" placeholder.
+    Pester tests for changelog selection and lossless installer YAML updates.
 
 .DESCRIPTION
     The script has two hard, non-parameterized dependencies on its own
     location ($PSScriptRoot):
       - it imports "..\powershell-yaml\powershell-yaml.psd1"
       - it reads/writes "..\installer_manifest.yaml"
-    To test it without ever touching the real repository files (and without a
-    network dependency on the real powershell-yaml module, which is
-    unrelated to the logic this PR changes), each test copies the script into
-    an isolated temp workspace that reproduces this relative layout, along
-    with a minimal stub "powershell-yaml" module. The stub's ConvertFrom-Yaml
-    ignores the piped YAML text and instead returns a fixture object supplied
-    via the PESTER_STUB_MANIFEST_JSON environment variable, so tests can
-    control the "existing manifest" input precisely without a real YAML
-    parser. The script never calls ConvertTo-Yaml (it builds YAML manually),
-    so that's the only function the stub needs to provide.
+    Each test copies the script and the real powershell-yaml module into an
+    isolated temp workspace. CI checks out that module at the repository root.
+    For local runs, set GS_TEST_YAML_MODULE_PATH to powershell-yaml.psd1 from
+    a checkout, or install the module. Tests perform no network requests.
+    Every output is parsed by the real parser, including the second input
+    when testing repeated updates. JSON seed fixtures are valid YAML too.
 
-    The script contains no `exit` calls, so it is safe to invoke directly
-    (via the call operator) in-process.
+    The updater runs in a child Windows PowerShell process on Windows, matching
+    the release workflow; elsewhere it uses pwsh. This also isolates module
+    imports between updates.
 
     Run with: Invoke-Pester -Path scripts/update-installer-manifest.Tests.ps1
 #>
 
 BeforeAll {
     $script:RealScriptPath = Join-Path $PSScriptRoot 'update-installer-manifest.ps1'
+    $script:YamlModulePath = $env:GS_TEST_YAML_MODULE_PATH
+    if (-not $script:YamlModulePath) {
+        $script:YamlModulePath = Join-Path $PSScriptRoot '..\powershell-yaml\powershell-yaml.psd1'
+    }
+    if (-not (Test-Path -LiteralPath $script:YamlModulePath)) {
+        $script:YamlModulePath = (Get-Module -ListAvailable powershell-yaml | Select-Object -First 1).Path
+    }
+    if (-not $script:YamlModulePath) {
+        throw 'Real YAML tests require powershell-yaml. Set GS_TEST_YAML_MODULE_PATH or install the module.'
+    }
+    Import-Module $script:YamlModulePath -Force -ErrorAction Stop
+    $script:ScriptHost = if ($env:OS -eq 'Windows_NT') { 'powershell.exe' } else { 'pwsh' }
 
     function New-TestWorkspace {
         $workspace = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid())
         New-Item -ItemType Directory -Path $workspace -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $workspace 'scripts') -Force | Out-Null
-        New-Item -ItemType Directory -Path (Join-Path $workspace 'powershell-yaml') -Force | Out-Null
-
         Copy-Item -Path $script:RealScriptPath -Destination (Join-Path $workspace 'scripts\update-installer-manifest.ps1')
-
-        # The real installer_manifest.yaml content is irrelevant: the stub
-        # ConvertFrom-Yaml below ignores it. The file just needs to exist so
-        # Get-Content does not throw.
-        Set-Content -Path (Join-Path $workspace 'installer_manifest.yaml') -Value 'placeholder' -NoNewline
-
-        $stubModule = @'
-function ConvertFrom-Yaml {
-    [CmdletBinding()]
-    param([Parameter(ValueFromPipeline = $true)][string]$InputObject)
-    process {
-        # Test stub: real YAML parsing is intentionally not exercised here.
-        # The fixture "existing manifest" object is supplied out-of-band via
-        # PESTER_STUB_MANIFEST_JSON so tests can control it precisely.
-        Get-Content -Path $env:PESTER_STUB_MANIFEST_JSON -Raw | ConvertFrom-Json
-    }
-}
-Export-ModuleMember -Function ConvertFrom-Yaml
-'@
-        Set-Content -Path (Join-Path $workspace 'powershell-yaml\powershell-yaml.psm1') -Value $stubModule
-
-        $stubManifest = @'
-@{
-    ModuleVersion = '1.0.0'
-    RootModule = 'powershell-yaml.psm1'
-    FunctionsToExport = @('ConvertFrom-Yaml')
-}
-'@
-        Set-Content -Path (Join-Path $workspace 'powershell-yaml\powershell-yaml.psd1') -Value $stubManifest
+        Copy-Item -LiteralPath (Split-Path -Parent $script:YamlModulePath) `
+            -Destination (Join-Path $workspace 'powershell-yaml') -Recurse
 
         return $workspace
     }
@@ -77,27 +53,24 @@ Export-ModuleMember -Function ConvertFrom-Yaml
             [Parameter(Mandatory)] [string]$Version,
             [Parameter(Mandatory)] [string]$TagName,
             [Parameter(Mandatory)] [string]$ChangelogFile,
-            [Parameter(Mandatory)] [string]$ExistingManifestJsonPath
+            [string]$ExistingManifestJsonPath
         )
 
         $scriptPath = Join-Path $Workspace 'scripts\update-installer-manifest.ps1'
-        $previous = [Environment]::GetEnvironmentVariable('PESTER_STUB_MANIFEST_JSON')
-        [Environment]::SetEnvironmentVariable('PESTER_STUB_MANIFEST_JSON', $ExistingManifestJsonPath)
-
-        try {
-            # *>&1 merges all streams (including the Information stream that
-            # Write-Host writes to) into the success stream so Out-String
-            # actually captures the script's Write-Host output.
-            $output = & $scriptPath -Version $Version -TagName $TagName -ChangelogFile $ChangelogFile *>&1 | Out-String
-        }
-        finally {
-            [Environment]::SetEnvironmentVariable('PESTER_STUB_MANIFEST_JSON', $previous)
-        }
-
         $resultYamlPath = Join-Path $Workspace 'installer_manifest.yaml'
+        if ($ExistingManifestJsonPath) {
+            Copy-Item -LiteralPath $ExistingManifestJsonPath -Destination $resultYamlPath -Force
+        }
+        $output = & $script:ScriptHost -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $scriptPath `
+            -Version $Version -TagName $TagName -ChangelogFile $ChangelogFile 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            throw "Manifest updater failed with exit code ${LASTEXITCODE}: $output"
+        }
+        $manifestRaw = [System.IO.File]::ReadAllText($resultYamlPath)
         [PSCustomObject]@{
             Output      = $output
-            ManifestRaw = (Get-Content -Path $resultYamlPath -Raw)
+            ManifestRaw = $manifestRaw
+            Manifest    = ($manifestRaw | ConvertFrom-Yaml)
         }
     }
 
@@ -130,7 +103,12 @@ Describe 'update-installer-manifest.ps1' {
     }
 
     AfterEach {
-        Remove-Item -Path $script:Workspace -Recurse -Force -ErrorAction SilentlyContinue
+        $cleanupPath = [System.IO.Path]::GetFullPath($script:Workspace)
+        $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+        if (-not $cleanupPath.StartsWith($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to remove test workspace outside the temp directory: $cleanupPath"
+        }
+        Remove-Item -LiteralPath $cleanupPath -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     Context 'when a "### Highlights" section exists for the version' {
@@ -284,6 +262,79 @@ Describe 'update-installer-manifest.ps1' {
         }
     }
 
+    Context 'YAML string round trips' {
+        It 'preserves quotes, paths, YAML-looking values, and Unicode across repeated updates' {
+            $entries = @(
+                'Fixed "Delete My Data" sometimes getting stuck.',
+                'Support imports from C:\Games: shared library',
+                'Keep the literal sequence \n and a trailing backslash\',
+                "Your friend's [library] #1: ready & waiting",
+                'true', 'null', '123', '2026-09-05',
+                'Faster café launches — بازی‌ها 🎮'
+            )
+            $changelog = "## [2.0.0] (2026-05-01)`n`n### Highlights`n`n" +
+                (($entries | ForEach-Object { "* $_" }) -join "`n")
+            [System.IO.File]::WriteAllText($script:ChangelogPath, $changelog)
+            $existingManifest = New-ExistingManifestFixture -Workspace $script:Workspace -Version '1.9.0'
+
+            $first = Invoke-ManifestScript -Workspace $script:Workspace -Version '2.0.0' -TagName 'GsPlugin-v2.0.0' `
+                -ChangelogFile $script:ChangelogPath -ExistingManifestJsonPath $existingManifest
+            $second = Invoke-ManifestScript -Workspace $script:Workspace -Version '2.0.0' -TagName 'GsPlugin-v2.0.0' `
+                -ChangelogFile $script:ChangelogPath
+
+            $second.ManifestRaw | Should -BeExactly $first.ManifestRaw
+            $second.Manifest.Packages.Count | Should -Be 2
+            $actual = @($second.Manifest.Packages[0].Changelog)
+            $actual.Count | Should -Be $entries.Count
+            for ($i = 0; $i -lt $entries.Count; $i++) {
+                $actual[$i] | Should -BeOfType [string]
+                $actual[$i] | Should -BeExactly $entries[$i]
+            }
+        }
+
+        It 'preserves older entries containing quotes, control characters, and backslashes' {
+            $oldEntries = @(
+                'Already fixed "Delete My Data".',
+                'Paths: C:\Games\new\ and \\server\games',
+                "A tab`tand a newline`nare kept.",
+                'A backslash immediately before a quote: \"'
+            )
+            $existingManifest = New-ExistingManifestFixture -Workspace $script:Workspace -Version '1.9.0'
+            $fixture = Get-Content -LiteralPath $existingManifest -Raw | ConvertFrom-Json
+            $fixture.Packages[0].Changelog = $oldEntries
+            [System.IO.File]::WriteAllText($existingManifest, ($fixture | ConvertTo-Json -Depth 5))
+            [System.IO.File]::WriteAllText($script:ChangelogPath, "## [2.0.0]`n`n### Highlights`n`n* New release")
+
+            $first = Invoke-ManifestScript -Workspace $script:Workspace -Version '2.0.0' -TagName 'GsPlugin-v2.0.0' `
+                -ChangelogFile $script:ChangelogPath -ExistingManifestJsonPath $existingManifest
+            $second = Invoke-ManifestScript -Workspace $script:Workspace -Version '2.0.0' -TagName 'GsPlugin-v2.0.0' `
+                -ChangelogFile $script:ChangelogPath
+
+            $second.ManifestRaw | Should -BeExactly $first.ManifestRaw
+            $actual = @($second.Manifest.Packages[1].Changelog)
+            $actual.Count | Should -Be $oldEntries.Count
+            for ($i = 0; $i -lt $oldEntries.Count; $i++) {
+                $actual[$i] | Should -BeExactly $oldEntries[$i]
+            }
+        }
+
+        It 'keeps the repaired historical highlights identical to the reviewed changelog' {
+            $manifest = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\installer_manifest.yaml')) | ConvertFrom-Yaml
+            $changelog = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\CHANGELOG.md'))
+            foreach ($version in @('2.8.1', '2.8.0', '2.7.0')) {
+                $section = [regex]::Match($changelog, "## \[$([regex]::Escape($version))\].*?\n(.*?)(?=\n## \[|$)", 'Singleline').Groups[1].Value
+                $highlights = [regex]::Match($section, '### Highlights\s*\n(.*?)(?=\n###|$)', 'Singleline').Groups[1].Value
+                $expected = @([regex]::Matches($highlights, '^\* (.+)', 'Multiline') | ForEach-Object { $_.Groups[1].Value.TrimEnd() })
+                $package = $manifest.Packages | Where-Object { $_.Version -eq $version }
+                $actual = @($package.Changelog)
+                $actual.Count | Should -Be $expected.Count
+                for ($i = 0; $i -lt $expected.Count; $i++) {
+                    $actual[$i] | Should -BeExactly $expected[$i]
+                }
+            }
+        }
+    }
+
     Context 'no leftover marketing-note placeholder' {
         It 'never injects any entry beyond what was parsed from the changelog' {
             $changelog = @'
@@ -308,7 +359,7 @@ Describe 'update-installer-manifest.ps1' {
             $changelogLines = @([regex]::Matches($newEntryBlock, '^ {6}-\s+(.+)$', 'Multiline') | ForEach-Object { $_.Groups[1].Value.Trim() })
 
             $changelogLines.Count | Should -Be 1
-            $changelogLines[0] | Should -Be 'Only entry'
+            $result.Manifest.Packages[0].Changelog[0] | Should -Be 'Only entry'
         }
     }
 }
