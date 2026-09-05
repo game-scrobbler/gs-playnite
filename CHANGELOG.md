@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.8.3](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.2...GsPlugin-v2.8.3) (2026-09-05)
+
+
+### Highlights
+
+* You'll no longer lose queued play sessions if the app closes or your connection drops mid-request.
+* Achievements and playtime sync more reliably, only counting a sync as done once it's actually confirmed.
+* Linking or unlinking your account is now protected from mix-ups caused by slow or delayed responses.
+* Fixed a rare issue where corrupted or unreadable data could replace your existing installation identity.
+* Improved privacy protections so personal folder names are properly hidden from diagnostic reports.
+
+
+### Bug Fixes
+
+* **accounts:** reject stale link and unlink completions ([ed1f58e](https://github.com/game-scrobbler/gs-playnite/commit/ed1f58eaa3beb3cb2a29f71a010a341e5cdad8ce))
+* **achievements:** distinguish unavailable reads from empty snapshots ([24c739d](https://github.com/game-scrobbler/gs-playnite/commit/24c739dea065cead1fc5b76c85736d02b081a071))
+* **api:** attach plugin version to every production request ([70222b5](https://github.com/game-scrobbler/gs-playnite/commit/70222b5d2c3d3e792f7a02e04c40a4ae8473265a))
+* **api:** recover queued scrobbles and retry transient HTTP errors ([c3cd3d2](https://github.com/game-scrobbler/gs-playnite/commit/c3cd3d2865a48e37284ba6187d392b32d297ce63))
+* harden session recovery, sync integrity, and telemetry privacy ([810b902](https://github.com/game-scrobbler/gs-playnite/commit/810b9025d48fdd9cc11f159aad9bb0eb6a94c6bf))
+* **hashes:** normalize wire values independently of Windows locale ([341465e](https://github.com/game-scrobbler/gs-playnite/commit/341465e6d8882825109889a324e5a8c7603996f1))
+* **host:** constrain assembly resolution and isolate dashboard storage ([b3a084c](https://github.com/game-scrobbler/gs-playnite/commit/b3a084c8c18ffc805dcb44583d5ffc07ec71c3e1))
+* **host:** require exact assembly signing identities ([a2a6304](https://github.com/game-scrobbler/gs-playnite/commit/a2a63040fd292c810352caa99727cd1a93b48195))
+* **release:** align Sentry release names and portable symbols ([a6bfccc](https://github.com/game-scrobbler/gs-playnite/commit/a6bfcccd45f357970b273a91da92d02a376179b4))
+* **release:** preserve changelog text across manifest updates ([0163190](https://github.com/game-scrobbler/gs-playnite/commit/0163190df6398a972ca1879f165c1733f2ac3621))
+* **scrobbling:** persist session events before network waits ([ea83df9](https://github.com/game-scrobbler/gs-playnite/commit/ea83df9b373b14722cc97e7833c50015e9b355e4))
+* **state:** preserve identity and durable queue transitions ([5b13fb4](https://github.com/game-scrobbler/gs-playnite/commit/5b13fb4719792c7fdfe0442f759b3d418ca95e87))
+* **sync:** require confirmed jobs before advancing local baselines ([2a13694](https://github.com/game-scrobbler/gs-playnite/commit/2a136947b3f691a6dfea51dcd07b86df8050a4c9))
+* **telemetry:** enforce consent throughout SDK lifetimes ([9499314](https://github.com/game-scrobbler/gs-playnite/commit/9499314208f950ec310f9087ec58e34b55bad9da))
+* **telemetry:** redact relocated Windows profile roots ([8aa6ebb](https://github.com/game-scrobbler/gs-playnite/commit/8aa6ebbc7a3ff69f57b63d44522c90d9bead3118))
+
 ## [2.8.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.1...GsPlugin-v2.8.2) (2026-08-28)
 
 
