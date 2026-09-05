@@ -829,18 +829,28 @@ namespace GsPlugin.Api {
             GsSentry.CaptureException(exception, contextMessage);
         }
 
+        /// <summary>
+        /// Captures a scrobble failure. The message is the Sentry issue fingerprint, so game name,
+        /// user id and session id are attached as a breadcrumb rather than interpolated into it:
+        /// putting a game title in the title split one failure mode into a separate issue per game
+        /// (making the real rate invisible) and published a per-title event stream nobody asked for.
+        /// The context is still available on the event, just not as its identity.
+        /// </summary>
         private static void CaptureSentryMessage(string message, SentryLevel level, string gameName = null, string userId = null, string sessionId = null) {
-            string contextMessage = message;
+            var data = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(gameName)) {
-                contextMessage += $" [Game: {gameName}]";
+                data["game"] = gameName;
             }
             if (!string.IsNullOrEmpty(userId)) {
-                contextMessage += $" [User: {userId}]";
+                data["user_id"] = userId;
             }
             if (!string.IsNullOrEmpty(sessionId)) {
-                contextMessage += $" [Session: {sessionId}]";
+                data["session_id"] = sessionId;
             }
-            GsSentry.CaptureMessage(contextMessage, level);
+            if (data.Count > 0) {
+                GsSentry.AddBreadcrumb(message: "scrobble failure context", category: "scrobble", data: data);
+            }
+            GsSentry.CaptureMessage(message, level);
         }
 
         private async Task<TResponse> GetJsonAsync<TResponse>(string url) where TResponse : class {

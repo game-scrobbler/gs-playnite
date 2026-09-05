@@ -158,6 +158,8 @@ namespace GsPlugin.Models {
 
             // Sync settings to GsDataManager
             GsDataManager.MutateAndSave(d => {
+                d.Theme = savedSettings.Theme;
+                d.UpdateFlags(savedSettings.DisableSentry, savedSettings.DisableScrobbling, savedSettings.DisablePostHog);
                 d.NewDashboardExperience = savedSettings.NewDashboardExperience;
                 d.SyncAchievements = savedSettings.SyncAchievements;
                 d.ShowUpdateNotifications = savedSettings.ShowUpdateNotifications;
@@ -230,6 +232,9 @@ namespace GsPlugin.Models {
                 d.ShowUpdateNotifications = s.ShowUpdateNotifications;
                 d.ShowImportantNotifications = s.ShowImportantNotifications;
             });
+
+            GsSentry.ApplyPreferences();
+            GsPostHog.ApplyPreferences();
 
             GsLogger.ShowDebugInfoBox($"Settings saved:\nTheme: {Settings.Theme}\nNew Dashboard: {Settings.NewDashboardExperience}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}", "Debug - Settings Saved");
         }
@@ -408,6 +413,8 @@ namespace GsPlugin.Models {
                     // Capture analytics before opt-out disables telemetry
                     GsPostHog.Capture("data_deletion_requested");
                     GsDataManager.PerformOptOut();
+                    GsSentry.ApplyPreferences();
+                    GsPostHog.ApplyPreferences();
                     GsSyncHashIndex.ClearAll();
                     Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteSuccess", "Your data has been deleted. The plugin is now disabled.");
                     // Notify UI to refresh connection status and button visibility
@@ -418,6 +425,8 @@ namespace GsPlugin.Models {
                     // Sync local state so the Delete button hides instead of looping on a
                     // failure the user can never clear by retrying.
                     GsDataManager.PerformOptOut();
+                    GsSentry.ApplyPreferences();
+                    GsPostHog.ApplyPreferences();
                     GsSyncHashIndex.ClearAll();
                     Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteAlreadyDone",
                         "Your data has already been deleted. The plugin is now disabled.");
@@ -466,6 +475,8 @@ namespace GsPlugin.Models {
                 }
 
                 GsDataManager.PerformOptIn();
+                GsSentry.ApplyPreferences();
+                GsPostHog.ApplyPreferences();
                 Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginOptBackInSuccess", "Plugin re-enabled. Please restart Playnite to resume syncing.");
                 OnLinkingStatusChanged();
             }

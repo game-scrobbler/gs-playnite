@@ -14,6 +14,14 @@ namespace GsPlugin.Infrastructure {
     public static class GsPostHog {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private static PostHogClient _client;
+        private static readonly object LifecycleLock = new object();
+        private static GsTelemetryConsent _consent;
+        private static GsTelemetryHttpClientFactory _httpClientFactory;
+
+        public static void ApplyPreferences() {
+            if (GsTelemetryConsent.HasConsent("no-posthog")) Initialize();
+            else Shutdown();
+        }
 
         private const string ApiKey = "phc_la6sOuOYr4cEb9Rpq27MMi6Mv8EhCLsVi6ovp6azdSi";
         private const string HostUrl = "https://eu.i.posthog.com";
@@ -23,6 +31,13 @@ namespace GsPlugin.Infrastructure {
         /// Must be called after GsDataManager.Initialize().
         /// </summary>
         public static void Initialize() {
+            lock (LifecycleLock) {
+                if (_client != null) return;
+                InitializeCore();
+            }
+        }
+
+        private static void InitializeCore() {
             try {
                 if (GsDataManager.DataOrNull == null) {
                     _logger.Warn("PostHog init skipped: GsDataManager not initialized");
@@ -39,11 +54,16 @@ namespace GsPlugin.Infrastructure {
                     HostUrl = new Uri(HostUrl)
                 });
 
-                _client = new PostHogClient(options);
+                _consent = new GsTelemetryConsent("no-posthog");
+                _httpClientFactory = new GsTelemetryHttpClientFactory(_consent);
+                _client = new PostHogClient(options, httpClientFactory: _httpClientFactory);
 
                 _logger.Info("PostHog analytics initialized");
             }
             catch (Exception ex) {
+                _consent?.Revoke();
+                _httpClientFactory?.Dispose();
+                _httpClientFactory = null;
                 _logger.Error(ex, "Failed to initialize PostHog (non-critical)");
             }
         }
@@ -92,8 +112,18 @@ namespace GsPlugin.Infrastructure {
         /// Shuts down the PostHog client and releases resources.
         /// </summary>
         public static void Shutdown() {
+            lock (LifecycleLock) {
+                ShutdownCore();
+            }
+        }
+
+        private static void ShutdownCore() {
             var client = _client;
+            var factory = _httpClientFactory;
+            var consent = _consent;
+            if (!GsTelemetryConsent.HasConsent("no-posthog")) consent?.Revoke();
             _client = null;
+            _httpClientFactory = null;
             if (client == null) {
                 return;
             }
@@ -103,7 +133,13 @@ namespace GsPlugin.Infrastructure {
                 // async flush (DisposeAsync().GetAwaiter().GetResult()), which can hang Playnite
                 // on exit when the ingest endpoint is slow/unreachable. Race it against a timeout
                 // instead of waiting on it directly.
-                var disposeTask = Task.Run(() => client.Dispose());
+                var disposeTask = Task.Run(() => {
+                    try { client.Dispose(); }
+                    finally {
+                        consent?.Revoke();
+                        factory?.Dispose();
+                    }
+                });
                 if (!disposeTask.Wait(TimeSpan.FromSeconds(2))) {
                     _logger.Warn("PostHog dispose timed out during shutdown; abandoning");
                     // Dispose keeps running in the background after we give up waiting on it —

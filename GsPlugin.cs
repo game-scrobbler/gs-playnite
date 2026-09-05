@@ -88,12 +88,6 @@ namespace GsPlugin {
             // Initialize snapshot manager for diff-based sync
             GsSyncHashIndex.Initialize(GetPluginUserDataPath());
 
-            // Initialize Sentry for error tracking
-            GsSentry.Initialize();
-
-            // Initialize PostHog for product analytics
-            GsPostHog.Initialize();
-
             // Initialize API client
             _apiClient = new GsApiClient();
 
@@ -107,6 +101,9 @@ namespace GsPlugin {
 
             // Create settings with linking service and achievement helper dependencies
             _settings = new GsPluginSettingsViewModel(this, _linkingService, _achievementHelper, _apiClient);
+            // Load saved privacy preferences before starting either telemetry SDK.
+            GsSentry.ApplyPreferences();
+            GsPostHog.ApplyPreferences();
             Properties = new GenericPluginProperties {
                 HasSettings = true
             };
