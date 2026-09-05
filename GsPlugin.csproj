@@ -161,6 +161,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Infrastructure -->
+    <Compile Include="Infrastructure\GsAssemblyIdentity.cs" />
     <Compile Include="Infrastructure\GsAtomicFile.cs" />
     <Compile Include="Infrastructure\GsLocalization.cs" />
     <Compile Include="Infrastructure\GsLogger.cs" />

@@ -63,12 +63,7 @@ namespace GsPlugin {
                 // at least what the caller asked for.
                 try {
                     var candidate = AssemblyName.GetAssemblyName(path);
-                    var wantedToken = name.GetPublicKeyToken();
-                    var candidateToken = candidate.GetPublicKeyToken();
-                    bool tokensMatch =
-                        wantedToken == null || wantedToken.Length == 0
-                        || (candidateToken != null && wantedToken.SequenceEqual(candidateToken));
-                    if (!tokensMatch) {
+                    if (!GsAssemblyIdentity.PublicKeyTokensMatch(name, candidate)) {
                         return null;
                     }
                     if (name.Version != null && candidate.Version != null && candidate.Version < name.Version) {
