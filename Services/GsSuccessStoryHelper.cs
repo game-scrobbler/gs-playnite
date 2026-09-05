@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using Playnite.SDK;
 
@@ -43,16 +44,18 @@ namespace GsPlugin.Services {
             var filePath = Path.Combine(_dataPath, $"{gameId}.json");
             if (!File.Exists(filePath)) return null;
 
-            byte[] fileBytes;
+            // Read as text and parse the string overload. JsonDocument.Parse(byte[]) /
+            // Parse(ReadOnlyMemory<byte>) is missing from older System.Text.Json builds
+            // that another Playnite extension may already have loaded into this AppDomain
+            // (GS-PLAYNITE-PE). Parse(string) has existed since 4.6.0.
+            string json;
             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read,
-                       FileShare.ReadWrite | FileShare.Delete)) {
-                using (var ms = new MemoryStream()) {
-                    stream.CopyTo(ms);
-                    fileBytes = ms.ToArray();
-                }
+                       FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true)) {
+                json = reader.ReadToEnd();
             }
 
-            using (var doc = JsonDocument.Parse(fileBytes)) {
+            using (var doc = JsonDocument.Parse(json)) {
                 var root = doc.RootElement;
 
                 if (root.TryGetProperty("IsIgnored", out var ignored) && ignored.GetBoolean())
@@ -101,6 +104,7 @@ namespace GsPlugin.Services {
         protected override string DescribeAchievementReadFailure(Exception ex) {
             if (ex is JsonException) return "JSON parse error";
             if (ex is IOException) return "File read error";
+            if (ex is MissingMethodException) return "Incompatible JSON parser";
             return null;
         }
 

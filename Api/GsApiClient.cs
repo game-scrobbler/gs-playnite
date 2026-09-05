@@ -152,11 +152,21 @@ namespace GsPlugin.Api {
             }
 
             string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/start";
+            var diagnostics = new HttpCallDiagnostics();
+            var attempts = 0;
 
             var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                attempts++;
+                diagnostics.Reset();
                 onAttempt?.Invoke();
-                return await PostJsonAsync<ApiResponse<ScrobbleStartData>>(url, startData);
-            }, maxRetries: 2, isFailure: r => r == null);
+                return await PostJsonAsync<ApiResponse<ScrobbleStartData>>(
+                    url, startData,
+                    onStatus: status => diagnostics.StatusCode = status,
+                    parseErrorBody: true,
+                    diagnostics: diagnostics,
+                    captureExceptions: false);
+            }, maxRetries: 2, isFailure: r => r == null,
+                isPermanent: () => IsPermanentRejection(diagnostics.StatusCode));
 
             switch (envelope?.Outcome) {
                 case ApiOutcome.Success when envelope.data?.session_id != null:
@@ -173,13 +183,24 @@ namespace GsPlugin.Api {
                     return null;
 
                 case ApiOutcome.Fail:
+                case ApiOutcome.Error:
                     _logger.Warn($"Scrobble start rejected by server: [{envelope.code}] {envelope.message}");
-                    CaptureSentryMessage($"Scrobble start fail: {envelope.code}", SentryLevel.Warning, startData.game_name, startData.user_id);
+                    // Flush retries already reported the live failure; do not open a new
+                    // issue every 5 minutes for the same queued start.
+                    if (onAttempt == null) {
+                        CaptureSentryMessage(
+                            $"Scrobble start fail: {envelope.code ?? "unknown"}",
+                            SentryLevel.Warning,
+                            startData.game_name,
+                            startData.user_id,
+                            extras: ScrobbleStartFailure.BuildExtras(
+                                attempts, diagnostics, envelope.Outcome.ToString()),
+                            fingerprint: new[] { "gs-playnite", "scrobble-start-fail", envelope.code ?? "unknown" });
+                    }
                     return null;
 
                 default:
-                    GsLogger.Error("Failed to start scrobble session");
-                    CaptureSentryMessage("Failed to start scrobble session", SentryLevel.Warning, startData.game_name, startData.user_id);
+                    ReportNullEnvelopeStartFailure(startData, onAttempt != null, attempts, diagnostics);
                     return null;
             }
         }
@@ -844,13 +865,49 @@ namespace GsPlugin.Api {
         }
 
         /// <summary>
+        /// Logs a null-envelope scrobble start and, on the live path only, reports one
+        /// Sentry event with a stable fingerprint. Game/user identity stays in extras
+        /// and breadcrumbs so Sentry cannot split GS-PLAYNITE-M5-style issues per title.
+        /// </summary>
+        private static void ReportNullEnvelopeStartFailure(
+            ScrobbleStartReq startData, bool isFlushRetry, int attempts, HttpCallDiagnostics diagnostics) {
+            var extras = ScrobbleStartFailure.BuildExtras(attempts, diagnostics, outcome: null);
+            extras.TryGetValue("failure_kind", out var reason);
+            GsLogger.Error(
+                $"Failed to start scrobble session (reason={reason ?? "unknown"}, http={diagnostics?.StatusCode ?? 0}, attempts={attempts})");
+
+            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry)) {
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(startData?.game_name)) {
+                extras["game"] = startData.game_name;
+            }
+
+            CaptureSentryMessage(
+                ScrobbleStartFailure.Message,
+                SentryLevel.Warning,
+                startData?.game_name,
+                startData?.user_id,
+                extras: extras,
+                fingerprint: ScrobbleStartFailure.Fingerprint);
+        }
+
+        /// <summary>
         /// Captures a scrobble failure. The message is the Sentry issue fingerprint, so game name,
         /// user id and session id are attached as a breadcrumb rather than interpolated into it:
         /// putting a game title in the title split one failure mode into a separate issue per game
         /// (making the real rate invisible) and published a per-title event stream nobody asked for.
         /// The context is still available on the event, just not as its identity.
         /// </summary>
-        private static void CaptureSentryMessage(string message, SentryLevel level, string gameName = null, string userId = null, string sessionId = null) {
+        private static void CaptureSentryMessage(
+            string message,
+            SentryLevel level,
+            string gameName = null,
+            string userId = null,
+            string sessionId = null,
+            Dictionary<string, string> extras = null,
+            IReadOnlyCollection<string> fingerprint = null) {
             var data = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(gameName)) {
                 data["game"] = gameName;
@@ -864,7 +921,7 @@ namespace GsPlugin.Api {
             if (data.Count > 0) {
                 GsSentry.AddBreadcrumb(message: "scrobble failure context", category: "scrobble", data: data);
             }
-            GsSentry.CaptureMessage(message, level);
+            GsSentry.CaptureMessage(message, level, fingerprint, extras);
         }
 
         private async Task<TResponse> GetJsonAsync<TResponse>(string url) where TResponse : class {
@@ -956,7 +1013,8 @@ namespace GsPlugin.Api {
         /// Opt-in so endpoints whose callers only test for null keep their current behaviour.
         /// </param>
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false,
-            Action<int> onStatus = null, bool parseErrorBody = false)
+            Action<int> onStatus = null, bool parseErrorBody = false,
+            HttpCallDiagnostics diagnostics = null, bool captureExceptions = true)
             where TResponse : class {
             string jsonData = JsonSerializer.Serialize(payload, _jsonOptions);
 
@@ -1004,6 +1062,7 @@ namespace GsPlugin.Api {
                                 : responseBody;
                         _logger.Warn(
                             $"POST {url} returned {(int)response.StatusCode} ({response.StatusCode}): {body}");
+                        diagnostics?.SetFailure("http");
 
                         if (ensureSuccess) {
                             var httpEx = new HttpRequestException(
@@ -1037,6 +1096,7 @@ namespace GsPlugin.Api {
                     // Validate response body before deserialization
                     if (string.IsNullOrWhiteSpace(responseBody)) {
                         _logger.Warn($"Received empty response body from {url}");
+                        diagnostics?.SetFailure("empty");
                         return null;
                     }
 
@@ -1045,6 +1105,7 @@ namespace GsPlugin.Api {
                     var contentType = response?.Content?.Headers?.ContentType?.MediaType;
                     if (contentType != null && contentType.Contains("html")) {
                         _logger.Warn($"POST {url} returned HTML content-type instead of JSON — likely a proxy error page");
+                        diagnostics?.SetFailure("html");
                         return null;
                     }
 
@@ -1052,11 +1113,13 @@ namespace GsPlugin.Api {
                         var deserializedResponse = JsonSerializer.Deserialize<TResponse>(responseBody, _jsonOptions);
                         if (deserializedResponse == null) {
                             _logger.Warn($"Deserialization returned null for {url}. Response: {responseBody}");
+                            diagnostics?.SetFailure("json");
                         }
                         return deserializedResponse;
                     }
                     catch (JsonException jsonEx) {
                         _logger.Error(jsonEx, $"Failed to deserialize JSON response from {url}. Response body starts with: {(responseBody.Length > 100 ? responseBody.Substring(0, 100) : responseBody)}");
+                        diagnostics?.SetFailure("json", jsonEx);
                         return null;
                     }
                 }
@@ -1066,7 +1129,14 @@ namespace GsPlugin.Api {
                         responseData: $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}",
                         isError: true);
 
-                    CaptureHttpException(ex, url, jsonData, response, responseBody);
+                    var kind = ex is TaskCanceledException || ex is TimeoutException
+                        ? "timeout"
+                        : "transport";
+                    diagnostics?.SetFailure(kind, ex);
+                    _logger.Warn(ex, $"POST {url} {kind} error: {ex.GetType().Name}");
+                    if (captureExceptions) {
+                        CaptureHttpException(ex, url, jsonData, response, responseBody);
+                    }
                     return null;
                 }
             }
@@ -1184,5 +1254,78 @@ namespace GsPlugin.Api {
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// Per-attempt notes from <see cref="GsApiClient"/>'s POST helper so a null
+    /// envelope can still say why the call failed (status, exception, kind).
+    /// </summary>
+    internal sealed class HttpCallDiagnostics {
+        public int StatusCode { get; set; }
+        public string FailureKind { get; set; }
+        public string ExceptionType { get; set; }
+
+        public void Reset() {
+            StatusCode = 0;
+            FailureKind = null;
+            ExceptionType = null;
+        }
+
+        public void SetFailure(string kind, Exception ex = null) {
+            FailureKind = kind;
+            if (ex != null) {
+                ExceptionType = ex.GetType().Name;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stable identity for the null-envelope scrobble-start path (GS-PLAYNITE-M5
+    /// and siblings). Game titles never enter the message or fingerprint.
+    /// </summary>
+    internal static class ScrobbleStartFailure {
+        public const string Message = "Failed to start scrobble session";
+
+        public static readonly string[] Fingerprint = { "gs-playnite", "scrobble-start-failed" };
+
+        /// <summary>
+        /// Report once on the live start path after the HTTP helper actually ran.
+        /// Circuit-open skips and pending-queue flush retries only log locally.
+        /// </summary>
+        public static bool ShouldCapture(int attempts, bool isFlushRetry) =>
+            attempts > 0 && !isFlushRetry;
+
+        public static Dictionary<string, string> BuildExtras(
+            int attempts, HttpCallDiagnostics diagnostics, string outcome) {
+            string kind;
+            if (attempts <= 0) {
+                kind = "circuit";
+            }
+            else if (!string.IsNullOrEmpty(diagnostics?.FailureKind)) {
+                kind = diagnostics.FailureKind;
+            }
+            else if (diagnostics != null && diagnostics.StatusCode >= 400) {
+                kind = "http";
+            }
+            else {
+                kind = "unknown";
+            }
+
+            var extras = new Dictionary<string, string> {
+                { "failure_kind", kind },
+                { "attempts", attempts.ToString() },
+                { "retry_count", Math.Max(0, attempts - 1).ToString() }
+            };
+            if (diagnostics != null && diagnostics.StatusCode > 0) {
+                extras["http_status"] = diagnostics.StatusCode.ToString();
+            }
+            if (!string.IsNullOrEmpty(diagnostics?.ExceptionType)) {
+                extras["exception_type"] = diagnostics.ExceptionType;
+            }
+            if (!string.IsNullOrEmpty(outcome)) {
+                extras["outcome"] = outcome;
+            }
+            return extras;
+        }
     }
 }

@@ -99,6 +99,88 @@ namespace GsPlugin.Tests {
                 });
 
                 Assert.Null(result);
+                // Transient 5xx stays retryable (initial + 2 retries).
+                Assert.Equal(3, handler.CallCount);
+            }
+        }
+
+        [Fact]
+        public async Task StartGameSession_PermanentFailEnvelope_DoesNotRetry() {
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token")) {
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        status = "fail",
+                        code = "UNSUPPORTED_PLUGIN",
+                        message = "plugin not allowed"
+                    })
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var result = await client.StartGameSession(new ScrobbleStartReq {
+                    user_id = "user-1",
+                    game_name = "Test",
+                    game_id = "g1",
+                    plugin_id = "p1"
+                });
+
+                Assert.Null(result);
+                Assert.Equal(1, handler.CallCount);
+            }
+        }
+
+        [Fact]
+        public async Task StartGameSession_TypedErrorEnvelope_DoesNotRetry() {
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token")) {
+                var handler = new MockHttpHandler {
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        status = "error",
+                        code = "INTERNAL",
+                        message = "start failed"
+                    })
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var result = await client.StartGameSession(new ScrobbleStartReq {
+                    user_id = "user-1",
+                    game_name = "Test",
+                    game_id = "g1",
+                    plugin_id = "p1"
+                });
+
+                Assert.Null(result);
+                Assert.Equal(1, handler.CallCount);
+            }
+        }
+
+        [Fact]
+        public async Task StartGameSession_OpenCircuit_SkipsHttp() {
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token")) {
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    ResponseBody = "{\"error\":\"internal\"}"
+                };
+                var breaker = new GsCircuitBreaker(
+                    failureThreshold: 1, timeout: TimeSpan.FromMinutes(2));
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                Assert.Null(await client.StartGameSession(new ScrobbleStartReq {
+                    user_id = "user-1",
+                    game_name = "Test",
+                    game_id = "g1",
+                    plugin_id = "p1"
+                }));
+                var callsAfterFirst = handler.CallCount;
+                Assert.True(callsAfterFirst >= 1);
+                Assert.Equal(GsCircuitBreaker.CircuitState.Open, breaker.State);
+
+                Assert.Null(await client.StartGameSession(new ScrobbleStartReq {
+                    user_id = "user-1",
+                    game_name = "Another Game",
+                    game_id = "g2",
+                    plugin_id = "p1"
+                }));
+                Assert.Equal(callsAfterFirst, handler.CallCount);
             }
         }
 
