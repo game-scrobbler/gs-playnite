@@ -49,6 +49,21 @@ jobs:
       - name: Run Tests
         run: dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal
 
+      # scripts/update-installer-manifest.ps1 and scripts/generate-release-highlights.ps1 drive the
+      # release pipeline: the manifest Playnite reads for update discovery, and the user-facing
+      # changelog. Both ship Pester suites that no workflow was running, so a break in either could
+      # only be found in production. Pester is version-pinned so a gallery release cannot change
+      # what CI enforces.
+      - name: Run PowerShell Script Tests (Pester)
+        run: |
+          Install-Module Pester -RequiredVersion 5.6.1 -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester -RequiredVersion 5.6.1
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = 'scripts'
+          $cfg.Run.Exit = $true
+          $cfg.Output.CIFormat = 'GithubActions'
+          Invoke-Pester -Configuration $cfg
+
       - name: Setup Playnite
         run: |
           Invoke-WebRequest -Uri "https://github.com/JosefNemec/Playnite/releases/download/${{ env.PLAYNITE_VERSION }}/${{ env.PLAYNITE_ZIP }}" -OutFile "$Env:GITHUB_WORKSPACE\Playnite.zip"
