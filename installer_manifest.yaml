@@ -6,7 +6,7 @@ Packages:
     ReleaseDate: 2026-08-14
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.8.1/GsPlugin-v2.8.1.pext
     Changelog:
-      - Your library and achievement syncs are now double-checked, so stats no longer look \"synced\" if the upload actually failed on our end.
+      - Your library and achievement syncs are now double-checked, so stats no longer look "synced" if the upload actually failed on our end.
       - Fixed a rare issue where Playnite could hang on exit while closing in the background.
   - Version: 2.8.0
     RequiredApiVersion: 6.12.0
@@ -15,8 +15,8 @@ Packages:
     Changelog:
       - You can now enjoy Game Scrobbler while playing in Fullscreen mode, once your theme adds support for it.
       - Fixed a mix-up where achievements could show frozen or incomplete progress if you'd previously used a different achievement tracker.
-      - Fixed \\"Delete My Data\\" sometimes getting stuck or failing forever, including when your data was already deleted.
-      - Fixed account linking sometimes showing \\"Successfully linked!\\" while your account was actually still disconnected.
+      - Fixed "Delete My Data" sometimes getting stuck or failing forever, including when your data was already deleted.
+      - Fixed account linking sometimes showing "Successfully linked!" while your account was actually still disconnected.
   - Version: 2.7.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-07-15
@@ -24,7 +24,7 @@ Packages:
     Changelog:
       - Your library and achievement uploads now sync in smaller, sturdier batches, so even huge libraries upload reliably.
       - Fixed an issue where your play stats or achievements could get out of sync after an interrupted sync.
-      - Renamed the \\\"new dashboard\\\" toggle to \\\"beta channel\\\" in settings for clarity.
+      - Renamed the "new dashboard" toggle to "beta channel" in settings for clarity.
       - Made background error reporting more reliable so it can no longer cause slowdowns when Playnite closes.
   - Version: 2.6.0
     RequiredApiVersion: 6.12.0

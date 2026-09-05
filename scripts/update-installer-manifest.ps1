@@ -12,6 +12,8 @@ param(
     [string]$ChangelogFile = "CHANGELOG.md"
 )
 
+$ErrorActionPreference = 'Stop'
+
 # Import powershell-yaml module
 Import-Module "$PSScriptRoot\..\powershell-yaml\powershell-yaml.psd1" -Force
 
@@ -25,10 +27,10 @@ Write-Host "Package URL: $packageUrl"
 Write-Host "Release Date: $releaseDate"
 
 # Read the current manifest
-$manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Yaml
+$manifest = [System.IO.File]::ReadAllText($manifestPath) | ConvertFrom-Yaml
 
 # Extract changelog entries for this version from CHANGELOG.md
-$changelogContent = Get-Content -Path $ChangelogFile -Raw
+$changelogContent = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $ChangelogFile))
 $versionPattern = "## \[$Version\].*?\n(.*?)(?=\n## \[|$)"
 $changelogMatch = [regex]::Match($changelogContent, $versionPattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
 
@@ -138,22 +140,17 @@ foreach ($package in $manifest.Packages) {
         # Remove trailing " ()" artifacts from changelog parsing
         $entryStr = $entryStr -replace '\s*\(\)\s*$', ''
 
-        # Escape quotes in the entry
-        $escapedEntry = $entryStr -replace '"', '\"'
-
-        # Quote entries that contain special YAML characters
-        if ($escapedEntry -match '[:\[\]{}@&*#?|<>%`]|^-|\s+$') {
-            $yamlLines += "      - `"$escapedEntry`""
-        } else {
-            $yamlLines += "      - $escapedEntry"
-        }
+        # JSON string literals are also valid YAML double-quoted scalars. Always
+        # quote strings so YAML cannot reinterpret true, null, dates, or numbers,
+        # and let the serializer escape quotes, backslashes, and control chars.
+        $yamlLines += "      - $(ConvertTo-Json -InputObject $entryStr -Compress)"
     }
 }
 
 $yamlContent = $yamlLines -join "`n"
 
 # Write to file
-Set-Content -Path $manifestPath -Value $yamlContent -NoNewline
+[System.IO.File]::WriteAllText($manifestPath, $yamlContent, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "Successfully updated $manifestPath"
 Write-Host ""
