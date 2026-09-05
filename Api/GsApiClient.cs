@@ -194,7 +194,7 @@ namespace GsPlugin.Api {
                             startData.game_name,
                             startData.user_id,
                             extras: ScrobbleStartFailure.BuildExtras(
-                                attempts, diagnostics, envelope.Outcome.ToString()),
+                                attempts, diagnostics, envelope.Outcome.ToString(), startData.game_name),
                             fingerprint: new[] { "gs-playnite", "scrobble-start-fail", envelope.code ?? "unknown" });
                     }
                     return null;
@@ -871,17 +871,14 @@ namespace GsPlugin.Api {
         /// </summary>
         private static void ReportNullEnvelopeStartFailure(
             ScrobbleStartReq startData, bool isFlushRetry, int attempts, HttpCallDiagnostics diagnostics) {
-            var extras = ScrobbleStartFailure.BuildExtras(attempts, diagnostics, outcome: null);
+            var extras = ScrobbleStartFailure.BuildExtras(
+                attempts, diagnostics, outcome: null, startData?.game_name);
             extras.TryGetValue("failure_kind", out var reason);
             GsLogger.Error(
                 $"Failed to start scrobble session (reason={reason ?? "unknown"}, http={diagnostics?.StatusCode ?? 0}, attempts={attempts})");
 
             if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry)) {
                 return;
-            }
-
-            if (!string.IsNullOrEmpty(startData?.game_name)) {
-                extras["game"] = startData.game_name;
             }
 
             CaptureSentryMessage(
@@ -1296,7 +1293,7 @@ namespace GsPlugin.Api {
             attempts > 0 && !isFlushRetry;
 
         public static Dictionary<string, string> BuildExtras(
-            int attempts, HttpCallDiagnostics diagnostics, string outcome) {
+            int attempts, HttpCallDiagnostics diagnostics, string outcome, string gameName = null) {
             string kind;
             if (attempts <= 0) {
                 kind = "circuit";
@@ -1324,6 +1321,9 @@ namespace GsPlugin.Api {
             }
             if (!string.IsNullOrEmpty(outcome)) {
                 extras["outcome"] = outcome;
+            }
+            if (!string.IsNullOrEmpty(gameName)) {
+                extras["game"] = gameName;
             }
             return extras;
         }

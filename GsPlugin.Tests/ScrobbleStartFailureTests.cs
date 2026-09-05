@@ -41,6 +41,18 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void BuildExtras_AttachesGameNameWithoutTouchingMessage() {
+            var extras = ScrobbleStartFailure.BuildExtras(
+                1, new HttpCallDiagnostics { StatusCode = 400, FailureKind = "http" },
+                "Fail", "Aliens: Fireteam Elite 2");
+
+            Assert.Equal("Aliens: Fireteam Elite 2", extras["game"]);
+            Assert.Equal("Fail", extras["outcome"]);
+            Assert.DoesNotContain("Aliens", ScrobbleStartFailure.Message);
+            Assert.DoesNotContain("Game:", ScrobbleStartFailure.Message);
+        }
+
+        [Fact]
         public void BuildExtras_IncludesHttpStatusOutcomeAndException() {
             var extras = ScrobbleStartFailure.BuildExtras(3, new HttpCallDiagnostics {
                 StatusCode = 503,
