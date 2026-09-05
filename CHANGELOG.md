@@ -3,6 +3,15 @@
 ## [2.8.3](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.2...GsPlugin-v2.8.3) (2026-09-05)
 
 
+### Highlights
+
+* You'll no longer lose queued play sessions if the app closes or your connection drops mid-request.
+* Achievements and playtime sync more reliably, only counting a sync as done once it's actually confirmed.
+* Linking or unlinking your account is now protected from mix-ups caused by slow or delayed responses.
+* Fixed a rare issue where corrupted or unreadable data could replace your existing installation identity.
+* Improved privacy protections so personal folder names are properly hidden from diagnostic reports.
+
+
 ### Bug Fixes
 
 * **accounts:** reject stale link and unlink completions ([ed1f58e](https://github.com/game-scrobbler/gs-playnite/commit/ed1f58eaa3beb3cb2a29f71a010a341e5cdad8ce))
