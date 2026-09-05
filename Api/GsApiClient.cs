@@ -65,14 +65,15 @@ namespace GsPlugin.Api {
         /// Constructor that accepts a custom HttpClient for testing.
         /// Production code uses the parameterless constructor which provides the shared Sentry-traced client.
         /// </summary>
-        internal GsApiClient(HttpClient httpClient) : this(httpClient, false) { }
+        internal GsApiClient(HttpClient httpClient, GsCircuitBreaker circuitBreaker = null)
+            : this(httpClient, false, circuitBreaker) { }
 
-        private GsApiClient(HttpClient httpClient, bool enableRecoveryFlush) {
+        private GsApiClient(HttpClient httpClient, bool enableRecoveryFlush, GsCircuitBreaker circuitBreaker = null) {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _jsonOptions = new JsonSerializerOptions {
                 PropertyNameCaseInsensitive = true
             };
-            _circuitBreaker = new GsCircuitBreaker(
+            _circuitBreaker = circuitBreaker ?? new GsCircuitBreaker(
                 failureThreshold: 3,
                 timeout: TimeSpan.FromMinutes(2),
                 retryDelay: TimeSpan.FromSeconds(10));
@@ -122,7 +123,10 @@ namespace GsPlugin.Api {
 
         #region Game Session Management
 
-        public async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) {
+        public Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData) =>
+            StartGameSession(startData, null);
+
+        private async Task<ScrobbleStartRes> StartGameSession(ScrobbleStartReq startData, Action onAttempt) {
             // Validate input before making API call
             if (!RequireRequest(startData, nameof(StartGameSession), "startData") ||
                 !RequireIdentity(startData.user_id, nameof(StartGameSession))) {
@@ -136,6 +140,7 @@ namespace GsPlugin.Api {
             string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/start";
 
             var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                onAttempt?.Invoke();
                 return await PostJsonAsync<ApiResponse<ScrobbleStartData>>(url, startData);
             }, maxRetries: 2, isFailure: r => r == null);
 
@@ -165,7 +170,10 @@ namespace GsPlugin.Api {
             }
         }
 
-        public async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData) {
+        public Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData) =>
+            FinishGameSession(endData, null);
+
+        private async Task<ScrobbleFinishRes> FinishGameSession(ScrobbleFinishReq endData, Action onAttempt) {
             // Validate input before making API call
             if (!RequireRequest(endData, nameof(FinishGameSession), "endData")) {
                 return null;
@@ -210,6 +218,7 @@ namespace GsPlugin.Api {
             string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/finish";
 
             var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                onAttempt?.Invoke();
                 return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(url, sendData, true);
             }, maxRetries: 2, isFailure: r => r == null);
 
@@ -261,6 +270,17 @@ namespace GsPlugin.Api {
             }
 
             try {
+                // An open circuit fast-fails every send without touching the network, but the loop
+                // below cannot tell that from a real rejection and would still increment
+                // FlushAttempts. Five such passes (~25 minutes offline, or five launches) would
+                // drop the entire queue for data that would have synced fine once connectivity
+                // returned. Skip only while the cooldown is active; after it expires this flush
+                // must itself be able to probe the server, even when no other API calls occur.
+                if (_circuitBreaker.IsBlocking) {
+                    _logger.Info("Skipping pending-scrobble flush: circuit breaker is open");
+                    return;
+                }
+
                 // Peek without clearing: items remain persisted until individually confirmed.
                 var pending = GsDataManager.PeekPendingScrobbles();
                 if (pending == null || pending.Count == 0) {
@@ -273,14 +293,25 @@ namespace GsPlugin.Api {
                     // Re-check opt-out before each send (user may have opted out mid-flush)
                     if (GsDataManager.IsOptedOut) break;
 
+                    // The breaker can trip partway through a pass: the first real send fails and
+                    // opens it, then every remaining item fast-fails with no network call. Stop
+                    // rather than burning an attempt per item on a circuit we already know is open.
+                    if (_circuitBreaker.IsBlocking) {
+                        _logger.Info("Stopping pending-scrobble flush: circuit breaker opened mid-pass");
+                        break;
+                    }
+
                     bool success = false;
+                    bool attempted = false;
+                    string startedSessionId = null;
                     try {
                         if (item.Type == "start" && item.StartData != null) {
-                            var res = await StartGameSession(item.StartData);
+                            var res = await StartGameSession(item.StartData, () => attempted = true);
                             success = res != null;
+                            startedSessionId = res?.session_id;
                         }
                         else if (item.Type == "finish" && item.FinishData != null) {
-                            var res = await FinishGameSession(item.FinishData);
+                            var res = await FinishGameSession(item.FinishData, () => attempted = true);
                             success = res != null;
                         }
                         else {
@@ -295,10 +326,21 @@ namespace GsPlugin.Api {
                     }
 
                     if (success) {
-                        // Remove from the persisted queue now that the server has accepted it.
-                        GsDataManager.RemovePendingScrobble(item);
+                        // Persist replay pairing before removing a start, so a crash cannot lose
+                        // its returned session id and let the finish target another open session.
+                        bool persisted = item.Type == "start"
+                            ? GsDataManager.CompletePendingStart(item, startedSessionId)
+                            : GsDataManager.CompletePendingScrobble(item);
+                        if (!persisted) {
+                            break;
+                        }
                     }
                     else {
+                        // Another request may open the circuit after our entry check. A fast-fail
+                        // in that window is not a failed send and must not consume the retry budget.
+                        if (!attempted && _circuitBreaker.IsBlocking) {
+                            break;
+                        }
                         // Mutate-then-save under GsDataManager's lock, rather than incrementing
                         // the field directly and calling Save() separately — keeps this in line
                         // with every other queue mutation (see RemovePendingScrobble) instead of
@@ -306,8 +348,7 @@ namespace GsPlugin.Api {
                         GsDataManager.IncrementPendingScrobbleFlushAttempts(item);
                         if (item.FlushAttempts >= MaxFlushAttempts) {
                             _logger.Warn($"Dropping pending scrobble after {item.FlushAttempts} failed flush attempts (type={item.Type}, queued={item.QueuedAt:O})");
-                            GsDataManager.RemovePendingScrobble(item);
-                            GsDataManager.MutateAndSave(d => d.DroppedScrobbleCount++);
+                            GsDataManager.DropPendingScrobble(item);
                             GsSentry.AddBreadcrumb(
                                 message: $"Dropped pending scrobble after {MaxFlushAttempts} attempts",
                                 category: "flush",
@@ -318,6 +359,10 @@ namespace GsPlugin.Api {
                         }
                         // else: item stays in the queue with its incremented FlushAttempts counter,
                         // already persisted by IncrementPendingScrobbleFlushAttempts above.
+                        // Keep FIFO order: a finish must never overtake its failed start, even if
+                        // that start failed permanently without opening the circuit. Terminally
+                        // dropped starts also drop their dependent finish in the same persisted edit.
+                        break;
                     }
                 }
             }
@@ -448,7 +493,8 @@ namespace GsPlugin.Api {
             return await _circuitBreaker.ExecuteAsync(
                 async () => {
                     lastStatus = 0;
-                    return await PostJsonAsync<TRes>(url, req, true, status => lastStatus = status);
+                    return await PostJsonAsync<TRes>(url, req, true, status => lastStatus = status,
+                        parseErrorBody: true);
                 },
                 maxRetries: 1,
                 isFailure: r => r == null,
@@ -875,8 +921,18 @@ namespace GsPlugin.Api {
         /// </summary>
         private const int MaxLoggedBodyChars = 512;
 
+        /// <param name="parseErrorBody">
+        /// When true, a permanent 4xx whose body deserializes into <typeparamref name="TResponse"/>
+        /// is returned instead of null. Transient HTTP errors always stay retryable failures.
+        /// Some rejections are business outcomes rather than failures:
+        /// the v4 commit answers a snapshot-hash mismatch with HTTP 400 and
+        /// {status:"force-full-sync", reason:"hash_mismatch"}. Collapsing that to null makes it
+        /// indistinguishable from a dropped connection, leaves the caller's recovery branch
+        /// unreachable, and lets a deterministic rejection count against the shared circuit breaker.
+        /// Opt-in so endpoints whose callers only test for null keep their current behaviour.
+        /// </param>
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false,
-            Action<int> onStatus = null)
+            Action<int> onStatus = null, bool parseErrorBody = false)
             where TResponse : class {
             string jsonData = JsonSerializer.Serialize(payload, _jsonOptions);
 
@@ -930,6 +986,26 @@ namespace GsPlugin.Api {
                                 $"Request failed with status {(int)response.StatusCode} ({response.StatusCode}) for URL {url}");
 
                             CaptureHttpException(httpEx, url, jsonData, response, responseBody);
+                        }
+
+                        // Keep recognized permanent business rejections (e.g. force-full-sync)
+                        // inspectable, but never turn JSON from a 408/429/5xx into circuit success.
+                        if (parseErrorBody && IsPermanentRejection((int)response.StatusCode)
+                            && !string.IsNullOrWhiteSpace(responseBody)) {
+                            var errorContentType = response?.Content?.Headers?.ContentType?.MediaType;
+                            if (errorContentType == null || !errorContentType.Contains("html")) {
+                                try {
+                                    var errorResponse =
+                                        JsonSerializer.Deserialize<TResponse>(responseBody, _jsonOptions);
+                                    if (errorResponse != null) {
+                                        return errorResponse;
+                                    }
+                                }
+                                catch (JsonException) {
+                                    // Not a shape we understand — fall through to the null result so the
+                                    // caller still treats it as a failure rather than a parsed outcome.
+                                }
+                            }
                         }
                         return null;
                     }
