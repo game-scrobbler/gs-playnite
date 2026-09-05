@@ -83,5 +83,50 @@
     ],
     "metadataHashV3": "6dde75868bbe4679874821267326bfd6e56253664aa36679b7db4a0507993e1e",
     "libraryHashV3": "4d059c3c1e3a07c30ff38bc6e15d3b013f16b8421346ce0dfa1cbfcfaf1f0403"
+  },
+  "achievements": {
+    "$comment": [
+      "Golden vector for createAchievementHashV2 / GsHashUtils.ComputeAchievementHash.",
+      "",
+      "Recipe, per game: {playnite_id}:{count}:{unlockedCount}:{sha256(sortedNames)}",
+      "where sortedNames is the achievement names joined by ',' after an ORDINAL",
+      "(UTF-16 code-unit) sort. Per-game keys are then ordinal-sorted and each is fed",
+      "to SHA-256 as UTF-8 bytes followed by a single '|' byte, including a trailing",
+      "one after the last key.",
+      "",
+      "The names are chosen so ordinal and linguistic sorts DISAGREE: ordinal orders",
+      "by code unit -- 'Z'(0x5A) < '_'(0x5F) < 'a'(0x61) -- giving",
+      "'Zebra,_Secret,apple', while a culture-aware sort would interleave them. A",
+      "vector using only lowercase names would pass under either comparer and prove",
+      "nothing.",
+      "",
+      "The empty-achievement game pins that a game with no achievements still",
+      "contributes a key, hashing the empty string (e3b0c442... is sha256 of '')."
+    ],
+    "games": [
+      {
+        "playnite_id": "22222222-2222-2222-2222-222222222222",
+        "achievements": []
+      },
+      {
+        "playnite_id": "11111111-1111-1111-1111-111111111111",
+        "achievements": [
+          {
+            "name": "Zebra",
+            "is_unlocked": true
+          },
+          {
+            "name": "apple",
+            "is_unlocked": false
+          },
+          {
+            "name": "_Secret",
+            "is_unlocked": true
+          }
+        ]
+      }
+    ],
+    "sortedNames": "Zebra,_Secret,apple",
+    "achievementHashV2": "87486c3e5ad37a1010286d93ee6474a4649e0416d46c5a8c873ef26dce0a14d9"
   }
 }

@@ -249,6 +249,13 @@ namespace GsPlugin.Api {
     public class AchievementItemDto {
         public string name { get; set; }
         public string description { get; set; }
+
+        // Not part of any hash recipe, but the providers disagree on DateTimeKind: SuccessStory's
+        // ISO strings yield Utc, while a bare timestamp from the Playnite Achievements SQLite cache
+        // yields Unspecified. Without the converter the same field reaches the server as "...Z",
+        // "...+02:00" or an ambiguous "..." depending on which addon supplied it. Normalize so an
+        // unlock time means one thing.
+        [JsonConverter(typeof(CanonicalDateTimeConverter))]
         public DateTime? date_unlocked { get; set; }
         public bool is_unlocked { get; set; }
         public float? rarity_percent { get; set; }

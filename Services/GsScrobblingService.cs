@@ -969,7 +969,9 @@ namespace GsPlugin.Services {
                             var dedupedByName = new Dictionary<string, AchievementItemDto>();
                             foreach (var a in achievements) {
                                 dedupedByName[a.Name ?? ""] = new AchievementItemDto {
-                                    name = a.Name,
+                                    // See the diff-sync site: "" not null, so the C# and JS sort
+                                    // orders agree on empty achievement names.
+                                    name = a.Name ?? "",
                                     description = a.Description,
                                     date_unlocked = a.DateUnlocked,
                                     is_unlocked = a.IsUnlocked,
@@ -1151,7 +1153,12 @@ namespace GsPlugin.Services {
                         var dedupedByName = new Dictionary<string, AchievementItemDto>();
                         foreach (var a in achievements) {
                             dedupedByName[a.Name ?? ""] = new AchievementItemDto {
-                                name = a.Name,
+                                // "" not null: the hash joins names with string.Join, which renders a
+                                // null as "", but JS Array.sort coerces null via ToString to the
+                                // literal "null" and orders it among the n's. Same characters, different
+                                // order, different digest -- a permanent hash mismatch. Normalizing here
+                                // leaves the C# digest unchanged and makes both sides agree.
+                                name = a.Name ?? "",
                                 description = a.Description,
                                 date_unlocked = a.DateUnlocked,
                                 is_unlocked = a.IsUnlocked,
@@ -1255,7 +1262,7 @@ namespace GsPlugin.Services {
         private static void HandleCooldownResponse(AsyncQueuedResponse response, bool isDiffSync = false) {
             DateTime? expiresAt = null;
             if (!string.IsNullOrEmpty(response.cooldownExpiresAt)
-                && DateTime.TryParse(response.cooldownExpiresAt, null,
+                && DateTime.TryParse(response.cooldownExpiresAt, CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)) {
                 expiresAt = parsed.ToUniversalTime();
             }

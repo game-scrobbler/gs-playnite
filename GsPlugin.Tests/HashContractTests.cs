@@ -135,6 +135,92 @@ namespace GsPlugin.Tests {
             Assert.Equal("", GsHashUtils.FormatDateForHash(null));
         }
 
+        /// <summary>
+        /// The achievement recipe had no vector on either side of the contract, while
+        /// the library recipe had two. It gates the same force-full-sync loop: a
+        /// disagreement here makes every achievements diff mismatch its baseline, and
+        /// the client re-uploads in full forever without surfacing an error.
+        ///
+        /// The names deliberately sort differently under ordinal and linguistic
+        /// comparers, so a comparer swap on either side turns this red.
+        /// </summary>
+        [Fact]
+        public void Achievement_hash_matches_the_shared_digest() {
+            var fixture = LoadFixture().GetProperty("achievements");
+            var games = ReadAchievementGames(fixture);
+
+            Assert.Equal(
+                fixture.GetProperty("achievementHashV2").GetString(),
+                GsHashUtils.ComputeAchievementHash(games));
+        }
+
+        /// <summary>
+        /// Per-game keys are ordinal-sorted before hashing, so the order games arrive
+        /// in must not change the digest. Providers do not guarantee an order.
+        /// </summary>
+        [Fact]
+        public void Achievement_hash_is_independent_of_game_order() {
+            var fixture = LoadFixture().GetProperty("achievements");
+            var games = ReadAchievementGames(fixture);
+            var reversed = new List<GameAchievementsDto>(games);
+            reversed.Reverse();
+
+            Assert.Equal(
+                GsHashUtils.ComputeAchievementHash(games),
+                GsHashUtils.ComputeAchievementHash(reversed));
+        }
+
+        /// <summary>
+        /// A null name and an empty name must hash identically. string.Join renders a
+        /// null as "", but JS Array.sort coerces null via ToString to the literal
+        /// "null" and orders it among the n's -- so a null reaching the wire would
+        /// give the two sides different digests. The DTO builders normalize to "";
+        /// this pins that the recipe agrees with that choice.
+        /// </summary>
+        [Fact]
+        public void Achievement_hash_treats_a_null_name_as_empty() {
+            var withNull = new List<GameAchievementsDto> {
+                new GameAchievementsDto {
+                    playnite_id = "g",
+                    achievements = new List<AchievementItemDto> {
+                        new AchievementItemDto { name = null, is_unlocked = false },
+                        new AchievementItemDto { name = "A", is_unlocked = true }
+                    }
+                }
+            };
+            var withEmpty = new List<GameAchievementsDto> {
+                new GameAchievementsDto {
+                    playnite_id = "g",
+                    achievements = new List<AchievementItemDto> {
+                        new AchievementItemDto { name = "", is_unlocked = false },
+                        new AchievementItemDto { name = "A", is_unlocked = true }
+                    }
+                }
+            };
+
+            Assert.Equal(
+                GsHashUtils.ComputeAchievementHash(withEmpty),
+                GsHashUtils.ComputeAchievementHash(withNull));
+        }
+
+        private static List<GameAchievementsDto> ReadAchievementGames(JsonElement fixture) {
+            var games = new List<GameAchievementsDto>();
+            foreach (var g in fixture.GetProperty("games").EnumerateArray()) {
+                var achievements = new List<AchievementItemDto>();
+                foreach (var a in g.GetProperty("achievements").EnumerateArray()) {
+                    achievements.Add(new AchievementItemDto {
+                        name = Str(a, "name"),
+                        is_unlocked = a.GetProperty("is_unlocked").GetBoolean()
+                    });
+                }
+                games.Add(new GameAchievementsDto {
+                    playnite_id = Str(g, "playnite_id"),
+                    achievements = achievements
+                });
+            }
+            return games;
+        }
+
         private static GameSyncDto ReadGame(JsonElement e) => new GameSyncDto {
             playnite_id = Str(e, "playnite_id"),
             game_name = Str(e, "game_name"),
