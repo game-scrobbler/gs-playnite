@@ -192,4 +192,5 @@
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">立即同步库</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">打开设置</sys:String>
 
+    <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">此请求期间安装信息已更改或插件已停用。请重试。</sys:String>
 </ResourceDictionary>

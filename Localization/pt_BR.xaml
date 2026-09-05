@@ -192,4 +192,5 @@ Deseja vincular a uma conta diferente?</sys:String>
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Sincronizar Biblioteca</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Abrir Configurações</sys:String>
 
+    <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">A instalação foi alterada ou desativada durante esta solicitação. Tente novamente.</sys:String>
 </ResourceDictionary>

@@ -192,4 +192,5 @@ ID пользователя: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Синхронизировать библиотеку</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Открыть настройки</sys:String>
 
+    <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">Во время запроса установка изменилась или плагин был отключён. Повторите попытку.</sys:String>
 </ResourceDictionary>

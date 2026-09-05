@@ -192,4 +192,5 @@ Möchten Sie ein anderes Konto verknüpfen?</sys:String>
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Bibliothek jetzt synchronisieren</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Einstellungen öffnen</sys:String>
 
+    <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">Die Installation wurde während dieser Anfrage geändert oder deaktiviert. Bitte versuchen Sie es erneut.</sys:String>
 </ResourceDictionary>

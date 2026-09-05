@@ -192,4 +192,5 @@ Do you want to link to a different account?</sys:String>
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Sync Library Now</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Open Settings</sys:String>
 
+    <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">The installation changed or was disabled during this request. Please try again.</sys:String>
 </ResourceDictionary>

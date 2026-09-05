@@ -192,4 +192,5 @@ Voulez-vous associer un autre compte ?</sys:String>
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Synchroniser maintenant</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Ouvrir les paramètres</sys:String>
 
+    <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">L’installation a été modifiée ou désactivée pendant cette requête. Veuillez réessayer.</sys:String>
 </ResourceDictionary>
