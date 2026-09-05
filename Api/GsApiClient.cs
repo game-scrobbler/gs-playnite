@@ -53,6 +53,20 @@ namespace GsPlugin.Api {
                     Timeout = TimeSpan.FromSeconds(30)
                 };
             }
+
+            // The server reads this on every token-authenticated request to populate
+            // playnite_users.plugin_version. Setting it as a default header covers registration,
+            // all v3/v4 writes, notifications and the dashboard token in one place; without it,
+            // version telemetry only exists for users who happen to open the sidebar.
+            // Guarded because a throw in a static constructor is unrecoverable: it would surface as
+            // TypeInitializationException on every later access to this type.
+            try {
+                _defaultHttpClient.DefaultRequestHeaders.Add(
+                    "x-playnite-plugin-version", GsSentry.GetPluginVersion());
+            }
+            catch (Exception ex) {
+                GsLogger.Warn($"Could not set plugin version header: {ex.Message}");
+            }
         }
 
         private readonly HttpClient _httpClient;
