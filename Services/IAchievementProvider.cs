@@ -5,6 +5,42 @@ using Playnite.SDK.Plugins;
 
 namespace GsPlugin.Services {
     /// <summary>
+    /// A successful read may contain no achievements. An unavailable read must never be
+    /// interpreted as a request to delete previously synchronized achievements.
+    /// </summary>
+    public sealed class AchievementReadResult {
+        public bool IsAvailable { get; }
+        public List<AchievementItem> Achievements { get; }
+        public string ProviderName { get; }
+
+        private AchievementReadResult(bool isAvailable, List<AchievementItem> achievements, string providerName) {
+            IsAvailable = isAvailable;
+            Achievements = achievements ?? new List<AchievementItem>();
+            ProviderName = providerName;
+        }
+
+        public static AchievementReadResult Available(List<AchievementItem> achievements, string providerName = null) =>
+            new AchievementReadResult(true, achievements, providerName);
+
+        public static AchievementReadResult Unavailable(string providerName = null) =>
+            new AchievementReadResult(false, null, providerName);
+
+        public static AchievementReadResult Read(IAchievementProvider provider, Guid gameId) {
+            if (provider is IReliableAchievementProvider reliable) {
+                return reliable.ReadAchievements(gameId);
+            }
+            var items = provider.GetAchievements(gameId);
+            // Older providers cannot distinguish absence from a read failure. Preserve the
+            // existing baseline when their answer is ambiguous.
+            return items == null ? Unavailable(provider.ProviderName) : Available(items, provider.ProviderName);
+        }
+    }
+
+    public interface IReliableAchievementProvider {
+        AchievementReadResult ReadAchievements(Guid gameId);
+    }
+
+    /// <summary>
     /// Reads the Version field from extension.yaml next to the plugin DLL.
     /// Assembly versions are often wrong in Playnite plugins; extension.yaml is authoritative.
     /// </summary>

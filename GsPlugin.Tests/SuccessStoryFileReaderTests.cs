@@ -56,6 +56,9 @@ namespace GsPlugin.Tests {
             var helper = CreateHelper();
             var result = helper.GetAchievements(gameId);
             Assert.Null(result);
+            var read = helper.ReadAchievements(gameId);
+            Assert.True(read.IsAvailable);
+            Assert.Empty(read.Achievements);
         }
 
         [Fact]
@@ -171,6 +174,7 @@ namespace GsPlugin.Tests {
             var helper = CreateHelper();
             var result = helper.GetAchievements(gameId);
             Assert.Null(result);
+            Assert.False(helper.ReadAchievements(gameId).IsAvailable);
         }
 
         [Fact]

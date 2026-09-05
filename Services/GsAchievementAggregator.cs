@@ -7,7 +7,7 @@ namespace GsPlugin.Services {
     /// Aggregates multiple achievement providers (e.g. SuccessStory, Playnite Achievements).
     /// For each game, returns data from the first provider that has it.
     /// </summary>
-    public class GsAchievementAggregator : IAchievementProvider {
+    public class GsAchievementAggregator : IAchievementProvider, IReliableAchievementProvider {
         private readonly List<IAchievementProvider> _providers;
 
         public GsAchievementAggregator(params IAchievementProvider[] providers) {
@@ -49,11 +49,18 @@ namespace GsPlugin.Services {
         }
 
         public List<AchievementItem> GetAchievements(Guid gameId) {
+            var result = ReadAchievements(gameId);
+            return result.IsAvailable && result.Achievements.Count > 0 ? result.Achievements : null;
+        }
+
+        public AchievementReadResult ReadAchievements(Guid gameId) {
             foreach (var p in ResolutionOrder()) {
-                var achievements = p.GetAchievements(gameId);
-                if (achievements != null) return achievements;
+                var result = AchievementReadResult.Read(p, gameId);
+                // A failed preferred provider cannot safely be replaced with a potentially
+                // older fallback snapshot. Retry the snapshot after the read recovers.
+                if (!result.IsAvailable || result.Achievements.Count > 0) return result;
             }
-            return null;
+            return AchievementReadResult.Available(null);
         }
 
         /// <summary>
@@ -61,11 +68,10 @@ namespace GsPlugin.Services {
         /// Used for diagnostic logging.
         /// </summary>
         public (List<AchievementItem> achievements, string providerName) GetAchievementsWithSource(Guid gameId) {
-            foreach (var p in ResolutionOrder()) {
-                var achievements = p.GetAchievements(gameId);
-                if (achievements != null) return (achievements, p.ProviderName);
-            }
-            return (null, null);
+            var result = ReadAchievements(gameId);
+            return result.IsAvailable && result.Achievements.Count > 0
+                ? (result.Achievements, result.ProviderName)
+                : (null, null);
         }
 
         /// <summary>

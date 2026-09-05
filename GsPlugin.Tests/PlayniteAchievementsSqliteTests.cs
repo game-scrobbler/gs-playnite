@@ -139,6 +139,9 @@ namespace GsPlugin.Tests {
             CreateTestDatabase();
             var helper = CreateHelper();
             Assert.Null(helper.GetAchievements(Guid.NewGuid()));
+            var read = helper.ReadAchievements(Guid.NewGuid());
+            Assert.True(read.IsAvailable);
+            Assert.Empty(read.Achievements);
         }
 
         [Fact]
@@ -224,6 +227,7 @@ namespace GsPlugin.Tests {
             File.WriteAllText(_dbPath, "this is not a database");
             var helper = CreateHelper();
             Assert.Null(helper.GetAchievements(Guid.NewGuid()));
+            Assert.False(helper.ReadAchievements(Guid.NewGuid()).IsAvailable);
         }
 
         [Fact]

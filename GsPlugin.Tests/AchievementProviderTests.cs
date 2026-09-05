@@ -8,7 +8,7 @@ namespace GsPlugin.Tests {
     /// <summary>
     /// Minimal IAchievementProvider stub for testing the aggregator.
     /// </summary>
-    internal class StubAchievementProvider : IAchievementProvider {
+    internal class StubAchievementProvider : IAchievementProvider, IReliableAchievementProvider {
         public bool IsInstalled { get; set; }
         public bool IsPluginLoaded { get; set; }
         public string ProviderName { get; set; } = "Stub";
@@ -33,6 +33,9 @@ namespace GsPlugin.Tests {
                 return null;
             return list.Count > 0 ? list : null;
         }
+
+        public AchievementReadResult ReadAchievements(Guid gameId) =>
+            AchievementReadResult.Available(GetAchievements(gameId), ProviderName);
     }
 
     public class AchievementItemTests {
