@@ -767,10 +767,10 @@ namespace GsPlugin.Models {
         }
 
         // A second start belongs to another launch: never attach its finish to this start.
-        private static PendingScrobble FindPairedFinish(PendingScrobble start) {
-            var startIndex = _data.PendingScrobbles.IndexOf(start);
-            for (var i = startIndex + 1; i < _data.PendingScrobbles.Count; i++) {
-                var candidate = _data.PendingScrobbles[i];
+        private static PendingScrobble FindPairedFinish(GsData d, PendingScrobble start) {
+            var startIndex = d.PendingScrobbles.IndexOf(start);
+            for (var i = startIndex + 1; i < d.PendingScrobbles.Count; i++) {
+                var candidate = d.PendingScrobbles[i];
                 if (!IsSameGame(candidate, start.StartData.game_id, start.StartData.plugin_id)) continue;
                 return candidate.Type == "finish" ? candidate : null;
             }
@@ -782,20 +782,20 @@ namespace GsPlugin.Models {
             return MutatePendingScrobble(item, d => {
                 var gameId = item.StartData.game_id;
                 var pluginId = item.StartData.plugin_id;
-                var pairedFinish = FindPairedFinish(item);
-                var laterStart = _data.PendingScrobbles.Skip(_data.PendingScrobbles.IndexOf(item) + 1)
+                var pairedFinish = FindPairedFinish(d, item);
+                var laterStart = d.PendingScrobbles.Skip(d.PendingScrobbles.IndexOf(item) + 1)
                     .Any(p => p.Type == "start" && IsSameGame(p, gameId, pluginId));
                 if (pairedFinish != null && string.IsNullOrEmpty(pairedFinish.FinishData.session_id)) {
                     pairedFinish.FinishData.session_id = sessionId;
                 }
                 if (pairedFinish == null && !laterStart && !string.IsNullOrEmpty(gameId)
                     && !string.IsNullOrEmpty(sessionId)) {
-                    _data.ActiveSessionsByGameId[gameId] = sessionId;
+                    d.ActiveSessionsByGameId[gameId] = sessionId;
                 }
                 if (!laterStart && (pairedFinish != null || !string.IsNullOrEmpty(sessionId))) {
-                    _data.PendingStartGameIds.Remove(gameId);
+                    d.PendingStartGameIds.Remove(gameId);
                 }
-                _data.PendingScrobbles.Remove(item);
+                d.PendingScrobbles.Remove(item);
                 _claimedScrobbles.Remove(item);
             });
         }
@@ -804,11 +804,11 @@ namespace GsPlugin.Models {
             return MutatePendingScrobble(item, d => {
                 var finish = item.FinishData;
                 if (!string.IsNullOrEmpty(finish?.game_id)
-                    && _data.ActiveSessionsByGameId.TryGetValue(finish.game_id, out var active)
+                    && d.ActiveSessionsByGameId.TryGetValue(finish.game_id, out var active)
                     && active == finish.session_id) {
-                    _data.ActiveSessionsByGameId.Remove(finish.game_id);
+                    d.ActiveSessionsByGameId.Remove(finish.game_id);
                 }
-                _data.PendingScrobbles.Remove(item);
+                d.PendingScrobbles.Remove(item);
                 _claimedScrobbles.Remove(item);
             });
         }
@@ -816,20 +816,20 @@ namespace GsPlugin.Models {
         public static bool DropPendingScrobble(PendingScrobble item) {
             return MutatePendingScrobble(item, d => {
                 if (item.Type == "start" && item.StartData != null) {
-                    var pairedFinish = FindPairedFinish(item);
+                    var pairedFinish = FindPairedFinish(d, item);
                     if (pairedFinish != null) {
-                        _data.PendingScrobbles.Remove(pairedFinish);
+                        d.PendingScrobbles.Remove(pairedFinish);
                         _claimedScrobbles.Remove(pairedFinish);
-                        _data.DroppedScrobbleCount++;
+                        d.DroppedScrobbleCount++;
                     }
-                    if (!_data.PendingScrobbles.Any(p => p != item && p.Type == "start"
+                    if (!d.PendingScrobbles.Any(p => p != item && p.Type == "start"
                         && IsSameGame(p, item.StartData.game_id, item.StartData.plugin_id))) {
-                        _data.PendingStartGameIds.Remove(item.StartData.game_id);
+                        d.PendingStartGameIds.Remove(item.StartData.game_id);
                     }
                 }
-                _data.PendingScrobbles.Remove(item);
+                d.PendingScrobbles.Remove(item);
                 _claimedScrobbles.Remove(item);
-                _data.DroppedScrobbleCount++;
+                d.DroppedScrobbleCount++;
             });
         }
 
