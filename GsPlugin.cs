@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,16 +38,62 @@ namespace GsPlugin {
                 if (string.IsNullOrEmpty(name.Name) || name.Name.StartsWith("Playnite", StringComparison.OrdinalIgnoreCase)) {
                     return null;
                 }
-                var path = Path.Combine(pluginDir, name.Name + ".dll");
-                if (File.Exists(path)) {
-                    return Assembly.LoadFrom(path);
+
+                // Strip any directory component before combining. The requested name is not
+                // ours to trust, and Path.Combine would happily follow "..\..\x" out of the
+                // plugin directory. Belt-and-braces: File.Exists below already confines the
+                // load, but the intent is that only a bare file name is ever considered.
+                var fileName = Path.GetFileName(name.Name);
+                if (string.IsNullOrEmpty(fileName) || fileName != name.Name) {
+                    return null;
                 }
-                return null;
+
+                var path = Path.Combine(pluginDir, fileName + ".dll");
+                if (!File.Exists(path)) {
+                    return null;
+                }
+
+                // Match on identity, not just simple name. This handler is registered on the
+                // shared AppDomain, so it is asked to resolve every extension's failures too.
+                // The plugin ships very common assemblies (System.Text.Json, System.Memory,
+                // Sentry, Microsoft.Extensions.*), and answering another extension's request
+                // for, say, System.Text.Json 4.0.1.0 with our 9.x is a silent downgrade or
+                // upgrade of a dependency that extension was never compiled against.
+                // Serve only an assembly whose public key token matches and whose version is
+                // at least what the caller asked for.
+                try {
+                    var candidate = AssemblyName.GetAssemblyName(path);
+                    var wantedToken = name.GetPublicKeyToken();
+                    var candidateToken = candidate.GetPublicKeyToken();
+                    bool tokensMatch =
+                        wantedToken == null || wantedToken.Length == 0
+                        || (candidateToken != null && wantedToken.SequenceEqual(candidateToken));
+                    if (!tokensMatch) {
+                        return null;
+                    }
+                    if (name.Version != null && candidate.Version != null && candidate.Version < name.Version) {
+                        return null;
+                    }
+                }
+                catch {
+                    // Unreadable metadata — decline rather than guess.
+                    return null;
+                }
+
+                return Assembly.LoadFrom(path);
             };
 
             // UnobservedTaskException handling is centralized in GsSentry.Initialize()
             // which filters by plugin origin, captures to Sentry, and calls SetObserved().
         }
+        /// <summary>
+        /// Private WebView2 profile directory, kept inside the plugin's own data folder. The default
+        /// profile is derived from the host process and is therefore shared by every Playnite
+        /// extension that hosts a WebView2 — including the dashboard's authenticated cookies and the
+        /// URL history holding its access_token.
+        /// </summary>
+        private string WebViewUserDataFolder => Path.Combine(GetPluginUserDataPath(), "WebView2");
+
         private GsPluginSettingsViewModel _settings { get; set; }
         private GsApiClient _apiClient;
         private GsAccountLinkingService _linkingService;
@@ -374,7 +421,7 @@ namespace GsPlugin {
                 return null;
             }
             if (args.Name == "Dashboard") {
-                return new MySidebarView(_apiClient);
+                return new MySidebarView(_apiClient, WebViewUserDataFolder);
             }
             return null;
         }
@@ -405,7 +452,7 @@ namespace GsPlugin {
                 Title = "Game Scrobbler",
                 Icon = iconImage,
                 Opened = () => {
-                    return new MySidebarView(_apiClient);
+                    return new MySidebarView(_apiClient, WebViewUserDataFolder);
                 },
             };
         }
@@ -436,7 +483,7 @@ namespace GsPlugin {
                     window.Title = "Game Scrobbler Dashboard";
                     window.Width = 1200;
                     window.Height = 800;
-                    window.Content = new MySidebarView(_apiClient);
+                    window.Content = new MySidebarView(_apiClient, WebViewUserDataFolder);
                     window.Owner = PlayniteApi.Dialogs.GetCurrentAppWindow();
                     window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
                     window.ShowDialog();

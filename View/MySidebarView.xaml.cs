@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using GsPlugin.Api;
@@ -11,13 +12,22 @@ namespace GsPlugin.View {
     public partial class MySidebarView : UserControl, IDisposable {
 
         private readonly IGsApiClient _apiClient;
+        private readonly string _userDataFolder;
         private bool _webView2Ready;
         private DateTime _lastNavigatedAtUtc = DateTime.MinValue;
         private bool _disposed;
 
-        public MySidebarView(IGsApiClient apiClient) {
+        /// <param name="userDataFolder">
+        /// Private WebView2 profile directory. Without one, WebView2 falls back to a folder derived
+        /// from the host process, which every Playnite extension hosting a WebView2 shares — so the
+        /// cookie jar, localStorage and browsing history of the signed-in gamescrobbler.com dashboard
+        /// (including the access_token carried in the URL) would be readable by any other extension.
+        /// Passing null keeps the shared default, for callers that cannot supply a path.
+        /// </param>
+        public MySidebarView(IGsApiClient apiClient, string userDataFolder = null) {
             InitializeComponent();
             _apiClient = apiClient;
+            _userDataFolder = userDataFolder;
 
             // One approach is to wait until the control is actually loaded in the visual tree.
             this.Loaded += MySidebarView_Loaded;
@@ -28,7 +38,21 @@ namespace GsPlugin.View {
         private async void MySidebarView_Loaded(object sender, RoutedEventArgs e) {
             try {
                 // Ensure the CoreWebView2 is ready to receive commands
-                await MyWebView2.EnsureCoreWebView2Async();
+                CoreWebView2Environment environment = null;
+                if (!string.IsNullOrEmpty(_userDataFolder)) {
+                    try {
+                        Directory.CreateDirectory(_userDataFolder);
+                        environment = await CoreWebView2Environment.CreateAsync(
+                            browserExecutableFolder: null, userDataFolder: _userDataFolder);
+                    }
+                    catch (Exception envEx) {
+                        // Fall back to the shared default rather than leaving the dashboard broken;
+                        // a private profile is a hardening measure, not a functional requirement.
+                        GsLogger.Warn($"Could not create a private WebView2 profile, using the default: {envEx.Message}");
+                    }
+                }
+
+                await MyWebView2.EnsureCoreWebView2Async(environment);
 
                 if (MyWebView2?.CoreWebView2 == null) {
                     GsLogger.Error("WebView2 initialization failed: CoreWebView2 is null after initialization");
