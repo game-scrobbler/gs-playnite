@@ -94,7 +94,15 @@ jobs:
           SENTRY_PROJECT: gs-playnite
         run: |
           npm install -g @sentry/cli@2.42.2
-          $version = "${{ steps.release.outputs.tag_name }}".TrimStart('v')
+          $assemblyVersion = [System.Reflection.AssemblyName]::GetAssemblyName("$Env:GITHUB_WORKSPACE\bin\Release\GsPlugin.dll").Version
+          $version = $assemblyVersion.ToString(3)
+          if ("${{ steps.release.outputs.tag_name }}" -ne "GsPlugin-v$version") {
+            throw "Release tag does not match the built plugin version $version"
+          }
+          $pdb = [System.IO.File]::ReadAllBytes("$Env:GITHUB_WORKSPACE\bin\Release\GsPlugin.pdb")
+          if ($pdb.Length -lt 4 -or [System.Text.Encoding]::ASCII.GetString($pdb, 0, 4) -ne 'BSJB') {
+            throw 'The plugin PDB must use the portable format expected by the symbol upload'
+          }
           sentry-cli releases new "GsPlugin@$version"
           sentry-cli releases set-commits "GsPlugin@$version" --auto
           sentry-cli upload-dif --type=portablepdb "$Env:GITHUB_WORKSPACE\bin\Release" --log-level=info
