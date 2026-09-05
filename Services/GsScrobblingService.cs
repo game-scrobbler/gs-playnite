@@ -486,9 +486,21 @@ namespace GsPlugin.Services {
                 if (commit == null || !commit.success) {
                     // A commit that never resolved (null transport failure) or that the server
                     // rejected leaves the session open; abort so the next attempt can begin anew.
-                    _logger.Error($"{label} v4 commit failed: status={commit?.status}");
+                    //
+                    // force-full-sync is a business outcome, not a failure: the server answers a
+                    // snapshot-hash mismatch with success=false and a reason the caller acts on.
+                    // Collapsing it to null here would keep the caller's recovery branch unreachable
+                    // even though the body now survives the HTTP layer, so propagate it. The session
+                    // is still aborted either way -- nothing was committed.
+                    var isForceFullSync = commit != null && commit.status == "force-full-sync";
+                    if (isForceFullSync) {
+                        _logger.Warn($"{label} v4 commit rejected: force-full-sync (reason: {commit.reason})");
+                    }
+                    else {
+                        _logger.Error($"{label} v4 commit failed: status={commit?.status}");
+                    }
                     await abortAsync(syncId);
-                    return null;
+                    return isForceFullSync ? commit : null;
                 }
                 return commit;
             }
@@ -557,24 +569,23 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>Polling cadence for <see cref="TryConfirmQueueCompletionAsync"/>.</summary>
-        private static readonly TimeSpan QueueStatusPollInterval = TimeSpan.FromSeconds(1.5);
+        internal TimeSpan QueueStatusPollInterval { get; set; } = TimeSpan.FromSeconds(1.5);
 
         /// <summary>
         /// Total time budget for <see cref="TryConfirmQueueCompletionAsync"/>. Matches the server's
         /// documented "1-5 seconds" typical processing time with margin, so a poll never meaningfully
         /// delays startup/library-updated callbacks that await these sync methods.
         /// </summary>
-        private static readonly TimeSpan QueueStatusPollBudget = TimeSpan.FromSeconds(8);
+        internal TimeSpan QueueStatusPollBudget { get; set; } = TimeSpan.FromSeconds(8);
 
         /// <summary>
         /// Best-effort check of a queued sync job's terminal status via GET /queue/status/:queueId.
         /// A "queued" admission only means the request was accepted onto the async queue, not that
         /// the server applied it — see gs-playnite#83, where a job that failed after admission left
         /// the client believing it had synced. Bounded to a short budget: if the job hasn't reached a
-        /// terminal state in time (large library, slow backend), returns null so the caller falls back
-        /// to the pre-existing behavior of trusting the "queued" admission. This only tightens the
-        /// common case — a job that fails fast (validation error, immediate crash) is now caught
-        /// instead of silently treated as success.
+        /// terminal state in time (large library, slow backend), returns null and leaves the
+        /// previous baseline intact. The next sync can retry or recover through force-full-sync;
+        /// an admission without confirmed completion must never suppress that retry.
         /// </summary>
         /// <returns>true if the job completed successfully, false if it failed/partially applied,
         /// or null if no terminal status was observed within the budget.</returns>
@@ -610,8 +621,8 @@ namespace GsPlugin.Services {
                 }
             } while (DateTime.UtcNow < deadline);
 
-            _logger.Info($"{label}: job {queueId} still processing after {QueueStatusPollBudget.TotalSeconds:F0}s — " +
-                "committing baseline optimistically (server may still be working on a large library).");
+            _logger.Info($"{label}: no confirmed completion for job {queueId} after {QueueStatusPollBudget.TotalSeconds:F0}s — " +
+                "keeping the previous baseline so a later sync can retry.");
             return null;
         }
 
@@ -665,10 +676,12 @@ namespace GsPlugin.Services {
         private async Task<SyncLibraryResult> CommitSyncBaselineAsync(
             string label,
             string queueId,
+            string expectedInstallId,
+            int expectedGeneration,
             Func<bool> persistIndex,
             Action<GsData> persistHashes,
             string queuedDetail = null) {
-            if (await TryConfirmQueueCompletionAsync(label, queueId) == false) {
+            if (await TryConfirmQueueCompletionAsync(label, queueId) != true) {
                 return SyncLibraryResult.Error;
             }
 
@@ -676,13 +689,18 @@ namespace GsPlugin.Services {
                 ? $"{label} queued successfully."
                 : $"{label} queued successfully ({queuedDetail}).");
 
-            if (!persistIndex()) {
+            var indexSaved = false;
+            // The data lock also fences the index write. Index stores read DataOrNull
+            // without taking this lock, so this does not invert their lock order.
+            var saved = GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration, d => {
+                indexSaved = persistIndex();
+                if (indexSaved) persistHashes(d);
+            });
+            if (!saved || !indexSaved) {
                 _logger.Error($"{label} queued but local hash index save failed — " +
-                    "not committing hash baseline. Will retry next run.");
+                    "or the installation changed; will retry next run.");
                 return SyncLibraryResult.Error;
             }
-
-            GsDataManager.MutateAndSave(persistHashes);
             return SyncLibraryResult.Success;
         }
 
@@ -695,6 +713,8 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
 
                 if (!bypassCooldown) {
                     var cooldownExpiry = GsDataManager.Data.SyncCooldownExpiresAt;
@@ -707,6 +727,7 @@ namespace GsPlugin.Services {
                 _logger.Info("Starting full library sync (v4 chunked)");
                 var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 var integrationAccounts = ReadIntegrationAccountsSafe();
                 var accountsHash = GsHashUtils.ComputeIntegrationAccountsHash(integrationAccounts);
                 var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
@@ -723,6 +744,7 @@ namespace GsPlugin.Services {
 
                 var response = await UploadLibraryFullChunkedAsync(library, libraryHash, integrationAccounts);
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (response == null) {
                     _logger.Error("Failed to queue full library sync.");
                     return SyncLibraryResult.Error;
@@ -742,7 +764,7 @@ namespace GsPlugin.Services {
                     var libCount = library.Count;
                     return await CommitSyncBaselineAsync(
                         "Full library sync",
-                        response.queueId,
+                        response.queueId, installId, generation,
                         () => GsSyncHashIndex.ReplaceLibraryIndex(BuildLibraryFingerprints(library)),
                         d => {
                             d.LastSyncAt = DateTime.UtcNow;
@@ -829,6 +851,8 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
 
                 var cooldownExpiry = GsDataManager.Data.LibraryDiffSyncCooldownExpiresAt;
                 if (cooldownExpiry.HasValue && DateTime.UtcNow < cooldownExpiry.Value) {
@@ -839,6 +863,7 @@ namespace GsPlugin.Services {
                 _logger.Info("Starting diff library sync (v2)");
                 var (library, libraryHash, totalCount, _) = await BuildLibraryDtosAsync(playniteDatabaseGames);
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 var integrationAccounts = ReadIntegrationAccountsSafe();
                 var accountsHash = GsHashUtils.ComputeIntegrationAccountsHash(integrationAccounts);
                 var accountsChanged = accountsHash != (GsDataManager.Data.LastIntegrationAccountsHash ?? "");
@@ -855,6 +880,7 @@ namespace GsPlugin.Services {
                 var (added, updated, removed, currentFingerprints) = await Task.Run(() =>
                     ComputeLibraryDiff(library, fingerprints));
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 // If only integration accounts changed (no library diff), still send the request
                 // with empty diff so the backend can process the new accounts.
                 if (added.Count == 0 && updated.Count == 0 && removed.Count == 0 && !accountsChanged) {
@@ -882,6 +908,7 @@ namespace GsPlugin.Services {
                     integration_accounts = integrationAccounts.Count > 0 ? integrationAccounts : null
                 });
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (response == null) {
                     _logger.Error("Failed to queue library diff sync.");
                     return SyncLibraryResult.Error;
@@ -907,7 +934,7 @@ namespace GsPlugin.Services {
                     var libCount = library.Count;
                     return await CommitSyncBaselineAsync(
                         "Library diff sync",
-                        response.queueId,
+                        response.queueId, installId, generation,
                         () => GsSyncHashIndex.ApplyLibraryDiff(
                             added.Concat(updated).ToDictionary(
                                 g => g.playnite_id,
@@ -941,6 +968,8 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
 
                 if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
                     _logger.Info("Achievement sync skipped: disabled or no achievement provider installed.");
@@ -960,7 +989,7 @@ namespace GsPlugin.Services {
                     return allGames
                         .Where(GsAllowedPlugins.IsAllowed)
                         .Select(g => {
-                            var achievements = _achievementHelper.GetAchievements(g.Id);
+                            var achievements = ReadAchievementsForSync(g.Id).Achievements;
                             if (achievements == null || achievements.Count == 0)
                                 return null;
 
@@ -991,17 +1020,8 @@ namespace GsPlugin.Services {
                         .ToList();
                 });
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 var achHash = GsHashUtils.ComputeAchievementHash(games);
-
-                if (games.Count == 0) {
-                    _logger.Info("No games with achievements found — setting empty baseline.");
-                    if (!GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string>())) {
-                        _logger.Error("Failed to persist empty achievements baseline.");
-                        return SyncLibraryResult.Error;
-                    }
-                    GsDataManager.MutateAndSave(d => d.LastAchievementHash = achHash);
-                    return SyncLibraryResult.Skipped;
-                }
 
                 if (achHash == GsDataManager.Data.LastAchievementHash && GsSyncHashIndex.HasAchievementsBaseline) {
                     return SkipOrRepairIndex(
@@ -1017,6 +1037,7 @@ namespace GsPlugin.Services {
 
                 var response = await UploadAchievementsFullChunkedAsync(games, achHash);
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (response == null) {
                     _logger.Error("Failed to queue full achievements sync.");
                     return SyncLibraryResult.Error;
@@ -1030,12 +1051,16 @@ namespace GsPlugin.Services {
                 if (response.success && response.status == "queued") {
                     return await CommitSyncBaselineAsync(
                         "Full achievements sync",
-                        response.queueId,
+                        response.queueId, installId, generation,
                         () => GsSyncHashIndex.ReplaceAchievementIndex(BuildAchievementFingerprints(games)),
                         d => d.LastAchievementHash = achHash);
                 }
 
                 _logger.Error($"Unexpected response from full achievements sync: status={response.status}");
+                return SyncLibraryResult.Error;
+            }
+            catch (AchievementReadUnavailableException ex) {
+                _logger.Warn(ex.Message);
                 return SyncLibraryResult.Error;
             }
             catch (Exception ex) {
@@ -1053,6 +1078,8 @@ namespace GsPlugin.Services {
             IEnumerable<Playnite.SDK.Models.Game> playniteDatabaseGames) {
             try {
                 if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
 
                 if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
                     _logger.Info("Achievement diff sync skipped: disabled or no achievement provider installed.");
@@ -1106,17 +1133,9 @@ namespace GsPlugin.Services {
 
                         filteredCount++;
                         var playniteId = g.Id.ToString();
-                        List<AchievementItem> achievements;
-                        string sourceProvider = null;
-
-                        if (_achievementHelper is GsAchievementAggregator diagAgg) {
-                            var (achs, src) = diagAgg.GetAchievementsWithSource(g.Id);
-                            achievements = achs;
-                            sourceProvider = src;
-                        }
-                        else {
-                            achievements = _achievementHelper.GetAchievements(g.Id);
-                        }
+                        var read = ReadAchievementsForSync(g.Id);
+                        var achievements = read.Achievements;
+                        var sourceProvider = read.ProviderName;
 
                         if (achievements == null || achievements.Count == 0) {
                             nullCount++;
@@ -1193,6 +1212,7 @@ namespace GsPlugin.Services {
                     return (result, cleared, live, changedFps);
                 });
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (changed.Count == 0 && clearedIds.Count == 0) {
                     _logger.Info("Achievement diff is empty — skipping.");
                     return SyncLibraryResult.Skipped;
@@ -1226,6 +1246,7 @@ namespace GsPlugin.Services {
                     result_snapshot_hash = resultAchievementHash
                 });
 
+                if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 if (response == null) {
                     _logger.Error("Failed to queue achievements diff sync.");
                     return SyncLibraryResult.Error;
@@ -1241,12 +1262,16 @@ namespace GsPlugin.Services {
                 if (response.success && response.status == "queued") {
                     return await CommitSyncBaselineAsync(
                         "Achievement diff sync",
-                        response.queueId,
+                        response.queueId, installId, generation,
                         () => GsSyncHashIndex.ApplyAchievementDiff(upsertedFingerprints, allCleared),
                         d => d.LastAchievementHash = resultAchievementHash);
                 }
 
                 _logger.Error($"Unexpected response from achievements diff sync: status={response.status}");
+                return SyncLibraryResult.Error;
+            }
+            catch (AchievementReadUnavailableException ex) {
+                _logger.Warn(ex.Message);
                 return SyncLibraryResult.Error;
             }
             catch (Exception ex) {
