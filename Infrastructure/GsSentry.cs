@@ -285,9 +285,18 @@ namespace GsPlugin.Infrastructure {
         /// own data lives under %APPDATA%, so almost every IO exception it reports carries the
         /// user's real Windows account name inside the path.
         /// </summary>
-        private static readonly Regex UserProfilePathRegex = new Regex(
-            @"[A-Za-z]:\\Users\\[^\\""'\r\n]+",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex UserProfilePathRegex = CreateUserProfilePathRegex(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+
+        /// <summary>Redacts the actual profile root, including relocated profiles, and standard Windows profile paths.</summary>
+        internal static Regex CreateUserProfilePathRegex(string profileRoot) {
+            const string standardProfile = @"[A-Za-z]:\\Users\\[^\\""'\r\n]+";
+            var root = profileRoot?.TrimEnd('\\', '/');
+            var pattern = string.IsNullOrEmpty(root)
+                ? standardProfile
+                : Regex.Escape(root) + @"(?=$|[\\/""'\s])|" + standardProfile;
+            return new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
 
         internal static string ScrubText(string value) =>
             string.IsNullOrEmpty(value)

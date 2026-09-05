@@ -60,6 +60,21 @@ namespace GsPlugin.Tests {
         }
 
         [Theory]
+        [InlineData(@"D:\Profiles\Alice", @"Error in D:\Profiles\Alice\AppData\state.json", @"Error in C:\Users\%USER%\AppData\state.json")]
+        [InlineData(@"D:\Profiles\Alice", @"'d:\profiles\ALICE'", @"'C:\Users\%USER%'")]
+        [InlineData(@"D:\Profiles\Alice\", @"D:\Profiles\Alice", @"C:\Users\%USER%")]
+        [InlineData(@"D:\Profiles\Alice (QA)+", @"D:\Profiles\Alice (QA)+\state.json", @"C:\Users\%USER%\state.json")]
+        [InlineData(@"D:\Profiles\Alice", @"D:\Profiles\AliceOther\state.json", @"D:\Profiles\AliceOther\state.json")]
+        [InlineData(null, "No user path here", "No user path here")]
+        [InlineData("", "No user path here", "No user path here")]
+        [InlineData("", @"C:\Users\Alice\state.json", @"C:\Users\%USER%\state.json")]
+        [InlineData(@"D:\Profiles\Alice", @"C:\Users\Bob\state.json", @"C:\Users\%USER%\state.json")]
+        public void ProfileRedaction_SupportsRelocatedRootsAndSafeFallback(string profileRoot, string input, string expected) {
+            var regex = GsSentry.CreateUserProfilePathRegex(profileRoot);
+            Assert.Equal(expected, regex.Replace(input, @"C:\Users\%USER%"));
+        }
+
+        [Theory]
         [InlineData("no-sentry")]
         [InlineData("no-posthog")]
         public async Task Transport_DiscardsBufferedWorkAfterPreferenceWithdrawal(string flag) {
