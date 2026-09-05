@@ -72,6 +72,24 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void GetAchievements_ParsesUtf8BomFile() {
+            var gameId = Guid.NewGuid();
+            var json = @"{""Items"":[{""Name"":""Bommed"",""DateUnlocked"":""2025-06-01T12:00:00Z"",""Percent"":1.0}]}";
+            var bytes = System.Text.Encoding.UTF8.GetPreamble()
+                .Concat(System.Text.Encoding.UTF8.GetBytes(json))
+                .ToArray();
+            File.WriteAllBytes(Path.Combine(_tempDir, $"{gameId}.json"), bytes);
+
+            var helper = CreateHelper();
+            var result = helper.GetAchievements(gameId);
+
+            Assert.NotNull(result);
+            Assert.Single(result);
+            Assert.Equal("Bommed", result[0].Name);
+            Assert.True(result[0].IsUnlocked);
+        }
+
+        [Fact]
         public void GetAchievements_ParsesUnlockedAchievement() {
             var gameId = Guid.NewGuid();
             var json = @"{

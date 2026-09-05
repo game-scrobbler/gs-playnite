@@ -414,7 +414,16 @@ namespace GsPlugin.Infrastructure {
         /// </summary>
         /// <param name="message">The message to capture.</param>
         /// <param name="level">The severity level of the message.</param>
-        public static void CaptureMessage(string message, SentryLevel level = SentryLevel.Info) {
+        /// <param name="fingerprint">
+        /// Optional explicit issue fingerprint. Use this when the message must stay
+        /// stable (or when extras vary) so Sentry does not split one failure mode.
+        /// </param>
+        /// <param name="extras">Optional diagnostic key/value pairs attached to the event.</param>
+        public static void CaptureMessage(
+            string message,
+            SentryLevel level = SentryLevel.Info,
+            IReadOnlyCollection<string> fingerprint = null,
+            IReadOnlyDictionary<string, string> extras = null) {
             if (!_initialized || _consent?.IsAllowed != true) return;
             // Skip if Sentry is disabled, data not yet initialized, or user opted out
             var data = GsDataManager.DataOrNull;
@@ -426,6 +435,16 @@ namespace GsPlugin.Infrastructure {
                     scope.Level = level;
                     scope.SetTag("installId", data.InstallID);
                     scope.SetTag("LinkedUserId", data.LinkedUserId);
+                    if (fingerprint != null && fingerprint.Count > 0) {
+                        scope.SetFingerprint(fingerprint);
+                    }
+                    if (extras != null) {
+                        foreach (var kv in extras) {
+                            if (!string.IsNullOrEmpty(kv.Key) && kv.Value != null) {
+                                scope.SetExtra(kv.Key, kv.Value);
+                            }
+                        }
+                    }
                 });
             }
             catch (Exception ex) { try { _logger.Debug(ex, "Sentry CaptureMessage failed (non-critical)"); } catch { } }
