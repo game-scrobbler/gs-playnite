@@ -23,8 +23,20 @@ namespace GsPlugin.Services {
         private readonly IGsApiClient _apiClient;
         private readonly IAchievementProvider _achievementHelper;
         private readonly GsIntegrationAccountReader _integrationAccountReader;
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> _sessionGates =
-            new ConcurrentDictionary<string, SemaphoreSlim>();
+        /// <summary>
+        /// Per-game mutual exclusion plus the count of handlers currently holding it. The count
+        /// exists so the entry can be retired without a handler that already took it from the map
+        /// losing its exclusion: retiring on "looks uncontended" alone let a handler that had the
+        /// instance but had not yet awaited it be replaced by a fresh gate, so two handlers for
+        /// the same game could run at once.
+        /// </summary>
+        private sealed class SessionGate {
+            public readonly SemaphoreSlim Semaphore = new SemaphoreSlim(1, 1);
+            public int Users;
+        }
+
+        private readonly ConcurrentDictionary<string, SessionGate> _sessionGates =
+            new ConcurrentDictionary<string, SessionGate>();
         /// <summary>
         /// A game whose start this process sent, held until it stops. The captured start
         /// instant travels with it so a shutdown finish can state its own session even
@@ -139,22 +151,39 @@ namespace GsPlugin.Services {
         /// ran until the app closed.
         /// </summary>
         /// <summary>
-        /// Drops a per-game gate once nothing is using it. GetOrAdd alone made this dictionary
-        /// append-only: every distinct game launched in a Playnite session left a SemaphoreSlim
-        /// behind for the life of the process, and none were ever disposed. Removing only an
-        /// uncontended gate keeps the mutual exclusion intact: a waiter still holds the same
-        /// instance, and the next caller simply creates a fresh one.
+        /// Takes a counted reference to this game's gate, creating it if needed. Acquisition and
+        /// retirement both mutate the count under the entry's own lock and retirement removes the
+        /// entry inside that lock, so a caller either registers before the entry can leave the map
+        /// or observes that it already has and retries against the replacement.
         /// </summary>
-        private void ReleaseSessionGate(string gameId, SemaphoreSlim gate) {
-            if (gameId == null || gate == null || gate.CurrentCount != 1) return;
-            if (!_sessionGates.TryRemove(gameId, out var removed)) return;
-            if (!ReferenceEquals(removed, gate) || removed.CurrentCount != 1) {
-                // Someone swapped or took it between the checks; put it back rather than
-                // disposing a gate another handler is about to wait on.
-                _sessionGates.TryAdd(gameId, removed);
-                return;
+        /// <summary>Live gate count, so a test can assert entries are retired rather than leaked.</summary>
+        internal int SessionGateCount => _sessionGates.Count;
+
+        private SessionGate AcquireSessionGate(string gameId) {
+            while (true) {
+                var entry = _sessionGates.GetOrAdd(gameId, _ => new SessionGate());
+                lock (entry) {
+                    if (_sessionGates.TryGetValue(gameId, out var current) && ReferenceEquals(current, entry)) {
+                        entry.Users++;
+                        return entry;
+                    }
+                }
             }
-            removed.Dispose();
+        }
+
+        /// <summary>
+        /// Drops a reference and retires the gate once the last handler is done, so the map does
+        /// not grow for the life of the process. The semaphore is deliberately not disposed: it is
+        /// only reachable from handlers that still hold a reference, it owns no unmanaged handle
+        /// (nothing here touches AvailableWaitHandle), and disposing it under a handler that had
+        /// already taken it would surface as ObjectDisposedException on a live scrobble.
+        /// </summary>
+        private void ReleaseSessionGate(string gameId, SessionGate entry) {
+            if (gameId == null || entry == null) return;
+            lock (entry) {
+                if (--entry.Users > 0) return;
+                _sessionGates.TryRemove(gameId, out _);
+            }
         }
 
         private void DiscardTrackedSession(string gameId) {
@@ -168,7 +197,7 @@ namespace GsPlugin.Services {
         public async Task OnGameStartAsync(OnGameStartingEventArgs args) {
             var at = DateTime.Now;
             PendingScrobble pending = null;
-            SemaphoreSlim gate = null;
+            SessionGate gate = null;
             // Declared out here so the finally can hand the gate back for disposal.
             string gameKey = null;
             var enteredGate = false;
@@ -195,8 +224,8 @@ namespace GsPlugin.Services {
                 _runningGames[gameId] = new RunningGame { Game = game, StartedAt = at };
 
                 gameKey = gameId;
-                gate = _sessionGates.GetOrAdd(gameId, _ => new SemaphoreSlim(1, 1));
-                await gate.WaitAsync();
+                gate = AcquireSessionGate(gameId);
+                await gate.Semaphore.WaitAsync();
                 enteredGate = true;
                 if (!IsCurrentIdentity(installId, generation)) return;
                 if (GsDataManager.HasEarlierPendingScrobble(pending)) return;
@@ -215,7 +244,7 @@ namespace GsPlugin.Services {
                 _logger.Error(ex, "Error starting scrobble session; any persisted event remains queued.");
             }
             finally {
-                if (enteredGate) gate.Release();
+                if (enteredGate) gate.Semaphore.Release();
                 if (pending != null) GsDataManager.ReleasePendingScrobble(pending);
                 ReleaseSessionGate(gameKey, gate);
             }
@@ -228,7 +257,7 @@ namespace GsPlugin.Services {
         public async Task OnGameStoppedAsync(OnGameStoppedEventArgs args) {
             var at = DateTime.Now;
             PendingScrobble pending = null;
-            SemaphoreSlim gate = null;
+            SessionGate gate = null;
             // Declared out here so the finally can hand the gate back for disposal.
             string gameKey = null;
             var enteredGate = false;
@@ -286,8 +315,8 @@ namespace GsPlugin.Services {
                 _runningGames.TryRemove(gameId, out _);
 
                 gameKey = gameId;
-                gate = _sessionGates.GetOrAdd(gameId, _ => new SemaphoreSlim(1, 1));
-                await gate.WaitAsync();
+                gate = AcquireSessionGate(gameId);
+                await gate.Semaphore.WaitAsync();
                 enteredGate = true;
                 if (!IsCurrentIdentity(installId, generation)) return;
                 if (GsDataManager.HasEarlierPendingScrobble(pending)) return;
@@ -305,7 +334,7 @@ namespace GsPlugin.Services {
                 _logger.Error(ex, "Error stopping scrobble session; any persisted event remains queued.");
             }
             finally {
-                if (enteredGate) gate.Release();
+                if (enteredGate) gate.Semaphore.Release();
                 if (pending != null) GsDataManager.ReleasePendingScrobble(pending);
                 ReleaseSessionGate(gameKey, gate);
             }
@@ -1131,7 +1160,16 @@ namespace GsPlugin.Services {
                 // no baseline is ever written, the hash shortcut below never engages, and the call
                 // repeats forever. Fenced through the identity check, which is what the earlier
                 // unfenced version of this branch was missing.
-                if (games.Count == 0) {
+                //
+                // Restricted to an install that has never synced achievements. "Empty" is also what
+                // a library reports after its last tracked game is removed, and taking the local
+                // shortcut there would record a baseline the server never agreed to: it would keep
+                // serving the achievements it already holds while every later run repeated this
+                // same local-only branch. With a prior baseline the empty snapshot has to go up and
+                // be acknowledged, which the normal path below does.
+                var hasPriorBaseline = GsSyncHashIndex.HasAchievementsBaseline
+                    || !string.IsNullOrEmpty(GsDataManager.Data.LastAchievementHash);
+                if (games.Count == 0 && !hasPriorBaseline) {
                     _logger.Info("No games with achievements found; setting empty baseline locally.");
                     var baselineSaved = false;
                     var committed = GsDataManager.TryMutateIfActiveIdentity(installId, generation, d => {
@@ -1238,7 +1276,7 @@ namespace GsPlugin.Services {
                 _logger.Info($"Achievement diff: {allGames.Count} total games, " +
                     $"index has {achievementFingerprints.Count} entries");
 
-                var (changed, clearedIds, liveWithAchievements, changedFingerprints) = await Task.Run(() => {
+                var (changed, clearedIds, liveWithAchievements, changedFingerprints, unreadableCount) = await Task.Run(() => {
                     var result = new List<GameAchievementsDto>();
                     var live = new List<GameAchievementsDto>();
                     var currentGameIds = new HashSet<string>();
@@ -1256,12 +1294,12 @@ namespace GsPlugin.Services {
 
                         filteredCount++;
                         var playniteId = g.Id.ToString();
-                        // Scoped to this game, not the whole pass. A diff only has to describe the
-                        // games it could actually read: one addon file locked mid-write used to
-                        // throw straight out of this loop, discarding every read already done and
-                        // failing achievement sync for the entire library. Marking the game current
-                        // keeps it out of the cleared set below, so its server-side achievements
-                        // survive untouched and its baseline fingerprint is left for the next run.
+                        // Record it and carry on rather than throwing out of the loop, which used
+                        // to discard every read already done. Marking the game current keeps it out
+                        // of the cleared set below, so nothing here can delete achievements the
+                        // plugin merely failed to read. The count is checked after the scan: a diff
+                        // that omits a game the server still holds cannot be uploaded, because its
+                        // result hash would not describe the server's snapshot.
                         var read = AchievementReadResult.Read(_achievementHelper, g.Id);
                         if (!read.IsAvailable) {
                             unavailableCount++;
@@ -1337,17 +1375,30 @@ namespace GsPlugin.Services {
 
                     _logger.Info($"Achievement diff scan: {filteredCount} eligible games, " +
                         $"{withDataCount} with data, {nullCount} with no data, " +
-                        $"{unavailableCount} unreadable (baseline kept), " +
+                        $"{unavailableCount} unreadable (diff deferred), " +
                         $"{result.Count} changed");
 
                     var cleared = achievementFingerprints.Keys
                         .Where(id => !currentGameIds.Contains(id))
                         .ToList();
 
-                    return (result, cleared, live, changedFps);
+                    return (result, cleared, live, changedFps, unavailableCount);
                 });
 
                 if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
+
+                // Skipping the unreadable game keeps its achievements on the server, but the
+                // result hash is computed from the games we could read, so it describes a snapshot
+                // the server does not have. The server stores that value as its next baseline, and
+                // the following diff then fails snapshot-hash validation and forces a full sync.
+                // Defer the whole diff instead: both baselines stay put and the next run, once the
+                // file is readable again, sends a diff whose hash matches what the server holds.
+                if (unreadableCount > 0) {
+                    _logger.Warn($"Achievement diff deferred: {unreadableCount} game(s) unreadable, " +
+                        "so the result hash would not describe the server's snapshot.");
+                    return SyncLibraryResult.Skipped;
+                }
+
                 if (changed.Count == 0 && clearedIds.Count == 0) {
                     _logger.Info("Achievement diff is empty — skipping.");
                     return SyncLibraryResult.Skipped;

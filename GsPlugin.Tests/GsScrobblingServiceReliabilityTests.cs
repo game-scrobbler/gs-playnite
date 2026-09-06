@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using GsPlugin.Api;
 using GsPlugin.Models;
@@ -30,7 +31,7 @@ namespace GsPlugin.Tests {
         private static GsData ReloadSaved(TempPluginDir temp) =>
             JsonSerializer.Deserialize<GsData>(File.ReadAllText(Path.Combine(temp.Path, "gs_data.json")));
 
-        private static GsScrobblingService Service(FakeApi api, Provider provider = null) =>
+        private static GsScrobblingService Service(FakeApi api, IAchievementProvider provider = null) =>
             new GsScrobblingService(api, provider ?? new Provider(), null) {
                 QueueStatusPollInterval = TimeSpan.Zero,
                 QueueStatusPollBudget = TimeSpan.Zero
@@ -394,6 +395,144 @@ namespace GsPlugin.Tests {
                 await stop;
                 Assert.Empty(ReloadSaved(temp).PendingScrobbles);
             }
+        }
+
+        /// <summary>
+        /// Skipping an unreadable game keeps its achievements on the server, but the result hash
+        /// is built only from the games that were readable. Uploading that would hand the server a
+        /// baseline describing a snapshot it does not have, and the next diff would fail hash
+        /// validation and force a full sync. With two games, one unreadable and one changed, the
+        /// diff must be deferred rather than sent.
+        /// </summary>
+        [Fact]
+        public async Task UnreadableGameAlongsideAChangedOne_DefersTheDiffInsteadOfUploading() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                var readable = Game();
+                var unreadable = Game();
+                GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> {
+                    [readable.Id.ToString()] = "old-readable",
+                    [unreadable.Id.ToString()] = "old-unreadable"
+                });
+                GsDataManager.MutateAndSave(d => d.LastAchievementHash = "old-global");
+
+                var api = new FakeApi();
+                var provider = new PerGameProvider();
+                provider.Results[readable.Id] = AchievementReadResult.Available(
+                    new List<AchievementItem> { new AchievementItem { Name = "changed" } });
+                provider.Results[unreadable.Id] = AchievementReadResult.Unavailable("locked");
+
+                var result = await Service(api, provider).SyncAchievementsDiffAsync(new[] { readable, unreadable });
+
+                Assert.Equal(SyncLibraryResult.Skipped, result);
+                Assert.Equal(0, api.AchievementUploads);
+                Assert.Equal("old-global", GsDataManager.Data.LastAchievementHash);
+                var fps = GsSyncHashIndex.GetAchievementFingerprints();
+                Assert.Equal("old-readable", fps[readable.Id.ToString()]);
+                Assert.Equal("old-unreadable", fps[unreadable.Id.ToString()]);
+            }
+        }
+
+        /// <summary>
+        /// An empty result after a real baseline exists means the games went away, not that the
+        /// install is new. Committing locally there would record a baseline the server never
+        /// agreed to, leaving it serving achievements forever. The empty snapshot must go up.
+        /// </summary>
+        [Fact]
+        public async Task EmptyAchievementsWithPriorBaseline_UploadsInsteadOfCommittingLocally() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                var game = Game();
+                GsSyncHashIndex.ReplaceAchievementIndex(
+                    new Dictionary<string, string> { [game.Id.ToString()] = "old-item" });
+                GsDataManager.MutateAndSave(d => d.LastAchievementHash = "old-global");
+
+                var api = new FakeApi();
+                var provider = new Provider { Result = AchievementReadResult.Available(null) };
+
+                var result = await Service(api, provider).SyncAchievementsFullAsync(new[] { game });
+
+                Assert.Equal(SyncLibraryResult.Success, result);
+                Assert.True(api.AchievementUploads > 0, "The empty snapshot was never sent to the server.");
+                Assert.NotEqual("old-global", GsDataManager.Data.LastAchievementHash);
+            }
+        }
+
+        /// <summary>A genuinely new install still short-circuits without touching the network.</summary>
+        [Fact]
+        public async Task EmptyAchievementsWithNoPriorBaseline_CommitsLocallyWithoutUploading() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                var api = new FakeApi();
+                var provider = new Provider { Result = AchievementReadResult.Available(null) };
+
+                var result = await Service(api, provider).SyncAchievementsFullAsync(new[] { Game() });
+
+                Assert.Equal(SyncLibraryResult.Skipped, result);
+                Assert.Equal(0, api.AchievementUploads);
+                Assert.NotNull(GsDataManager.Data.LastAchievementHash);
+            }
+        }
+
+        /// <summary>
+        /// A handler can take the gate from the map and be descheduled before awaiting it. If the
+        /// other handler's cleanup retires the entry on "looks uncontended" alone, the paused one
+        /// keeps an instance nobody else shares and two handlers for the same game run at once.
+        /// Two concurrent starts must serialize: only one may be inside the API call at a time,
+        /// and the gate must still be retired afterwards so the map does not grow.
+        /// </summary>
+        [Fact]
+        public async Task ConcurrentHandlersForOneGame_StaySerializedAndStillRetireTheGate() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var inFlight = 0;
+                var maxConcurrent = 0;
+                var entered = new TaskCompletionSource<bool>();
+                var release = new TaskCompletionSource<bool>();
+                var api = new FakeApi {
+                    OnStart = async _ => {
+                        var now = Interlocked.Increment(ref inFlight);
+                        InterlockedMax(ref maxConcurrent, now);
+                        entered.TrySetResult(true);
+                        await release.Task;
+                        Interlocked.Decrement(ref inFlight);
+                        return new ScrobbleStartRes { session_id = "session" };
+                    }
+                };
+                var service = Service(api);
+                var game = Game();
+
+                // Neither is awaited yet: the first holds the gate inside the API call while the
+                // second is contending for the same gate.
+                var first = service.OnGameStartAsync(Event<OnGameStartingEventArgs>(game));
+                var second = service.OnGameStartAsync(Event<OnGameStartingEventArgs>(game));
+                await entered.Task;
+
+                release.SetResult(true);
+                await Task.WhenAll(first, second);
+
+                Assert.Equal(1, maxConcurrent);
+                Assert.Equal(0, service.SessionGateCount);
+            }
+        }
+
+        private static void InterlockedMax(ref int target, int value) {
+            int seen;
+            while (value > (seen = Volatile.Read(ref target))) {
+                if (Interlocked.CompareExchange(ref target, value, seen) == seen) return;
+            }
+        }
+
+        private sealed class PerGameProvider : IAchievementProvider, IReliableAchievementProvider {
+            public readonly Dictionary<Guid, AchievementReadResult> Results =
+                new Dictionary<Guid, AchievementReadResult>();
+            public bool IsInstalled => true;
+            public bool IsPluginLoaded => true;
+            public string ProviderName => "per-game";
+            public string GetVersion() => "1";
+            public (int unlocked, int total)? GetCounts(Guid gameId) => null;
+            public List<AchievementItem> GetAchievements(Guid gameId) {
+                var r = ReadAchievements(gameId);
+                return r.IsAvailable && r.Achievements.Count > 0 ? r.Achievements : null;
+            }
+            public AchievementReadResult ReadAchievements(Guid gameId) =>
+                Results.TryGetValue(gameId, out var r) ? r : AchievementReadResult.Available(null);
         }
 
         private sealed class Provider : IAchievementProvider, IReliableAchievementProvider {

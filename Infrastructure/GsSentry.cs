@@ -56,7 +56,8 @@ namespace GsPlugin.Infrastructure {
         /// Installs the AppDomain and TaskScheduler handlers once per process. Idempotent, and
         /// independent of whether the SDK is running: <see cref="CaptureException"/> already
         /// no-ops without consent, so an installed handler on an opted-out install logs locally
-        /// and marks the fault observed without sending anything.
+        /// and marks its own faults observed without sending anything. Faults from other
+        /// extensions are left untouched for their owner to handle.
         /// </summary>
         internal static void EnsureGlobalExceptionHandlers() {
             lock (LifecycleLock) {
@@ -121,12 +122,15 @@ namespace GsPlugin.Infrastructure {
                 if (fromUs) {
                     _logger.Error(e.Exception, "UnobservedTaskException captured (from GsPlugin)");
                     CaptureException(e.Exception, "TaskScheduler.UnobservedTaskException");
+                    // Only ours. SetObserved() suppresses the fault process-wide, and this handler
+                    // now runs regardless of telemetry consent, so calling it on another
+                    // extension's task would silently override whatever escalation the host or
+                    // that extension configured for its own failures.
+                    e.SetObserved();
                 }
                 else {
-                    _logger.Debug("UnobservedTaskException not from our plugin; marking observed without capture.");
+                    _logger.Debug("UnobservedTaskException not from our plugin; leaving it for its owner to handle.");
                 }
-
-                e.SetObserved();
             }
             catch (Exception handlerEx) {
                 // Last resort: log to Playnite but don't throw from exception handler

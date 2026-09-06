@@ -516,7 +516,7 @@ namespace GsPlugin.Models {
         // Preserve queue item identity across rollback: an in-flight sender holds those same
         // objects. Only the session ID and start instant of a paired finish are edited by
         // these transactions.
-        private static bool PersistMutation(Action<GsData> action) {
+        private static bool PersistMutation(Action<GsData> action, bool durable = false) {
             var before = _data;
             var claims = new HashSet<PendingScrobble>(_claimedScrobbles);
             var finishPairings = _data.PendingScrobbles.Where(p => p.FinishData != null)
@@ -528,7 +528,7 @@ namespace GsPlugin.Models {
                 // as well as their contents. Pending items stay shared for live/replay pairing.
                 _data = before.CreateRollbackSnapshot();
                 action(_data);
-                saved = SaveInternal();
+                saved = SaveInternal(durable);
                 return saved;
             }
             finally {
@@ -544,11 +544,11 @@ namespace GsPlugin.Models {
             }
         }
 
-        private static bool MutatePendingScrobble(PendingScrobble item, Action<GsData> action) {
+        private static bool MutatePendingScrobble(PendingScrobble item, Action<GsData> action, bool durable = false) {
             bool saved;
             lock (_lock) {
                 if (_data == null || _data.OptedOut || !_data.PendingScrobbles.Contains(item)) return false;
-                saved = PersistMutation(action);
+                saved = PersistMutation(action, durable);
             }
             if (saved) NotifyDiagnosticsChanged();
             return saved;
@@ -558,6 +558,25 @@ namespace GsPlugin.Models {
         /// Persists every shutdown finish and removes only the corresponding active sessions
         /// in one write. On a failed write the original collections remain available for retry.
         /// </summary>
+        /// <summary>
+        /// True when the queue already holds a finish for the same launch. Two finishes are the
+        /// same session only when they agree on a non-empty identifier: the server's session_id,
+        /// or failing that the exact start instant. Two unidentified finishes are never assumed
+        /// to be the same launch.
+        /// </summary>
+        private static bool IsSameSessionFinish(GsData d, ScrobbleFinishReq finish) {
+            return d.PendingScrobbles.Any(p => {
+                if (p.Type != "finish" || !IsSameGame(p, finish.game_id, finish.plugin_id)) return false;
+                var existing = p.FinishData;
+                if (existing == null) return false;
+                if (!string.IsNullOrEmpty(finish.session_id)) {
+                    return existing.session_id == finish.session_id;
+                }
+                return !string.IsNullOrEmpty(finish.started_at)
+                    && existing.started_at == finish.started_at;
+            });
+        }
+
         public static bool QueueSessionFinishesAndClearActive(Dictionary<string, string> sessions, List<PendingScrobble> finishes,
             string expectedInstallId, int expectedGeneration) {
             bool saved;
@@ -569,15 +588,6 @@ namespace GsPlugin.Models {
                 saved = PersistMutation(d => {
                     foreach (var pending in finishes) {
                         var finish = pending.FinishData;
-                        // A live OnGameStoppedAsync can land its own finish for this game between
-                        // the caller's active-session snapshot and this write. Appending anyway
-                        // leaves a duplicate that no send-time guard removes: HasEarlierPendingScrobble
-                        // only defers it, so a later flush pass finishes an already-finished session.
-                        if (d.PendingScrobbles.Any(p => p.Type == "finish"
-                            && IsSameGame(p, finish.game_id, finish.plugin_id)
-                            && p.FinishData?.session_id == finish.session_id)) {
-                            continue;
-                        }
                         if (string.IsNullOrEmpty(finish.session_id)
                             && !d.PendingScrobbles.Any(p => p.Type == "start"
                                 && IsSameGame(p, finish.game_id, finish.plugin_id))) {
@@ -594,6 +604,18 @@ namespace GsPlugin.Models {
                         // the start that recorded this instant.
                         if (string.IsNullOrEmpty(finish.started_at)) {
                             finish.started_at = d.ResolveSessionStart(finish.game_id);
+                        }
+                        // A live OnGameStoppedAsync can land its own finish for this game between
+                        // the caller's active-session snapshot and this write. Appending anyway
+                        // leaves a duplicate that no send-time guard removes: HasEarlierPendingScrobble
+                        // only defers it, so a later flush pass finishes an already-finished session.
+                        //
+                        // Runs after both identifiers are resolved, and matches only on a non-empty
+                        // one. Comparing raw session_id before resolution made two null ids look
+                        // equal, so a second launch's finish, identified by its own started_at, was
+                        // silently dropped as a duplicate of the first.
+                        if (IsSameSessionFinish(d, finish)) {
+                            continue;
                         }
                         d.PendingScrobbles.Add(pending);
                         d.PendingStartGameIds.Remove(finish.game_id);
@@ -941,7 +963,13 @@ namespace GsPlugin.Models {
                 }
                 d.PendingScrobbles.Remove(item);
                 _claimedScrobbles.Remove(item);
-            });
+            },
+            // Durable. This is the one queue transaction that creates state replay cannot
+            // rebuild: it removes the queued start and records the active session in its place.
+            // Startup replays PendingScrobbles but never reconstructs ActiveSessionsByGameId, so
+            // losing this write to the OS cache in a power cut strands the session with no queued
+            // start to replay and no active session to finish.
+            durable: true);
         }
 
         public static bool CompletePendingScrobble(PendingScrobble item) {
