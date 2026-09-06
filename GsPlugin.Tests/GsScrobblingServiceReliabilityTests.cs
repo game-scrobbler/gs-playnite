@@ -135,21 +135,41 @@ namespace GsPlugin.Tests {
             }
         }
 
-        [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task FailedAchievementRead_PreservesBaselineWithoutUploading(bool full) {
+        /// <summary>
+        /// A full sync replaces the server-side baseline wholesale, so a snapshot missing a game
+        /// it could not read would delete that game's achievements. It has to abort.
+        /// </summary>
+        [Fact]
+        public async Task FailedAchievementRead_AbortsFullSyncWithoutUploading() {
             using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
                 var game = Game();
                 GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { [game.Id.ToString()] = "old-item" });
                 GsDataManager.MutateAndSave(d => d.LastAchievementHash = "old-global");
                 var api = new FakeApi();
                 var provider = new Provider { Result = AchievementReadResult.Unavailable("unreadable") };
-                var service = Service(api, provider);
-                var result = full
-                    ? await service.SyncAchievementsFullAsync(new[] { game })
-                    : await service.SyncAchievementsDiffAsync(new[] { game });
+                var result = await Service(api, provider).SyncAchievementsFullAsync(new[] { game });
                 Assert.Equal(SyncLibraryResult.Error, result);
+                Assert.Equal(0, api.AchievementUploads);
+                Assert.Equal("old-global", GsDataManager.Data.LastAchievementHash);
+                Assert.Equal("old-item", GsSyncHashIndex.GetAchievementFingerprints()[game.Id.ToString()]);
+            }
+        }
+
+        /// <summary>
+        /// A diff only describes the games it could read, so one unreadable game is skipped
+        /// rather than failing the pass. The game must keep its baseline fingerprint and must not
+        /// be reported as cleared, which would delete its achievements server-side.
+        /// </summary>
+        [Fact]
+        public async Task FailedAchievementRead_SkipsOnlyThatGameInDiffSync() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                var game = Game();
+                GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { [game.Id.ToString()] = "old-item" });
+                GsDataManager.MutateAndSave(d => d.LastAchievementHash = "old-global");
+                var api = new FakeApi();
+                var provider = new Provider { Result = AchievementReadResult.Unavailable("unreadable") };
+                var result = await Service(api, provider).SyncAchievementsDiffAsync(new[] { game });
+                Assert.Equal(SyncLibraryResult.Skipped, result);
                 Assert.Equal(0, api.AchievementUploads);
                 Assert.Equal("old-global", GsDataManager.Data.LastAchievementHash);
                 Assert.Equal("old-item", GsSyncHashIndex.GetAchievementFingerprints()[game.Id.ToString()]);
@@ -170,14 +190,16 @@ namespace GsPlugin.Tests {
             }
         }
 
+        /// <summary>
+        /// A status the server actually disowned is the one gs-playnite#83 is about, and it must
+        /// leave both baselines alone so the next sync retries.
+        /// </summary>
         [Theory]
-        [InlineData("library-full", "processing")]
-        [InlineData("library-diff", "processing")]
-        [InlineData("achievement-full", "processing")]
-        [InlineData("achievement-diff", "processing")]
         [InlineData("library-full", "failed")]
+        [InlineData("library-diff", "failed")]
+        [InlineData("achievement-full", "partial")]
         [InlineData("achievement-diff", "partial")]
-        public async Task UnconfirmedQueueJob_DoesNotCommitEitherBaseline(string path, string status) {
+        public async Task RejectedQueueJob_DoesNotCommitEitherBaseline(string path, string status) {
             using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
                 var game = Game();
                 var id = game.Id.ToString();
@@ -199,6 +221,43 @@ namespace GsPlugin.Tests {
                 Assert.Equal("old-achievement-global", GsDataManager.Data.LastAchievementHash);
                 Assert.Equal("old-library", GsSyncHashIndex.GetLibraryFingerprints()[id]);
                 Assert.Equal("old-achievement", GsSyncHashIndex.GetAchievementFingerprints()[id]);
+            }
+        }
+
+        /// <summary>
+        /// The counterpart: a job the server admitted and is still working on must advance the
+        /// baseline. Refusing to means a library whose job outruns the poll budget re-uploads in
+        /// full on every launch and never records a sync: the force-full-sync loop the confirm
+        /// step exists to avoid.
+        /// </summary>
+        [Theory]
+        [InlineData("library-full")]
+        [InlineData("library-diff")]
+        [InlineData("achievement-full")]
+        [InlineData("achievement-diff")]
+        public async Task StillProcessingQueueJob_CommitsBaselineSoTheNextRunIsADiff(string path) {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                var game = Game();
+                var id = game.Id.ToString();
+                GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> { [id] = "old-library" });
+                GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { [id] = "old-achievement" });
+                GsDataManager.MutateAndSave(d => { d.LastLibraryHash = "old-library-global"; d.LastAchievementHash = "old-achievement-global"; });
+                var api = new FakeApi { QueueStatus = "processing" };
+                var provider = new Provider { Result = AchievementReadResult.Available(new List<AchievementItem> { new AchievementItem { Name = "new" } }) };
+                var service = Service(api, provider);
+                SyncLibraryResult result;
+                switch (path) {
+                    case "library-full": result = await service.SyncLibraryFullAsync(new[] { game }); break;
+                    case "library-diff": result = await service.SyncLibraryDiffAsync(new[] { game }); break;
+                    case "achievement-full": result = await service.SyncAchievementsFullAsync(new[] { game }); break;
+                    default: result = await service.SyncAchievementsDiffAsync(new[] { game }); break;
+                }
+                Assert.Equal(SyncLibraryResult.Success, result);
+                var isLibrary = path.StartsWith("library");
+                Assert.NotEqual(isLibrary ? "old-library-global" : "old-achievement-global",
+                    isLibrary ? GsDataManager.Data.LastLibraryHash : GsDataManager.Data.LastAchievementHash);
+                Assert.NotEqual(isLibrary ? "old-library" : "old-achievement",
+                    isLibrary ? GsSyncHashIndex.GetLibraryFingerprints()[id] : GsSyncHashIndex.GetAchievementFingerprints()[id]);
             }
         }
 
@@ -249,6 +308,91 @@ namespace GsPlugin.Tests {
                 Assert.Null(GsDataManager.Data.LastAchievementHash);
                 Assert.Equal(libraryAfterOptOut, GsSyncHashIndex.GetLibraryFingerprints());
                 Assert.Equal(achievementsAfterOptOut, GsSyncHashIndex.GetAchievementFingerprints());
+            }
+        }
+
+        /// <summary>
+        /// A game whose source stops being eligible mid-session must not stay tracked. The stop
+        /// handler declines to report it, and if it also leaves the active-session entry behind,
+        /// the shutdown sweep, which applies no allow-list filter, finishes it at Playnite's
+        /// exit time and reports a session that ran until the app closed.
+        /// </summary>
+        [Fact]
+        public async Task StopOfNoLongerAllowedGame_ClearsSessionSoShutdownInventsNoFinish() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var api = new FakeApi();
+                var service = Service(api);
+                var game = Game();
+                await service.OnGameStartAsync(Event<OnGameStartingEventArgs>(game));
+                Assert.True(GsDataManager.TryGetActiveSession(game.Id.ToString(), out _));
+
+                // The user retags the running game to a source the allowlist does not recognize.
+                game.PluginId = Guid.Empty;
+                await service.OnGameStoppedAsync(Event<OnGameStoppedEventArgs>(game));
+
+                Assert.Empty(GsDataManager.SnapshotActiveSessions());
+                api.Finishes.Clear();
+                await service.OnApplicationStoppedAsync();
+                Assert.Empty(api.Finishes);
+                Assert.Empty(ReloadSaved(temp).PendingScrobbles);
+            }
+        }
+
+        /// <summary>Same leak, reached by switching scrobbling off while a game runs.</summary>
+        [Fact]
+        public async Task StopWhileScrobblingDisabled_ClearsSessionSoShutdownInventsNoFinish() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var api = new FakeApi();
+                var service = Service(api);
+                var game = Game();
+                await service.OnGameStartAsync(Event<OnGameStartingEventArgs>(game));
+
+                GsDataManager.MutateAndSave(d => d.Flags.Add("no-scrobble"));
+                await service.OnGameStoppedAsync(Event<OnGameStoppedEventArgs>(game));
+                Assert.Empty(GsDataManager.SnapshotActiveSessions());
+
+                // Re-enabled later in the same session, so the shutdown sweep actually runs.
+                GsDataManager.MutateAndSave(d => d.Flags.Remove("no-scrobble"));
+                api.Finishes.Clear();
+                await service.OnApplicationStoppedAsync();
+                Assert.Empty(api.Finishes);
+            }
+        }
+
+        /// <summary>
+        /// The shutdown sweep can race a live stop for the same game. Appending unconditionally
+        /// left a second finish for an already-finished session persisted in the queue, which a
+        /// later flush would send.
+        /// </summary>
+        [Fact]
+        public async Task ShutdownRacingALiveStop_QueuesNoDuplicateFinish() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var release = new TaskCompletionSource<ScrobbleFinishRes>();
+                var api = new FakeApi { OnFinish = _ => release.Task };
+                var service = Service(api);
+                var game = Game();
+                await service.OnGameStartAsync(Event<OnGameStartingEventArgs>(game));
+                var sessions = GsDataManager.SnapshotActiveSessions();
+                Assert.Single(sessions);
+
+                // The live stop lands its durable finish first; shutdown still holds the older snapshot.
+                var stop = service.OnGameStoppedAsync(Event<OnGameStoppedEventArgs>(game));
+                var finishes = sessions.Select(entry => new PendingScrobble {
+                    Type = "finish",
+                    QueuedAt = DateTime.Now,
+                    FinishData = new ScrobbleFinishReq {
+                        game_id = entry.Key,
+                        plugin_id = game.PluginId.ToString(),
+                        session_id = entry.Value
+                    }
+                }).ToList();
+                Assert.True(GsDataManager.QueueSessionFinishesAndClearActive(
+                    sessions, finishes, GsDataManager.Data.InstallID, GsDataManager.Data.IdentityGeneration));
+
+                Assert.Single(GsDataManager.Data.PendingScrobbles, p => p.Type == "finish");
+                release.SetResult(new ScrobbleFinishRes());
+                await stop;
+                Assert.Empty(ReloadSaved(temp).PendingScrobbles);
             }
         }
 

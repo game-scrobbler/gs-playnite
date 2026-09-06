@@ -193,4 +193,6 @@ ID пользователя: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Открыть настройки</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">Во время запроса установка изменилась или плагин был отключён. Повторите попытку.</sys:String>
+    <sys:String x:Key="LOCGsPluginDataUnreadable">Game Scrobbler не смог прочитать сохранённые данные и отключён на время этого сеанса. Файл оставлен без изменений в {0}, его можно восстановить или удалить.</sys:String>
+    <sys:String x:Key="LOCGsPluginDashboardProfileFailed">Game Scrobbler не смог открыть отдельный профиль браузера для панели, поэтому она не была загружена. Перезапустите Playnite, чтобы повторить попытку.</sys:String>
 </ResourceDictionary>

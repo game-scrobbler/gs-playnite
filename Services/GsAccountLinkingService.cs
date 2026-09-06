@@ -268,11 +268,8 @@ namespace GsPlugin.Services {
             return !string.IsNullOrWhiteSpace(userId) && userId != GsData.NotLinkedValue;
         }
 
-        private static bool IsActiveIdentity(string expectedInstallId, int expectedGeneration) {
-            var data = GsDataManager.DataOrNull;
-            return data != null && !data.OptedOut && data.InstallID == expectedInstallId
-                && data.IdentityGeneration == expectedGeneration;
-        }
+        private static bool IsActiveIdentity(string expectedInstallId, int expectedGeneration) =>
+            GsDataManager.IsActiveIdentity(expectedInstallId, expectedGeneration);
 
         private static LinkingResult IdentityChangedResult(LinkingContext context) =>
             LinkingResult.CreateError(GsLocalization.Get("LOCGsPluginIdentityChangedDuringRequest",

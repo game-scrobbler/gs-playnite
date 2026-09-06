@@ -226,23 +226,34 @@ namespace GsPlugin.Api {
                 metadata = endData.metadata,
                 finished_at = endData.finished_at,
                 session_id = endData.session_id,
+                started_at = endData.started_at,
             };
 
+            var hasStartInstant = !string.IsNullOrEmpty(sendData.started_at);
+
             if (string.IsNullOrEmpty(sendData.session_id) || !Guid.TryParse(sendData.session_id, out _)) {
+                var fallback = hasStartInstant
+                    ? "backend will match on the session start instant"
+                    : "backend will use name-based matching";
                 if (!string.IsNullOrEmpty(sendData.session_id)) {
                     // Non-null but non-UUID: likely a stale "queued" placeholder from an older
                     // plugin version in the pending-scrobble queue. Cleared so the backend falls
-                    // back to name-based matching (Strategy 2) instead of rejecting the request.
-                    GsLogger.Warn($"Clearing non-UUID session_id '{sendData.session_id}' before finish — backend will use name-based matching (game: {sendData.game_name ?? "unknown"})");
+                    // back to another matching strategy instead of rejecting the request.
+                    GsLogger.Warn($"Clearing non-UUID session_id '{sendData.session_id}' before finish, {fallback} (game: {sendData.game_name ?? "unknown"})");
                 }
                 else {
-                    _logger.Info($"Finishing session without session_id (game: {sendData.game_name ?? "unknown"}), backend will use name-based matching");
+                    _logger.Info($"Finishing session without session_id (game: {sendData.game_name ?? "unknown"}), {fallback}");
                 }
                 sendData.session_id = null;
             }
 
-            if (sendData.session_id == null && string.IsNullOrEmpty(sendData.game_name)) {
-                GsLogger.Error("FinishGameSession aborted: no session_id and no game_name — Strategy 2 would match an arbitrary open session");
+            // Without a session_id the backend needs something exact to match on. A start
+            // instant plus either identifier is exact; a bare game_name is the legacy
+            // "most recent open session" guess, and nothing at all would let that guess
+            // land on an arbitrary session.
+            if (sendData.session_id == null && string.IsNullOrEmpty(sendData.game_name)
+                && !(hasStartInstant && !string.IsNullOrEmpty(sendData.game_id))) {
+                GsLogger.Error("FinishGameSession aborted: no session_id, no game_name, and no (started_at + game_id); the backend would match an arbitrary open session");
                 return null;
             }
 
@@ -1007,7 +1018,10 @@ namespace GsPlugin.Api {
         /// {status:"force-full-sync", reason:"hash_mismatch"}. Collapsing that to null makes it
         /// indistinguishable from a dropped connection, leaves the caller's recovery branch
         /// unreachable, and lets a deterministic rejection count against the shared circuit breaker.
-        /// Opt-in so endpoints whose callers only test for null keep their current behaviour.
+        /// Opt-in, and additionally gated on the response carrying a server-set
+        /// <see cref="IStatusCarryingResponse.status"/>: every v4 route shares one helper, so this
+        /// applies to begin and chunk as well as commit, and a caller that tests only for null must
+        /// still never see an unrelated error body as a successful response.
         /// </param>
         private async Task<TResponse> PostJsonAsync<TResponse>(string url, object payload, bool ensureSuccess = false,
             Action<int> onStatus = null, bool parseErrorBody = false,
@@ -1077,7 +1091,15 @@ namespace GsPlugin.Api {
                                 try {
                                     var errorResponse =
                                         JsonSerializer.Deserialize<TResponse>(responseBody, _jsonOptions);
-                                    if (errorResponse != null) {
+                                    // Deserializing without throwing proves nothing: System.Text.Json
+                                    // fills a body it does not recognize with defaults, so a generic
+                                    // 401 {"error":"invalid_token"} would come back as a non-null
+                                    // object, satisfy the caller's r == null failure test, and be
+                                    // recorded by the circuit breaker as a healthy response, leaving a
+                                    // permanently rejected install retrying every cycle with no backoff.
+                                    // Require the server-set discriminator before trusting the parse.
+                                    if (errorResponse is IStatusCarryingResponse recognized
+                                        && !string.IsNullOrEmpty(recognized.status)) {
                                         return errorResponse;
                                     }
                                 }

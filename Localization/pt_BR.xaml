@@ -193,4 +193,6 @@ Deseja vincular a uma conta diferente?</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Abrir Configurações</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">A instalação foi alterada ou desativada durante esta solicitação. Tente novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginDataUnreadable">O Game Scrobbler não conseguiu ler os dados salvos e está desativado nesta sessão. O arquivo foi mantido intacto em {0} para que possa ser reparado ou removido.</sys:String>
+    <sys:String x:Key="LOCGsPluginDashboardProfileFailed">O Game Scrobbler não conseguiu abrir um perfil de navegador privado para o painel, por isso ele não foi carregado. Reinicie o Playnite para tentar novamente.</sys:String>
 </ResourceDictionary>

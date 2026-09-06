@@ -25,9 +25,25 @@ namespace GsPlugin.Services {
         private readonly GsIntegrationAccountReader _integrationAccountReader;
         private readonly ConcurrentDictionary<string, SemaphoreSlim> _sessionGates =
             new ConcurrentDictionary<string, SemaphoreSlim>();
-        private readonly ConcurrentDictionary<string, Playnite.SDK.Models.Game> _runningGames =
-            new ConcurrentDictionary<string, Playnite.SDK.Models.Game>();
+        /// <summary>
+        /// A game whose start this process sent, held until it stops. The captured start
+        /// instant travels with it so a shutdown finish can state its own session even
+        /// while the start is still in flight.
+        /// </summary>
+        private sealed class RunningGame {
+            public Playnite.SDK.Models.Game Game;
+            public DateTime StartedAt;
+        }
 
+        private readonly ConcurrentDictionary<string, RunningGame> _runningGames =
+            new ConcurrentDictionary<string, RunningGame>();
+
+        /// <summary>
+        /// Aborts a *full* achievement sync only. A full sync replaces the server-side baseline
+        /// wholesale, so a snapshot missing a game it simply could not read would delete that
+        /// game's achievements. The diff path has no such constraint and skips the unreadable
+        /// game instead of failing the whole library. See SyncAchievementsDiffAsync.
+        /// </summary>
         private sealed class AchievementReadUnavailableException : Exception {
             public AchievementReadUnavailableException(string providerName, Guid gameId)
                 : base($"Achievement snapshot unavailable from {providerName ?? "provider"} for {gameId}; keeping the previous baseline.") { }
@@ -92,8 +108,11 @@ namespace GsPlugin.Services {
         /// Builds the session-finish payload for a Playnite game. Shared by the live send and the
         /// queued-retry copy. Pass a null <paramref name="sessionId"/> for the queued-start pairing
         /// path, where no server session exists yet.
+        /// <paramref name="startedAt"/> is the start event's own timestamp string, passed through
+        /// unchanged: the server matches it as an exact instant, so re-formatting a
+        /// <see cref="DateTime"/> here would break that match. Null when unknown.
         /// </summary>
-        private static ScrobbleFinishReq BuildFinishReq(Playnite.SDK.Models.Game g, string sessionId, DateTime at) {
+        private static ScrobbleFinishReq BuildFinishReq(Playnite.SDK.Models.Game g, string sessionId, string startedAt, DateTime at) {
             return new ScrobbleFinishReq {
                 user_id = GsDataManager.InstallIdForBody,
                 game_name = g.Name,
@@ -102,20 +121,56 @@ namespace GsPlugin.Services {
                 external_game_id = g.GameId,
                 source_name = g.Source?.Name,
                 session_id = sessionId,
+                started_at = startedAt,
                 metadata = new { PluginId = g.PluginId.ToString(), SourceName = g.Source?.Name },
                 finished_at = FormatScrobbleTimestamp(at)
             };
         }
 
         private static bool IsCurrentIdentity(string installId, int generation) =>
-            !GsDataManager.IsOptedOut && GsDataManager.Data.InstallID == installId
-            && GsDataManager.Data.IdentityGeneration == generation;
+            GsDataManager.IsActiveIdentity(installId, generation);
+
+        /// <summary>
+        /// Forgets a game the plugin will not report on: it stopped while its source was no
+        /// longer eligible, or while scrobbling was switched off. Without this both the live
+        /// active-session entry and the in-memory running-game entry survive the stop, and
+        /// <see cref="OnApplicationStoppedAsync"/>, which filters by neither, turns whichever
+        /// one remains into a finish stamped at Playnite's exit time, reporting a session that
+        /// ran until the app closed.
+        /// </summary>
+        /// <summary>
+        /// Drops a per-game gate once nothing is using it. GetOrAdd alone made this dictionary
+        /// append-only: every distinct game launched in a Playnite session left a SemaphoreSlim
+        /// behind for the life of the process, and none were ever disposed. Removing only an
+        /// uncontended gate keeps the mutual exclusion intact: a waiter still holds the same
+        /// instance, and the next caller simply creates a fresh one.
+        /// </summary>
+        private void ReleaseSessionGate(string gameId, SemaphoreSlim gate) {
+            if (gameId == null || gate == null || gate.CurrentCount != 1) return;
+            if (!_sessionGates.TryRemove(gameId, out var removed)) return;
+            if (!ReferenceEquals(removed, gate) || removed.CurrentCount != 1) {
+                // Someone swapped or took it between the checks; put it back rather than
+                // disposing a gate another handler is about to wait on.
+                _sessionGates.TryAdd(gameId, removed);
+                return;
+            }
+            removed.Dispose();
+        }
+
+        private void DiscardTrackedSession(string gameId) {
+            _runningGames.TryRemove(gameId, out _);
+            if (string.IsNullOrEmpty(gameId) || !GsDataManager.HasActiveSession(gameId)) return;
+            _logger.Info($"Clearing active session for no-longer-tracked game ID: {gameId}");
+            GsDataManager.MutateAndSave(d => d.RemoveActiveSession(gameId));
+        }
 
         /// <summary>Persists the start before attempting its live send.</summary>
         public async Task OnGameStartAsync(OnGameStartingEventArgs args) {
             var at = DateTime.Now;
             PendingScrobble pending = null;
             SemaphoreSlim gate = null;
+            // Declared out here so the finally can hand the gate back for disposal.
+            string gameKey = null;
             var enteredGate = false;
             try {
                 if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")
@@ -137,8 +192,9 @@ namespace GsPlugin.Services {
                     d.PendingScrobbles.Add(pending);
                     if (!d.PendingStartGameIds.Contains(gameId)) d.PendingStartGameIds.Add(gameId);
                 })) return;
-                _runningGames[gameId] = game;
+                _runningGames[gameId] = new RunningGame { Game = game, StartedAt = at };
 
+                gameKey = gameId;
                 gate = _sessionGates.GetOrAdd(gameId, _ => new SemaphoreSlim(1, 1));
                 await gate.WaitAsync();
                 enteredGate = true;
@@ -161,6 +217,7 @@ namespace GsPlugin.Services {
             finally {
                 if (enteredGate) gate.Release();
                 if (pending != null) GsDataManager.ReleasePendingScrobble(pending);
+                ReleaseSessionGate(gameKey, gate);
             }
         }
 
@@ -172,13 +229,22 @@ namespace GsPlugin.Services {
             var at = DateTime.Now;
             PendingScrobble pending = null;
             SemaphoreSlim gate = null;
+            // Declared out here so the finally can hand the gate back for disposal.
+            string gameKey = null;
             var enteredGate = false;
             try {
-                if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")
-                    || args?.Game == null || !GsAllowedPlugins.IsAllowed(args.Game)) return;
+                if (GsDataManager.IsOptedOut || args?.Game == null) return;
 
                 var game = args.Game;
                 var gameId = game.Id.ToString();
+                // Split out from the opt-out check: these two say "do not report this stop",
+                // not "leave the session open". Returning without clearing what the start
+                // recorded is what let a stopped game be finished again at Playnite's exit.
+                if (GsDataManager.Data.Flags.Contains("no-scrobble") || !GsAllowedPlugins.IsAllowed(game)) {
+                    DiscardTrackedSession(gameId);
+                    return;
+                }
+
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
                 var startPending = GsDataManager.HasPendingStart(gameId);
@@ -187,7 +253,11 @@ namespace GsPlugin.Services {
 
                 pending = new PendingScrobble {
                     Type = "finish",
-                    FinishData = BuildFinishReq(game, startPending ? null : sessionId, at),
+                    FinishData = BuildFinishReq(game, startPending ? null : sessionId,
+                        _runningGames.TryGetValue(gameId, out var running)
+                            ? FormatScrobbleTimestamp(running.StartedAt)
+                            : null,
+                        at),
                     QueuedAt = at
                 };
                 GsDataManager.ClaimPendingScrobble(pending);
@@ -199,25 +269,34 @@ namespace GsPlugin.Services {
                         && d.ActiveSessionsByGameId.TryGetValue(gameId, out var completedSession)) {
                         pending.FinishData.session_id = completedSession;
                     }
+                    // Same resolution the shutdown path uses: the start that recorded this
+                    // instant may only be visible from inside the transaction.
+                    if (string.IsNullOrEmpty(pending.FinishData.started_at)) {
+                        pending.FinishData.started_at = d.ResolveSessionStart(gameId);
+                    }
                     d.PendingScrobbles.Add(pending);
                     d.PendingStartGameIds.Remove(gameId);
                     // The durable finish owns completion from now on. Never erase a newer
                     // session merely because it uses the same Playnite game ID.
                     if (!string.IsNullOrEmpty(pending.FinishData.session_id)
                         && d.ActiveSessionsByGameId.TryGetValue(gameId, out var current) && current == pending.FinishData.session_id) {
-                        d.ActiveSessionsByGameId.Remove(gameId);
+                        d.RemoveActiveSession(gameId);
                     }
                 })) return;
                 _runningGames.TryRemove(gameId, out _);
 
+                gameKey = gameId;
                 gate = _sessionGates.GetOrAdd(gameId, _ => new SemaphoreSlim(1, 1));
                 await gate.WaitAsync();
                 enteredGate = true;
                 if (!IsCurrentIdentity(installId, generation)) return;
                 if (GsDataManager.HasEarlierPendingScrobble(pending)) return;
-                // A failed start is still ahead of this finish in the durable queue. Replay
-                // must resolve it first; sending the finish now could finish an older session.
-                if (string.IsNullOrEmpty(pending.FinishData.session_id)) return;
+                // Nothing here identifies which session to close: no server session id, and no
+                // start instant to match one on. Only the queued replay can resolve it, once
+                // the start ahead of it in the queue succeeds. A finish that knows when its
+                // session began needs no such help: it describes the session on its own.
+                if (string.IsNullOrEmpty(pending.FinishData.session_id)
+                    && string.IsNullOrEmpty(pending.FinishData.started_at)) return;
 
                 var response = await _apiClient.FinishGameSession(pending.FinishData);
                 if (response != null) GsDataManager.CompletePendingScrobble(pending);
@@ -228,6 +307,7 @@ namespace GsPlugin.Services {
             finally {
                 if (enteredGate) gate.Release();
                 if (pending != null) GsDataManager.ReleasePendingScrobble(pending);
+                ReleaseSessionGate(gameKey, gate);
             }
         }
         /// <summary>
@@ -259,6 +339,11 @@ namespace GsPlugin.Services {
                             user_id = GsDataManager.InstallIdForBody,
                             game_id = entry.Key,
                             session_id = entry.Value,
+                            // This payload names no game, so without the start instant a
+                            // session_id the server has since closed leaves it nothing exact
+                            // to match on. Null only for sessions started before the plugin
+                            // began recording it.
+                            started_at = GsDataManager.ResolveSessionStart(entry.Key),
                             metadata = new { reason = "application_stopped" },
                             finished_at = FormatScrobbleTimestamp(at)
                         }
@@ -271,7 +356,8 @@ namespace GsPlugin.Services {
                     pendingFinishes.Add(new PendingScrobble {
                         Type = "finish",
                         QueuedAt = at,
-                        FinishData = BuildFinishReq(entry.Value, null, at)
+                        FinishData = BuildFinishReq(entry.Value.Game, null,
+                            FormatScrobbleTimestamp(entry.Value.StartedAt), at)
                     });
                 }
                 if (pendingFinishes.Count == 0) return;
@@ -282,7 +368,8 @@ namespace GsPlugin.Services {
                 _runningGames.Clear();
                 foreach (var pending in pendingFinishes) {
                     if (!IsCurrentIdentity(installId, generation)) break;
-                    if (string.IsNullOrEmpty(pending.FinishData.session_id)
+                    if ((string.IsNullOrEmpty(pending.FinishData.session_id)
+                            && string.IsNullOrEmpty(pending.FinishData.started_at))
                         || GsDataManager.HasEarlierPendingScrobble(pending)) continue;
                     try {
                         var response = await _apiClient.FinishGameSession(pending.FinishData);
@@ -582,16 +669,27 @@ namespace GsPlugin.Services {
         /// Best-effort check of a queued sync job's terminal status via GET /queue/status/:queueId.
         /// A "queued" admission only means the request was accepted onto the async queue, not that
         /// the server applied it — see gs-playnite#83, where a job that failed after admission left
-        /// the client believing it had synced. Bounded to a short budget: if the job hasn't reached a
-        /// terminal state in time (large library, slow backend), returns null and leaves the
-        /// previous baseline intact. The next sync can retry or recover through force-full-sync;
-        /// an admission without confirmed completion must never suppress that retry.
+        /// the client believing it had synced. That issue is a job the server *rejected*, which
+        /// this reports as false and the caller treats as fatal.
+        ///
+        /// A null is a different answer and must not be conflated with it: the job was admitted
+        /// and simply has not finished inside the budget. Treating that as failure meant a library
+        /// whose server-side job routinely runs longer than the budget never advanced its baseline,
+        /// so every launch re-uploaded the whole library and LastSyncAt never moved: the
+        /// force-full-sync loop this whole path exists to avoid, and strictly worse than trusting
+        /// an admission the server has not disowned.
         /// </summary>
-        /// <returns>true if the job completed successfully, false if it failed/partially applied,
-        /// or null if no terminal status was observed within the budget.</returns>
+        /// <returns>true if the job completed successfully; false if the server disowned it
+        /// (failed/partial) or never gave a job id to poll; null if it was admitted and simply
+        /// had not finished within the budget.</returns>
         private async Task<bool?> TryConfirmQueueCompletionAsync(string label, string queueId) {
             if (string.IsNullOrEmpty(queueId)) {
-                return null;
+                // false, not null. "Admitted but still working" is a job we can come back to;
+                // an admission carrying no job id can never be confirmed at all, which is a
+                // malformed response rather than a slow one. Report it as a failure so the
+                // baseline is held back.
+                _logger.Error($"{label}: server accepted the sync but returned no job id; not committing the baseline.");
+                return false;
             }
 
             var deadline = DateTime.UtcNow + QueueStatusPollBudget;
@@ -622,7 +720,7 @@ namespace GsPlugin.Services {
             } while (DateTime.UtcNow < deadline);
 
             _logger.Info($"{label}: no confirmed completion for job {queueId} after {QueueStatusPollBudget.TotalSeconds:F0}s — " +
-                "keeping the previous baseline so a later sync can retry.");
+                "the job was admitted and is still processing; committing the baseline optimistically.");
             return null;
         }
 
@@ -681,7 +779,10 @@ namespace GsPlugin.Services {
             Func<bool> persistIndex,
             Action<GsData> persistHashes,
             string queuedDetail = null) {
-            if (await TryConfirmQueueCompletionAsync(label, queueId) != true) {
+            // == false, not != true. Only a status the server actually disowned (failed/partial)
+            // blocks the baseline; an unconfirmed-but-admitted job keeps it, because refusing to
+            // advance on a slow job is a permanent full re-upload every launch.
+            if (await TryConfirmQueueCompletionAsync(label, queueId) == false) {
                 return SyncLibraryResult.Error;
             }
 
@@ -1023,6 +1124,27 @@ namespace GsPlugin.Services {
                 if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
                 var achHash = GsHashUtils.ComputeAchievementHash(games);
 
+                // Nothing to upload is a local outcome, not a request. Without this an install
+                // whose games have no recorded achievements (a new install, or a library with
+                // none that track any) opened a v4 session with expected_total_items = 0 and
+                // committed zero chunks on every sync. If the server declines an empty full sync,
+                // no baseline is ever written, the hash shortcut below never engages, and the call
+                // repeats forever. Fenced through the identity check, which is what the earlier
+                // unfenced version of this branch was missing.
+                if (games.Count == 0) {
+                    _logger.Info("No games with achievements found; setting empty baseline locally.");
+                    var baselineSaved = false;
+                    var committed = GsDataManager.TryMutateIfActiveIdentity(installId, generation, d => {
+                        baselineSaved = GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string>());
+                        if (baselineSaved) d.LastAchievementHash = achHash;
+                    });
+                    if (!committed || !baselineSaved) {
+                        _logger.Error("Failed to persist empty achievements baseline.");
+                        return SyncLibraryResult.Error;
+                    }
+                    return SyncLibraryResult.Skipped;
+                }
+
                 if (achHash == GsDataManager.Data.LastAchievementHash && GsSyncHashIndex.HasAchievementsBaseline) {
                     return SkipOrRepairIndex(
                         "Full achievements sync",
@@ -1126,6 +1248,7 @@ namespace GsPlugin.Services {
                     int filteredCount = 0;
                     int nullCount = 0;
                     int withDataCount = 0;
+                    int unavailableCount = 0;
 
                     foreach (var g in allGames) {
                         if (!GsAllowedPlugins.IsAllowed(g))
@@ -1133,7 +1256,18 @@ namespace GsPlugin.Services {
 
                         filteredCount++;
                         var playniteId = g.Id.ToString();
-                        var read = ReadAchievementsForSync(g.Id);
+                        // Scoped to this game, not the whole pass. A diff only has to describe the
+                        // games it could actually read: one addon file locked mid-write used to
+                        // throw straight out of this loop, discarding every read already done and
+                        // failing achievement sync for the entire library. Marking the game current
+                        // keeps it out of the cleared set below, so its server-side achievements
+                        // survive untouched and its baseline fingerprint is left for the next run.
+                        var read = AchievementReadResult.Read(_achievementHelper, g.Id);
+                        if (!read.IsAvailable) {
+                            unavailableCount++;
+                            currentGameIds.Add(playniteId);
+                            continue;
+                        }
                         var achievements = read.Achievements;
                         var sourceProvider = read.ProviderName;
 
@@ -1203,6 +1337,7 @@ namespace GsPlugin.Services {
 
                     _logger.Info($"Achievement diff scan: {filteredCount} eligible games, " +
                         $"{withDataCount} with data, {nullCount} with no data, " +
+                        $"{unavailableCount} unreadable (baseline kept), " +
                         $"{result.Count} changed");
 
                     var cleared = achievementFingerprints.Keys
@@ -1268,10 +1403,6 @@ namespace GsPlugin.Services {
                 }
 
                 _logger.Error($"Unexpected response from achievements diff sync: status={response.status}");
-                return SyncLibraryResult.Error;
-            }
-            catch (AchievementReadUnavailableException ex) {
-                _logger.Warn(ex.Message);
                 return SyncLibraryResult.Error;
             }
             catch (Exception ex) {

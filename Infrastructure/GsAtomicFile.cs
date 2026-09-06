@@ -58,16 +58,23 @@ namespace GsPlugin.Infrastructure {
         /// Streams <paramref name="value"/> to a temp file (avoids allocating one giant string for
         /// large payloads) then atomically replaces the target with retry.
         /// </summary>
-        public static void WriteJson<T>(string filePath, T value, JsonSerializerOptions options) {
+        /// <param name="durable">
+        /// Forces the temp file's bytes onto the physical disk before the replace. File.Replace is
+        /// atomic for the directory-entry swap, but without this the contents may still be sitting
+        /// in the OS write cache, so a power loss can commit the rename over a truncated file, and
+        /// RecoverTemp cannot help because the destination now exists.
+        ///
+        /// Off by default because it is a FlushFileBuffers-class syscall, and GsDataManager saves
+        /// under a process-wide lock on every game start, game stop and queued-scrobble transition
+        /// so paying a hardware commit there blocks every other reader, including the UI thread, and
+        /// draining a backed-up queue pays it once per item. Reserve it for state that cannot be
+        /// reconstructed by replaying work: install identity, tokens and consent.
+        /// </param>
+        public static void WriteJson<T>(string filePath, T value, JsonSerializerOptions options, bool durable = false) {
             var tempPath = filePath + ".tmp";
             using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None)) {
                 JsonSerializer.Serialize(stream, value, options);
-                // Force the bytes to the physical disk before the replace below. File.Replace is
-                // atomic for the directory-entry swap, but without this the temp file's contents may
-                // still be sitting in the OS write cache, so a power loss can commit the rename over
-                // a zero-length or truncated file. RecoverTemp cannot help there: the destination now
-                // exists, so it is never promoted.
-                stream.Flush(flushToDisk: true);
+                stream.Flush(flushToDisk: durable);
             }
             ReplaceWithRetry(tempPath, filePath);
         }

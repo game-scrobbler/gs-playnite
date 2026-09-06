@@ -63,6 +63,16 @@ namespace GsPlugin.Models {
         /// </summary>
         public Dictionary<string, string> ActiveSessionsByGameId { get; set; } = new Dictionary<string, string>();
         /// <summary>
+        /// Start timestamps of the active sessions above, keyed by the same Playnite
+        /// game ID and holding the exact string the start event sent. Kept as a
+        /// parallel map rather than folded into the value of
+        /// <see cref="ActiveSessionsByGameId"/> so existing gs_data.json files keep
+        /// deserializing; the two only ever move together, via
+        /// <see cref="SetActiveSession"/> and <see cref="RemoveActiveSession"/>.
+        /// Empty for sessions started by a plugin version predating this field.
+        /// </summary>
+        public Dictionary<string, string> ActiveSessionStartsByGameId { get; set; } = new Dictionary<string, string>();
+        /// <summary>
         /// Game IDs whose start scrobble was queued (failed to send).
         /// Used by OnGameStoppedAsync to pair a finish with the pending start.
         /// An entry is removed once the finish is queued or when the start succeeds.
@@ -135,9 +145,52 @@ namespace GsPlugin.Models {
         /// </summary>
         public int DroppedScrobbleCount { get; set; } = 0;
 
+        /// <summary>
+        /// Records an active session and the instant it began. The only way to add to
+        /// <see cref="ActiveSessionsByGameId"/>: the start map must never be allowed to
+        /// drift from it, or a finish would report a start time belonging to another session.
+        /// </summary>
+        internal void SetActiveSession(string gameId, string sessionId, string startedAt) {
+            ActiveSessionsByGameId[gameId] = sessionId;
+            if (string.IsNullOrEmpty(startedAt)) {
+                ActiveSessionStartsByGameId.Remove(gameId);
+            }
+            else {
+                ActiveSessionStartsByGameId[gameId] = startedAt;
+            }
+        }
+
+        /// <summary>Drops an active session and its start instant together.</summary>
+        internal void RemoveActiveSession(string gameId) {
+            ActiveSessionsByGameId.Remove(gameId);
+            ActiveSessionStartsByGameId.Remove(gameId);
+        }
+
+        /// <summary>
+        /// Best-effort start instant for a game that is being finished: the active session's
+        /// recorded start, else the most recent queued start still waiting to be sent. The
+        /// latest queued start wins because a finish always pairs with the newest launch.
+        /// Returns null when nothing local knows when the session began.
+        /// </summary>
+        internal string ResolveSessionStart(string gameId) {
+            if (string.IsNullOrEmpty(gameId)) return null;
+            if (ActiveSessionStartsByGameId.TryGetValue(gameId, out var known)
+                && !string.IsNullOrEmpty(known)) {
+                return known;
+            }
+            for (var i = PendingScrobbles.Count - 1; i >= 0; i--) {
+                var item = PendingScrobbles[i];
+                if (item.Type == "start" && item.StartData?.game_id == gameId) {
+                    return item.StartData.started_at;
+                }
+            }
+            return null;
+        }
+
         internal GsData CreateRollbackSnapshot() {
             var copy = (GsData)MemberwiseClone();
             copy.ActiveSessionsByGameId = new Dictionary<string, string>(ActiveSessionsByGameId);
+            copy.ActiveSessionStartsByGameId = new Dictionary<string, string>(ActiveSessionStartsByGameId);
             copy.PendingStartGameIds = new List<string>(PendingStartGameIds);
             copy.PendingScrobbles = new List<PendingScrobble>(PendingScrobbles);
             copy.Flags = new List<string>(Flags);
@@ -162,6 +215,7 @@ namespace GsPlugin.Models {
         public void ClearIdentityBoundState(IdentityClearScope scope) {
             LinkedUserId = null;
             ActiveSessionsByGameId.Clear();
+            ActiveSessionStartsByGameId.Clear();
             PendingStartGameIds.Clear();
             PendingScrobbles.Clear();
             LastLibraryHash = null;
@@ -305,7 +359,7 @@ namespace GsPlugin.Models {
                         loaded.InstallID = Guid.NewGuid().ToString();
                         loaded.IdentityGeneration++;
                         Directory.CreateDirectory(folderPath);
-                        GsAtomicFile.WriteJson(_filePath, loaded, jsonOptions);
+                        GsAtomicFile.WriteJson(_filePath, loaded, jsonOptions, durable: true);
                         GsLogger.Info("Generated new InstallID");
                     }
                     _data = loaded;
@@ -326,9 +380,15 @@ namespace GsPlugin.Models {
         /// Must be called under _lock.
         /// </summary>
         private static GsData Load() {
-            GsAtomicFile.RecoverTemp(_filePath);
-
             for (var attempt = 0; ; attempt++) {
+                // Inside the loop, not before it. The one case the FileNotFoundException guard
+                // below exists for (destination gone, .tmp survived) is repaired by this call,
+                // and the repair itself can lose a race with an antivirus or indexer scan. Hoisted
+                // out of the loop it ran exactly once, so a transient lock on the .tmp made every
+                // remaining attempt re-read the same missing file and then throw, discarding a
+                // recoverable last-known-good write.
+                GsAtomicFile.RecoverTemp(_filePath);
+
                 try {
                     var json = File.ReadAllText(_filePath);
                     var data = JsonSerializer.Deserialize<GsData>(json, jsonOptions);
@@ -344,8 +404,11 @@ namespace GsPlugin.Models {
                 catch (DirectoryNotFoundException) {
                     return new GsData();
                 }
+                // JsonException is deliberately absent: a file nobody is writing parses
+                // identically every time, so retrying it only burns the backoff on the startup
+                // thread before failing anyway. Only a contended handle is worth a second look.
                 catch (Exception ex) when (attempt < 2 &&
-                    (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)) {
+                    (ex is IOException || ex is UnauthorizedAccessException)) {
                     System.Threading.Thread.Sleep(50 * (attempt + 1));
                 }
             }
@@ -417,12 +480,25 @@ namespace GsPlugin.Models {
             }
         }
 
+        /// <summary>
+        /// True when the install this response belongs to is still the live one. The single
+        /// definition of that question. Every fence in the plugin (the mutation guard below,
+        /// the scrobbling service's post-await rechecks, the account-linking service's
+        /// stale-response rejection) resolves to this method, so the rule cannot be changed
+        /// in one place and silently left stale in another.
+        /// Null-safe by construction: unavailable data is never the active identity.
+        /// </summary>
+        public static bool IsActiveIdentity(string expectedInstallId, int expectedGeneration) {
+            var data = _data;
+            return data != null && !data.OptedOut && data.InstallID == expectedInstallId
+                && data.IdentityGeneration == expectedGeneration;
+        }
+
         /// <summary>Rejects responses that belong to a deleted or replaced installation.</summary>
         public static bool TryMutateIfActiveIdentity(string expectedInstallId, int expectedGeneration, Action<GsData> action) {
             bool saved;
             lock (_lock) {
-                if (_data == null || _data.OptedOut || _data.InstallID != expectedInstallId
-                    || _data.IdentityGeneration != expectedGeneration) {
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
                     return false;
                 }
                 saved = PersistMutation(action);
@@ -431,13 +507,21 @@ namespace GsPlugin.Models {
             return saved;
         }
 
+        /// <summary>The fields of a queued finish that these transactions may edit in place.</summary>
+        private struct FinishPairing {
+            public string SessionId;
+            public string StartedAt;
+        }
+
         // Preserve queue item identity across rollback: an in-flight sender holds those same
-        // objects. Only the session ID of a paired finish is edited by these transactions.
+        // objects. Only the session ID and start instant of a paired finish are edited by
+        // these transactions.
         private static bool PersistMutation(Action<GsData> action) {
             var before = _data;
             var claims = new HashSet<PendingScrobble>(_claimedScrobbles);
-            var finishIds = _data.PendingScrobbles.Where(p => p.FinishData != null)
-                .Select(p => p.FinishData).Distinct().ToDictionary(f => f, f => f.session_id);
+            var finishPairings = _data.PendingScrobbles.Where(p => p.FinishData != null)
+                .Select(p => p.FinishData).Distinct()
+                .ToDictionary(f => f, f => new FinishPairing { SessionId = f.session_id, StartedAt = f.started_at });
             bool saved = false;
             try {
                 // Work on copied collections so a failed write preserves existing references
@@ -450,7 +534,10 @@ namespace GsPlugin.Models {
             finally {
                 if (!saved) {
                     _data = before;
-                    foreach (var finish in finishIds) finish.Key.session_id = finish.Value;
+                    foreach (var finish in finishPairings) {
+                        finish.Key.session_id = finish.Value.SessionId;
+                        finish.Key.started_at = finish.Value.StartedAt;
+                    }
                     _claimedScrobbles.Clear();
                     _claimedScrobbles.UnionWith(claims);
                 }
@@ -472,15 +559,25 @@ namespace GsPlugin.Models {
         /// in one write. On a failed write the original collections remain available for retry.
         /// </summary>
         public static bool QueueSessionFinishesAndClearActive(Dictionary<string, string> sessions, List<PendingScrobble> finishes,
-            string expectedInstallId = null, int? expectedGeneration = null) {
+            string expectedInstallId, int expectedGeneration) {
             bool saved;
             lock (_lock) {
-                if (_data == null || _data.OptedOut) return false;
-                if ((expectedInstallId != null && _data.InstallID != expectedInstallId)
-                    || (expectedGeneration.HasValue && _data.IdentityGeneration != expectedGeneration.Value)) return false;
+                // Required, not optional. As defaulted parameters these were skippable, so the
+                // one mutation that writes a batch of finishes was also the one that could run
+                // unfenced, and the shape invited the next caller to copy it.
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) return false;
                 saved = PersistMutation(d => {
                     foreach (var pending in finishes) {
                         var finish = pending.FinishData;
+                        // A live OnGameStoppedAsync can land its own finish for this game between
+                        // the caller's active-session snapshot and this write. Appending anyway
+                        // leaves a duplicate that no send-time guard removes: HasEarlierPendingScrobble
+                        // only defers it, so a later flush pass finishes an already-finished session.
+                        if (d.PendingScrobbles.Any(p => p.Type == "finish"
+                            && IsSameGame(p, finish.game_id, finish.plugin_id)
+                            && p.FinishData?.session_id == finish.session_id)) {
+                            continue;
+                        }
                         if (string.IsNullOrEmpty(finish.session_id)
                             && !d.PendingScrobbles.Any(p => p.Type == "start"
                                 && IsSameGame(p, finish.game_id, finish.plugin_id))) {
@@ -493,18 +590,23 @@ namespace GsPlugin.Models {
                                 continue; // The start was already dropped or the game stopped.
                             }
                         }
+                        // Same reason as the session_id above: the caller's snapshot can predate
+                        // the start that recorded this instant.
+                        if (string.IsNullOrEmpty(finish.started_at)) {
+                            finish.started_at = d.ResolveSessionStart(finish.game_id);
+                        }
                         d.PendingScrobbles.Add(pending);
                         d.PendingStartGameIds.Remove(finish.game_id);
                         if (!string.IsNullOrEmpty(finish.session_id)
                             && d.ActiveSessionsByGameId.TryGetValue(finish.game_id, out var active)
                             && active == finish.session_id) {
-                            d.ActiveSessionsByGameId.Remove(finish.game_id);
+                            d.RemoveActiveSession(finish.game_id);
                         }
                     }
                     foreach (var session in sessions) {
                         if (d.ActiveSessionsByGameId.TryGetValue(session.Key, out var current)
                             && current == session.Value) {
-                            d.ActiveSessionsByGameId.Remove(session.Key);
+                            d.RemoveActiveSession(session.Key);
                         }
                     }
                 });
@@ -545,6 +647,17 @@ namespace GsPlugin.Models {
         }
 
         /// <summary>
+        /// Best-effort start instant for a game about to be finished, taken from the active
+        /// session or from its still-queued start. Lets a finish describe its own session
+        /// rather than depending on the server having seen the start. Thread-safe.
+        /// </summary>
+        public static string ResolveSessionStart(string gameId) {
+            lock (_lock) {
+                return _data?.ResolveSessionStart(gameId);
+            }
+        }
+
+        /// <summary>
         /// Returns true if the given game ID has a pending (queued) start scrobble. Thread-safe.
         /// </summary>
         public static bool HasPendingStart(string gameId) {
@@ -556,7 +669,12 @@ namespace GsPlugin.Models {
         /// <summary>
         /// Internal save implementation. Must be called under _lock.
         /// </summary>
-        private static bool SaveInternal() {
+        /// <param name="durable">
+        /// True only for state that replaying work cannot rebuild: install identity, token and
+        /// consent. Routine saves (scrobble queue transitions, notification bookkeeping) leave it
+        /// false so a per-event write does not hold this lock through a physical disk commit.
+        /// </param>
+        private static bool SaveInternal(bool durable = false) {
             if (_data == null || string.IsNullOrEmpty(_filePath)) return false;
             try {
                 var dir = Path.GetDirectoryName(_filePath);
@@ -564,7 +682,7 @@ namespace GsPlugin.Models {
                     Directory.CreateDirectory(dir);
                 }
                 GsLogger.Info("Saving plugin data to disk");
-                GsAtomicFile.WriteJson(_filePath, _data, jsonOptions);
+                GsAtomicFile.WriteJson(_filePath, _data, jsonOptions, durable);
                 return true;
             }
             catch (Exception ex) {
@@ -609,7 +727,7 @@ namespace GsPlugin.Models {
                 _data.IdentityGeneration++;
                 // Token is invalidated server-side on opt-out, so clear it too.
                 _data.ClearIdentityBoundState(IdentityClearScope.InstallToken);
-                SaveInternal();
+                SaveInternal(durable: true);
             }
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
         }
@@ -621,7 +739,7 @@ namespace GsPlugin.Models {
         public static void PerformOptIn() {
             lock (_lock) {
                 _data.OptedOut = false;
-                SaveInternal();
+                SaveInternal(durable: true);
             }
         }
 
@@ -666,7 +784,7 @@ namespace GsPlugin.Models {
                     return false;
                 }
                 _data.InstallToken = token;
-                SaveInternal();
+                SaveInternal(durable: true);
                 stored = true;
             }
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
@@ -690,7 +808,7 @@ namespace GsPlugin.Models {
                 // account link that belongs to the abandoned server-side identity.
                 _data.ClearIdentityBoundState(
                     IdentityClearScope.InstallToken | IdentityClearScope.ShownNotifications);
-                SaveInternal();
+                SaveInternal(durable: true);
                 GsLogger.Info("InstallID rotated for lost-token recovery; identity-bound state cleared");
             }
             // Reset hash index outside the data lock (each manager has its own lock).
@@ -733,10 +851,33 @@ namespace GsPlugin.Models {
         /// </summary>
         public static List<PendingScrobble> PeekPendingScrobbles() {
             lock (_lock) {
-                // A claimed start can already have a durable matching finish behind it.
-                // Replay only the available prefix, so that finish cannot overtake its start.
-                return _data.PendingScrobbles.TakeWhile(item => !_claimedScrobbles.Contains(item)).ToList();
+                // A claimed start can already have a durable matching finish behind it, and that
+                // finish must not overtake its start. That ordering is per game, though: cutting
+                // the whole queue at the first claimed item let one game's in-flight live request
+                // hide every other game's queued work for the length of an HTTP timeout. Block
+                // only the games that actually have an item in flight.
+                var blocked = new HashSet<string>();
+                var available = new List<PendingScrobble>();
+                foreach (var item in _data.PendingScrobbles) {
+                    var key = GameKeyOf(item);
+                    if (_claimedScrobbles.Contains(item)) {
+                        blocked.Add(key);
+                        continue;
+                    }
+                    if (blocked.Contains(key)) {
+                        continue;
+                    }
+                    available.Add(item);
+                }
+                return available;
             }
+        }
+
+        /// <summary>Identity a pending item's ordering is scoped to: one launch target.</summary>
+        private static string GameKeyOf(PendingScrobble item) {
+            var gameId = item.StartData?.game_id ?? item.FinishData?.game_id;
+            var pluginId = item.StartData?.plugin_id ?? item.FinishData?.plugin_id;
+            return $"{gameId}|{pluginId}";
         }
 
         public static void ClaimPendingScrobble(PendingScrobble item) {
@@ -788,9 +929,12 @@ namespace GsPlugin.Models {
                 if (pairedFinish != null && string.IsNullOrEmpty(pairedFinish.FinishData.session_id)) {
                     pairedFinish.FinishData.session_id = sessionId;
                 }
+                if (pairedFinish != null && string.IsNullOrEmpty(pairedFinish.FinishData.started_at)) {
+                    pairedFinish.FinishData.started_at = item.StartData.started_at;
+                }
                 if (pairedFinish == null && !laterStart && !string.IsNullOrEmpty(gameId)
                     && !string.IsNullOrEmpty(sessionId)) {
-                    d.ActiveSessionsByGameId[gameId] = sessionId;
+                    d.SetActiveSession(gameId, sessionId, item.StartData.started_at);
                 }
                 if (!laterStart && (pairedFinish != null || !string.IsNullOrEmpty(sessionId))) {
                     d.PendingStartGameIds.Remove(gameId);
@@ -806,17 +950,31 @@ namespace GsPlugin.Models {
                 if (!string.IsNullOrEmpty(finish?.game_id)
                     && d.ActiveSessionsByGameId.TryGetValue(finish.game_id, out var active)
                     && active == finish.session_id) {
-                    d.ActiveSessionsByGameId.Remove(finish.game_id);
+                    d.RemoveActiveSession(finish.game_id);
                 }
                 d.PendingScrobbles.Remove(item);
                 _claimedScrobbles.Remove(item);
             });
         }
 
+        /// <summary>
+        /// True when a queued finish can be sent on its own, without the server having
+        /// accepted its start: it either names the session or states when it began.
+        /// </summary>
+        private static bool IsSelfContainedFinish(PendingScrobble item) =>
+            !string.IsNullOrEmpty(item?.FinishData?.session_id)
+            || !string.IsNullOrEmpty(item?.FinishData?.started_at);
+
         public static bool DropPendingScrobble(PendingScrobble item) {
             return MutatePendingScrobble(item, d => {
                 if (item.Type == "start" && item.StartData != null) {
                     var pairedFinish = FindPairedFinish(d, item);
+                    // A finish that carries its own start instant outlives the start it was
+                    // paired with: the server reconstructs the session from the finish alone.
+                    // Only a finish that can say nothing without the start goes down with it.
+                    if (pairedFinish != null && IsSelfContainedFinish(pairedFinish)) {
+                        pairedFinish = null;
+                    }
                     if (pairedFinish != null) {
                         d.PendingScrobbles.Remove(pairedFinish);
                         _claimedScrobbles.Remove(pairedFinish);
@@ -853,8 +1011,16 @@ namespace GsPlugin.Models {
         /// </summary>
         public static void IncrementPendingScrobbleFlushAttempts(PendingScrobble item) {
             lock (_lock) {
+                if (_data == null) return;
+                // The counter lives on the shared queue item, not on the GsData snapshot, so
+                // PersistMutation's rollback cannot restore it. Undo it here instead: leaving a
+                // failed save's increment in memory made the in-memory and on-disk attempt counts
+                // disagree, and a restart before the next successful save handed the item extra
+                // retries past MaxFlushAttempts.
                 item.FlushAttempts++;
-                SaveInternal();
+                if (!SaveInternal()) {
+                    item.FlushAttempts--;
+                }
             }
         }
     }

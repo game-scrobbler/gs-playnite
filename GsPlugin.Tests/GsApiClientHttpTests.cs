@@ -240,6 +240,56 @@ namespace GsPlugin.Tests {
             }
         }
 
+        [Fact]
+        public async Task FinishGameSession_NoSessionIdOrGameName_SendsWhenItCarriesAStartInstant() {
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token-abc")) {
+                var handler = new MockHttpHandler {
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        status = "success",
+                        data = new { duration_seconds = 3600 },
+                        message = "Session recorded from finish event (start never received)"
+                    })
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                // The application-stopped payload: no game_name, and a session the
+                // server may have never opened. started_at plus game_id is exact, so
+                // this is no longer the "match an arbitrary open session" case.
+                var result = await client.FinishGameSession(new ScrobbleFinishReq {
+                    user_id = "user-1",
+                    game_id = "game-guid-1",
+                    started_at = "2026-01-01T10:00:00+02:00",
+                    finished_at = "2026-01-01T11:00:00+02:00"
+                });
+
+                Assert.NotNull(result);
+                Assert.True(handler.CallCount > 0);
+                // Asserted on the decoded value, not the raw text: System.Text.Json
+                // escapes the offset's plus sign, which the server decodes back.
+                var sent = JsonSerializer.Deserialize<ScrobbleFinishReq>(handler.LastRequestBody ?? "{}");
+                Assert.Equal("2026-01-01T10:00:00+02:00", sent.started_at);
+            }
+        }
+
+        [Fact]
+        public async Task FinishGameSession_NoSessionIdGameNameOrStartInstant_Aborts() {
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token-abc")) {
+                var handler = new MockHttpHandler();
+                var client = new GsApiClient(new HttpClient(handler));
+
+                var result = await client.FinishGameSession(new ScrobbleFinishReq {
+                    user_id = "user-1",
+                    game_id = "game-guid-1",
+                    finished_at = "2026-01-01T11:00:00+02:00"
+                });
+
+                // Nothing exact to match on: sending would let the backend close
+                // whichever session it guessed at.
+                Assert.Null(result);
+                Assert.Equal(0, handler.CallCount);
+            }
+        }
+
         // --- RegisterInstallToken Tests ---
 
         [Fact]

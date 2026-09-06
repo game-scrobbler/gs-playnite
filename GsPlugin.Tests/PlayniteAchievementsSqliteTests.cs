@@ -164,6 +164,44 @@ namespace GsPlugin.Tests {
             Assert.Equal(42.5f, result[0].RarityPercent);
         }
 
+        /// <summary>
+        /// The column is UnlockTimeUtc, and the addon writes it without a "Z". Round-tripping that
+        /// gives DateTimeKind.Unspecified, which ToUniversalTime() treats as local, so every
+        /// downstream normalization (CanonicalDateTimeConverter, and therefore date_unlocked on the
+        /// wire) silently subtracted the machine's offset. Pinned as UTC at the read, and asserted
+        /// under a non-UTC local time so a regression cannot pass on a UTC build agent.
+        /// </summary>
+        [Fact]
+        public void GetAchievements_TreatsBareUnlockTimeAsUtcNotLocalTime() {
+            var gameId = Guid.NewGuid();
+            CreateTestDatabase(conn => InsertTestData(conn, gameId, "Test Game",
+                new (string name, string desc, bool unlocked, string unlockTime, double? rarity)[] {
+                    ("Bare Timestamp", "No zone marker", true, "2025-06-01T12:00:00", null)
+                }));
+
+            var result = CreateHelper().GetAchievements(gameId);
+
+            var unlocked = Assert.Single(result).DateUnlocked;
+            Assert.NotNull(unlocked);
+            Assert.Equal(DateTimeKind.Utc, unlocked.Value.Kind);
+            // The value the server must receive, whatever the machine's zone.
+            Assert.Equal(new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc), unlocked.Value.ToUniversalTime());
+        }
+
+        /// <summary>An explicit "Z" was already correct and must stay untouched.</summary>
+        [Fact]
+        public void GetAchievements_KeepsAnExplicitlyUtcUnlockTime() {
+            var gameId = Guid.NewGuid();
+            CreateTestDatabase(conn => InsertTestData(conn, gameId, "Test Game",
+                new (string name, string desc, bool unlocked, string unlockTime, double? rarity)[] {
+                    ("Zoned", "Has zone marker", true, "2025-06-01T12:00:00Z", null)
+                }));
+
+            var unlocked = Assert.Single(CreateHelper().GetAchievements(gameId)).DateUnlocked;
+
+            Assert.Equal(new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc), unlocked.Value.ToUniversalTime());
+        }
+
         [Fact]
         public void GetAchievements_ParsesLockedAchievement() {
             var gameId = Guid.NewGuid();

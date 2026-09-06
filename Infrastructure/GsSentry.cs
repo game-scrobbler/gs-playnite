@@ -42,8 +42,96 @@ namespace GsPlugin.Infrastructure {
 
         /// <summary>Applies settings changes to the running SDK, including automatic capture.</summary>
         public static void ApplyPreferences() {
+            // Before the consent branch, deliberately. These handlers are crash-safety, not
+            // telemetry: the unobserved-task one calls SetObserved() on our own faults. Living
+            // inside the enabled path meant declining Sentry also silently uninstalled them, so a
+            // privacy preference decided whether the plugin observed its own background failures.
+            // Registration is unconditional; the consent gate still decides whether to report.
+            EnsureGlobalExceptionHandlers();
             if (GsTelemetryConsent.HasConsent("no-sentry")) Initialize();
             else Shutdown();
+        }
+
+        /// <summary>
+        /// Installs the AppDomain and TaskScheduler handlers once per process. Idempotent, and
+        /// independent of whether the SDK is running: <see cref="CaptureException"/> already
+        /// no-ops without consent, so an installed handler on an opted-out install logs locally
+        /// and marks the fault observed without sending anything.
+        /// </summary>
+        internal static void EnsureGlobalExceptionHandlers() {
+            lock (LifecycleLock) {
+                if (_unhandledExceptionHandler == null) {
+                    _unhandledExceptionHandler = OnAppDomainUnhandledException;
+                    AppDomain.CurrentDomain.UnhandledException += _unhandledExceptionHandler;
+                }
+                if (_unobservedTaskExceptionHandler == null) {
+                    _unobservedTaskExceptionHandler = OnUnobservedTaskException;
+                    System.Threading.Tasks.TaskScheduler.UnobservedTaskException += _unobservedTaskExceptionHandler;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Detaches the global handlers. Only plugin disposal calls this; a consent change must
+        /// not, or turning telemetry off would again strip the plugin's fault observation.
+        /// </summary>
+        internal static void ReleaseGlobalExceptionHandlers() {
+            lock (LifecycleLock) {
+                if (_unhandledExceptionHandler != null) {
+                    AppDomain.CurrentDomain.UnhandledException -= _unhandledExceptionHandler;
+                    _unhandledExceptionHandler = null;
+                }
+                if (_unobservedTaskExceptionHandler != null) {
+                    System.Threading.Tasks.TaskScheduler.UnobservedTaskException -= _unobservedTaskExceptionHandler;
+                    _unobservedTaskExceptionHandler = null;
+                }
+            }
+        }
+
+        private static void OnAppDomainUnhandledException(object s, UnhandledExceptionEventArgs e) {
+            try {
+                var ex = e.ExceptionObject as Exception;
+                if (ex != null) {
+                    // Filter: only capture if exception originates from our plugin to avoid reporting other extensions' errors
+                    bool fromUs = IsExceptionFromOurPlugin(ex);
+                    if (fromUs) {
+                        _logger.Error(ex, "Unhandled exception (AppDomain.CurrentDomain.UnhandledException)");
+                        CaptureException(ex, "AppDomain.CurrentDomain.UnhandledException");
+                    }
+                    else {
+                        _logger.Debug("Unhandled exception not from our plugin; skipping capture.");
+                    }
+                }
+                else {
+                    _logger.Error("Unhandled exception (non-Exception type) captured in AppDomain.CurrentDomain.UnhandledException");
+                }
+            }
+            catch (Exception handlerEx) {
+                // Last resort: log to Playnite but don't throw from exception handler
+                try { _logger.Debug(handlerEx, "Exception in UnhandledException handler"); } catch { }
+            }
+        }
+
+        private static void OnUnobservedTaskException(
+            object s, System.Threading.Tasks.UnobservedTaskExceptionEventArgs e) {
+            try {
+                // Filter: only capture if exception originates from our plugin assembly to avoid reporting other extensions' errors
+                bool fromUs = IsExceptionFromOurPlugin(e.Exception);
+
+                if (fromUs) {
+                    _logger.Error(e.Exception, "UnobservedTaskException captured (from GsPlugin)");
+                    CaptureException(e.Exception, "TaskScheduler.UnobservedTaskException");
+                }
+                else {
+                    _logger.Debug("UnobservedTaskException not from our plugin; marking observed without capture.");
+                }
+
+                e.SetObserved();
+            }
+            catch (Exception handlerEx) {
+                // Last resort: log to Playnite but don't throw from exception handler
+                try { _logger.Debug(handlerEx, "Exception in UnobservedTaskException handler"); } catch { }
+            }
         }
 
         private static void InitializeCore(Func<System.Net.Http.HttpMessageHandler> createHandler, Action<Exception> onError) {
@@ -173,53 +261,6 @@ namespace GsPlugin.Infrastructure {
                     _logger.Debug(ex, "Failed to configure Sentry scope (non-critical)");
                 }
 
-                // Hook global exception handlers to prevent UnobservedTaskException crashes and capture in Sentry
-                _unhandledExceptionHandler = (s, e) => {
-                    try {
-                        var ex = e.ExceptionObject as Exception;
-                        if (ex != null) {
-                            // Filter: only capture if exception originates from our plugin to avoid reporting other extensions' errors
-                            bool fromUs = IsExceptionFromOurPlugin(ex);
-                            if (fromUs) {
-                                _logger.Error(ex, "Unhandled exception (AppDomain.CurrentDomain.UnhandledException)");
-                                CaptureException(ex, "AppDomain.CurrentDomain.UnhandledException");
-                            }
-                            else {
-                                _logger.Debug("Unhandled exception not from our plugin; skipping capture.");
-                            }
-                        }
-                        else {
-                            _logger.Error("Unhandled exception (non-Exception type) captured in AppDomain.CurrentDomain.UnhandledException");
-                        }
-                    }
-                    catch (Exception handlerEx) {
-                        // Last resort: log to Playnite but don't throw from exception handler
-                        try { _logger.Debug(handlerEx, "Exception in UnhandledException handler"); } catch { }
-                    }
-                };
-                AppDomain.CurrentDomain.UnhandledException += _unhandledExceptionHandler;
-
-                _unobservedTaskExceptionHandler = (s, e) => {
-                    try {
-                        // Filter: only capture if exception originates from our plugin assembly to avoid reporting other extensions' errors
-                        bool fromUs = IsExceptionFromOurPlugin(e.Exception);
-
-                        if (fromUs) {
-                            _logger.Error(e.Exception, "UnobservedTaskException captured (from GsPlugin)");
-                            CaptureException(e.Exception, "TaskScheduler.UnobservedTaskException");
-                        }
-                        else {
-                            _logger.Debug("UnobservedTaskException not from our plugin; marking observed without capture.");
-                        }
-
-                        e.SetObserved();
-                    }
-                    catch (Exception handlerEx) {
-                        // Last resort: log to Playnite but don't throw from exception handler
-                        try { _logger.Debug(handlerEx, "Exception in UnobservedTaskException handler"); } catch { }
-                    }
-                };
-                System.Threading.Tasks.TaskScheduler.UnobservedTaskException += _unobservedTaskExceptionHandler;
 
                 _initialized = true;
                 _logger.Info($"Sentry initialized. Tracking enabled: {!disableSentryFlag}");
@@ -246,14 +287,6 @@ namespace GsPlugin.Infrastructure {
             // On consent withdrawal, revoke before disposing: SDK disposal can emit a final
             // automatic-session envelope or flush work queued before the preference changed.
             if (!GsTelemetryConsent.HasConsent("no-sentry")) _consent?.Revoke();
-            if (_unhandledExceptionHandler != null) {
-                AppDomain.CurrentDomain.UnhandledException -= _unhandledExceptionHandler;
-                _unhandledExceptionHandler = null;
-            }
-            if (_unobservedTaskExceptionHandler != null) {
-                System.Threading.Tasks.TaskScheduler.UnobservedTaskException -= _unobservedTaskExceptionHandler;
-                _unobservedTaskExceptionHandler = null;
-            }
             if (_sdkLifetime == null) {
                 _consent?.Revoke();
                 _initialized = false;

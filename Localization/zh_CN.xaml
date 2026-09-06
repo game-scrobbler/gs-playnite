@@ -193,4 +193,6 @@
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">打开设置</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">此请求期间安装信息已更改或插件已停用。请重试。</sys:String>
+    <sys:String x:Key="LOCGsPluginDataUnreadable">Game Scrobbler 无法读取已保存的数据，本次会话中已禁用。文件已原样保留在 {0}，可以修复或删除。</sys:String>
+    <sys:String x:Key="LOCGsPluginDashboardProfileFailed">Game Scrobbler 无法为仪表板打开独立的浏览器配置文件，因此未加载。请重启 Playnite 后重试。</sys:String>
 </ResourceDictionary>
