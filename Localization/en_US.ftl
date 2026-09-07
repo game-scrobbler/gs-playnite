@@ -164,6 +164,8 @@ delete_rate_limited = Too many deletion requests. Please wait 15 minutes and try
 delete_failed = Failed to request data deletion. Please try again later.
 delete_error = An error occurred. Please try again later.
 opt_back_in_success = Plugin re-enabled. Please restart Playnite to resume syncing.
+opt_back_in_rate_limited = Too many attempts. Please wait and try again.
+opt_back_in_failed = Failed to re-enable. Please restart Playnite to try again.
 
 # ── URI Handler ──
 invalid_linking_token = Invalid linking token received.
@@ -180,3 +182,17 @@ sync_error = Library sync encountered an error.
 # ── Menu Items ──
 menu_sync_library = Sync Library Now
 menu_open_settings = Open Settings
+
+# -- Section: ported from main (Playnite 10) --
+confirm_linking_title = Confirm Account Linking
+confirm_linking_body =
+    A website is requesting to link this Playnite installation to a GameScrobbler account.
+
+    Only continue if you just clicked "Link Playnite" on gamescrobbler.com yourself.
+invalid_user_id_format = Invalid user ID format received from server
+identity_changed_during_request = The installation changed or was disabled during this request. Please try again.
+delete_no_token = Couldn't reach GameScrobbler to authorize the deletion. Check your internet connection and try again.
+delete_already_done = Your data has already been deleted. The plugin is now disabled.
+delete_auth_failed = This installation couldn't be verified. Reconnect your account, then try deleting again.
+data_unreadable = Game Scrobbler could not read its saved data and is disabled for this session. The file was left untouched at { $path } so it can be repaired or removed.
+dashboard_profile_failed = Game Scrobbler could not open a private browser profile for the dashboard, so it was not loaded. Restart Playnite to try again.

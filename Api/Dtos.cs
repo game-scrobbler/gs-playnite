@@ -16,6 +16,8 @@ namespace GsPlugin.Api {
         public string game_id { get; set; }
         public string plugin_id { get; set; }
         public string external_game_id { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string source_name { get; set; }
         public object metadata { get; set; }
         public string started_at { get; set; }
     }
@@ -26,6 +28,7 @@ namespace GsPlugin.Api {
 
     public enum ApiOutcome {
         Success,
+        Queued,
         Fail,
         Error,
     }
@@ -38,6 +41,7 @@ namespace GsPlugin.Api {
 
         public ApiOutcome Outcome =>
             status == "success" ? ApiOutcome.Success :
+            status == "queued" ? ApiOutcome.Queued :
             status == "fail" ? ApiOutcome.Fail :
                                   ApiOutcome.Error;
     }
@@ -55,7 +59,18 @@ namespace GsPlugin.Api {
         public string session_id { get; set; }
     }
 
-    public class AsyncQueuedResponse {
+    /// <summary>
+    /// A response whose <c>status</c> the server always sets, including on a rejection it wants
+    /// the client to act on. Lets the HTTP layer tell a recognized business outcome apart from an
+    /// arbitrary error body that merely happens to be JSON: System.Text.Json fills an unmatched
+    /// shape with defaults rather than throwing, so "deserialized without error" is not on its own
+    /// evidence that the payload was ever meant for this type.
+    /// </summary>
+    public interface IStatusCarryingResponse {
+        string status { get; set; }
+    }
+
+    public class AsyncQueuedResponse : IStatusCarryingResponse {
         public bool success { get; set; }
         public string status { get; set; }
         public string queueId { get; set; }
@@ -67,6 +82,23 @@ namespace GsPlugin.Api {
         public string lastSyncAt { get; set; }
     }
 
+    /// <summary>
+    /// Response from GET /api/playnite/queue/status/{queueId}. Polled after a
+    /// "queued" response so the client can wait for terminal worker state
+    /// (completed/failed) instead of treating queue admission as completion.
+    /// </summary>
+    public class QueueStatusRes {
+        public bool success { get; set; }
+        public QueueStatusData data { get; set; }
+    }
+
+    public class QueueStatusData {
+        public string id { get; set; }
+        /// <summary>pending | processing | completed | partial | failed | retrying</summary>
+        public string status { get; set; }
+        public string errorMessage { get; set; }
+    }
+
     public class ScrobbleFinishReq {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string user_id { get; set; }
@@ -74,10 +106,28 @@ namespace GsPlugin.Api {
         public string game_id { get; set; }
         public string plugin_id { get; set; }
         public string external_game_id { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string source_name { get; set; }
         public object metadata { get; set; }
         public string finished_at { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string session_id { get; set; }
+        /// <summary>
+        /// When this session began, echoed verbatim from the start event so the
+        /// finish can stand on its own.
+        ///
+        /// <c>session_id</c> is still the preferred key. This is what the server
+        /// falls back to when the start's response never reached us: it matches
+        /// on (install, started_at, game), and failing that records the session
+        /// with a real duration instead of a zero-length stub. Because the
+        /// server matches on the exact instant, the string sent here must be the
+        /// one the start sent, never re-derived from a second clock read.
+        ///
+        /// Null when the start time is unknown (a finish queued by a plugin
+        /// version that predated this field, or one whose start was dropped).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string started_at { get; set; }
     }
 
     public class ScrobbleFinishRes { }
@@ -86,6 +136,19 @@ namespace GsPlugin.Api {
     // Library Sync DTOs
     // ──────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Slim sync DTO sent to the v3 library sync endpoints.
+    ///
+    /// Per ADR-011 (gs-mono), IGDB is the single source of truth for game
+    /// metadata (genres, themes, companies, scores, release dates, etc.).
+    /// The server reads those fields from the canonical `games` layer via
+    /// IGDB joins; the plugin no longer needs to send them.
+    ///
+    /// Fields removed vs the previous v2 GameSyncDto:
+    ///   genres, platforms, developers, publishers, tags, features,
+    ///   categories, series, age_ratings, regions, critic_score,
+    ///   community_score, release_year, release_date.
+    /// </summary>
     public class GameSyncDto {
         public string game_id { get; set; }
         public string plugin_id { get; set; }
@@ -93,32 +156,21 @@ namespace GsPlugin.Api {
         public string playnite_id { get; set; }
         public long playtime_seconds { get; set; }
         public int play_count { get; set; }
+        [JsonConverter(typeof(CanonicalDateTimeConverter))]
         public DateTime? last_activity { get; set; }
         public bool is_installed { get; set; }
         public string completion_status_id { get; set; }
         public string completion_status_name { get; set; }
         public int? achievement_count_unlocked { get; set; }
         public int? achievement_count_total { get; set; }
-        public List<string> genres { get; set; }
-        public List<string> platforms { get; set; }
-        public List<string> developers { get; set; }
-        public List<string> publishers { get; set; }
-        public List<string> tags { get; set; }
-        public List<string> features { get; set; }
-        public List<string> categories { get; set; }
-        public List<string> series { get; set; }
         public int? user_score { get; set; }
-        public int? critic_score { get; set; }
-        public int? community_score { get; set; }
-        public int? release_year { get; set; }
+        [JsonConverter(typeof(CanonicalDateTimeConverter))]
         public DateTime? date_added { get; set; }
         public bool is_favorite { get; set; }
         public bool is_hidden { get; set; }
         public string source_name { get; set; }
-        public string release_date { get; set; }
+        [JsonConverter(typeof(CanonicalDateTimeConverter))]
         public DateTime? modified { get; set; }
-        public List<string> age_ratings { get; set; }
-        public List<string> regions { get; set; }
     }
 
     public class LibraryFullSyncReq {
@@ -129,13 +181,92 @@ namespace GsPlugin.Api {
         public List<Services.IntegrationAccountDto> integration_accounts { get; set; }
     }
 
+    // ──────────────────────────────────────────────────────────
+    // v4 chunked full sync
+    // ──────────────────────────────────────────────────────────
+
+    public class LibraryV4FullSyncBeginReq {
+        public int expected_total_items { get; set; }
+        public string result_snapshot_hash { get; set; }
+        public string[] flags { get; set; }
+        public List<Services.IntegrationAccountDto> integration_accounts { get; set; }
+    }
+
+    public class LibraryV4ChunkReq {
+        public string sync_id { get; set; }
+        public int chunk_index { get; set; }
+        public List<GameSyncDto> items { get; set; }
+    }
+
+    public class LibraryV4CommitReq {
+        public string sync_id { get; set; }
+        public string result_snapshot_hash { get; set; }
+        public int chunk_count { get; set; }
+        public int item_count { get; set; }
+    }
+
+    public class AchievementsV4FullSyncBeginReq {
+        public int expected_total_items { get; set; }
+        public string result_snapshot_hash { get; set; }
+    }
+
+    public class AchievementsV4ChunkReq {
+        public string sync_id { get; set; }
+        public int chunk_index { get; set; }
+        public List<GameAchievementsDto> items { get; set; }
+    }
+
+    public class AchievementsV4CommitReq {
+        public string sync_id { get; set; }
+        public string result_snapshot_hash { get; set; }
+        public int chunk_count { get; set; }
+        public int item_count { get; set; }
+    }
+
+    public class V4SyncAbortReq {
+        public string sync_id { get; set; }
+    }
+
+    public class V4SyncBeginRes : IStatusCarryingResponse {
+        public bool success { get; set; }
+        public string status { get; set; }
+        public string sync_id { get; set; }
+        public int max_chunk_items { get; set; }
+        public string expires_at { get; set; }
+        public string timestamp { get; set; }
+        public string error { get; set; }
+        public string reason { get; set; }
+        public string message { get; set; }
+    }
+
+    public class V4SyncChunkRes : IStatusCarryingResponse {
+        public bool success { get; set; }
+        public string status { get; set; }
+        public string sync_id { get; set; }
+        public int chunk_index { get; set; }
+        public int items_accepted { get; set; }
+        public int max_chunk_items { get; set; }
+        public string timestamp { get; set; }
+        public string error { get; set; }
+        public string message { get; set; }
+    }
+
     public class LibraryDiffSyncReq {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string user_id { get; set; }
         public List<GameSyncDto> added { get; set; }
         public List<GameSyncDto> updated { get; set; }
         public List<string> removed { get; set; }
+        /// <summary>Hash of the library *before* this diff (the previous synced baseline).</summary>
         public string base_snapshot_hash { get; set; }
+        /// <summary>
+        /// Hash of the library *after* this diff (the current full-library state).
+        /// The server stores this verbatim as the next baseline instead of
+        /// reconstructing it from persisted rows — exact even for games the
+        /// server never persists (e.g. Humble bundle extras). Old plugins omit
+        /// this field and fall back to server-side reconstruction.
+        /// </summary>
+        public string result_snapshot_hash { get; set; }
         public string[] flags { get; set; }
         public List<Services.IntegrationAccountDto> integration_accounts { get; set; }
     }
@@ -147,6 +278,13 @@ namespace GsPlugin.Api {
     public class AchievementItemDto {
         public string name { get; set; }
         public string description { get; set; }
+
+        // Not part of any hash recipe, but the providers disagree on DateTimeKind: SuccessStory's
+        // ISO strings yield Utc, while a bare timestamp from the Playnite Achievements SQLite cache
+        // yields Unspecified. Without the converter the same field reaches the server as "...Z",
+        // "...+02:00" or an ambiguous "..." depending on which addon supplied it. Normalize so an
+        // unlock time means one thing.
+        [JsonConverter(typeof(CanonicalDateTimeConverter))]
         public DateTime? date_unlocked { get; set; }
         public bool is_unlocked { get; set; }
         public float? rarity_percent { get; set; }
@@ -156,6 +294,8 @@ namespace GsPlugin.Api {
         public string playnite_id { get; set; }
         public string game_id { get; set; }
         public string plugin_id { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string source_name { get; set; }
         public List<AchievementItemDto> achievements { get; set; }
     }
 
@@ -170,14 +310,12 @@ namespace GsPlugin.Api {
         public string user_id { get; set; }
         public List<GameAchievementsDto> changed { get; set; }
         public string base_snapshot_hash { get; set; }
-    }
-
-    public class AchievementSyncRes {
-        public bool success { get; set; }
-        public string status { get; set; }
-        public string reason { get; set; }
-        public string message { get; set; }
-        public string timestamp { get; set; }
+        /// <summary>
+        /// Hash of the achievement snapshot *after* this diff. Stored verbatim
+        /// as the next server baseline (mirrors library diff sync).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string result_snapshot_hash { get; set; }
     }
 
     // ──────────────────────────────────────────────────────────
@@ -207,6 +345,8 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
 
     public class AllowedPluginsRes {
+        public int schemaVersion { get; set; }
+        public bool supportsSourceAliases { get; set; }
         public List<AllowedPluginEntry> plugins { get; set; }
         public string source { get; set; }
     }
@@ -216,6 +356,7 @@ namespace GsPlugin.Api {
         public string libraryName { get; set; }
         public string sourceSlug { get; set; }
         public string status { get; set; }
+        public List<string> sourceAliases { get; set; }
     }
 
     // ──────────────────────────────────────────────────────────
@@ -257,6 +398,22 @@ namespace GsPlugin.Api {
         public bool success { get; set; }
         public string message { get; set; }
         public bool rateLimited { get; set; }
+
+        /// <summary>
+        /// Server resolved the install as already opted out (HTTP 403). The data is
+        /// already gone — the client should sync its local opt-out state rather than
+        /// treat this as a retryable failure.
+        /// </summary>
+        [JsonIgnore]
+        public bool alreadyOptedOut { get; set; }
+
+        /// <summary>
+        /// Server rejected the install token (HTTP 401). The stored token does not
+        /// resolve to an install, so retrying with the same token cannot succeed —
+        /// the user needs to reconnect rather than keep hitting the same wall.
+        /// </summary>
+        [JsonIgnore]
+        public bool authFailed { get; set; }
     }
 
     public class OptInReq {

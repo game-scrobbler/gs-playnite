@@ -11,7 +11,10 @@ namespace GsPlugin.Tests {
         public void DefaultValues_AreCorrect() {
             var data = new GsData();
             Assert.Null(data.InstallID);
-            Assert.Null(data.ActiveSessionId);
+            Assert.NotNull(data.ActiveSessionsByGameId);
+            Assert.Empty(data.ActiveSessionsByGameId);
+            Assert.NotNull(data.PendingStartGameIds);
+            Assert.Empty(data.PendingStartGameIds);
             Assert.Equal("Dark", data.Theme);
             Assert.NotNull(data.Flags);
             Assert.Empty(data.Flags);
@@ -28,7 +31,7 @@ namespace GsPlugin.Tests {
         public void SerializationRoundtrip_PreservesAllFields() {
             var original = new GsData {
                 InstallID = "test-id-123",
-                ActiveSessionId = "session-456",
+                ActiveSessionsByGameId = new Dictionary<string, string> { { "game-1", "session-456" } },
                 Theme = "Light",
                 Flags = new List<string> { "no-sentry", "no-scrobble" },
                 LinkedUserId = "user-789",
@@ -41,7 +44,7 @@ namespace GsPlugin.Tests {
             var deserialized = JsonSerializer.Deserialize<GsData>(json);
 
             Assert.Equal(original.InstallID, deserialized.InstallID);
-            Assert.Equal(original.ActiveSessionId, deserialized.ActiveSessionId);
+            Assert.Equal(original.ActiveSessionsByGameId, deserialized.ActiveSessionsByGameId);
             Assert.Equal(original.Theme, deserialized.Theme);
             Assert.Equal(original.Flags, deserialized.Flags);
             Assert.Equal(original.LinkedUserId, deserialized.LinkedUserId);

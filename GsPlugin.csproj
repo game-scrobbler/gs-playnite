@@ -34,7 +34,7 @@
 
   <ItemGroup>
     <PackageReference Include="Playnite.SDK" Version="11.0.0-alpha14" />
-    <PackageReference Include="Sentry" Version="5.*" />
+    <PackageReference Include="Sentry" Version="6.*" />
     <PackageReference Include="PostHog" Version="2.4.0" />
     <!-- CommunityToolkit.Mvvm provides ObservableObject for settings view model/data -->
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
@@ -56,5 +56,4 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
 </Project>

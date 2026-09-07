@@ -4,8 +4,8 @@ using GsPlugin.Api;
 
 namespace GsPlugin.View {
     public class GsDashboardView : AppViewItem {
-        public GsDashboardView(IGsApiClient apiClient) {
-            View = new MySidebarView(apiClient);
+        public GsDashboardView(IGsApiClient apiClient, string? userDataFolder = null) {
+            View = new MySidebarView(apiClient, userDataFolder);
         }
 
         public override async Task ActivateViewAsync(ActivateViewAsyncArgs args) {

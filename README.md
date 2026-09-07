@@ -45,6 +45,8 @@ Playnite aggregates games from many launchers. GameScrobbler tracks everything P
 
 Steam, GOG, Epic Games, Xbox, PlayStation, Battle.net, Ubisoft Connect, itch.io, Humble, Amazon Games, and more.
 
+Official Playnite library plugins are supported by plugin ID. Recognized OSS/forked library plugins are also supported when Playnite exposes a known source name such as GOG OSS, Legendary, Epic Games, or Amazon Games. Manual/custom games without a library plugin are not synced.
+
 You can also link your GameScrobbler account to Steam and Discord at [gamescrobbler.com](https://gamescrobbler.com), with more platforms coming soon.
 
 ---
@@ -124,11 +126,22 @@ Steam friends, Discord servers, and linked accounts — all visible in one place
 ## How It Works
 
 1. You play a game — the plugin records the session automatically
-2. Your library, playtime, and achievements sync to GameScrobbler
+2. Your library, playtime, and achievements sync to GameScrobbler in bounded batches
 3. AI and analytics generate insights, visualizations, and recommendations
 4. View everything in Playnite's sidebar or at [gamescrobbler.com](https://gamescrobbler.com)
 
 Link your GameScrobbler account to connect data from other platforms (Steam, Xbox, PlayStation, etc.) into one unified profile.
+
+### Reliable synchronization
+
+- Full library and achievement uploads are divided into chunks, preventing large Playnite libraries from producing oversized requests.
+- Later syncs compare compact local fingerprints and send only added, changed, or removed entries.
+- Failed chunked uploads are aborted without replacing the last known-good local baseline, so the next sync can retry safely.
+- A queued upload is confirmed before its local baseline is accepted. Failed or unconfirmed jobs retain the previous baseline for the next sync attempt.
+- Session starts and stops are saved before network requests, and shutdown saves all active sessions before waiting on the server.
+- Achievement read failures postpone the upload instead of clearing previously synced achievements.
+- Existing installations migrate their legacy local sync snapshot automatically. This migration affects only plugin state on your computer and does not delete library or achievement data.
+- Sync writes use the server-issued install token. On first startup, registration completes before the initial library sync begins.
 
 ---
 
@@ -208,6 +221,8 @@ Settings allow you to:
 
 All options are configurable inside the plugin settings.
 
+Library synchronization is authenticated with a per-install token stored in Playnite's plugin data directory. Current full-sync requests do not place the installation identity in the request body.
+
 ---
 
 ## Development
@@ -234,10 +249,10 @@ dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-bu
 
 ```text
 gs-playnite/
-├── Api/
-├── Services/
-├── Models/
-├── Infrastructure/
+├── Api/                — HTTP client, request/response DTOs, circuit breaker
+├── Services/           — scrobbling, chunked sync, hashes, achievements
+├── Models/             — settings, persistent data, compact sync indexes
+├── Infrastructure/     — logging, telemetry, localization, atomic files
 ├── View/
 ├── Localization/       — en_US, ru_RU, pt_BR, de_DE, fr_FR, zh_CN, hi_IN
 └── GsPlugin.Tests/

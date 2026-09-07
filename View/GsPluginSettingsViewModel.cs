@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Playnite;
 using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
@@ -74,6 +75,8 @@ namespace GsPlugin.Models {
             GsAccountLinkingService.OnLinkingStatusChanged();
         }
 
+        private readonly GsPlugin? _plugin;
+
         #region Constructor
         /// <summary>
         /// Initializes a new instance of the GsPluginSettingsViewModel.
@@ -81,11 +84,17 @@ namespace GsPlugin.Models {
         /// <param name="userDataDir">The plugin's user data directory (PlayniteApi.UserDataDir).</param>
         /// <param name="linkingService">The account linking service.</param>
         /// <param name="apiClient">The API client for server communication.</param>
+        /// <param name="plugin">
+        /// Owning plugin, used only to register an install token on demand from "Delete My Data".
+        /// Null in tests, where that path is not exercised.
+        /// </param>
         public GsPluginSettingsViewModel(
             string userDataDir,
             GsAccountLinkingService linkingService,
-            IGsApiClient apiClient
+            IGsApiClient apiClient,
+            GsPlugin? plugin = null
         ) {
+            _plugin = plugin;
             _settingsFilePath = Path.Combine(
                 userDataDir ?? throw new ArgumentNullException(nameof(userDataDir)),
                 "settings.json");
@@ -130,6 +139,8 @@ namespace GsPlugin.Models {
 
             // Sync settings to GsDataManager
             GsDataManager.MutateAndSave(d => {
+                d.Theme = savedSettings.Theme;
+                d.UpdateFlags(savedSettings.DisableSentry, savedSettings.DisableScrobbling, savedSettings.DisablePostHog);
                 d.NewDashboardExperience = savedSettings.NewDashboardExperience;
                 d.ShowUpdateNotifications = savedSettings.ShowUpdateNotifications;
                 d.ShowImportantNotifications = savedSettings.ShowImportantNotifications;
@@ -206,6 +217,9 @@ namespace GsPlugin.Models {
                 d.ShowUpdateNotifications = s.ShowUpdateNotifications;
                 d.ShowImportantNotifications = s.ShowImportantNotifications;
             });
+
+            GsSentry.ApplyPreferences();
+            GsPostHog.ApplyPreferences();
 
             GsLogger.ShowDebugInfoBox($"Settings saved:\nTheme: {Settings.Theme}\nNew Dashboard: {Settings.NewDashboardExperience}\nFlags: {string.Join(", ", GsDataManager.Data.Flags)}", "Debug - Settings Saved");
         }
@@ -362,19 +376,48 @@ namespace GsPlugin.Models {
                 Settings.IsDeleting = true;
                 Settings.DeleteStatusMessage = "Requesting data deletion...";
 
+                // Deletion is strictly token-authenticated. If startup registration failed
+                // (e.g. transient network error), the local token stays empty for the whole
+                // session and every delete attempt would fail before reaching the server —
+                // the "it keeps failing" symptom. Register a token on demand first.
+                if (string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken) && _plugin != null) {
+                    await _plugin.EnsureInstallTokenReadyAsync();
+                }
+
+                if (string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken)) {
+                    Settings.DeleteStatusMessage = Loc.delete_no_token();
+                    return;
+                }
+
                 var result = await _apiClient.RequestDeleteMyData(new DeleteDataReq());
 
                 if (result != null && result.success) {
                     // Capture analytics before opt-out disables telemetry
                     GsPostHog.Capture("data_deletion_requested");
                     GsDataManager.PerformOptOut();
-                    GsSnapshotManager.ClearAll();
-                    Settings.DeleteStatusMessage = "Your data has been deleted. The plugin is now disabled.";
+                    GsSentry.ApplyPreferences();
+                    GsPostHog.ApplyPreferences();
+                    GsSyncHashIndex.ClearAll();
+                    Settings.DeleteStatusMessage = Loc.delete_success();
                     // Notify UI to refresh connection status and button visibility
+                    OnLinkingStatusChanged();
+                }
+                else if (result != null && result.alreadyOptedOut) {
+                    // Server says this install is already opted out — the data is gone.
+                    // Sync local state so the Delete button hides instead of looping on a
+                    // failure the user can never clear by retrying.
+                    GsDataManager.PerformOptOut();
+                    GsSentry.ApplyPreferences();
+                    GsPostHog.ApplyPreferences();
+                    GsSyncHashIndex.ClearAll();
+                    Settings.DeleteStatusMessage = Loc.delete_already_done();
                     OnLinkingStatusChanged();
                 }
                 else if (result != null && result.rateLimited) {
                     Settings.DeleteStatusMessage = "Too many deletion requests. Please wait 15 minutes and try again.";
+                }
+                else if (result != null && result.authFailed) {
+                    Settings.DeleteStatusMessage = Loc.delete_auth_failed();
                 }
                 else {
                     Settings.DeleteStatusMessage = "Failed to request data deletion. Please try again later.";
@@ -403,16 +446,18 @@ namespace GsPlugin.Models {
 
                 if (result == null || !result.success) {
                     if (result?.rateLimited == true) {
-                        Settings.DeleteStatusMessage = "Too many attempts. Please wait and try again.";
+                        Settings.DeleteStatusMessage = Loc.opt_back_in_rate_limited();
                     }
                     else {
-                        Settings.DeleteStatusMessage = "Failed to re-enable. Please restart Playnite to try again.";
+                        Settings.DeleteStatusMessage = Loc.opt_back_in_failed();
                     }
                     return;
                 }
 
                 GsDataManager.PerformOptIn();
-                Settings.DeleteStatusMessage = "Plugin re-enabled. Please restart Playnite to resume syncing.";
+                GsSentry.ApplyPreferences();
+                GsPostHog.ApplyPreferences();
+                Settings.DeleteStatusMessage = Loc.opt_back_in_success();
                 OnLinkingStatusChanged();
             }
             catch (Exception ex) {

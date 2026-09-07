@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using Playnite;
@@ -65,7 +66,10 @@ namespace GsPlugin.Services {
     public class GsAccountLinkingService {
         private static readonly ILogger _logger = LogManager.GetLogger<GsAccountLinkingService>();
         private readonly IGsApiClient _apiClient;
-        private readonly IPlayniteApi _playniteApi;
+        private readonly IPlayniteApi? _playniteApi;
+        // Deep links and settings can both change the account. Serialize their requests so a
+        // slower response cannot reverse a newer link/unlink operation on the same install.
+        private static readonly SemaphoreSlim IdentityOperations = new SemaphoreSlim(1, 1);
 
         /// <summary>
         /// Event triggered when account linking status changes.
@@ -77,10 +81,19 @@ namespace GsPlugin.Services {
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
         /// <param name="playniteApi">The Playnite API instance for UI interactions.</param>
-        public GsAccountLinkingService(IGsApiClient apiClient, IPlayniteApi playniteApi) {
+        public GsAccountLinkingService(IGsApiClient apiClient, IPlayniteApi? playniteApi = null) {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
-            _playniteApi = playniteApi ?? throw new ArgumentNullException(nameof(playniteApi));
+            _playniteApi = playniteApi;
         }
+
+        /// <summary>
+        /// Shows a yes/no confirmation. Playnite 11 has no synchronous dialog service, so the
+        /// real implementation is a WPF MessageBox, which cannot run in a headless test. Tests
+        /// substitute an answer here rather than driving a real window.
+        /// </summary>
+        internal static Func<string, string, bool> ConfirmYesNo { get; set; } =
+            (body, title) => MessageBox.Show(body, title, MessageBoxButton.YesNo, MessageBoxImage.Question)
+                == System.Windows.MessageBoxResult.Yes;
 
         /// <summary>
         /// Performs account linking with the provided token.
@@ -100,7 +113,24 @@ namespace GsPlugin.Services {
                 return LinkingResult.CreateError("Please enter a valid token", context);
             }
 
-            GsLogger.Info($"Starting {context} account linking.");
+            var expectedInstallId = GsDataManager.Data.InstallID;
+            var expectedGeneration = GsDataManager.Data.IdentityGeneration;
+            await IdentityOperations.WaitAsync();
+            try {
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
+                    return IdentityChangedResult(context);
+                }
+                return await LinkAccountCoreAsync(token, context, expectedInstallId, expectedGeneration);
+            }
+            finally {
+                IdentityOperations.Release();
+            }
+        }
+
+        private async Task<LinkingResult> LinkAccountCoreAsync(string token, LinkingContext context,
+            string expectedInstallId, int expectedGeneration) {
+
+            GsLogger.Info($"Starting {context} account linking (install_id={GsDataManager.Data.InstallID}).");
             GsSentry.AddBreadcrumb(
                 message: $"Starting {context} account linking",
                 category: "linking",
@@ -113,7 +143,11 @@ namespace GsPlugin.Services {
 
             try {
                 // Verify token with API
-                var response = await _apiClient.VerifyToken(token, GsDataManager.Data.InstallID);
+                var response = await _apiClient.VerifyToken(token, expectedInstallId);
+
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
+                    return IdentityChangedResult(context);
+                }
 
                 if (response == null) {
                     string errorMessage = "Network error — could not reach the server. Please check your connection and try again.";
@@ -122,21 +156,43 @@ namespace GsPlugin.Services {
                 }
 
                 if (response.success) {
-                    if (response.userId != GsData.NotLinkedValue
-                        && (string.IsNullOrWhiteSpace(response.userId) || response.userId.Length > 256)) {
-                        string errorMessage = "Invalid user ID format received from server";
+                    // A verify can succeed yet resolve to the "not_linked" sentinel (or an empty
+                    // user id): the token was accepted but the server did NOT bind this install to
+                    // an account. Reporting that as success made the settings UI show
+                    // "Successfully linked!" while the connection status stayed "Disconnected" and
+                    // the website's linking page kept polling "not linked" (issue #54). Treat it as
+                    // a failed link, clear any local link so state matches the server, and route the
+                    // user to fetch a fresh token (same recovery path as an expired token).
+                    if (!IsLinkedUserId(response.userId)) {
+                        if (!GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration,
+                            d => d.LinkedUserId = null)) {
+                            return IdentityChangedResult(context);
+                        }
+                        OnLinkingStatusChanged();
+
+                        GsLogger.Error($"{context} linking did not complete: token verified but the server returned a not-linked result (install_id={GsDataManager.Data.InstallID}, userId={response.userId ?? "null"}).");
+                        GsSentry.CaptureMessage(
+                            $"{context} linking verified but returned not-linked (install_id={GsDataManager.Data.InstallID})",
+                            SentryLevel.Warning);
+
+                        string notLinkedMessage = Loc.status_token_expired();
+                        return LinkingResult.CreateError(notLinkedMessage, context, isTokenExpiry: true);
+                    }
+
+                    if (response.userId.Length > 256) {
+                        string errorMessage = Loc.invalid_user_id_format();
                         GsLogger.Error($"{context} linking failed: {errorMessage}");
                         return LinkingResult.CreateError(errorMessage, context);
                     }
-                    GsDataManager.MutateAndSave(d => {
-                        d.LinkedUserId = response.userId == GsData.NotLinkedValue
-                            ? null
-                            : response.userId;
-                    });
+
+                    if (!GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration,
+                        d => d.LinkedUserId = response.userId)) {
+                        return IdentityChangedResult(context);
+                    }
                     // Notify listeners of status change
                     OnLinkingStatusChanged();
 
-                    GsLogger.Info($"Account successfully linked via {context} to User ID: {response.userId}");
+                    GsLogger.Info($"Account successfully linked via {context} to User ID: {response.userId} (install_id={GsDataManager.Data.InstallID})");
                     GsSentry.AddBreadcrumb(
                         message: $"{context} account linking successful",
                         category: "linking",
@@ -200,10 +256,28 @@ namespace GsPlugin.Services {
         public static bool ValidateToken(string token) {
             if (string.IsNullOrWhiteSpace(token)) return false;
             if (token.Length > 512) return false;
-            // Allow alphanumeric, hyphens, underscores, dots, plus, equals, slashes (covers JWT/base64 tokens)
-            if (!Regex.IsMatch(token, @"^[a-zA-Z0-9\-_\.+=\/]+$")) return false;
+            // Allow alphanumeric, hyphens, underscores, dots, plus, equals, slashes (covers JWT/base64 tokens).
+            // Anchor with \z, not $: in .NET $ also matches immediately before a trailing newline, so
+            // a token with a trailing newline would otherwise pass and be sent to the server verbatim.
+            if (!Regex.IsMatch(token, @"^[a-zA-Z0-9\-_\.+=\/]+\z")) return false;
             return true;
         }
+
+        /// <summary>
+        /// Returns true when a verify response's user id represents a real linked account.
+        /// A successful verify that resolves to the <see cref="GsData.NotLinkedValue"/> sentinel
+        /// (or an empty value) means the token was accepted without actually binding the install
+        /// to an account, so callers must not treat it as a successful link (issue #54).
+        /// </summary>
+        internal static bool IsLinkedUserId(string userId) {
+            return !string.IsNullOrWhiteSpace(userId) && userId != GsData.NotLinkedValue;
+        }
+
+        private static bool IsActiveIdentity(string expectedInstallId, int expectedGeneration) =>
+            GsDataManager.IsActiveIdentity(expectedInstallId, expectedGeneration);
+
+        private static LinkingResult IdentityChangedResult(LinkingContext context) =>
+            LinkingResult.CreateError(Loc.identity_changed_during_request(), context);
 
         /// <summary>
         /// Checks if the user wants to proceed with relinking to a different account.
@@ -214,15 +288,9 @@ namespace GsPlugin.Services {
                 return true;
             }
 
-            // P11: use WPF MessageBox directly for yes/no dialogs.
-            var result = MessageBox.Show(
+            return ConfirmYesNo(
                 Loc.already_linked_body(GsDataManager.Data.LinkedUserId),
-                Loc.already_linked_title(),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question
-            );
-
-            return result == System.Windows.MessageBoxResult.Yes;
+                Loc.already_linked_title());
         }
 
         /// <summary>
@@ -236,19 +304,35 @@ namespace GsPlugin.Services {
                     LinkingContext.ManualSettings);
             }
 
-            // P11: use WPF MessageBox directly for yes/no dialogs.
-            var confirm = MessageBox.Show(
-                Loc.disconnect_dialog_body(),
-                Loc.disconnect_dialog_title(),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+            var expectedInstallId = GsDataManager.Data.InstallID;
+            var expectedGeneration = GsDataManager.Data.IdentityGeneration;
 
-            if (confirm != System.Windows.MessageBoxResult.Yes) {
+            var confirm = ConfirmYesNo(Loc.disconnect_dialog_body(), Loc.disconnect_dialog_title());
+
+            if (!confirm) {
                 return LinkingResult.CreateError("Cancelled", LinkingContext.ManualSettings);
             }
 
+            await IdentityOperations.WaitAsync();
+            try {
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
+                    return IdentityChangedResult(LinkingContext.ManualSettings);
+                }
+                return await UnlinkAccountCoreAsync(expectedInstallId, expectedGeneration);
+            }
+            finally {
+                IdentityOperations.Release();
+            }
+        }
+
+        private async Task<LinkingResult> UnlinkAccountCoreAsync(string expectedInstallId, int expectedGeneration) {
+
             try {
                 var response = await _apiClient.UnlinkAccount();
+
+                if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
+                    return IdentityChangedResult(LinkingContext.ManualSettings);
+                }
 
                 if (response == null) {
                     return LinkingResult.CreateError(
@@ -258,21 +342,13 @@ namespace GsPlugin.Services {
 
                 if (response.success) {
                     // Clear all identity-bound state to prevent data from bleeding
-                    // across accounts after a re-link. Same fields as RotateInstallId
-                    // but without rotating the InstallID/InstallToken themselves.
-                    GsDataManager.MutateAndSave(d => {
-                        d.LinkedUserId = null;
-                        d.ActiveSessionId = null;
-                        d.PendingStartGameId = null;
-                        d.PendingScrobbles.Clear();
-                        d.LastLibraryHash = null;
-                        d.LastSyncAt = null;
-                        d.LastSyncGameCount = null;
-                        d.SyncCooldownExpiresAt = null;
-                        d.LibraryDiffSyncCooldownExpiresAt = null;
-                        d.LastIntegrationAccountsHash = null;
-                    });
-                    GsSnapshotManager.Reset();
+                    // across accounts after a re-link. Base set only: the install stays
+                    // registered, so neither the InstallID nor its token is touched.
+                    if (!GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration,
+                        d => d.ClearIdentityBoundState(IdentityClearScope.None))) {
+                        return IdentityChangedResult(LinkingContext.ManualSettings);
+                    }
+                    GsSyncHashIndex.Reset();
                     OnLinkingStatusChanged();
                     // Refresh diagnostics widgets (pending scrobble count, last-sync text)
                     // since MutateAndSave does not emit DiagnosticsStateChanged.

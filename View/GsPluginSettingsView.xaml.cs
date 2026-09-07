@@ -181,6 +181,8 @@ namespace GsPlugin.View {
 
         /// <summary>
         /// Handles property changes on the settings object.
+        /// Status message text and visibility are bound directly in XAML, so only
+        /// the in-progress flags need to be reflected here.
         /// </summary>
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e) {
             switch (e.PropertyName) {
@@ -192,20 +194,8 @@ namespace GsPlugin.View {
                     }
                     break;
 
-                case nameof(GsPluginSettings.LinkStatusMessage):
-                    UpdateStatusMessage();
-                    break;
-
-                case nameof(GsPluginSettings.TokenCountdown):
-                    UpdateCountdownDisplay();
-                    break;
-
                 case nameof(GsPluginSettings.IsDeleting):
                     UpdateDeletingState();
-                    break;
-
-                case nameof(GsPluginSettings.DeleteStatusMessage):
-                    UpdateDeleteStatusMessage();
                     break;
             }
         }
@@ -258,34 +248,20 @@ namespace GsPlugin.View {
                 : Loc.link_account_button();
         }
 
-        /// <summary>
-        /// Updates the status message display.
-        /// </summary>
-        private void UpdateStatusMessage() {
-            if (_viewModel?.Settings == null) return;
-
-            string message = _viewModel.Settings.LinkStatusMessage;
-            LinkStatusTextBlock.Text = message;
-            LinkStatusTextBlock.Visibility = string.IsNullOrEmpty(message)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-        }
-
-        /// <summary>
-        /// Updates the token countdown display.
-        /// </summary>
-        private void UpdateCountdownDisplay() {
-            if (_viewModel?.Settings == null) return;
-
-            string countdown = _viewModel.Settings.TokenCountdown;
-            TokenCountdownTextBlock.Text = countdown;
-            TokenCountdownTextBlock.Visibility = string.IsNullOrEmpty(countdown)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-        }
         #endregion
 
         #region User Interaction Handlers
+        /// <summary>
+        /// Shows the standard localized error dialog for a failed user action.
+        /// </summary>
+        private static void ShowErrorDialog(string message) {
+            MessageBox.Show(
+                message,
+                Loc.error_dialog_title(),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+
         /// <summary>
         /// Handles the link account button click event.
         /// </summary>
@@ -411,19 +387,6 @@ namespace GsPlugin.View {
             _viewModel?.OptBackIn();
             UpdateOptOutState();
             UpdateConnectionStatus();
-        }
-
-        /// <summary>
-        /// Updates the delete status message display.
-        /// </summary>
-        private void UpdateDeleteStatusMessage() {
-            if (_viewModel?.Settings == null) return;
-
-            string message = _viewModel.Settings.DeleteStatusMessage;
-            DeleteStatusTextBlock.Text = message;
-            DeleteStatusTextBlock.Visibility = string.IsNullOrEmpty(message)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
         }
 
         /// <summary>

@@ -12,6 +12,8 @@ param(
     [string]$ChangelogFile = "CHANGELOG.md"
 )
 
+$ErrorActionPreference = 'Stop'
+
 # Import powershell-yaml module
 Import-Module "$PSScriptRoot\..\powershell-yaml\powershell-yaml.psd1" -Force
 
@@ -25,19 +27,30 @@ Write-Host "Package URL: $packageUrl"
 Write-Host "Release Date: $releaseDate"
 
 # Read the current manifest
-$manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Yaml
+$manifest = [System.IO.File]::ReadAllText($manifestPath) | ConvertFrom-Yaml
 
 # Extract changelog entries for this version from CHANGELOG.md
-$changelogContent = Get-Content -Path $ChangelogFile -Raw
+$changelogContent = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $ChangelogFile))
 $versionPattern = "## \[$Version\].*?\n(.*?)(?=\n## \[|$)"
 $changelogMatch = [regex]::Match($changelogContent, $versionPattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
 
 $changelogEntries = @()
 if ($changelogMatch.Success) {
     $versionChangelog = $changelogMatch.Groups[1].Value
-    # Extract bullet points from Features and Bug Fixes sections
+
+    # Prefer the curated "### Highlights" section (user-facing bullets added on
+    # the release PR by generate-release-highlights.ps1). Fall back to the raw
+    # Features/Bug Fixes bullets when no Highlights section exists.
+    $highlightsMatch = [regex]::Match($versionChangelog, "### Highlights\s*\n(.*?)(?=\n###|\n## |$)", [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    $bulletSource = $versionChangelog
+    if ($highlightsMatch.Success) {
+        Write-Host "Using curated Highlights section for changelog entries"
+        $bulletSource = $highlightsMatch.Groups[1].Value
+    }
+
+    # Extract bullet points
     $bulletPattern = "^\s*\*\s+(.+?)$"
-    $matches = [regex]::Matches($versionChangelog, $bulletPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
+    $matches = [regex]::Matches($bulletSource, $bulletPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
 
     foreach ($match in $matches) {
         $line = $match.Groups[1].Value.Trim()
@@ -49,12 +62,6 @@ if ($changelogMatch.Success) {
             $changelogEntries += $line
         }
     }
-}
-
-# Marketing note placeholder (leave empty to skip)
-$marketingNote = ""
-if ($marketingNote) {
-    $changelogEntries = @($marketingNote) + $changelogEntries
 }
 
 # If no changelog entries found, add a generic one
@@ -133,22 +140,17 @@ foreach ($package in $manifest.Packages) {
         # Remove trailing " ()" artifacts from changelog parsing
         $entryStr = $entryStr -replace '\s*\(\)\s*$', ''
 
-        # Escape quotes in the entry
-        $escapedEntry = $entryStr -replace '"', '\"'
-
-        # Quote entries that contain special YAML characters
-        if ($escapedEntry -match '[:\[\]{}@&*#?|<>%`]|^-|\s+$') {
-            $yamlLines += "      - `"$escapedEntry`""
-        } else {
-            $yamlLines += "      - $escapedEntry"
-        }
+        # JSON string literals are also valid YAML double-quoted scalars. Always
+        # quote strings so YAML cannot reinterpret true, null, dates, or numbers,
+        # and let the serializer escape quotes, backslashes, and control chars.
+        $yamlLines += "      - $(ConvertTo-Json -InputObject $entryStr -Compress)"
     }
 }
 
 $yamlContent = $yamlLines -join "`n"
 
 # Write to file
-Set-Content -Path $manifestPath -Value $yamlContent -NoNewline
+[System.IO.File]::WriteAllText($manifestPath, $yamlContent, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "Successfully updated $manifestPath"
 Write-Host ""

@@ -7,73 +7,45 @@ using GsPlugin.Models;
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]
     public class GsDataManagerTests {
-        private static string CreateTempDir() {
-            var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(dir);
-            return dir;
-        }
-
         [Fact]
         public void IsAccountLinked_WhenLinkedUserIdIsNull_ReturnsFalse() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.LinkedUserId = null;
 
                 Assert.False(GsDataManager.IsAccountLinked);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void IsAccountLinked_WhenLinkedUserIdIsSentinel_ReturnsFalse() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.LinkedUserId = GsData.NotLinkedValue;
 
                 Assert.False(GsDataManager.IsAccountLinked);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void IsAccountLinked_WhenLinkedUserIdIsEmpty_ReturnsFalse() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.LinkedUserId = "";
 
                 Assert.False(GsDataManager.IsAccountLinked);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void IsAccountLinked_WhenLinkedUserIdIsRealId_ReturnsTrue() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.LinkedUserId = "user-abc-123";
 
                 Assert.True(GsDataManager.IsAccountLinked);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void EnqueuePendingScrobble_AddsItemToQueue() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.PendingScrobbles.Clear();
 
                 var item = new PendingScrobble {
@@ -85,87 +57,60 @@ namespace GsPlugin.Tests {
                 Assert.Single(GsDataManager.Data.PendingScrobbles);
                 Assert.Equal("start", GsDataManager.Data.PendingScrobbles[0].Type);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void Initialize_GeneratesInstallId_WhenNotPresent() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
-
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 Assert.False(string.IsNullOrEmpty(GsDataManager.Data.InstallID));
                 // InstallID should be a valid GUID
                 Assert.True(Guid.TryParse(GsDataManager.Data.InstallID, out _));
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void Initialize_WhenFileExists_LoadsExistingData() {
-            var tempDir = CreateTempDir();
-            try {
-                // First initialization — creates a file with an InstallID
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                // The fixture performed the first initialization, which created the InstallID.
                 var originalInstallId = GsDataManager.Data.InstallID;
                 GsDataManager.Data.LinkedUserId = "persisted-user";
                 GsDataManager.Save();
 
                 // Re-initialize from the same directory
-                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Initialize(temp.Path, null);
 
                 Assert.Equal(originalInstallId, GsDataManager.Data.InstallID);
                 Assert.Equal("persisted-user", GsDataManager.Data.LinkedUserId);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void Save_PersistsDataToDisk() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.Theme = "Light";
                 GsDataManager.Data.LastSyncGameCount = 99;
                 GsDataManager.Save();
 
-                var filePath = Path.Combine(tempDir, "gs_data.json");
+                var filePath = Path.Combine(temp.Path, "gs_data.json");
                 Assert.True(File.Exists(filePath));
 
                 var json = File.ReadAllText(filePath);
                 Assert.Contains("Light", json);
                 Assert.Contains("99", json);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
         [Fact]
         public void IsOptedOut_DefaultsFalse() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
-
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 Assert.False(GsDataManager.IsOptedOut);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void PerformOptOut_SetsOptedOutAndClearsState() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.LinkedUserId = "user-123";
-                GsDataManager.Data.ActiveSessionId = "session-1";
+                GsDataManager.Data.ActiveSessionsByGameId["game-1"] = "session-1";
                 GsDataManager.Data.LastLibraryHash = "abc";
                 GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                 GsDataManager.EnqueuePendingScrobble(new PendingScrobble { Type = "start", QueuedAt = DateTime.UtcNow });
@@ -175,38 +120,28 @@ namespace GsPlugin.Tests {
                 Assert.True(GsDataManager.IsOptedOut);
                 Assert.True(GsDataManager.Data.OptedOut);
                 Assert.Null(GsDataManager.Data.LinkedUserId);
-                Assert.Null(GsDataManager.Data.ActiveSessionId);
+                Assert.Empty(GsDataManager.Data.ActiveSessionsByGameId);
                 Assert.Null(GsDataManager.Data.LastLibraryHash);
                 Assert.Null(GsDataManager.Data.LastSyncAt);
                 Assert.Empty(GsDataManager.Data.PendingScrobbles);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void PerformOptOut_PersistsToDisk() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.PerformOptOut();
 
                 // Re-initialize from disk
-                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Initialize(temp.Path, null);
 
                 Assert.True(GsDataManager.IsOptedOut);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void PerformOptIn_ClearsOptedOut() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.PerformOptOut();
                 Assert.True(GsDataManager.IsOptedOut);
 
@@ -215,67 +150,46 @@ namespace GsPlugin.Tests {
                 Assert.False(GsDataManager.IsOptedOut);
                 Assert.False(GsDataManager.Data.OptedOut);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void PerformOptIn_PersistsToDisk() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.PerformOptOut();
                 GsDataManager.PerformOptIn();
 
                 // Re-initialize from disk
-                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Initialize(temp.Path, null);
 
                 Assert.False(GsDataManager.IsOptedOut);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
         [Fact]
         public void Initialize_FreshInstall_BumpsIdentityGeneration() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
-
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 // A fresh install (no existing gs_data.json) should bump IdentityGeneration
                 // so that any surviving stale gs_snapshot.json is invalidated.
                 Assert.True(GsDataManager.Data.IdentityGeneration >= 1);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void Initialize_ExistingInstallId_DoesNotBumpGeneration() {
-            var tempDir = CreateTempDir();
-            try {
-                // First init creates an InstallID and bumps generation
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                // The fixture's first init created an InstallID and bumped generation.
                 var gen = GsDataManager.Data.IdentityGeneration;
                 GsDataManager.Save();
 
                 // Re-initialize from same directory — InstallID already exists, no bump
-                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Initialize(temp.Path, null);
 
                 Assert.Equal(gen, GsDataManager.Data.IdentityGeneration);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void RotateInstallId_ChangesInstallIdAndClearsToken() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 var originalId = GsDataManager.Data.InstallID;
                 GsDataManager.Data.InstallToken = "old-token";
                 GsDataManager.Save();
@@ -286,32 +200,22 @@ namespace GsPlugin.Tests {
                 Assert.Equal(newId, GsDataManager.Data.InstallID);
                 Assert.Null(GsDataManager.Data.InstallToken);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void RotateInstallId_IncrementsIdentityGeneration() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 var genBefore = GsDataManager.Data.IdentityGeneration;
 
                 GsDataManager.RotateInstallId();
 
                 Assert.Equal(genBefore + 1, GsDataManager.Data.IdentityGeneration);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void RotateInstallId_ClearsLinkedUserId() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.LinkedUserId = "linked-user-123";
                 GsDataManager.Save();
 
@@ -319,18 +223,13 @@ namespace GsPlugin.Tests {
 
                 Assert.Null(GsDataManager.Data.LinkedUserId);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void RotateInstallId_ClearsIdentityBoundState() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
-                GsDataManager.Data.ActiveSessionId = "session-1";
-                GsDataManager.Data.PendingStartGameId = "game-1";
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                GsDataManager.Data.ActiveSessionsByGameId["game-1"] = "session-1";
+                GsDataManager.Data.PendingStartGameIds.Add("game-1");
                 GsDataManager.Data.LastLibraryHash = "hash-lib";
                 GsDataManager.Data.LastSyncAt = DateTime.UtcNow;
                 GsDataManager.Data.LastSyncGameCount = 50;
@@ -342,8 +241,8 @@ namespace GsPlugin.Tests {
 
                 GsDataManager.RotateInstallId();
 
-                Assert.Null(GsDataManager.Data.ActiveSessionId);
-                Assert.Null(GsDataManager.Data.PendingStartGameId);
+                Assert.Empty(GsDataManager.Data.ActiveSessionsByGameId);
+                Assert.Empty(GsDataManager.Data.PendingStartGameIds);
                 Assert.Null(GsDataManager.Data.LastLibraryHash);
                 Assert.Null(GsDataManager.Data.LastSyncAt);
                 Assert.Null(GsDataManager.Data.LastSyncGameCount);
@@ -352,32 +251,21 @@ namespace GsPlugin.Tests {
                 Assert.Null(GsDataManager.Data.LastIntegrationAccountsHash);
                 Assert.Empty(GsDataManager.Data.PendingScrobbles);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void SetInstallTokenIfActive_WhenNotOptedOut_StoresToken() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
-
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 var stored = GsDataManager.SetInstallTokenIfActive("new-token-abc");
 
                 Assert.True(stored);
                 Assert.Equal("new-token-abc", GsDataManager.Data.InstallToken);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void SetInstallTokenIfActive_WhenOptedOut_RejectsToken() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.PerformOptOut();
 
                 var stored = GsDataManager.SetInstallTokenIfActive("should-not-persist");
@@ -385,44 +273,29 @@ namespace GsPlugin.Tests {
                 Assert.False(stored);
                 Assert.Null(GsDataManager.Data.InstallToken);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void InstallIdForBody_WithNoToken_ReturnsInstallId() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.InstallToken = null;
 
                 Assert.Equal(GsDataManager.Data.InstallID, GsDataManager.InstallIdForBody);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void InstallIdForBody_WithToken_ReturnsNull() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.InstallToken = "active-token";
 
                 Assert.Null(GsDataManager.InstallIdForBody);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void PerformOptOut_ClearsInstallToken() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.Data.InstallToken = "token-to-clear";
                 GsDataManager.Save();
 
@@ -430,16 +303,10 @@ namespace GsPlugin.Tests {
 
                 Assert.Null(GsDataManager.Data.InstallToken);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
         [Fact]
         public void MutateAndSave_AtomicallyUpdatesMultipleFields() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
-
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.MutateAndSave(d => {
                     d.LastLibraryHash = "abc123";
                     d.LastSyncGameCount = 42;
@@ -451,20 +318,15 @@ namespace GsPlugin.Tests {
                 Assert.Null(GsDataManager.Data.SyncCooldownExpiresAt);
 
                 // Verify persisted to disk by re-loading
-                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Initialize(temp.Path, null);
                 Assert.Equal("abc123", GsDataManager.Data.LastLibraryHash);
                 Assert.Equal(42, GsDataManager.Data.LastSyncGameCount);
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
-        public static void PeekPendingScrobbles_ReturnsSnapshotWithoutRemoving() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+        public void PeekPendingScrobbles_ReturnsSnapshotWithoutRemoving() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
                     Type = "start",
                     QueuedAt = DateTime.UtcNow
@@ -477,16 +339,11 @@ namespace GsPlugin.Tests {
                 var peekedAgain = GsDataManager.PeekPendingScrobbles();
                 Assert.Single(peekedAgain);
             }
-            finally {
-                Directory.Delete(tempDir, true);
-            }
         }
 
         [Fact]
         public void RemovePendingScrobble_RemovesSingleItemAndPersists() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 var item1 = new PendingScrobble { Type = "start", QueuedAt = DateTime.UtcNow };
                 var item2 = new PendingScrobble { Type = "finish", QueuedAt = DateTime.UtcNow };
                 GsDataManager.EnqueuePendingScrobble(item1);
@@ -500,28 +357,20 @@ namespace GsPlugin.Tests {
                 Assert.Equal("finish", remaining[0].Type);
 
                 // Verify persisted to disk
-                GsDataManager.Initialize(tempDir, null);
+                GsDataManager.Initialize(temp.Path, null);
                 Assert.Single(GsDataManager.PeekPendingScrobbles());
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
 
         [Fact]
         public void RotateInstallId_ClearsShownNotificationIds() {
-            var tempDir = CreateTempDir();
-            try {
-                GsDataManager.Initialize(tempDir, null);
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.RecordShownNotifications(new List<string> { "n1", "n2" }, 100);
                 Assert.Equal(2, GsDataManager.GetShownNotificationIds().Count);
 
                 GsDataManager.RotateInstallId();
 
                 Assert.Empty(GsDataManager.GetShownNotificationIds());
-            }
-            finally {
-                Directory.Delete(tempDir, true);
             }
         }
     }

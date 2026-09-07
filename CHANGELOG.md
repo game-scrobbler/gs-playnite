@@ -1,5 +1,124 @@
 # Changelog
 
+## [2.8.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.1...GsPlugin-v2.8.2) (2026-08-28)
+
+
+### Highlights
+
+* Fixed an issue that could cause your library updates to be silently rejected, so your stats stay accurate and in sync with gamescrobbler.com.
+* Repeatedly rejected updates could wrongly disable tracking for other games, sometimes even pausing your live scrobbles — that's now resolved.
+* Failed uploads now leave clearer details in your log, making it easier to get help if something goes wrong.
+
+
+### Bug Fixes
+
+* **sync:** serialize hashed dates in the form they are hashed ([2ae8ae4](https://github.com/game-scrobbler/gs-playnite/commit/2ae8ae43073f4d2cb0d9b4a6a21f7cbc72968064))
+* **sync:** serialize hashed dates in the form they are hashed ([4abe345](https://github.com/game-scrobbler/gs-playnite/commit/4abe345ec0c9c3c94a96317983602a709762ebb7))
+
+## [2.8.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.0...GsPlugin-v2.8.1) (2026-08-10)
+
+
+### Highlights
+
+* Your library and achievement syncs are now double-checked, so stats no longer look "synced" if the upload actually failed on our end.
+* Fixed a rare issue where Playnite could hang on exit while closing in the background.
+
+
+### Bug Fixes
+
+* **sync:** confirm queue completion before committing sync baseline ([8f3568c](https://github.com/game-scrobbler/gs-playnite/commit/8f3568c38b721bf44132af02fe667b36e4b72bed))
+* **sync:** confirm queue completion before committing sync baseline ([cdb43bd](https://github.com/game-scrobbler/gs-playnite/commit/cdb43bd9d82a167cf54e82e54df46a7387077256))
+* **telemetry:** bound PostHog client dispose during shutdown ([a775fd7](https://github.com/game-scrobbler/gs-playnite/commit/a775fd70a24a0cd78f9bc7cfd67f4a1b33233bef))
+* **telemetry:** bound PostHog client dispose during shutdown ([625154c](https://github.com/game-scrobbler/gs-playnite/commit/625154cded28948ea49076bc5c82499255d6bc4c)), closes [#84](https://github.com/game-scrobbler/gs-playnite/issues/84)
+* **telemetry:** observe PostHog dispose fault after shutdown timeout ([1176e0f](https://github.com/game-scrobbler/gs-playnite/commit/1176e0f3fe59bc2f98d320e31a3538fa65d3780a))
+
+## [2.8.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.7.0...GsPlugin-v2.8.0) (2026-07-16)
+
+
+### Highlights
+
+* You can now enjoy Game Scrobbler while playing in Fullscreen mode, once your theme adds support for it.
+* Fixed a mix-up where achievements could show frozen or incomplete progress if you'd previously used a different achievement tracker.
+* Fixed "Delete My Data" sometimes getting stuck or failing forever, including when your data was already deleted.
+* Fixed account linking sometimes showing "Successfully linked!" while your account was actually still disconnected.
+
+
+### Features
+
+* **theme:** embeddable dashboard control for Fullscreen/Desktop themes ([#74](https://github.com/game-scrobbler/gs-playnite/issues/74)) ([c44f3d1](https://github.com/game-scrobbler/gs-playnite/commit/c44f3d15a1ee028e8ecb4c9ddb81319f7c00d544))
+* **theme:** expose dashboard as embeddable control for Fullscreen/Desktop themes ([d94bbff](https://github.com/game-scrobbler/gs-playnite/commit/d94bbff7dc1ae3f76806ef4213df3e81ab2c97b5))
+
+
+### Bug Fixes
+
+* **achievements:** prefer live plugin over stale on-disk provider data ([cfb58db](https://github.com/game-scrobbler/gs-playnite/commit/cfb58db9bd0c9eb9afd24d7c50bb7b04e5e9cab3))
+* **achievements:** prefer live plugin over stale on-disk provider data ([192f620](https://github.com/game-scrobbler/gs-playnite/commit/192f620aa624fd37acc684d47792c440935202b1)), closes [#66](https://github.com/game-scrobbler/gs-playnite/issues/66)
+* **hooks:** address review feedback on the format check ([4566ec3](https://github.com/game-scrobbler/gs-playnite/commit/4566ec3d46c18f86069827f76c6b0177abc27111))
+* **hooks:** run format check under a capable .NET SDK ([562af21](https://github.com/game-scrobbler/gs-playnite/commit/562af21101cff53c9648e5a2bb372ad93cf14f76))
+* **hooks:** run pre-commit format check under a capable .NET SDK ([fa124e2](https://github.com/game-scrobbler/gs-playnite/commit/fa124e24ee7c5d0fda6bb58c1585aeecdcc5d617))
+* **linking:** localize invalid user ID error message ([be9888f](https://github.com/game-scrobbler/gs-playnite/commit/be9888f2da31610c3afee4319f87b616c5d5ff0a))
+* **linking:** stop reporting success when verify returns not-linked ([ffdd5f2](https://github.com/game-scrobbler/gs-playnite/commit/ffdd5f254ff708376893f7ac116b0a1dbe446001))
+* **privacy:** make Delete My Data resilient to token and opt-out states ([331c148](https://github.com/game-scrobbler/gs-playnite/commit/331c1481091525ca8b6e3e2ca697668701922914)), closes [#61](https://github.com/game-scrobbler/gs-playnite/issues/61)
+* **token:** serialize install-token registration across concurrent callers ([1974510](https://github.com/game-scrobbler/gs-playnite/commit/1974510f2ae9c1a9896136fb828b68355654e0de))
+* **token:** serialize install-token registration across concurrent callers ([46bf711](https://github.com/game-scrobbler/gs-playnite/commit/46bf7113ba54f7b265427d138ecab7b02237888e))
+
+## [2.7.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.6.0...GsPlugin-v2.7.0) (2026-07-15)
+
+
+### Highlights
+
+* Your library and achievement uploads now sync in smaller, sturdier batches, so even huge libraries upload reliably.
+* Fixed an issue where your play stats or achievements could get out of sync after an interrupted sync.
+* Renamed the "new dashboard" toggle to "beta channel" in settings for clarity.
+* Made background error reporting more reliable so it can no longer cause slowdowns when Playnite closes.
+
+
+### Features
+
+* **settings:** rebrand new dashboard toggle as beta channel ([b18ca26](https://github.com/game-scrobbler/gs-playnite/commit/b18ca2661441d73538b7d23e61abb63f9574238b))
+* **sync:** replace fat snapshots with chunked hash-index sync ([0b98019](https://github.com/game-scrobbler/gs-playnite/commit/0b9801923663908f1959050b1a16ba877d504b65))
+* **sync:** split v4 full-sync chunks by payload byte size ([3d5633e](https://github.com/game-scrobbler/gs-playnite/commit/3d5633e4aa3fde53f919e8a07d6a52f4366adaa5))
+
+
+### Bug Fixes
+
+* **telemetry:** harden Sentry lifecycle in Playnite's shared process ([0cd6dbb](https://github.com/game-scrobbler/gs-playnite/commit/0cd6dbb76d48993f99ba2da93cbd5d592f004ede))
+
+## [2.6.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.5.0...GsPlugin-v2.6.0) (2026-07-11)
+
+
+### Highlights
+
+* Games from launchers like GOG OSS, Legendary, and Amazon Games now count toward your stats instead of being skipped.
+* Playing two games at once? Each one's playtime is now tracked correctly.
+* Safer account linking: Playnite now asks for your confirmation before connecting to a link you opened in the browser.
+* Turning scrobbling back on after opting out now works properly again.
+* Your library and achievements stay up to date more dependably, even when your connection hiccups.
+
+
+### Features
+
+* **observability:** report sync, flush and token-parse failures to Sentry ([57531e3](https://github.com/game-scrobbler/gs-playnite/commit/57531e3200721afad9dcbdb3fac4bdb4368f7762))
+* **playnite:** allow source-aware library plugins ([7130ba2](https://github.com/game-scrobbler/gs-playnite/commit/7130ba29585ceaf1cc48eaf897c7da8a0ce89882))
+* **scrobbling:** track multiple concurrent game sessions per game ID ([67543d0](https://github.com/game-scrobbler/gs-playnite/commit/67543d04d7f951068af6696e5b4866fc7d451de0))
+* **sync:** migrate library sync to the slim v3 DTO and endpoints ([ea24584](https://github.com/game-scrobbler/gs-playnite/commit/ea24584b8cb0e01bfc99b75a0a1fb5707d27431d))
+* **sync:** send result_snapshot_hash on achievement diff sync ([aa9fe0a](https://github.com/game-scrobbler/gs-playnite/commit/aa9fe0a3f3130d68e477c992fb86e85ae9b842be))
+* **sync:** send result_snapshot_hash on v3 diff sync ([0b5f92a](https://github.com/game-scrobbler/gs-playnite/commit/0b5f92a50ad9aaa8660710fbf4e33582119f9b13))
+* wire OptBackIn to server-side /v2/opt-in endpoint ([8f8a959](https://github.com/game-scrobbler/gs-playnite/commit/8f8a9596a1cb9f3bc8b7157a10dcbe3fa6752b85))
+
+
+### Bug Fixes
+
+* **api:** don't overwrite process-wide TLS SecurityProtocol setting ([d67eb0d](https://github.com/game-scrobbler/gs-playnite/commit/d67eb0d4af55923823e545cf21165d2f17de277f))
+* **data:** increment PendingScrobble.FlushAttempts under GsDataManager lock ([a58e268](https://github.com/game-scrobbler/gs-playnite/commit/a58e2684164d615cb09e7421effe994dc235ca1c))
+* **data:** retry GsData save on transient IOException ([43a373d](https://github.com/game-scrobbler/gs-playnite/commit/43a373d2194d061514094197586fb36ba0f933a1))
+* **security:** require confirmation before deep-link account linking ([da64c0d](https://github.com/game-scrobbler/gs-playnite/commit/da64c0d1beee96a3d088134fdf51e51cb1afa5a2))
+* **startup:** prevent orphaned flush timer when Dispose races startup ([dab7ca8](https://github.com/game-scrobbler/gs-playnite/commit/dab7ca803127e5df5d2b7a3068b47f482267f311))
+* stop sending "queued" string as session_id in async scrobble start ([f03f764](https://github.com/game-scrobbler/gs-playnite/commit/f03f764c2e88f38dde119a23c4046383ee61ab7e))
+* store null instead of \"queued\" as session_id in pending finish scrobbles ([e6c7129](https://github.com/game-scrobbler/gs-playnite/commit/e6c71296cf0d7100cbde6058c56cb15659a33f40))
+* **sync:** apply library snapshot diff before committing hash baseline ([7beb594](https://github.com/game-scrobbler/gs-playnite/commit/7beb594fa24ebb2c19f5f2933e011a835716d0e2))
+* **tests:** implement RequestOptIn in MockGsApiClient ([766047f](https://github.com/game-scrobbler/gs-playnite/commit/766047f541342e0cd2dcc2550068d68ca9213130))
+
 ## [2.5.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.4.0...GsPlugin-v2.5.0) (2026-03-27)
 
 

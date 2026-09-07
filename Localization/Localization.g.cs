@@ -739,6 +739,20 @@ public static partial class Loc
         return GetString("opt_back_in_success");
     }
     /// <summary>
+    /// Too many attempts. Please wait and try again.
+    /// </summary>
+    public static string opt_back_in_rate_limited()
+    {
+        return GetString("opt_back_in_rate_limited");
+    }
+    /// <summary>
+    /// Failed to re-enable. Please restart Playnite to try again.
+    /// </summary>
+    public static string opt_back_in_failed()
+    {
+        return GetString("opt_back_in_failed");
+    }
+    /// <summary>
     /// Invalid linking token received.
     /// </summary>
     public static string invalid_linking_token()
@@ -807,6 +821,71 @@ public static partial class Loc
     public static string menu_open_settings()
     {
         return GetString("menu_open_settings");
+    }
+    /// <summary>
+    /// Confirm Account Linking
+    /// </summary>
+    public static string confirm_linking_title()
+    {
+        return GetString("confirm_linking_title");
+    }
+    /// <summary>
+    /// A website is requesting to link this Playnite installation to a GameScrobbler account.
+    /// 
+    /// Only continue if you just clicked "Link Playnite" on gamescrobbler.com yourself.
+    /// </summary>
+    public static string confirm_linking_body()
+    {
+        return GetString("confirm_linking_body");
+    }
+    /// <summary>
+    /// Invalid user ID format received from server
+    /// </summary>
+    public static string invalid_user_id_format()
+    {
+        return GetString("invalid_user_id_format");
+    }
+    /// <summary>
+    /// The installation changed or was disabled during this request. Please try again.
+    /// </summary>
+    public static string identity_changed_during_request()
+    {
+        return GetString("identity_changed_during_request");
+    }
+    /// <summary>
+    /// Couldn't reach GameScrobbler to authorize the deletion. Check your internet connection and try again.
+    /// </summary>
+    public static string delete_no_token()
+    {
+        return GetString("delete_no_token");
+    }
+    /// <summary>
+    /// Your data has already been deleted. The plugin is now disabled.
+    /// </summary>
+    public static string delete_already_done()
+    {
+        return GetString("delete_already_done");
+    }
+    /// <summary>
+    /// This installation couldn't be verified. Reconnect your account, then try deleting again.
+    /// </summary>
+    public static string delete_auth_failed()
+    {
+        return GetString("delete_auth_failed");
+    }
+    /// <summary>
+    /// Game Scrobbler could not read its saved data and is disabled for this session. The file was left untouched at {$path} so it can be repaired or removed.
+    /// </summary>
+    public static string data_unreadable(object path)
+    {
+        return GetString("data_unreadable", ("path", path));
+    }
+    /// <summary>
+    /// Game Scrobbler could not open a private browser profile for the dashboard, so it was not loaded. Restart Playnite to try again.
+    /// </summary>
+    public static string dashboard_profile_failed()
+    {
+        return GetString("dashboard_profile_failed");
     }
 }
 
@@ -1243,6 +1322,14 @@ public static partial class LocId
     /// </summary>
     public const string opt_back_in_success = "opt_back_in_success";
     /// <summary>
+    /// Too many attempts. Please wait and try again.
+    /// </summary>
+    public const string opt_back_in_rate_limited = "opt_back_in_rate_limited";
+    /// <summary>
+    /// Failed to re-enable. Please restart Playnite to try again.
+    /// </summary>
+    public const string opt_back_in_failed = "opt_back_in_failed";
+    /// <summary>
     /// Invalid linking token received.
     /// </summary>
     public const string invalid_linking_token = "invalid_linking_token";
@@ -1282,4 +1369,42 @@ public static partial class LocId
     /// Open Settings
     /// </summary>
     public const string menu_open_settings = "menu_open_settings";
+    /// <summary>
+    /// Confirm Account Linking
+    /// </summary>
+    public const string confirm_linking_title = "confirm_linking_title";
+    /// <summary>
+    /// A website is requesting to link this Playnite installation to a GameScrobbler account.
+    /// 
+    /// Only continue if you just clicked "Link Playnite" on gamescrobbler.com yourself.
+    /// </summary>
+    public const string confirm_linking_body = "confirm_linking_body";
+    /// <summary>
+    /// Invalid user ID format received from server
+    /// </summary>
+    public const string invalid_user_id_format = "invalid_user_id_format";
+    /// <summary>
+    /// The installation changed or was disabled during this request. Please try again.
+    /// </summary>
+    public const string identity_changed_during_request = "identity_changed_during_request";
+    /// <summary>
+    /// Couldn't reach GameScrobbler to authorize the deletion. Check your internet connection and try again.
+    /// </summary>
+    public const string delete_no_token = "delete_no_token";
+    /// <summary>
+    /// Your data has already been deleted. The plugin is now disabled.
+    /// </summary>
+    public const string delete_already_done = "delete_already_done";
+    /// <summary>
+    /// This installation couldn't be verified. Reconnect your account, then try deleting again.
+    /// </summary>
+    public const string delete_auth_failed = "delete_auth_failed";
+    /// <summary>
+    /// Game Scrobbler could not read its saved data and is disabled for this session. The file was left untouched at {$path} so it can be repaired or removed.
+    /// </summary>
+    public const string data_unreadable = "data_unreadable";
+    /// <summary>
+    /// Game Scrobbler could not open a private browser profile for the dashboard, so it was not loaded. Restart Playnite to try again.
+    /// </summary>
+    public const string dashboard_profile_failed = "dashboard_profile_failed";
 }

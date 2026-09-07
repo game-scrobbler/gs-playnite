@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -17,7 +18,25 @@ namespace GsPlugin.Services {
         /// Both sides normalize to "yyyy-MM-ddTHH:mm:ssZ" (no fractional seconds, UTC).
         /// </summary>
         internal static string FormatDateForHash(DateTime? dt) =>
-            dt?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") ?? "";
+            dt?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture) ?? "";
+
+        /// <summary>
+        /// Normalizes a date string persisted in a legacy fat snapshot (written with
+        /// DateTime.ToString("o"), i.e. fractional seconds + offset) into the same
+        /// second-precision UTC form <see cref="FormatDateForHash"/> produces for live DTOs.
+        /// Without this, a migrated fingerprint could never equal its live counterpart and
+        /// every played game would be flagged 'updated' on the first post-migration diff.
+        /// </summary>
+        internal static string NormalizeSnapshotDateForHash(string raw) {
+            if (string.IsNullOrEmpty(raw)) {
+                return "";
+            }
+            if (DateTime.TryParse(raw, CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind, out var dt)) {
+                return FormatDateForHash(dt);
+            }
+            return raw;
+        }
 
         /// <summary>
         /// Computes a SHA-256 hex digest of the library for change detection.
@@ -31,22 +50,20 @@ namespace GsPlugin.Services {
                 .OrderBy(k => k, StringComparer.Ordinal)
                 .ToArray();
 
-            var separator = new byte[] { (byte)'|' };
-            using (var sha256 = SHA256.Create()) {
-                foreach (var key in keys) {
-                    var bytes = Encoding.UTF8.GetBytes(key);
-                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
-                    sha256.TransformBlock(separator, 0, 1, null, 0);
-                }
-                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
-            }
+            return Sha256HexOfKeys(keys);
         }
 
         /// <summary>
         /// Computes a SHA-256 hex digest of per-game metadata for diff detection.
-        /// Includes all DTO fields except activity fields (playtime, play_count, last_activity)
-        /// which are already covered by the library-level hash key.
+        /// Operates over the slim v3 GameSyncDto field set — the server's IGDB
+        /// canonical layer owns genre/theme/company/score/release-date metadata
+        /// (per ADR-011 in gs-mono), so those fields are not sent or hashed.
+        /// Includes all DTO fields except activity fields (playtime, play_count,
+        /// last_activity) which are already covered by the library-level hash key.
+        ///
+        /// Must produce the **exact same output** as server-side
+        /// computeGameMetadataHashV3() in
+        /// gs-mono/apps/backend/src/services/playnite/playniteUtils/hashUtils.ts.
         /// </summary>
         public static string ComputeGameMetadataHash(GameSyncDto g) {
             var sb = new StringBuilder();
@@ -58,35 +75,7 @@ namespace GsPlugin.Services {
             sb.Append('|');
             sb.Append(g.is_installed ? "1" : "0");
             sb.Append('|');
-            sb.Append(g.genres != null ? string.Join(",", g.genres) : "");
-            sb.Append('|');
-            sb.Append(g.platforms != null ? string.Join(",", g.platforms) : "");
-            sb.Append('|');
-            sb.Append(g.developers != null ? string.Join(",", g.developers) : "");
-            sb.Append('|');
-            sb.Append(g.publishers != null ? string.Join(",", g.publishers) : "");
-            sb.Append('|');
-            sb.Append(g.tags != null ? string.Join(",", g.tags) : "");
-            sb.Append('|');
-            sb.Append(g.features != null ? string.Join(",", g.features) : "");
-            sb.Append('|');
-            sb.Append(g.categories != null ? string.Join(",", g.categories) : "");
-            sb.Append('|');
-            sb.Append(g.series != null ? string.Join(",", g.series) : "");
-            sb.Append('|');
-            sb.Append(g.age_ratings != null ? string.Join(",", g.age_ratings) : "");
-            sb.Append('|');
-            sb.Append(g.regions != null ? string.Join(",", g.regions) : "");
-            sb.Append('|');
-            sb.Append(g.release_date ?? "");
-            sb.Append('|');
-            sb.Append(g.release_year?.ToString() ?? "");
-            sb.Append('|');
             sb.Append(g.user_score?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.critic_score?.ToString() ?? "");
-            sb.Append('|');
-            sb.Append(g.community_score?.ToString() ?? "");
             sb.Append('|');
             sb.Append(g.source_name ?? "");
             sb.Append('|');
@@ -97,12 +86,96 @@ namespace GsPlugin.Services {
             sb.Append(FormatDateForHash(g.date_added));
             sb.Append('|');
             sb.Append(FormatDateForHash(g.modified));
-            using (var sha256 = SHA256.Create()) {
-                var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-                var hash = sha256.ComputeHash(bytes);
-                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-            }
+            sb.Append('|');
+            sb.Append(g.achievement_count_unlocked?.ToString() ?? "");
+            sb.Append('|');
+            sb.Append(g.achievement_count_total?.ToString() ?? "");
+
+            return Sha256Hex(sb.ToString());
         }
+
+        /// <summary>
+        /// Compute a SHA-256 hash of achievement data for change detection.
+        /// Per-game key: {playnite_id}:{achievement_count}:{unlocked_count}:{sorted_names_hash}
+        /// Keys are sorted ordinally, then hashed with "|" separator.
+        /// Must match server's createAchievementHashV2() exactly.
+        /// </summary>
+        public static string ComputeAchievementHash(List<GameAchievementsDto> games) {
+            var keys = games
+                .Select(g => {
+                    var achs = g.achievements ?? new List<AchievementItemDto>();
+                    var unlockedCount = achs.Count(a => a.is_unlocked);
+                    var sortedNames = string.Join(",", achs.Select(a => a.name).OrderBy(n => n, StringComparer.Ordinal));
+                    var namesHash = Sha256Hex(sortedNames);
+                    return $"{g.playnite_id}:{achs.Count}:{unlockedCount}:{namesHash}";
+                })
+                .OrderBy(k => k, StringComparer.Ordinal)
+                .ToArray();
+
+            return Sha256HexOfKeys(keys);
+        }
+
+        /// <summary>
+        /// Per-game library fingerprint used by the local hash index for diffs.
+        /// Must stay aligned with the activity + metadata fields in ComputeLibraryHash.
+        /// </summary>
+        public static string ComputeLibraryItemFingerprint(GameSyncDto g) {
+            return $"{g.playtime_seconds}|{g.play_count}|{FormatDateForHash(g.last_activity)}|{ComputeGameMetadataHash(g)}";
+        }
+
+        /// <summary>
+        /// Rebuild fingerprint from a legacy fat GameSnapshot row (migration only).
+        /// </summary>
+        public static string LibraryFingerprintFromSnapshot(Models.GameSnapshot snap) {
+            var last = NormalizeSnapshotDateForHash(snap.last_activity);
+            var meta = snap.metadata_hash ?? "";
+            return $"{snap.playtime_seconds}|{snap.play_count}|{last}|{meta}";
+        }
+
+        /// <summary>
+        /// Per-game achievement fingerprint used by the local hash index for diff detection.
+        /// Unlike <see cref="ComputeAchievementHash"/> — which is a server contract
+        /// (createAchievementHashV2, names + counts only) and must NOT change — this local
+        /// fingerprint also folds in each achievement's unlock state and rarity so the diff path
+        /// re-sends a game when its rarity changes or its unlock set swaps without a count change.
+        /// Kept in one place so the live and migration recipes never drift apart.
+        /// </summary>
+        public static string ComputeAchievementGameFingerprint(GameAchievementsDto g) {
+            var achs = g.achievements ?? new List<AchievementItemDto>();
+            return AchievementFingerprint(
+                g.playnite_id,
+                achs.Select(a => (a.name, a.is_unlocked, a.rarity_percent)));
+        }
+
+        /// <summary>
+        /// Rebuild the local fingerprint from a legacy fat GameAchievementSnapshot (migration only).
+        /// Must produce the same value as <see cref="ComputeAchievementGameFingerprint"/> for the
+        /// same underlying achievement set.
+        /// </summary>
+        public static string AchievementFingerprintFromSnapshot(Models.GameAchievementSnapshot snap) {
+            var achs = snap.achievements ?? new List<Models.AchievementSnapshot>();
+            return AchievementFingerprint(
+                snap.playnite_id,
+                achs.Select(a => (a.name, a.is_unlocked, a.rarity_percent)));
+        }
+
+        private static string AchievementFingerprint(
+            string playniteId,
+            IEnumerable<(string name, bool unlocked, float? rarity)> achievements) {
+            var list = achievements.ToList();
+            var unlockedCount = list.Count(a => a.unlocked);
+            // Per-achievement name + unlock state + rarity, field-separated with a control
+            // character so names containing digits/delimiters cannot collide, then ordered so
+            // the digest is stable regardless of the provider's iteration order.
+            var detail = string.Join("", list
+                .Select(a => $"{a.name}{(a.unlocked ? "1" : "0")}{FormatRarity(a.rarity)}")
+                .OrderBy(s => s, StringComparer.Ordinal));
+            var detailHash = Sha256Hex(detail);
+            return $"{playniteId}:{list.Count}:{unlockedCount}:{detailHash}";
+        }
+
+        private static string FormatRarity(float? rarity) =>
+            rarity?.ToString("0.####", CultureInfo.InvariantCulture) ?? "";
 
         /// <summary>
         /// Computes a stable hash of integration account identities so we can detect
@@ -112,14 +185,49 @@ namespace GsPlugin.Services {
             if (accounts == null || accounts.Count == 0) {
                 return "";
             }
-            var sorted = accounts.OrderBy(a => a.provider_id).ThenBy(a => a.account_id);
+            // StringComparer.Ordinal, matching every other hash recipe in this file: the default
+            // string comparer is CurrentCulture-linguistic, so a Windows locale change would reorder
+            // these and flip the hash, spuriously flagging integration accounts as changed.
+            var sorted = accounts
+                .OrderBy(a => a.provider_id, StringComparer.Ordinal)
+                .ThenBy(a => a.account_id, StringComparer.Ordinal);
             var sb = new StringBuilder();
             foreach (var a in sorted) {
                 sb.Append(a.provider_id).Append(':').Append(a.account_id).Append(';');
             }
-            using (var sha = SHA256.Create()) {
-                var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
-                return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+            return Sha256Hex(sb.ToString());
+        }
+
+        /// <summary>
+        /// SHA-256 of a single UTF-8 string, rendered as lowercase hex with no separators.
+        /// Server contract: the digest input is the string exactly as supplied, so callers
+        /// own the pre-image construction and this helper must never alter it.
+        /// </summary>
+        private static string Sha256Hex(string input) {
+            using (var sha256 = SHA256.Create()) {
+                var bytes = Encoding.UTF8.GetBytes(input);
+                var hash = sha256.ComputeHash(bytes);
+                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
+        /// SHA-256 of an already-ordered key sequence, rendered as lowercase hex with no separators.
+        /// Server contract: each key is fed as UTF-8 bytes followed by a single '|' byte, including
+        /// after the final key, so the digest input always ends with '|'. That trailing separator is
+        /// part of the contract with createLibraryHashV3 / createAchievementHashV2; do not replace
+        /// this with a string join. Callers are responsible for ordering (StringComparer.Ordinal).
+        /// </summary>
+        private static string Sha256HexOfKeys(IEnumerable<string> orderedKeys) {
+            var separator = new byte[] { (byte)'|' };
+            using (var sha256 = SHA256.Create()) {
+                foreach (var key in orderedKeys) {
+                    var bytes = Encoding.UTF8.GetBytes(key);
+                    sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
+                    sha256.TransformBlock(separator, 0, 1, null, 0);
+                }
+                sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
             }
         }
     }

@@ -65,19 +65,22 @@ When P11 reaches GA and P10 is deprecated, `playnite11` becomes `main`.
 
 ---
 
-### Phase C — Game stop detection via `GameSession.Length`
+### Phase C — Game stop detection ✅ DONE (alpha14)
 
-**Affected file:** `GsPlugin.cs`, line 263
+The SDK shipped the real lifecycle callbacks, so the workaround is gone. `Plugin` now exposes
+`OnGameStartingAsync`, `OnGameStartedAsync` and `OnGameStoppedAsync`, alongside
+`OnApplicationShutdownAsync` and `OnLibraryUpdateFinishedAsync`.
 
-**Problem:** P10 fired `OnGameStopped(Game game, long sessionLength)`. In P11 the stop callback is TBD; the current workaround fires scrobble stop only on `OnApplicationStopped`.
+`GsPlugin` overrides `OnGameStartingAsync` (matching the Playnite 10 behaviour of scrobbling on
+launch rather than on process start) and `OnGameStoppedAsync`. Two shapes to know:
 
-**Known P11 SDK facts (confirmed from SDK XML):**
-- `GameSession` has `GameId`, `LibraryId`, `SessionId`, `Length`, `Date`
-- `GameSession.OnLengthChanged(uint oldValue, uint newValue)` exists
+- `OnGameStoppedEventArgs` carries no `Game`; the game is at `args.StartingArgs.Game`.
+- Elapsed seconds are at `args.StoppedArgs.SessionLength` (a `uint`).
 
-**Suspected P11 event:** A `GameSessionChanged` / `GameSessionUpdated` event on `PlayniteApi.Library` that fires when `Length` goes from 0 → non-zero marks game stop. Needs verification once Playnite 11 has published documentation or source.
-
-**Interim plan (already in place):** `OnApplicationStopped` cleanup handles the common case. When the real P11 stop event is documented, wire it up here and remove this TODO.
+`GsScrobblingService.OnGameStartAsync`/`OnGameStoppedAsync` therefore take a `Game` rather than the
+event args, so the service stays independent of the SDK's event shape. The `SessionIds`-diffing
+code in `OnGameCollectionChange` has been deleted; that handler now only kicks off a library sync
+when games are added.
 
 ---
 
@@ -122,9 +125,28 @@ All `GsLocalization.Get()` / `Format()` call sites replaced:
 
 ### Remaining `// TODO P11` items
 
-| File | Line area | Phase |
-|---|---|---|
-| `GsPlugin.cs` | game stop detection | Phase C (blocked on P11 GA docs) |
+None. Phase C, the last one, closed when alpha14 shipped the game lifecycle callbacks.
+
+### Merged from `main` (Playnite 10)
+
+The Playnite 10 line kept moving while this branch sat still, so `main` was merged in. Everything
+that is not tied to the Playnite 10 SDK came across: the v4 chunked full sync and the
+confirm-then-commit baseline rule, `GsSyncHashIndex`/`GsHashIndexStore` replacing the fat
+`gs_snapshot.json` (and `GsSnapshotManager`, now deleted), `GsAtomicFile` crash recovery, the
+per-game scrobble gates and persist-before-send queueing, telemetry consent gating and Sentry
+scrubbing, the inert `_dataUnavailable` mode, the private WebView2 profile with its fail-closed
+behaviour, the deep-link confirmation prompt, and the source-alias allowlist.
+
+Three merge decisions worth knowing:
+
+1. **The slim library DTO won.** `main` removed genres/platforms/companies/scores/release dates
+   from `GameSyncDto` per ADR-011 (IGDB is the server-side source of truth). This branch still had
+   the fat v2 shape, and it is now gone here too.
+2. **The library hash recipe is `main`'s again.** This branch had dropped
+   `achievement_count_unlocked`/`_total` from `ComputeGameMetadataHash`, which silently diverged
+   from the server's `createLibraryHashV3`. They are back, always null.
+3. **Achievements stay removed** (see CLAUDE.md), but every piece needed to switch them back on
+   — API methods, hash-index half, hash recipes, DTO fields — was kept.
 
 ---
 
@@ -132,7 +154,7 @@ All `GsLocalization.Get()` / `Format()` call sites replaced:
 
 | Item | Value |
 |---|---|
-| SDK NuGet package | `Playnite.SDK` `11.0.0-alpha6` |
+| SDK NuGet package | `Playnite.SDK` `11.0.0-alpha14` (matches the Playnite **11.0.11.0** alpha; the app and package alpha numbers differ) |
 | NuGet feed | `https://nuget.playnite.link/v3/index.json` |
 | Target framework | `net10.0-windows` |
 | Extension manifest | `extension.toml` (TOML) |

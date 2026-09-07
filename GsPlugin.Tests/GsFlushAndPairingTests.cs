@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using Xunit;
 using GsPlugin.Api;
 using GsPlugin.Models;
@@ -8,7 +7,7 @@ using static GsPlugin.Api.GsApiClient;
 namespace GsPlugin.Tests {
     /// <summary>
     /// Tests for flush retry semantics (FlushAttempts / re-queue) and
-    /// the start-fail / stop pairing state (PendingStartGameId).
+    /// the start-fail / stop pairing state (PendingStartGameIds).
     ///
     /// Note: service-level tests that require Playnite SDK types (Game, OnGameStoppedEventArgs)
     /// are not feasible here because the test project does not have a direct Playnite.SDK reference.
@@ -16,21 +15,19 @@ namespace GsPlugin.Tests {
     /// </summary>
     [Collection("StaticManagerTests")]
     public class GsFlushAndPairingTests : IDisposable {
-        private readonly string _tempDir;
+        private readonly TempPluginDir _temp;
 
         public GsFlushAndPairingTests() {
-            _tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(_tempDir);
-            GsDataManager.Initialize(_tempDir, null);
+            _temp = TempPluginDir.CreateWithDataManager();
             // Start with clean state
             GsDataManager.Data.PendingScrobbles.Clear();
-            GsDataManager.Data.PendingStartGameId = null;
-            GsDataManager.Data.ActiveSessionId = null;
+            GsDataManager.Data.PendingStartGameIds.Clear();
+            GsDataManager.Data.ActiveSessionsByGameId.Clear();
             GsDataManager.Save();
         }
 
         public void Dispose() {
-            Directory.Delete(_tempDir, true);
+            _temp.Dispose();
         }
 
         #region FlushAttempts field
@@ -51,7 +48,7 @@ namespace GsPlugin.Tests {
             GsDataManager.EnqueuePendingScrobble(item);
 
             // Re-initialize to force a load from disk
-            GsDataManager.Initialize(_tempDir, null);
+            GsDataManager.Initialize(_temp.Path, null);
 
             Assert.Single(GsDataManager.Data.PendingScrobbles);
             Assert.Equal(3, GsDataManager.Data.PendingScrobbles[0].FlushAttempts);
@@ -90,40 +87,62 @@ namespace GsPlugin.Tests {
             Assert.Equal(3, GsDataManager.Data.PendingScrobbles[0].FlushAttempts);
 
             // Verify survives persistence
-            GsDataManager.Initialize(_tempDir, null);
+            GsDataManager.Initialize(_temp.Path, null);
             Assert.Single(GsDataManager.Data.PendingScrobbles);
             Assert.Equal(3, GsDataManager.Data.PendingScrobbles[0].FlushAttempts);
         }
 
         #endregion
 
-        #region PendingStartGameId field
+        #region PendingStartGameIds field
 
         [Fact]
-        public void PendingStartGameId_DefaultsToNull() {
-            Assert.Null(GsDataManager.Data.PendingStartGameId);
+        public void PendingStartGameIds_DefaultsToEmpty() {
+            Assert.Empty(GsDataManager.Data.PendingStartGameIds);
         }
 
         [Fact]
-        public void PendingStartGameId_RoundtripsViaPersistence() {
+        public void PendingStartGameIds_RoundtripsViaPersistence() {
             var gameId = Guid.NewGuid().ToString();
-            GsDataManager.Data.PendingStartGameId = gameId;
+            GsDataManager.Data.PendingStartGameIds.Add(gameId);
             GsDataManager.Save();
 
-            GsDataManager.Initialize(_tempDir, null);
-            Assert.Equal(gameId, GsDataManager.Data.PendingStartGameId);
+            GsDataManager.Initialize(_temp.Path, null);
+            Assert.Contains(gameId, GsDataManager.Data.PendingStartGameIds);
         }
 
         [Fact]
-        public void PendingStartGameId_CanBeCleared() {
-            GsDataManager.Data.PendingStartGameId = "game-123";
+        public void PendingStartGameIds_CanBeCleared() {
+            GsDataManager.Data.PendingStartGameIds.Add("game-123");
             GsDataManager.Save();
 
-            GsDataManager.Data.PendingStartGameId = null;
+            GsDataManager.Data.PendingStartGameIds.Remove("game-123");
             GsDataManager.Save();
 
-            GsDataManager.Initialize(_tempDir, null);
-            Assert.Null(GsDataManager.Data.PendingStartGameId);
+            GsDataManager.Initialize(_temp.Path, null);
+            Assert.Empty(GsDataManager.Data.PendingStartGameIds);
+        }
+
+        [Fact]
+        public void PendingStartGameIds_TracksMultipleGamesIndependently() {
+            // Regression test: two concurrently-running games each with a queued
+            // start must not clobber each other's pending-start marker.
+            var gameA = Guid.NewGuid().ToString();
+            var gameB = Guid.NewGuid().ToString();
+
+            GsDataManager.Data.PendingStartGameIds.Add(gameA);
+            GsDataManager.Data.PendingStartGameIds.Add(gameB);
+            GsDataManager.Save();
+
+            Assert.Contains(gameA, GsDataManager.Data.PendingStartGameIds);
+            Assert.Contains(gameB, GsDataManager.Data.PendingStartGameIds);
+
+            // Resolving game A's pending start must not affect game B's.
+            GsDataManager.Data.PendingStartGameIds.Remove(gameA);
+            GsDataManager.Save();
+
+            Assert.DoesNotContain(gameA, GsDataManager.Data.PendingStartGameIds);
+            Assert.Contains(gameB, GsDataManager.Data.PendingStartGameIds);
         }
 
         #endregion
@@ -147,7 +166,7 @@ namespace GsPlugin.Tests {
                 },
                 QueuedAt = now
             });
-            GsDataManager.Data.PendingStartGameId = gameId;
+            GsDataManager.Data.PendingStartGameIds.Add(gameId);
             GsDataManager.Save();
 
             // Queue a finish (simulates OnGameStoppedAsync pairing path)
@@ -162,7 +181,7 @@ namespace GsPlugin.Tests {
                 },
                 QueuedAt = now.AddMinutes(30)
             });
-            GsDataManager.Data.PendingStartGameId = null;
+            GsDataManager.Data.PendingStartGameIds.Remove(gameId);
             GsDataManager.Save();
 
             // Verify the queue has the correct order
@@ -170,7 +189,7 @@ namespace GsPlugin.Tests {
             Assert.Equal("start", GsDataManager.Data.PendingScrobbles[0].Type);
             Assert.Equal("finish", GsDataManager.Data.PendingScrobbles[1].Type);
             Assert.Null(GsDataManager.Data.PendingScrobbles[1].FinishData.session_id);
-            Assert.Null(GsDataManager.Data.PendingStartGameId);
+            Assert.DoesNotContain(gameId, GsDataManager.Data.PendingStartGameIds);
         }
 
         [Fact]
@@ -201,7 +220,7 @@ namespace GsPlugin.Tests {
             });
 
             // Reload from disk
-            GsDataManager.Initialize(_tempDir, null);
+            GsDataManager.Initialize(_temp.Path, null);
 
             var items = GsDataManager.Data.PendingScrobbles;
             Assert.Equal(2, items.Count);

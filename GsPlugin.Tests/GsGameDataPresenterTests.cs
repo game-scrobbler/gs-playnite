@@ -40,9 +40,18 @@ namespace GsPlugin.Tests {
             public Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq r) => Task.FromResult<DeleteDataRes>(null);
             public Task<OptInRes> RequestOptIn(OptInReq r) => Task.FromResult<OptInRes>(null);
             public Task<RegisterInstallTokenRes> RegisterInstallToken(string i) => Task.FromResult<RegisterInstallTokenRes>(null);
-            public Task<string> ResetInstallToken(string t) => Task.FromResult<string>(null);
+            public static Task<string> ResetInstallToken(string t) => Task.FromResult<string>(null);
             public Task<string> GetDashboardToken() => Task.FromResult<string>(null);
             public Task<PlayniteNotificationsRes> GetNotifications() => Task.FromResult<PlayniteNotificationsRes>(null);
+            public Task<QueueStatusRes> GetQueueStatus(string q) => Task.FromResult<QueueStatusRes>(null);
+            public Task<V4SyncBeginRes> SyncLibraryFullBegin(LibraryV4FullSyncBeginReq r) => Task.FromResult<V4SyncBeginRes>(null);
+            public Task<V4SyncChunkRes> SyncLibraryFullChunk(LibraryV4ChunkReq r) => Task.FromResult<V4SyncChunkRes>(null);
+            public Task<AsyncQueuedResponse> SyncLibraryFullCommit(LibraryV4CommitReq r) => Task.FromResult<AsyncQueuedResponse>(null);
+            public Task SyncLibraryFullAbort(string s) => Task.CompletedTask;
+            public Task<V4SyncBeginRes> SyncAchievementsFullBegin(AchievementsV4FullSyncBeginReq r) => Task.FromResult<V4SyncBeginRes>(null);
+            public Task<V4SyncChunkRes> SyncAchievementsFullChunk(AchievementsV4ChunkReq r) => Task.FromResult<V4SyncChunkRes>(null);
+            public Task<AsyncQueuedResponse> SyncAchievementsFullCommit(AchievementsV4CommitReq r) => Task.FromResult<AsyncQueuedResponse>(null);
+            public Task SyncAchievementsFullAbort(string s) => Task.CompletedTask;
         }
 
         private static GameDataRes Synced() => new GameDataRes {
