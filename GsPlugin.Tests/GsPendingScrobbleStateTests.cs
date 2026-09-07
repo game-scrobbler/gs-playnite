@@ -294,5 +294,70 @@ namespace GsPlugin.Tests {
                 }
             }
         }
+        /// <summary>
+        /// The claim only has to hold one game's ordering. Cutting the whole queue at the first
+        /// claimed item let an in-flight live request for one game hide every other game's queued
+        /// work from the flusher for the length of an HTTP timeout.
+        /// </summary>
+        [Fact]
+        public void PeekPendingScrobbles_ClaimBlocksOnlyItsOwnGame() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var claimedStart = new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game-a", plugin_id = "p" }
+                };
+                var sameGameFinish = new PendingScrobble {
+                    Type = "finish",
+                    FinishData = new ScrobbleFinishReq { game_id = "game-a", plugin_id = "p" }
+                };
+                var otherGameStart = new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game-b", plugin_id = "p" }
+                };
+                GsDataManager.MutateAndSave(d => {
+                    d.PendingScrobbles.Add(claimedStart);
+                    d.PendingScrobbles.Add(sameGameFinish);
+                    d.PendingScrobbles.Add(otherGameStart);
+                });
+                GsDataManager.ClaimPendingScrobble(claimedStart);
+
+                var available = GsDataManager.PeekPendingScrobbles();
+
+                // game-b is replayable; game-a's finish still waits behind its claimed start.
+                Assert.Same(otherGameStart, Assert.Single(available));
+
+                GsDataManager.ReleasePendingScrobble(claimedStart);
+                Assert.Equal(3, GsDataManager.PeekPendingScrobbles().Count);
+            }
+        }
+
+        /// <summary>
+        /// The attempt counter lives on the shared queue item, so PersistMutation's rollback
+        /// cannot restore it. A failed save must undo it here, or the in-memory and on-disk counts
+        /// diverge and a restart hands the item retries past the drop threshold.
+        /// </summary>
+        [Fact]
+        public void IncrementFlushAttempts_RollsBackWhenTheSaveFails() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var item = new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq { game_id = "game", plugin_id = "p" }
+                };
+                GsDataManager.MutateAndSave(d => d.PendingScrobbles.Add(item));
+                GsDataManager.IncrementPendingScrobbleFlushAttempts(item);
+                Assert.Equal(1, item.FlushAttempts);
+
+                var path = Path.Combine(temp.Path, "gs_data.json");
+                // Read sharing blocks File.Replace from deleting the destination, so the write fails.
+                using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                    GsDataManager.IncrementPendingScrobbleFlushAttempts(item);
+                    Assert.Equal(1, item.FlushAttempts);
+                }
+
+                GsDataManager.IncrementPendingScrobbleFlushAttempts(item);
+                Assert.Equal(2, item.FlushAttempts);
+            }
+        }
+
     }
 }

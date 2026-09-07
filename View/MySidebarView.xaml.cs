@@ -46,9 +46,18 @@ namespace GsPlugin.View {
                             browserExecutableFolder: null, userDataFolder: _userDataFolder);
                     }
                     catch (Exception envEx) {
-                        // Fall back to the shared default rather than leaving the dashboard broken;
-                        // a private profile is a hardening measure, not a functional requirement.
-                        GsLogger.Warn($"Could not create a private WebView2 profile, using the default: {envEx.Message}");
+                        // Fail closed. Falling back to the shared default used to look harmless
+                        // because the dashboard still rendered, but the default profile is derived
+                        // from the host process and shared with every other extension hosting a
+                        // WebView2, so the fallback quietly handed them this dashboard's
+                        // authenticated cookies and the access_token in its URL history, which is
+                        // the exact exposure the private profile exists to prevent. A caller that
+                        // asked for isolation gets isolation or an error, never a silent downgrade.
+                        GsLogger.Error($"Could not create a private WebView2 profile: {envEx.Message}");
+                        ShowErrorMessage(GsLocalization.Get("LOCGsPluginDashboardProfileFailed",
+                            "Game Scrobbler could not open a private browser profile for the dashboard, "
+                            + "so it was not loaded. Restart Playnite to try again."));
+                        return;
                     }
                 }
 

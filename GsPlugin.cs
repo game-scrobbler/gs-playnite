@@ -59,15 +59,23 @@ namespace GsPlugin {
                 // Sentry, Microsoft.Extensions.*), and answering another extension's request
                 // for, say, System.Text.Json 4.0.1.0 with our 9.x is a silent downgrade or
                 // upgrade of a dependency that extension was never compiled against.
-                // Serve only an assembly whose public key token matches and whose version is
-                // at least what the caller asked for.
+                // Serve only an assembly whose public key token matches exactly and whose version
+                // shares the requested major version while being at least the requested build.
                 try {
                     var candidate = AssemblyName.GetAssemblyName(path);
                     if (!GsAssemblyIdentity.PublicKeyTokensMatch(name, candidate)) {
                         return null;
                     }
-                    if (name.Version != null && candidate.Version != null && candidate.Version < name.Version) {
-                        return null;
+                    if (name.Version != null && candidate.Version != null) {
+                        // Both bounds. Rejecting only older candidates still answered the exact
+                        // case the comment above describes: a request for System.Text.Json 4.0.1.0
+                        // matched our 9.x on token and passed the lower bound, so another
+                        // extension got a major version it was never compiled against and can fail
+                        // with MissingMethodException. Same major, at least the requested build.
+                        if (candidate.Version < name.Version
+                            || candidate.Version.Major != name.Version.Major) {
+                            return null;
+                        }
                     }
                 }
                 catch {
@@ -78,8 +86,10 @@ namespace GsPlugin {
                 return Assembly.LoadFrom(path);
             };
 
-            // UnobservedTaskException handling is centralized in GsSentry.Initialize()
-            // which filters by plugin origin, captures to Sentry, and calls SetObserved().
+            // UnobservedTaskException handling is centralized in
+            // GsSentry.EnsureGlobalExceptionHandlers(), which the constructor installs through
+            // ApplyPreferences() regardless of consent. It filters by plugin origin, captures to
+            // Sentry only when telemetry is enabled, and always calls SetObserved().
         }
         /// <summary>
         /// Private WebView2 profile directory, kept inside the plugin's own data folder. The default
@@ -98,6 +108,13 @@ namespace GsPlugin {
         private GsUpdateChecker _updateChecker;
         private GsNotificationService _notificationService;
         private bool _disposed;
+        /// <summary>
+        /// Set when <see cref="GsDataManager.Initialize"/> could not read the data file. Every
+        /// entry point below returns early on it, because the services it would use were never
+        /// constructed. Checked before <see cref="GsDataManager.IsOptedOut"/>, which reports false
+        /// when data is unavailable and so cannot stand in for this.
+        /// </summary>
+        private readonly bool _dataUnavailable;
         private int _librarySyncInFlight;
         private int _achievementSyncInFlight;
         private Timer _pendingFlushTimer;
@@ -125,7 +142,37 @@ namespace GsPlugin {
         public GsPlugin(IPlayniteAPI api) : base(api) {
 
             // Initialize GsDataManager
-            GsDataManager.Initialize(GetPluginUserDataPath(), null);
+            try {
+                GsDataManager.Initialize(GetPluginUserDataPath(), null);
+            }
+            catch (Exception ex) {
+                // Initialize deliberately refuses to invent a fresh install over a file it could
+                // not read: consent lives in that file, and a new identity would silently re-enable
+                // telemetry for someone who had opted out. Preserving it is right. Letting the
+                // throw escape the constructor was not: the extension then failed to construct at
+                // all, so settings, "Delete My Data" and opt-out were unreachable and the only
+                // remedy was deleting the file by hand.
+                //
+                // Stay constructed and completely inert instead: no services, no sync, no
+                // scrobbling, no telemetry (nothing is sent, so consent is still honoured), and
+                // tell the user where the file is so they can move or repair it.
+                _dataUnavailable = true;
+                _logger.Error(ex, "Plugin data could not be read; starting in a disabled state.");
+                Properties = new GenericPluginProperties { HasSettings = false };
+                try {
+                    PlayniteApi.Notifications.Add(new NotificationMessage(
+                        "gs-data-unreadable",
+                        GsLocalization.Format("LOCGsPluginDataUnreadable",
+                            "Game Scrobbler could not read its saved data and is disabled for this session. "
+                            + "The file was left untouched at {0} so it can be repaired or removed.",
+                            Path.Combine(GetPluginUserDataPath(), "gs_data.json")),
+                        NotificationType.Error));
+                }
+                catch (Exception notifyEx) {
+                    _logger.Error(notifyEx, "Could not surface the unreadable-data notification");
+                }
+                return;
+            }
 
             // Initialize snapshot manager for diff-based sync
             GsSyncHashIndex.Initialize(GetPluginUserDataPath());
@@ -205,6 +252,7 @@ namespace GsPlugin {
         /// Called before a game is started. This happens when the user clicks Play but before the game actually launches.
         /// </summary>
         public override async void OnGameStarting(OnGameStartingEventArgs args) {
+            if (_dataUnavailable) { base.OnGameStarting(args); return; }
             await GuardedAsync("OnGameStarting", () => base.OnGameStarting(args), async () => {
                 GsPostHog.Capture("game_session_started", new Dictionary<string, object> {
                     { "platform_id", args.Game?.PluginId.ToString() ?? "unknown" }
@@ -217,6 +265,7 @@ namespace GsPlugin {
         /// Called when a game stops running. This happens when the game process exits.
         /// </summary>
         public override async void OnGameStopped(OnGameStoppedEventArgs args) {
+            if (_dataUnavailable) { base.OnGameStopped(args); return; }
             await GuardedAsync("OnGameStopped", () => base.OnGameStopped(args), async () => {
                 GsPostHog.Capture("game_session_ended", new Dictionary<string, object> {
                     { "elapsed_seconds", args.ElapsedSeconds },
@@ -230,7 +279,7 @@ namespace GsPlugin {
         /// Called when the application is started and initialized. This is a good place for one-time initialization tasks.
         /// </summary>
         public override async void OnApplicationStarted(OnApplicationStartedEventArgs args) {
-            if (GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
+            if (_dataUnavailable || GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
             var sw = System.Diagnostics.Stopwatch.StartNew();
             // Detect first run before any async work: no prior sync and no token yet.
             bool isFirstRun = GsDataManager.Data.LastSyncAt == null
@@ -356,6 +405,7 @@ namespace GsPlugin {
         /// Called when the application is shutting down. This is the place to clean up resources.
         /// </summary>
         public override async void OnApplicationStopped(OnApplicationStoppedEventArgs args) {
+            if (_dataUnavailable) { base.OnApplicationStopped(args); return; }
             await GuardedAsync("OnApplicationStopped", () => base.OnApplicationStopped(args), async () => {
                 GsPostHog.Capture("plugin_stopped");
                 await _scrobblingService.OnApplicationStoppedAsync();
@@ -366,6 +416,7 @@ namespace GsPlugin {
         /// Called when a library update has been finished. This happens after games are imported or metadata is updated.
         /// </summary>
         public override async void OnLibraryUpdated(OnLibraryUpdatedEventArgs args) {
+            if (_dataUnavailable) { base.OnLibraryUpdated(args); return; }
             await GuardedAsync("OnLibraryUpdated", () => base.OnLibraryUpdated(args), async () => {
                 GsPostHog.Capture("library_synced", new Dictionary<string, object> {
                     { "game_count", PlayniteApi.Database.Games?.Count ?? 0 }
@@ -388,6 +439,7 @@ namespace GsPlugin {
         /// <param name="firstRunSettings">True if this is the first time settings are being requested (e.g., during first run of the plugin).</param>
         /// <returns>The settings object for this plugin.</returns>
         public override ISettings GetSettings(bool firstRunSettings) {
+            if (_dataUnavailable) return null;
             return (ISettings)_settings;
         }
 
@@ -398,6 +450,7 @@ namespace GsPlugin {
         /// <param name="firstRunSettings">True if this is the first time settings are being displayed (e.g., during first run of the plugin).</param>
         /// <returns>A UserControl that represents the settings view.</returns>
         public override UserControl GetSettingsView(bool firstRunSettings) {
+            if (_dataUnavailable) return null;
             return new GsPluginSettingsView();
         }
 
@@ -412,7 +465,7 @@ namespace GsPlugin {
         /// <param name="args">Requested element name and the current application mode.</param>
         /// <returns>The requested control, or null when unknown/opted out.</returns>
         public override Control GetGameViewControl(GetGameViewControlArgs args) {
-            if (GsDataManager.IsOptedOut) {
+            if (_dataUnavailable || GsDataManager.IsOptedOut) {
                 return null;
             }
             if (args.Name == "Dashboard") {
@@ -427,7 +480,7 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>A collection of SidebarItem objects to be displayed in the sidebar.</returns>
         public override IEnumerable<SidebarItem> GetSidebarItems() {
-            if (GsDataManager.IsOptedOut) yield break;
+            if (_dataUnavailable || GsDataManager.IsOptedOut) yield break;
             // Load the icon from the plugin directory, with a fallback if the file is missing or corrupt
             object iconImage = null;
             try {
@@ -458,6 +511,9 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>A collection of MainMenuItem objects to be displayed under Extensions → Game Scrobbler.</returns>
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args) {
+            // Nothing here works without data, and the settings entry the opted-out branch
+            // offers would open a view GetSettings() now declines to supply.
+            if (_dataUnavailable) yield break;
             if (GsDataManager.IsOptedOut) {
                 yield return new MainMenuItem {
                     Description = "Open Settings",
@@ -745,6 +801,10 @@ namespace GsPlugin {
 
                 try {
                     GsSentry.Shutdown();
+                    // Only here. Consent changes call Shutdown() too, and detaching the global
+                    // handlers there would let a privacy preference disable the plugin's own
+                    // fault observation; process teardown is the one moment it is right to.
+                    GsSentry.ReleaseGlobalExceptionHandlers();
                 }
                 catch (Exception ex) {
                     _logger.Error(ex, "Error closing Sentry");

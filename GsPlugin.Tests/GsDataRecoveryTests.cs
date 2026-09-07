@@ -9,6 +9,11 @@ using GsPlugin.Models;
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]
     public class GsDataRecoveryTests {
+        // The identity fence is required on this call now, so tests pass the live identity
+        // rather than opting out of it.
+        private static string CurrentInstallId() => GsDataManager.Data.InstallID;
+        private static int CurrentGeneration() => GsDataManager.Data.IdentityGeneration;
+
         [Fact]
         public void QueueSessionFinishes_RejectsSnapshotFromAnEarlierIdentity() {
             using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
@@ -181,7 +186,7 @@ namespace GsPlugin.Tests {
                 // Read sharing allows inspection but prevents File.Replace from deleting
                 // the destination, exercising the real atomic writer's failure path.
                 using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                    Assert.False(GsDataManager.QueueSessionFinishesAndClearActive(sessions, finishes));
+                    Assert.False(GsDataManager.QueueSessionFinishesAndClearActive(sessions, finishes, CurrentInstallId(), CurrentGeneration()));
                     Assert.Same(previousQueue, GsDataManager.Data.PendingScrobbles);
                     Assert.Same(previousSessions, GsDataManager.Data.ActiveSessionsByGameId);
                     Assert.Same(existing, Assert.Single(GsDataManager.PeekPendingScrobbles()));
@@ -189,7 +194,7 @@ namespace GsPlugin.Tests {
                     Assert.Equal(originalBytes, File.ReadAllBytes(path));
                 }
 
-                Assert.True(GsDataManager.QueueSessionFinishesAndClearActive(sessions, finishes));
+                Assert.True(GsDataManager.QueueSessionFinishesAndClearActive(sessions, finishes, CurrentInstallId(), CurrentGeneration()));
                 GsDataManager.Initialize(temp.Path, null);
                 Assert.Equal(2, GsDataManager.Data.PendingScrobbles.Count);
                 Assert.Equal("session-to-finish", GsDataManager.Data.PendingScrobbles[1].FinishData.session_id);
@@ -215,7 +220,7 @@ namespace GsPlugin.Tests {
                 };
                 Assert.True(GsDataManager.CompletePendingStart(start, "late-session"));
 
-                Assert.True(GsDataManager.QueueSessionFinishesAndClearActive(snapshot, new List<PendingScrobble> { finish }));
+                Assert.True(GsDataManager.QueueSessionFinishesAndClearActive(snapshot, new List<PendingScrobble> { finish }, CurrentInstallId(), CurrentGeneration()));
                 GsDataManager.Initialize(temp.Path, null);
                 Assert.Equal("late-session", Assert.Single(GsDataManager.PeekPendingScrobbles()).FinishData.session_id);
                 Assert.Empty(GsDataManager.SnapshotActiveSessions());
@@ -238,7 +243,7 @@ namespace GsPlugin.Tests {
                     new PendingScrobble { Type = "finish", FinishData = new ScrobbleFinishReq { game_id = "stopped-game", session_id = "matching-session" } }
                 };
 
-                Assert.True(GsDataManager.QueueSessionFinishesAndClearActive(snapshot, finishes));
+                Assert.True(GsDataManager.QueueSessionFinishesAndClearActive(snapshot, finishes, CurrentInstallId(), CurrentGeneration()));
                 GsDataManager.Initialize(temp.Path, null);
 
                 Assert.Equal("new-session", GsDataManager.Data.ActiveSessionsByGameId["restarted-game"]);

@@ -104,7 +104,17 @@ namespace GsPlugin.Services {
                                         System.Globalization.DateTimeStyles.RoundtripKind,
                                         out var parsed)
                                     && parsed > DateTime.MinValue && parsed.Year > 1) {
-                                    dateUnlocked = parsed;
+                                    // The column is UnlockTimeUtc, but a bare timestamp (no "Z", no
+                                    // offset) round-trips as Unspecified. Anything downstream that
+                                    // normalizes (CanonicalDateTimeConverter, and therefore every
+                                    // date_unlocked on the wire) calls ToUniversalTime(), which
+                                    // treats Unspecified as *local* and silently subtracts the
+                                    // machine's offset. Stamping the kind here states what the
+                                    // column already promises, so a UTC+3:30 install stops shipping
+                                    // unlock times 3.5 hours early.
+                                    dateUnlocked = parsed.Kind == DateTimeKind.Unspecified
+                                        ? DateTime.SpecifyKind(parsed, DateTimeKind.Utc)
+                                        : parsed;
                                 }
                             }
 

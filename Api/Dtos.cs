@@ -57,7 +57,18 @@ namespace GsPlugin.Api {
         public string session_id { get; set; }
     }
 
-    public class AsyncQueuedResponse {
+    /// <summary>
+    /// A response whose <c>status</c> the server always sets, including on a rejection it wants
+    /// the client to act on. Lets the HTTP layer tell a recognized business outcome apart from an
+    /// arbitrary error body that merely happens to be JSON: System.Text.Json fills an unmatched
+    /// shape with defaults rather than throwing, so "deserialized without error" is not on its own
+    /// evidence that the payload was ever meant for this type.
+    /// </summary>
+    public interface IStatusCarryingResponse {
+        string status { get; set; }
+    }
+
+    public class AsyncQueuedResponse : IStatusCarryingResponse {
         public bool success { get; set; }
         public string status { get; set; }
         public string queueId { get; set; }
@@ -99,6 +110,22 @@ namespace GsPlugin.Api {
         public string finished_at { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string session_id { get; set; }
+        /// <summary>
+        /// When this session began, echoed verbatim from the start event so the
+        /// finish can stand on its own.
+        ///
+        /// <c>session_id</c> is still the preferred key. This is what the server
+        /// falls back to when the start's response never reached us: it matches
+        /// on (install, started_at, game), and failing that records the session
+        /// with a real duration instead of a zero-length stub. Because the
+        /// server matches on the exact instant, the string sent here must be the
+        /// one the start sent, never re-derived from a second clock read.
+        ///
+        /// Null when the start time is unknown (a finish queued by a plugin
+        /// version that predated this field, or one whose start was dropped).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string started_at { get; set; }
     }
 
     public class ScrobbleFinishRes { }
@@ -198,7 +225,7 @@ namespace GsPlugin.Api {
         public string sync_id { get; set; }
     }
 
-    public class V4SyncBeginRes {
+    public class V4SyncBeginRes : IStatusCarryingResponse {
         public bool success { get; set; }
         public string status { get; set; }
         public string sync_id { get; set; }
@@ -210,7 +237,7 @@ namespace GsPlugin.Api {
         public string message { get; set; }
     }
 
-    public class V4SyncChunkRes {
+    public class V4SyncChunkRes : IStatusCarryingResponse {
         public bool success { get; set; }
         public string status { get; set; }
         public string sync_id { get; set; }

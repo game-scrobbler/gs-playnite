@@ -193,4 +193,6 @@ Voulez-vous associer un autre compte ?</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Ouvrir les paramètres</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">L’installation a été modifiée ou désactivée pendant cette requête. Veuillez réessayer.</sys:String>
+    <sys:String x:Key="LOCGsPluginDataUnreadable">Game Scrobbler n'a pas pu lire ses données enregistrées et est désactivé pour cette session. Le fichier a été laissé intact dans {0} afin de pouvoir être réparé ou supprimé.</sys:String>
+    <sys:String x:Key="LOCGsPluginDashboardProfileFailed">Game Scrobbler n'a pas pu ouvrir un profil de navigateur privé pour le tableau de bord, qui n'a donc pas été chargé. Redémarrez Playnite pour réessayer.</sys:String>
 </ResourceDictionary>

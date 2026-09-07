@@ -193,4 +193,6 @@
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">सेटिंग्स खोलें</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">इस अनुरोध के दौरान इंस्टॉलेशन बदल गया या अक्षम कर दिया गया। कृपया फिर से प्रयास करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginDataUnreadable">Game Scrobbler अपना सहेजा गया डेटा नहीं पढ़ सका और इस सत्र के लिए अक्षम है। फ़ाइल {0} पर अपरिवर्तित छोड़ दी गई है, ताकि उसे ठीक या हटाया जा सके।</sys:String>
+    <sys:String x:Key="LOCGsPluginDashboardProfileFailed">Game Scrobbler डैशबोर्ड के लिए निजी ब्राउज़र प्रोफ़ाइल नहीं खोल सका, इसलिए वह लोड नहीं हुआ। पुनः प्रयास करने के लिए Playnite को फिर से शुरू करें।</sys:String>
 </ResourceDictionary>
