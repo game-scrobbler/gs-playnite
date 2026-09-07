@@ -12,7 +12,7 @@ namespace GsPlugin.Infrastructure {
     /// Handles configuration, opt-out behavior, and release information.
     /// </summary>
     public class GsSentry {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsSentry>();
 
         /// <summary>
         /// Initializes Sentry with appropriate configuration settings.
@@ -238,7 +238,7 @@ namespace GsPlugin.Infrastructure {
                 return $"{version.Major}.{version.Minor}.{version.Build}";
             }
             catch (Exception ex) {
-                LogManager.GetLogger().Warn(ex, "Failed to get assembly version");
+                LogManager.GetLogger<GsSentry>().Warn(ex, "Failed to get assembly version");
                 return "unknown";
             }
         }

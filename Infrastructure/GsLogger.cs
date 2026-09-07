@@ -3,7 +3,7 @@ using Playnite;
 
 namespace GsPlugin.Infrastructure {
     public static class GsLogger {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger(typeof(GsLogger));
 
         /// <summary>
         /// Set to true to show interactive HTTP debug windows in Debug builds.

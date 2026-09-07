@@ -63,7 +63,7 @@ namespace GsPlugin.Services {
     /// Manages the process of linking Playnite plugin with GS user accounts.
     /// </summary>
     public class GsAccountLinkingService {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsAccountLinkingService>();
         private readonly IGsApiClient _apiClient;
         private readonly IPlayniteApi _playniteApi;
 

@@ -16,7 +16,7 @@ using GsPlugin.Models;
 
 namespace GsPlugin.Api {
     public class GsApiClient : IGsApiClient {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsApiClient>();
 
         private static readonly string _apiBaseUrl = "https://api.gamescrobbler.com";
         private static readonly string _nextApiBaseUrl = "https://gamescrobbler.com";

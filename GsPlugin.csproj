@@ -33,7 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Playnite.SDK" Version="11.0.0-alpha6" />
+    <PackageReference Include="Playnite.SDK" Version="11.0.0-alpha14" />
     <PackageReference Include="Sentry" Version="5.*" />
     <PackageReference Include="PostHog" Version="2.4.0" />
     <!-- CommunityToolkit.Mvvm provides ObservableObject for settings view model/data -->

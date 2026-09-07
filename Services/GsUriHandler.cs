@@ -14,7 +14,7 @@ namespace GsPlugin.Services {
     public class GsUriHandler {
         private readonly IPlayniteApi _playniteApi;
         private readonly GsAccountLinkingService _linkingService;
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsUriHandler>();
 
         public GsUriHandler(IPlayniteApi playniteApi, GsAccountLinkingService linkingService) {
             _playniteApi = playniteApi ?? throw new ArgumentNullException(nameof(playniteApi));

@@ -13,7 +13,7 @@ namespace GsPlugin.Services {
     /// fields (e.g. Steam UserId) without reflection or runtime plugin dependencies.
     /// </summary>
     public class GsIntegrationAccountReader {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsIntegrationAccountReader>();
         private readonly string _extensionsDataPath;
 
         /// <summary>

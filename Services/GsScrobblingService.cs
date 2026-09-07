@@ -12,7 +12,7 @@ namespace GsPlugin.Services {
     /// Tracks game sessions by recording start/stop events and communicating with the API.
     /// </summary>
     public class GsScrobblingService {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsScrobblingService>();
         private readonly IGsApiClient _apiClient;
         private readonly GsIntegrationAccountReader _integrationAccountReader;
         private readonly ILibraryApi _libraryApi;

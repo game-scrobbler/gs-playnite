@@ -11,7 +11,7 @@ namespace GsPlugin.Infrastructure {
     /// Mirrors the GsSentry pattern: static methods, DataOrNull guards, try/catch wrappers.
     /// </summary>
     public static class GsPostHog {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger(typeof(GsPostHog));
         private static PostHogClient _client;
 
         private const string ApiKey = "phc_la6sOuOYr4cEb9Rpq27MMi6Mv8EhCLsVi6ovp6azdSi";

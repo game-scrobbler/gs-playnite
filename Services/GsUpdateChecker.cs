@@ -10,7 +10,7 @@ using GsPlugin.Models;
 
 namespace GsPlugin.Services {
     internal class GsUpdateChecker {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsUpdateChecker>();
         private const string ReleasesApiUrl =
             "https://api.github.com/repos/game-scrobbler/gs-playnite/releases/latest";
         private const string NotificationId = "gs-update-available";

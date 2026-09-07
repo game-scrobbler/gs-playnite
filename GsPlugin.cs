@@ -26,7 +26,7 @@ namespace GsPlugin {
     }
 
     public class GsPlugin : Plugin {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsPlugin>();
 
         /// <summary>
         /// Resolves assembly version mismatches at runtime.
@@ -335,7 +335,7 @@ namespace GsPlugin {
             if (args.ItemId == "gs-sync") {
                 return [new MenuItemImpl(
                     Loc.menu_sync_library(),
-                    async () => {
+                    async (_) => {
                         try {
                             var result = await SyncLibraryWithDiffAsync();
                             string message;
@@ -374,7 +374,7 @@ namespace GsPlugin {
             if (args.ItemId == "gs-settings") {
                 return [new MenuItemImpl(
                     Loc.menu_open_settings(),
-                    async () => await PlayniteApi.MainView.OpenPluginSettingsAsync(GsPluginPlugin.Id))];
+                    async (_) => await PlayniteApi.MainView.OpenPluginSettingsAsync(GsPluginPlugin.Id))];
             }
 
             return null;

@@ -9,7 +9,7 @@ namespace GsPlugin.Api {
     /// Helps prevent cascading failures and provides resilience against temporary service outages.
     /// </summary>
     public class GsCircuitBreaker {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsCircuitBreaker>();
 
         // Reuse a single Random instance for jitter calculation to improve performance
         // and ensure better randomness distribution

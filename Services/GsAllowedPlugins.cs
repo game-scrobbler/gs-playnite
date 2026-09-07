@@ -13,7 +13,7 @@ namespace GsPlugin.Services {
     /// Lazy-initialized from disk cache or hardcoded fallback, refreshed at runtime from the server.
     /// </summary>
     internal static class GsAllowedPlugins {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger(typeof(GsAllowedPlugins));
 
         /// <summary>
         /// Hardcoded fallback list of Playnite 11 library plugin IDs.

@@ -14,7 +14,7 @@ namespace GsPlugin.Services {
     /// in Playnite's native notification tray.
     /// </summary>
     internal class GsNotificationService {
-        private static readonly ILogger _logger = LogManager.GetLogger();
+        private static readonly ILogger _logger = LogManager.GetLogger<GsNotificationService>();
         private readonly IPlayniteApi _playniteApi;
         private readonly IGsApiClient _apiClient;
         private readonly string _pluginId;

@@ -52,8 +52,4 @@ public static partial class Loc {
 
     public static string GetString(string stringId, params (string name, object value)[] args) =>
         Api?.GetLocalizedString(stringId, args) ?? stringId;
-
-    public static bool IsStringId(string id) {
-        return LocId.StringIds.Contains(id);
-    }
 }
