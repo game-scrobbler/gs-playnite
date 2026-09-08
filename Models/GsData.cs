@@ -141,7 +141,12 @@ namespace GsPlugin.Models {
 
         /// <summary>
         /// Number of scrobbles permanently dropped due to repeated flush failures.
-        /// Displayed in the settings diagnostics section. Reset on successful flush or manual sync.
+        /// Displayed in the settings diagnostics section.
+        /// Monotonic for the life of the install: it is only ever incremented, and nothing
+        /// resets it. It also survives opt-out, unlink and install-ID rotation, because
+        /// <see cref="ClearIdentityBoundState"/> treats it as a diagnostics counter rather
+        /// than identity-bound state. The settings warning strip therefore stays visible
+        /// once any scrobble has been dropped.
         /// </summary>
         public int DroppedScrobbleCount { get; set; } = 0;
 
@@ -232,9 +237,10 @@ namespace GsPlugin.Models {
 
             // Asymmetry preserved from the three hand-written copies this method replaced:
             // only install-id rotation cleared ShownNotificationIds, and none of them cleared
-            // DroppedScrobbleCount (a lifetime diagnostics counter, not identity-bound state).
-            // Both are recorded as observed behavior, not as a deliberate design conclusion;
-            // a future reader should decide intentionally rather than assume it was reasoned.
+            // DroppedScrobbleCount. The latter is settled: it is a lifetime diagnostics
+            // counter, not identity-bound state, so it is deliberately left alone here.
+            // The ShownNotificationIds asymmetry is still only observed behavior, not a
+            // reasoned conclusion; a future reader should decide it intentionally.
             if ((scope & IdentityClearScope.ShownNotifications) != 0) {
                 ShownNotificationIds.Clear();
             }
