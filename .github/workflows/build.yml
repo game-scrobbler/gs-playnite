@@ -6,11 +6,6 @@ on:
 
 name: Release Build (Playnite 11)
 
-env:
-  # Keep in step with the Playnite.SDK alpha in GsPlugin.csproj. The app and package alpha
-  # numbers differ: app 11.0.11.0 carries the API surface of Playnite.SDK 11.0.0-alpha14.
-  PLAYNITE_VERSION: "11.0.11.0"
-
 jobs:
   build:
     runs-on: windows-2022
@@ -53,18 +48,20 @@ jobs:
           $cfg.Output.CIFormat = 'GithubActions'
           Invoke-Pester -Configuration $cfg
 
-      # KNOWN GAP: Playnite 11 is a devel-channel build and is not published as a GitHub release
-      # asset, so this download 404s today - the releases API stops at 10.x and no
-      # Playnite${{ env.PLAYNITE_VERSION }}.zip exists. Packaging therefore needs a Toolbox 11
-      # from somewhere else (cached artifact, self-hosted runner, or a vendored copy).
+      # Toolbox is vendored at tools/playnite-toolbox because Playnite 11 ships on the devel
+      # channel and is not published as a GitHub release asset - the download the Playnite 10
+      # pipeline used 404s for every 11.x version. See that folder's README for provenance.
       #
       # Do not replace this with Compress-Archive: Toolbox omits the assemblies Playnite itself
       # ships (Playnite.SDK.dll, ByteAether.Ulid.dll, CommunityToolkit.Mvvm.dll), and a plain zip
       # of bin\Release would ship those and reintroduce the host/extension version skew.
-      - name: Setup Playnite Toolbox
+      - name: Verify vendored Toolbox
         run: |
-          Invoke-WebRequest -Uri "https://github.com/JosefNemec/Playnite/releases/download/${{ env.PLAYNITE_VERSION }}/Playnite${{ env.PLAYNITE_VERSION }}.zip" -OutFile "$Env:GITHUB_WORKSPACE\Playnite.zip"
-          Expand-Archive "$Env:GITHUB_WORKSPACE\Playnite.zip" -DestinationPath "$Env:GITHUB_WORKSPACE\Playnite"
+          $exe = Join-Path $Env:GITHUB_WORKSPACE "tools\playnite-toolbox\Toolbox.exe"
+          $expected = "D551A59AA3B122CC6B04874F643BA26BFBEBCD68424E5CAEBCD4A3B405348D9F"
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash
+          if ($actual -ne $expected) { throw "Vendored Toolbox.exe hash $actual != expected $expected" }
+          Write-Host "Vendored Toolbox.exe verified ($actual)"
 
       - name: Pack with Playnite Toolbox
         id: pack
@@ -74,7 +71,7 @@ jobs:
           # as a file: passing a directory fails with UnauthorizedAccessException. Name the .pext2
           # here instead of packing first and renaming afterwards.
           $name = "GsPlugin_" + "${{ github.ref_name }}".Replace("/", "_") + ".pext2"
-          & "$Env:GITHUB_WORKSPACE\Playnite\Toolbox.exe" pack "$Env:GITHUB_WORKSPACE\bin\Release\net10.0-windows" "$Env:GITHUB_WORKSPACE\PackingOutput\$name"
+          & "$Env:GITHUB_WORKSPACE\tools\playnite-toolbox\Toolbox.exe" pack "$Env:GITHUB_WORKSPACE\bin\Release\net10.0-windows" "$Env:GITHUB_WORKSPACE\PackingOutput\$name"
           if (-not (Test-Path "$Env:GITHUB_WORKSPACE\PackingOutput\$name")) { throw "Toolbox did not produce $name" }
           Move-Item -Path "$Env:GITHUB_WORKSPACE\PackingOutput\$name" -Destination $Env:GITHUB_WORKSPACE
 

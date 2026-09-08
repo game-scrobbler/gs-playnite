@@ -263,6 +263,8 @@ paket-files/
 
 # Plugin packing output
 PackingOutput/
+# Packed extensions produced by a local "Toolbox.exe pack"
+*.pext2
 
 # Tool config
 /qodana.yaml

@@ -15,7 +15,11 @@ Game Scrobbler is a Playnite plugin that tracks game sessions and provides stati
 - **Run a single test**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --filter "FullyQualifiedName~ClassName.MethodName"`
 - **Setup git hooks**: `powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1`
 - **Manual formatting**: `powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1`
-- **Pack plugin**: `Playnite\Toolbox.exe pack "bin\Release\net10.0-windows" "PackingOutput"` (produces `.pext2`)
+- **Pack plugin**: `tools\playnite-toolbox\Toolbox.exe pack "bin\Release\net10.0-windows" "PackingOutput\GsPlugin.pext2"`
+  - Toolbox is vendored (Playnite 11 is devel-channel and has no downloadable release asset); see `tools/playnite-toolbox/README.md`.
+  - The second argument is documented as a directory but is opened as a **file** — passing a directory fails with `UnauthorizedAccessException`.
+  - Never substitute `Compress-Archive`: Toolbox omits the assemblies Playnite itself ships (`Playnite.SDK.dll`, `ByteAether.Ulid.dll`, `CommunityToolkit.Mvvm.dll`), and shipping our own copies reintroduces host/extension version skew.
+- **Generate localization classes**: `tools\playnite-toolbox\Toolbox.exe ftlgen "Localization" "Localization"`, then `dotnet format`
 
 ## Architecture Overview
 
