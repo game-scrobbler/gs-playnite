@@ -26,10 +26,19 @@
     </AssemblyAttribute>
   </ItemGroup>
 
-  <!-- Explicitly exclude the test project — the SDK **/*.cs glob would otherwise
-       include test source files in GenerateTemporaryTargetAssembly (WPF XAML Pass2). -->
+  <!-- The project sits at the repository root, so the SDK's **/*.cs glob sweeps in every
+       directory beside it. Exclude the ones that are not ours:
+         - GsPlugin.Tests: test sources would land in GenerateTemporaryTargetAssembly (WPF
+           XAML Pass2) and be compiled into the plugin.
+         - powershell-yaml: CI checks this third-party module out at the repository root for
+           the manifest tests and the release manifest update. It ships C# sources, and
+           compiling (and format-checking) someone else's code fails the build on our own
+           analyzer settings.
+         - tools: vendored binaries, never sources. -->
   <ItemGroup>
     <Compile Remove="GsPlugin.Tests\**\*.cs" />
+    <Compile Remove="powershell-yaml\**\*.cs" />
+    <Compile Remove="tools\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

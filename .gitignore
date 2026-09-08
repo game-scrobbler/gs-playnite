@@ -266,6 +266,10 @@ PackingOutput/
 # Packed extensions produced by a local "Toolbox.exe pack"
 *.pext2
 
+# Third-party module CI checks out at the repository root for the installer-manifest
+# tests and the release manifest update. Clone it to run those tests locally; never commit it.
+powershell-yaml/
+
 # Tool config
 /qodana.yaml
 /.sentryclirc
