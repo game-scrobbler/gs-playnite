@@ -16,6 +16,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      # scripts/update-installer-manifest.Tests.ps1 parses its output with the real YAML
+      # parser rather than a stub, and looks for the module at the repository root.
+      # Without this the Pester step below fails before it runs a single manifest test.
+      - name: Checkout powershell-yaml
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: cloudbase/powershell-yaml
+          ref: 9664752e6f0149fd95a769e5788e0c84f75bd99e # pin to immutable commit
+          path: powershell-yaml
+
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
