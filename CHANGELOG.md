@@ -3,6 +3,15 @@
 ## [2.8.3](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.2...GsPlugin-v2.8.3) (2026-09-08)
 
 
+### Highlights
+
+* Play sessions and achievement progress are now tracked more reliably, even through short sessions, restarts, or a rough shutdown.
+* Fixed a bug where some achievement unlock times could show up hours off from when you actually earned them.
+* Your dashboard now uses its own private browsing profile, keeping your login separate from other Playnite extensions.
+* Improved handling for spotty internet connections so queued play sessions and achievements reach your stats without getting lost or duplicated.
+* Fixed an issue where corrupted or unreadable game data could prevent the extension from loading at all.
+
+
 ### Bug Fixes
 
 * **accounts:** reject stale link and unlink completions ([ed1f58e](https://github.com/game-scrobbler/gs-playnite/commit/ed1f58eaa3beb3cb2a29f71a010a341e5cdad8ce))
