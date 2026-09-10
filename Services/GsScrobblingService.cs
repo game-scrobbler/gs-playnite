@@ -556,6 +556,38 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
+        /// Renders a v4 begin/chunk/commit failure for the local log.
+        ///
+        /// A null response and a server rejection are different outages with different fixes, and
+        /// interpolating <c>response?.status</c> collapsed both into the same empty <c>status=</c>.
+        /// That is what a user reporting a days-long sync outage was able to send us in
+        /// gs-playnite#89: three identical "commit failed: status=" lines that could not say whether
+        /// the server had answered at all. A null response means the API client already logged the
+        /// HTTP status and body it saw, so point the reader at that line instead of printing nothing;
+        /// a response that arrived carries the server's own status/error/reason/message, so print
+        /// whichever of them the server actually set.
+        /// </summary>
+        internal static string DescribeV4Failure(
+            bool responded, string status, string error, string message, string reason) {
+            if (!responded) {
+                return "no usable response (see the preceding POST log line for the HTTP status and body)";
+            }
+            var parts = new List<string> {
+                $"status={(string.IsNullOrEmpty(status) ? "(none)" : status)}"
+            };
+            if (!string.IsNullOrEmpty(error)) {
+                parts.Add($"error={error}");
+            }
+            if (!string.IsNullOrEmpty(reason)) {
+                parts.Add($"reason={reason}");
+            }
+            if (!string.IsNullOrEmpty(message)) {
+                parts.Add($"message={message}");
+            }
+            return string.Join(", ", parts);
+        }
+
+        /// <summary>
         /// Generic v4 begin→chunk→commit upload driver shared by the library and achievement
         /// paths. On a begin/chunk failure, a rejected/failed commit, or a thrown exception it
         /// aborts the server-side session so a retry can start fresh rather than being refused
@@ -574,7 +606,8 @@ namespace GsPlugin.Services {
                 var begin = await beginAsync(items.Count);
                 if (begin == null || !begin.success || begin.status != "started"
                     || string.IsNullOrEmpty(begin.sync_id)) {
-                    _logger.Error($"{label} v4 begin failed: status={begin?.status}, error={begin?.error}");
+                    _logger.Error($"{label} v4 begin failed: "
+                        + DescribeV4Failure(begin != null, begin?.status, begin?.error, begin?.message, begin?.reason));
                     return null;
                 }
                 syncId = begin.sync_id;
@@ -592,7 +625,8 @@ namespace GsPlugin.Services {
                 for (var i = 0; i < chunkCount; i++) {
                     var chunkRes = await chunkAsync(syncId, i, chunks[i]);
                     if (chunkRes == null || !chunkRes.success || chunkRes.status != "accepted") {
-                        _logger.Error($"{label} v4 chunk {i} failed: status={chunkRes?.status}");
+                        _logger.Error($"{label} v4 chunk {i + 1}/{chunkCount} failed: "
+                            + DescribeV4Failure(chunkRes != null, chunkRes?.status, chunkRes?.error, chunkRes?.message, null));
                         await abortAsync(syncId);
                         return null;
                     }
@@ -613,7 +647,8 @@ namespace GsPlugin.Services {
                         _logger.Warn($"{label} v4 commit rejected: force-full-sync (reason: {commit.reason})");
                     }
                     else {
-                        _logger.Error($"{label} v4 commit failed: status={commit?.status}");
+                        _logger.Error($"{label} v4 commit failed: "
+                            + DescribeV4Failure(commit != null, commit?.status, null, commit?.message, commit?.reason));
                     }
                     await abortAsync(syncId);
                     return isForceFullSync ? commit : null;

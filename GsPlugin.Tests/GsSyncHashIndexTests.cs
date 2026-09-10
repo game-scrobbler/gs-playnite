@@ -656,6 +656,49 @@ namespace GsPlugin.Tests {
                     <= 5 * 1024 * 1024));
         }
 
+        // gs-playnite#89: the only trace of a days-long sync outage a user could send us was
+        // "Library v4 commit failed: status=" three times over. A response that never arrived and a
+        // response the server rejected have to read differently or the log cannot start a diagnosis.
+        [Fact]
+        public void DescribeV4Failure_NoResponse_PointsAtTheHttpLogLineInsteadOfAnEmptyStatus() {
+            var described = GsScrobblingService.DescribeV4Failure(
+                responded: false, status: null, error: null, message: null, reason: null);
+
+            Assert.DoesNotContain("status=", described);
+            Assert.Contains("no usable response", described);
+        }
+
+        [Fact]
+        public void DescribeV4Failure_ResponseWithoutStatus_SaysNoneRatherThanNothing() {
+            var described = GsScrobblingService.DescribeV4Failure(
+                responded: true, status: null, error: null, message: null, reason: null);
+
+            Assert.Equal("status=(none)", described);
+        }
+
+        [Fact]
+        public void DescribeV4Failure_IncludesEveryFieldTheServerSet() {
+            var described = GsScrobblingService.DescribeV4Failure(
+                responded: true,
+                status: "rejected",
+                error: "HASH_MISMATCH",
+                message: "recomputed digest did not match",
+                reason: "hash_mismatch");
+
+            Assert.Equal(
+                "status=rejected, error=HASH_MISMATCH, reason=hash_mismatch, "
+                    + "message=recomputed digest did not match",
+                described);
+        }
+
+        [Fact]
+        public void DescribeV4Failure_OmitsFieldsTheServerLeftUnset() {
+            var described = GsScrobblingService.DescribeV4Failure(
+                responded: true, status: "rejected", error: null, message: null, reason: "cooldown");
+
+            Assert.Equal("status=rejected, reason=cooldown", described);
+        }
+
         [Fact]
         public async Task UploadAchievementsFullChunked_ItemOverByteLimit_AbortsWithoutSendingChunk() {
             var mock = new TrackingMockApiClient();
