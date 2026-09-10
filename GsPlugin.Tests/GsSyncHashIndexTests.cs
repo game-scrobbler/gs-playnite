@@ -656,9 +656,13 @@ namespace GsPlugin.Tests {
                     <= 5 * 1024 * 1024));
         }
 
-        // gs-playnite#89: the only trace of a days-long sync outage a user could send us was
-        // "Library v4 commit failed: status=" three times over. A response that never arrived and a
-        // response the server rejected have to read differently or the log cannot start a diagnosis.
+        /// <summary>
+        /// gs-playnite#89: the only trace of a days-long sync outage a user could send us was
+        /// "Library v4 commit failed: status=" three times over. A response that never arrived and a
+        /// response the server rejected have to read differently or the log cannot start a diagnosis.
+        /// When nothing came back, the API client has already logged the HTTP status and body, so the
+        /// line has to send the reader there instead of printing an empty <c>status=</c>.
+        /// </summary>
         [Fact]
         public void DescribeV4Failure_NoResponse_PointsAtTheHttpLogLineInsteadOfAnEmptyStatus() {
             var described = GsScrobblingService.DescribeV4Failure(
@@ -668,6 +672,11 @@ namespace GsPlugin.Tests {
             Assert.Contains("no usable response", described);
         }
 
+        /// <summary>
+        /// A server that answered but set no status still tells us the request reached it. Printing
+        /// "(none)" keeps that case distinguishable from the no-response case, which prints no
+        /// <c>status=</c> at all rather than an empty one.
+        /// </summary>
         [Fact]
         public void DescribeV4Failure_ResponseWithoutStatus_SaysNoneRatherThanNothing() {
             var described = GsScrobblingService.DescribeV4Failure(
@@ -676,6 +685,11 @@ namespace GsPlugin.Tests {
             Assert.Equal("status=(none)", described);
         }
 
+        /// <summary>
+        /// Any one of status, error, reason or message may be the only clue the server gave, so all
+        /// four have to survive into the line when they are set. This pins the wording a support
+        /// reader will be grepping the log for.
+        /// </summary>
         [Fact]
         public void DescribeV4Failure_IncludesEveryFieldTheServerSet() {
             var described = GsScrobblingService.DescribeV4Failure(
@@ -691,6 +705,11 @@ namespace GsPlugin.Tests {
                 described);
         }
 
+        /// <summary>
+        /// The counterpart: unset fields are dropped rather than printed empty, so a field appearing
+        /// in the line means the server actually set it. Trailing "error=" noise is exactly what made
+        /// the original lines unreadable.
+        /// </summary>
         [Fact]
         public void DescribeV4Failure_OmitsFieldsTheServerLeftUnset() {
             var described = GsScrobblingService.DescribeV4Failure(
