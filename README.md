@@ -174,6 +174,30 @@ Auth via `x-profile-token` header or `profile_token` parameter.
 
 ---
 
+## Theme Integration
+
+The dashboard is exposed as a custom element, so theme developers can place it anywhere in a **Desktop or Fullscreen** theme. This is how GameScrobbler becomes usable in Fullscreen mode, which has no sidebar.
+
+Add this to your theme XAML:
+
+```xml
+<ContentControl x:Name="GameScrobbler_Dashboard" />
+```
+
+Playnite renders the dashboard wherever you place the control, and your layout controls its position and size. Nothing else is required: no configuration, and no reference to the plugin assembly.
+
+Notes:
+
+- The element resolves only when the Game Scrobbler plugin is installed and enabled. If the user has opted out of data collection, the control renders nothing.
+- The same dashboard is used on every surface (sidebar, Extensions menu, and your theme), so users see consistent content wherever it appears.
+- The control disposes itself when unloaded, so theme reloads and view changes are safe.
+
+**Current limitation:** this embeds the *whole* dashboard as a single web view. You can position and size it, but you cannot restyle its internals or place individual pieces (the Dossier board, the AI Roast text, specific stats) separately in your theme's own visual language.
+
+Finer-grained integration is being scoped in [#74](https://github.com/game-scrobbler/gs-playnite/issues/74), either as native WPF widgets that inherit your theme's styles or as bindable data you render yourself. If you build themes, that issue is the place to say which pieces you want and which of the two approaches suits you.
+
+---
+
 ## Achievement Sync
 
 GameScrobbler can aggregate achievement progress from multiple Playnite addons.
