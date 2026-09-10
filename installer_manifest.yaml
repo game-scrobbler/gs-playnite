@@ -1,256 +1,266 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.8.3
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-09-10
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.8.3/GsPlugin-v2.8.3.pext
+    Changelog:
+      - "Play sessions and achievement progress are now tracked more reliably, even through short sessions, restarts, or a rough shutdown."
+      - "Fixed a bug where some achievement unlock times could show up hours off from when you actually earned them."
+      - "Your dashboard now uses its own private browsing profile, keeping your login separate from other Playnite extensions."
+      - "Improved handling for spotty internet connections so queued play sessions and achievements reach your stats without getting lost or duplicated."
+      - "Fixed an issue where corrupted or unreadable game data could prevent the extension from loading at all."
   - Version: 2.8.2
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-08-28
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.8.2/GsPlugin-v2.8.2.pext
     Changelog:
-      - Fixed an issue that could cause your library updates to be silently rejected, so your stats stay accurate and in sync with gamescrobbler.com.
-      - Repeatedly rejected updates could wrongly disable tracking for other games, sometimes even pausing your live scrobbles — that's now resolved.
-      - Failed uploads now leave clearer details in your log, making it easier to get help if something goes wrong.
+      - "Fixed an issue that could cause your library updates to be silently rejected, so your stats stay accurate and in sync with gamescrobbler.com."
+      - "Repeatedly rejected updates could wrongly disable tracking for other games, sometimes even pausing your live scrobbles — that\u0027s now resolved."
+      - "Failed uploads now leave clearer details in your log, making it easier to get help if something goes wrong."
   - Version: 2.8.1
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-08-14
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.8.1/GsPlugin-v2.8.1.pext
     Changelog:
-      - Your library and achievement syncs are now double-checked, so stats no longer look "synced" if the upload actually failed on our end.
-      - Fixed a rare issue where Playnite could hang on exit while closing in the background.
+      - "Your library and achievement syncs are now double-checked, so stats no longer look \"synced\" if the upload actually failed on our end."
+      - "Fixed a rare issue where Playnite could hang on exit while closing in the background."
   - Version: 2.8.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-07-16
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.8.0/GsPlugin-v2.8.0.pext
     Changelog:
-      - You can now enjoy Game Scrobbler while playing in Fullscreen mode, once your theme adds support for it.
-      - Fixed a mix-up where achievements could show frozen or incomplete progress if you'd previously used a different achievement tracker.
-      - Fixed "Delete My Data" sometimes getting stuck or failing forever, including when your data was already deleted.
-      - Fixed account linking sometimes showing "Successfully linked!" while your account was actually still disconnected.
+      - "You can now enjoy Game Scrobbler while playing in Fullscreen mode, once your theme adds support for it."
+      - "Fixed a mix-up where achievements could show frozen or incomplete progress if you\u0027d previously used a different achievement tracker."
+      - "Fixed \"Delete My Data\" sometimes getting stuck or failing forever, including when your data was already deleted."
+      - "Fixed account linking sometimes showing \"Successfully linked!\" while your account was actually still disconnected."
   - Version: 2.7.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-07-15
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.7.0/GsPlugin-v2.7.0.pext
     Changelog:
-      - Your library and achievement uploads now sync in smaller, sturdier batches, so even huge libraries upload reliably.
-      - Fixed an issue where your play stats or achievements could get out of sync after an interrupted sync.
-      - Renamed the "new dashboard" toggle to "beta channel" in settings for clarity.
-      - Made background error reporting more reliable so it can no longer cause slowdowns when Playnite closes.
+      - "Your library and achievement uploads now sync in smaller, sturdier batches, so even huge libraries upload reliably."
+      - "Fixed an issue where your play stats or achievements could get out of sync after an interrupted sync."
+      - "Renamed the \"new dashboard\" toggle to \"beta channel\" in settings for clarity."
+      - "Made background error reporting more reliable so it can no longer cause slowdowns when Playnite closes."
   - Version: 2.6.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-07-12
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.6.0/GsPlugin-v2.6.0.pext
     Changelog:
-      - Games from launchers like GOG OSS, Legendary, and Amazon Games now count toward your stats instead of being skipped.
-      - "Playing two games at once? Each one's playtime is now tracked correctly."
+      - "Games from launchers like GOG OSS, Legendary, and Amazon Games now count toward your stats instead of being skipped."
+      - "Playing two games at once? Each one\u0027s playtime is now tracked correctly."
       - "Safer account linking: Playnite now asks for your confirmation before connecting to a link you opened in the browser."
-      - Turning scrobbling back on after opting out now works properly again.
-      - Your library and achievements stay up to date more dependably, even when your connection hiccups.
+      - "Turning scrobbling back on after opting out now works properly again."
+      - "Your library and achievements stay up to date more dependably, even when your connection hiccups."
   - Version: 2.5.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-27
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.5.0/GsPlugin-v2.5.0.pext
     Changelog:
-      - add localization for pt-BR, de-DE, fr-FR, zh-CN, hi-IN
-      - add localization infrastructure and linking strings
+      - "add localization for pt-BR, de-DE, fr-FR, zh-CN, hi-IN"
+      - "add localization infrastructure and linking strings"
       - "add Russian localization (thanks to [[@god](https://github.com/god)OFslaves](https://github.com/godOFslaves))"
-      - improve token expiry UX and add account disconnect
-      - localize all remaining hardcoded UI strings for Russian support
-      - clean up leading spaces in Russian localization
+      - "improve token expiry UX and add account disconnect"
+      - "localize all remaining hardcoded UI strings for Russian support"
+      - "clean up leading spaces in Russian localization"
   - Version: 2.4.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-25
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.4.0/GsPlugin-v2.4.0.pext
     Changelog:
-      - add diagnostic logging for achievement provider resolution
-      - enforce thread-safe mutations and bound retry recursion
-      - improve token expiry error with actionable guidance and downgrade Sentry level
-      - make circuit breaker detect HTTP server errors
-      - restrict WebView external URLs and surface dropped scrobbles
-      - use atomic file writes for persistent state
+      - "add diagnostic logging for achievement provider resolution"
+      - "enforce thread-safe mutations and bound retry recursion"
+      - "improve token expiry error with actionable guidance and downgrade Sentry level"
+      - "make circuit breaker detect HTTP server errors"
+      - "restrict WebView external URLs and surface dropped scrobbles"
+      - "use atomic file writes for persistent state"
   - Version: 2.3.3
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.3.3/GsPlugin-v2.3.3.pext
     Changelog:
-      - Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!
-      - inherit Playnite theme TextBox style to fix non-editable token input
+      - "Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!"
+      - "inherit Playnite theme TextBox style to fix non-editable token input"
   - Version: 2.3.2
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.3.2/GsPlugin-v2.3.2.pext
     Changelog:
-      - Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!
-      - parse verify error responses instead of treating 400 as network error
+      - "Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!"
+      - "parse verify error responses instead of treating 400 as network error"
   - Version: 2.3.1
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.3.1/GsPlugin-v2.3.1.pext
     Changelog:
-      - Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!
-      - address high-priority Sentry errors and fix CI for windows-2022
+      - "Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!"
+      - "address high-priority Sentry errors and fix CI for windows-2022"
   - Version: 2.3.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-21
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.3.0/GsPlugin-v2.3.0.pext
     Changelog:
-      - Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!
-      - add opt-out and delete my data support
-      - add opt-out, delete my data, and fix update notification
-      - add per-install token authentication and identity management
-      - add server notification system with settings controls
-      - add sidebar dashboard auto-refresh with token expiry detection
-      - crash-safe pending scrobble flush with periodic retry and startup improvements
-      - overhaul settings view with localized sections and diagnostics
-      - add MutateAndSave for atomic data mutations and library sync guard
-      - add System.Net.Http reference to test project for HttpClient tests
-      - harden achievement providers and infrastructure resilience
-      - harden WebView2 security and remove dead code
-      - open Add-ons dialog instead of plugin settings on update notification click
-      - remove missing package urls and add changelogs to installer manifest
-      - revert debug API URL and restore permissive pre-commit hook
-      - use theme-aware TextBrush for library sync status text
-      - cache reflection lookups and replace debug MessageBox with logging
+      - "Try our new Chat with your library and Timeline features on your GameScrobbler dashboard!"
+      - "add opt-out and delete my data support"
+      - "add opt-out, delete my data, and fix update notification"
+      - "add per-install token authentication and identity management"
+      - "add server notification system with settings controls"
+      - "add sidebar dashboard auto-refresh with token expiry detection"
+      - "crash-safe pending scrobble flush with periodic retry and startup improvements"
+      - "overhaul settings view with localized sections and diagnostics"
+      - "add MutateAndSave for atomic data mutations and library sync guard"
+      - "add System.Net.Http reference to test project for HttpClient tests"
+      - "harden achievement providers and infrastructure resilience"
+      - "harden WebView2 security and remove dead code"
+      - "open Add-ons dialog instead of plugin settings on update notification click"
+      - "remove missing package urls and add changelogs to installer manifest"
+      - "revert debug API URL and restore permissive pre-commit hook"
+      - "use theme-aware TextBrush for library sync status text"
+      - "cache reflection lookups and replace debug MessageBox with logging"
   - Version: 2.2.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-03-10
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.2.0/GsPlugin-v2.2.0.pext
     Changelog:
-      - add PostHog analytics alongside Sentry
-      - embed YouTube video in README.md
-      - send integration account identities during library sync
-      - deduplicate achievements by name in diff sync path
-      - deduplicate achievements by name in full sync path
-      - improve Sentry exception filtering and handle missing data directory
-      - wrap all SentrySdk calls in try/catch for graceful fallback
+      - "add PostHog analytics alongside Sentry"
+      - "embed YouTube video in README.md"
+      - "send integration account identities during library sync"
+      - "deduplicate achievements by name in diff sync path"
+      - "deduplicate achievements by name in full sync path"
+      - "improve Sentry exception filtering and handle missing data directory"
+      - "wrap all SentrySdk calls in try/catch for graceful fallback"
   - Version: 2.1.1
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-02-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.1.1/GsPlugin-v2.1.1.pext
     Changelog:
-      - add click action to update notification to open plugin settings
+      - "add click action to update notification to open plugin settings"
   - Version: 2.1.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-02-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.1.0/GsPlugin-v2.1.0.pext
     Changelog:
-      - add Playnite Achievements plugin support alongside SuccessStory
+      - "add Playnite Achievements plugin support alongside SuccessStory"
   - Version: 2.0.1
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-02-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.0.1/GsPlugin-v2.0.1.pext
     Changelog:
-      - correct $PSScriptRoot paths in installer manifest script after move to scripts/
-      - prevent JSON crash on non-JSON responses, add gzip compression, and filter third-party Sentry errors
+      - "correct $PSScriptRoot paths in installer manifest script after move to scripts/"
+      - "prevent JSON crash on non-JSON responses, add gzip compression, and filter third-party Sentry errors"
   - Version: 2.0.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-02-21
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.0.0/GsPlugin-v2.0.0.pext
     Changelog:
-      - add achievement sync via SuccessStory plugin and v2 sync endpoint
-      - add diff-based library and achievement sync with snapshot state
-      - add Extensions top-menu with Open Dashboard, Sync Library Now, and Open Settings
-      - add in-app update notification via GitHub releases API
-      - add offline queue with retry on circuit breaker recovery
-      - extend GameSyncDto with scores, release year, dates, and user flags
-      - reorganize root files into Api, Services, Models, Infrastructure subfolders
+      - "add achievement sync via SuccessStory plugin and v2 sync endpoint"
+      - "add diff-based library and achievement sync with snapshot state"
+      - "add Extensions top-menu with Open Dashboard, Sync Library Now, and Open Settings"
+      - "add in-app update notification via GitHub releases API"
+      - "add offline queue with retry on circuit breaker recovery"
+      - "extend GameSyncDto with scores, release year, dates, and user flags"
+      - "reorganize root files into Api, Services, Models, Infrastructure subfolders"
   - Version: 1.1.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-02-13
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v1.1.0/GsPlugin-v1.1.0.pext
     Changelog:
-      - add dynamic client-side plugin filtering for library sync and scrobbling
-      - add new dashboard toggle and scrobbling disabled warning to settings UI
+      - "add dynamic client-side plugin filtering for library sync and scrobbling"
+      - "add new dashboard toggle and scrobbling disabled warning to settings UI"
   - Version: 1.0.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-25
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v1.0.0/GsPlugin-v1.0.0.pext
     Changelog:
-      - This marks the first stable release of GsPlugin with all core features tested and production-ready. The plugin now has stable scrobbling, library sync, and account linking functionality.
+      - "This marks the first stable release of GsPlugin with all core features tested and production-ready. The plugin now has stable scrobbling, library sync, and account linking functionality."
   - Version: 0.11.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-25
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.11.0/GsPlugin-v0.11.0.pext
     Changelog:
-      - simplify library sync by removing image URL enrichment
-      - update plugin icon and sidebar icon with new brand design
+      - "simplify library sync by removing image URL enrichment"
+      - "update plugin icon and sidebar icon with new brand design"
   - Version: 0.10.3
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.3/GsPlugin-v0.10.3.pext
     Changelog:
-      - improve PowerShell script to handle changelog parsing edge cases
+      - "improve PowerShell script to handle changelog parsing edge cases"
   - Version: 0.10.2
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.2/GsPlugin-v0.10.2.pext
     Changelog:
-      - fix YAML generation in update-installer-manifest script
+      - "fix YAML generation in update-installer-manifest script"
   - Version: 0.10.1
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-24
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.1/GsPlugin-v0.10.1.pext
     Changelog:
-      - automate installer_manifest.yaml updates and add missing versions
-      - improve performance and error handling across multiple components
+      - "automate installer_manifest.yaml updates and add missing versions"
+      - "improve performance and error handling across multiple components"
   - Version: 0.10.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-16
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.10.0/GsPlugin-v0.10.0.pext
     Changelog:
-      - performance and stability improvements
+      - "performance and stability improvements"
   - Version: 0.8.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-15
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.8.0/GsPlugin-v0.8.0.pext
     Changelog:
-      - stability and bug fixes
+      - "stability and bug fixes"
   - Version: 0.7.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-10-12
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.7.0/GsPlugin-v0.7.0.pext
     Changelog:
-      - commit messages must now follow Conventional Commits specification
+      - "commit messages must now follow Conventional Commits specification"
   - Version: 0.6.2
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2025-09-22
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.6.2/GsPlugin-v0.6.2.pext
     Changelog:
-      - major reliability improvements with circuit breaker pattern and retry logic
-      - enhanced error handling with global exception protection
-      - detailed logging with game context for better debugging
-      - updated all dependencies to latest stable versions
+      - "major reliability improvements with circuit breaker pattern and retry logic"
+      - "enhanced error handling with global exception protection"
+      - "detailed logging with game context for better debugging"
+      - "updated all dependencies to latest stable versions"
   - Version: 0.5.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-06-12
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.5.0/GsPlugin-v0.5.0.pext
     Changelog:
-      - ability to link GS account
-      - small bug fixes
+      - "ability to link GS account"
+      - "small bug fixes"
   - Version: 0.4.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-19
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.4.0/GsPlugin-v0.4.0.pext
     Changelog:
-      - add plugin setting page
-      - add dark mode and support for themes
-      - add opt out option for error tracking and game tracking
-      - fix a bug that caused errors on persistent game tracking
-      - fix a bug that caused plugin crash for some users
+      - "add plugin setting page"
+      - "add dark mode and support for themes"
+      - "add opt out option for error tracking and game tracking"
+      - "fix a bug that caused errors on persistent game tracking"
+      - "fix a bug that caused plugin crash for some users"
   - Version: 0.3.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-10
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.3.0/GsPlugin-v0.3.0.pext
     Changelog:
-      - refactoring and improve code quality
-      - add Sentry for error tracking
+      - "refactoring and improve code quality"
+      - "add Sentry for error tracking"
   - Version: 0.2.0
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-06
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.2.0/GsPlugin-v0.2.0.pext
     Changelog:
-      - fix a dependency bug that caused the plugin to not load
+      - "fix a dependency bug that caused the plugin to not load"
   - Version: 0.1.3
     RequiredApiVersion: 6.11.0
     ReleaseDate: 2025-02-05
     PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v0.1.3/GsPlugin_GsPlugin-v0.1.3.pext
     Changelog:
-      - initial release
+      - "initial release"
