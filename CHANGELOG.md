@@ -3,6 +3,15 @@
 ## [2.8.4](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.3...GsPlugin-v2.8.4) (2026-09-11)
 
 
+### Highlights
+
+* Your saved play stats are now much more resistant to being lost if antivirus or other software briefly locks a file during saving.
+* Fixed a bug that could stop the extension from loading at all for some players after the last update.
+* Trying to link an already-linked Playnite installation no longer gets mistakenly flagged as an error on our end.
+* Sync failure messages in the log are now clearer, making it easier for us to diagnose upload problems you report.
+* Documented the dashboard widget theme creators can use to bring Game Scrobbler into Fullscreen mode.
+
+
 ### Bug Fixes
 
 * give a locked file long enough to be retried ([a5f6183](https://github.com/game-scrobbler/gs-playnite/commit/a5f6183c6571c829853bead8be84e2e745aaf48d))
