@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.8.4](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.3...GsPlugin-v2.8.4) (2026-09-11)
+
+
+### Highlights
+
+* Your saved play stats are now much more resistant to being lost if antivirus or other software briefly locks a file during saving.
+* Fixed a bug that could stop the extension from loading at all for some players after the last update.
+* Trying to link an already-linked Playnite installation no longer gets mistakenly flagged as an error on our end.
+* Sync failure messages in the log are now clearer, making it easier for us to diagnose upload problems you report.
+* Documented the dashboard widget theme creators can use to bring Game Scrobbler into Fullscreen mode.
+
+
+### Bug Fixes
+
+* give a locked file long enough to be retried ([a5f6183](https://github.com/game-scrobbler/gs-playnite/commit/a5f6183c6571c829853bead8be84e2e745aaf48d))
+* **linking:** stop reporting expected link rejections as Sentry issues ([e611913](https://github.com/game-scrobbler/gs-playnite/commit/e6119131f53336d8c11279f197e5ad4497f76e2f))
+* **loading:** serve the cross-major references our own package set needs ([651f817](https://github.com/game-scrobbler/gs-playnite/commit/651f8177f1d83adb8d0014f62f785f98f00ec94d))
+* make 2.8.3 loadable again and quiet expected linking rejections ([b65c897](https://github.com/game-scrobbler/gs-playnite/commit/b65c8978af45cc973636726bc81a46d676aa6e71))
+* **persistence:** give a locked file long enough to be retried ([ae50d7d](https://github.com/game-scrobbler/gs-playnite/commit/ae50d7d2cebc8b07e7df4df7f92a3c78e025f6b3))
+* **sync:** make v4 upload failures diagnosable in the log ([1b49e0f](https://github.com/game-scrobbler/gs-playnite/commit/1b49e0f1c7f2d0543e02f94d6880477a3feeea6a))
+* **sync:** make v4 upload failures diagnosable in the log ([57804e4](https://github.com/game-scrobbler/gs-playnite/commit/57804e42096fa3717a9ff22ea0ad6fa3cbab6cce))
+
 ## [2.8.3](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.2...GsPlugin-v2.8.3) (2026-09-08)
 
 
