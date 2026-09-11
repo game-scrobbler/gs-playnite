@@ -59,23 +59,16 @@ namespace GsPlugin {
                 // Sentry, Microsoft.Extensions.*), and answering another extension's request
                 // for, say, System.Text.Json 4.0.1.0 with our 9.x is a silent downgrade or
                 // upgrade of a dependency that extension was never compiled against.
-                // Serve only an assembly whose public key token matches exactly and whose version
-                // shares the requested major version while being at least the requested build.
+                //
+                // Our own package set is the exception, and must be, because it legitimately spans
+                // majors: Sentry 6.1.0 asks for System.Text.Json 8.0.0.5 while the set we package
+                // resolves to 9.0.0.9. Refusing that request is what made 2.8.3 unloadable.
+                // GsAssemblyIdentity.CanServe holds the whole policy, including why the requesting
+                // assembly cannot be used to tell the two apart.
                 try {
                     var candidate = AssemblyName.GetAssemblyName(path);
-                    if (!GsAssemblyIdentity.PublicKeyTokensMatch(name, candidate)) {
+                    if (!GsAssemblyIdentity.CanServe(name, candidate)) {
                         return null;
-                    }
-                    if (name.Version != null && candidate.Version != null) {
-                        // Both bounds. Rejecting only older candidates still answered the exact
-                        // case the comment above describes: a request for System.Text.Json 4.0.1.0
-                        // matched our 9.x on token and passed the lower bound, so another
-                        // extension got a major version it was never compiled against and can fail
-                        // with MissingMethodException. Same major, at least the requested build.
-                        if (candidate.Version < name.Version
-                            || candidate.Version.Major != name.Version.Major) {
-                            return null;
-                        }
                     }
                 }
                 catch {
