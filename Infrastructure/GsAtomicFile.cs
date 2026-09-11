@@ -33,25 +33,65 @@ namespace GsPlugin.Infrastructure {
         }
 
         /// <summary>
-        /// Moves/replaces tempPath onto destPath, retrying briefly on IOException. A just-written
-        /// file can be transiently locked (antivirus/indexer scan) on Windows; without a retry
-        /// that sharing violation surfaces as a failed save.
+        /// Attempts allowed for a file operation that can hit a transient Windows sharing
+        /// violation, and the backoff between them: 20, 40, 80, 160, 320 ms, about 620 ms in
+        /// total.
+        ///
+        /// The previous budget was three attempts over 75 ms, which is not enough for the
+        /// antivirus and indexer scans this retry exists for. Driving the shipped WriteJson
+        /// through a save that is forced to fail and then the save that has to succeed lost that
+        /// race four times in four thousand rounds, every one of them "Unable to remove the file
+        /// to be replaced".
+        /// That sequence leaves the .tmp freshly written and abandoned, so it provokes a scan far
+        /// more often than an ordinary save does; treat the figure as the rate for a save retried
+        /// after a failure, not as a field rate. GsDataManager.SaveInternal does report the
+        /// failure to Sentry, but MutateAndSave and Save ignore its result, so the in-memory state
+        /// is kept while the disk copy stays stale.
+        ///
+        /// The cost is paid only while a write is already failing, so the common path is
+        /// unchanged. It is bounded on purpose: GsDataManager saves under a process-wide lock, so
+        /// retrying forever would block every reader including the UI thread.
         /// </summary>
-        public static void ReplaceWithRetry(string tempPath, string destPath, int maxAttempts = 3) {
-            for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+        private const int MaxAttempts = 6;
+
+        private static int BackoffMs(int attempt) => 20 * (1 << (attempt - 1));
+
+        /// <summary>
+        /// Runs a file operation, retrying a transient sharing violation on the schedule above.
+        /// The final attempt's IOException propagates: callers decide what a genuinely failed
+        /// write means, and swallowing it here would hide it from all of them.
+        ///
+        /// Internal rather than private so the retry contract can be tested against an injected
+        /// operation. Timing a real lock cannot pin it: whether the writer or the thread holding
+        /// the file wins a given moment is not something a test can schedule, which makes such a
+        /// test both non-discriminating and flaky.
+        /// </summary>
+        internal static void WithRetry(Action operation) {
+            for (var attempt = 1; attempt <= MaxAttempts; attempt++) {
                 try {
-                    if (File.Exists(destPath)) {
-                        File.Replace(tempPath, destPath, destinationBackupFileName: null);
-                    }
-                    else {
-                        File.Move(tempPath, destPath);
-                    }
+                    operation();
                     return;
                 }
-                catch (IOException) when (attempt < maxAttempts) {
-                    Thread.Sleep(25 * attempt);
+                catch (IOException) when (attempt < MaxAttempts) {
+                    Thread.Sleep(BackoffMs(attempt));
                 }
             }
+        }
+
+        /// <summary>
+        /// Moves/replaces tempPath onto destPath, retrying on IOException. A just-written file can
+        /// be transiently locked (antivirus/indexer scan) on Windows; without a retry that sharing
+        /// violation surfaces as a failed save.
+        /// </summary>
+        public static void ReplaceWithRetry(string tempPath, string destPath) {
+            WithRetry(() => {
+                if (File.Exists(destPath)) {
+                    File.Replace(tempPath, destPath, destinationBackupFileName: null);
+                }
+                else {
+                    File.Move(tempPath, destPath);
+                }
+            });
         }
 
         /// <summary>
@@ -72,10 +112,17 @@ namespace GsPlugin.Infrastructure {
         /// </param>
         public static void WriteJson<T>(string filePath, T value, JsonSerializerOptions options, bool durable = false) {
             var tempPath = filePath + ".tmp";
-            using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None)) {
-                JsonSerializer.Serialize(stream, value, options);
-                stream.Flush(flushToDisk: durable);
-            }
+            // Opening the temp file gets the same retry as the replace below. A save that just
+            // failed leaves this exact path freshly written and abandoned, which is precisely the
+            // file a scanner is holding, so the open is exposed to the hazard the replace already
+            // defends against. Only the replace has been observed losing the race; this is the
+            // same defect class rather than a second measurement.
+            WithRetry(() => {
+                using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None)) {
+                    JsonSerializer.Serialize(stream, value, options);
+                    stream.Flush(flushToDisk: durable);
+                }
+            });
             ReplaceWithRetry(tempPath, filePath);
         }
 
