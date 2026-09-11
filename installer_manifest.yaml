@@ -1,6 +1,16 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.8.4
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-09-11
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.8.4/GsPlugin-v2.8.4.pext
+    Changelog:
+      - "Your saved play stats are now much more resistant to being lost if antivirus or other software briefly locks a file during saving."
+      - "Fixed a bug that could stop the extension from loading at all for some players after the last update."
+      - "Trying to link an already-linked Playnite installation no longer gets mistakenly flagged as an error on our end."
+      - "Sync failure messages in the log are now clearer, making it easier for us to diagnose upload problems you report."
+      - "Documented the dashboard widget theme creators can use to bring Game Scrobbler into Fullscreen mode."
   - Version: 2.8.3
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-09-10
