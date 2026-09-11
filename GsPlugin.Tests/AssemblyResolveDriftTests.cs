@@ -151,9 +151,22 @@ namespace GsPlugin.Tests {
         }
 
         /// <summary>
-        /// Walks up from the test binary to the repository root and picks the plugin output that
-        /// matches this build's configuration. Fails loudly rather than skipping: a silent pass
-        /// here would mean the check is not running at all.
+        /// The configuration these tests were compiled in, which is the only plugin output they
+        /// may read. Taken from the compiler rather than sniffed out of the binary's path so it
+        /// cannot be wrong.
+        /// </summary>
+#if DEBUG
+        private const string BuildConfiguration = "Debug";
+#else
+        private const string BuildConfiguration = "Release";
+#endif
+
+        /// <summary>
+        /// Walks up from the test binary to the repository root and returns the plugin output for
+        /// this build's configuration, and only that one. Falling back to the other configuration
+        /// would let a stale build satisfy the check, which defeats the point of reading the real
+        /// output. Missing output fails loudly rather than skipping: a silent pass here would mean
+        /// the check is not running at all.
         /// </summary>
         private static string FindPluginOutputDirectory() {
             var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
@@ -168,24 +181,14 @@ namespace GsPlugin.Tests {
             }
             Assert.True(root != null, "Could not locate the repository root from " + baseDirectory);
 
-            // Prefer the configuration this test was built in, so a stale opposite-configuration
-            // output cannot be read instead.
-            var preferred = baseDirectory.IndexOf(
-                Path.DirectorySeparatorChar + "Debug" + Path.DirectorySeparatorChar,
-                StringComparison.OrdinalIgnoreCase) >= 0
-                ? new[] { "Debug", "Release" }
-                : new[] { "Release", "Debug" };
-
-            foreach (var configuration in preferred) {
-                var candidate = Path.Combine(root, "bin", configuration);
-                if (File.Exists(Path.Combine(candidate, "GsPlugin.dll"))) {
-                    return candidate;
-                }
+            var output = Path.Combine(root, "bin", BuildConfiguration);
+            if (File.Exists(Path.Combine(output, "GsPlugin.dll"))) {
+                return output;
             }
 
             throw new Xunit.Sdk.XunitException(
-                "No plugin build output under " + Path.Combine(root, "bin")
-                + ". Build the plugin with MSBuild before running the tests.");
+                "No " + BuildConfiguration + " plugin build output at " + output
+                + ". Build the plugin with MSBuild in that configuration before running the tests.");
         }
     }
 }
