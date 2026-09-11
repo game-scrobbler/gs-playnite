@@ -10,8 +10,8 @@ Game Scrobbler is a Playnite plugin that tracks game sessions and provides stati
 
 - **Build solution**: `MSBuild.exe GsPlugin.sln -p:Configuration=Release -restore`
 - **Restore NuGet packages**: `nuget restore GsPlugin.sln`
-- **Format code**: `dotnet format GsPlugin.sln`
-- **Verify formatting**: `dotnet format GsPlugin.sln --verify-no-changes`
+- **Format code**: `powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1`. Do not call `dotnet format GsPlugin.sln` directly: the solution's old-style WPF `.csproj` can only be loaded through a .NET Framework build host (`BuildHost-net472`) that the repo-pinned .NET 8 SDK does not ship, so the bare command dies with "The build host could not be found". `scripts/format-sdk.ps1` picks the newest installed SDK that has one and leaves the SDK pin alone.
+- **Verify formatting**: same script; the pre-commit hook runs it for staged `.cs` files.
 - **Run all tests**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` (build with MSBuild first)
 - **Run a single test**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~ClassName.MethodName"`
 - **Setup git hooks**: `powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1`
