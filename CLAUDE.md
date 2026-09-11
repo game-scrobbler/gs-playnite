@@ -10,8 +10,8 @@ Game Scrobbler is a Playnite plugin that tracks game sessions and provides stati
 
 - **Build solution**: `MSBuild.exe GsPlugin.sln -p:Configuration=Release -restore`
 - **Restore NuGet packages**: `nuget restore GsPlugin.sln`
-- **Format code**: `dotnet format GsPlugin.sln`
-- **Verify formatting**: `dotnet format GsPlugin.sln --verify-no-changes`
+- **Format code**: `powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1`. Do not call `dotnet format GsPlugin.sln` directly: the solution's old-style WPF `.csproj` can only be loaded through a .NET Framework build host (`BuildHost-net472`) that the repo-pinned .NET 8 SDK does not ship, so the bare command dies with "The build host could not be found". `scripts/format-sdk.ps1` picks the newest installed SDK that has one and leaves the SDK pin alone.
+- **Verify formatting**: same script; the pre-commit hook runs it for staged `.cs` files.
 - **Run all tests**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal` (build with MSBuild first)
 - **Run a single test**: `dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~ClassName.MethodName"`
 - **Setup git hooks**: `powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1`
@@ -221,6 +221,7 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks
 ### Playnite Plugin Hosting Constraints
 - Playnite loads plugins in its own AppDomain and **ignores plugin-level `app.config` binding redirects**. Assembly version mismatches must be resolved at runtime via the `AppDomain.CurrentDomain.AssemblyResolve` handler in `GsPlugin`'s static constructor.
 - When upgrading a NuGet package version, the plugin's dependencies (e.g., Sentry) may still reference the old assembly version. The `AssemblyResolve` handler in `GsPlugin.cs` resolves only DLLs shipped in the plugin output directory and refuses Playnite assemblies; never broaden it into a process-wide arbitrary loader because all extensions share the AppDomain.
+- `GsAssemblyIdentity.CanServe` decides that handler's version policy: same major is served, across a major only the identities in `KnownCrossMajorReferences` (what our own package set declares, e.g. Sentry 6.1.0 asking for System.Text.Json 8.0.0.5 against the 9.0.0.9 we ship). Refusing those is what made 2.8.3 unloadable. `ResolveEventArgs.RequestingAssembly` cannot be used to tell our own dependency apart from a foreign one: it is null for every bind that matters, verified against the real DLLs. `AssemblyResolveDriftTests` reads the actual build output, so a package upgrade that introduces new skew fails the tests instead of shipping an extension that cannot load; when it fails, add the identity it names or realign the package versions.
 - After building, the extension folder in `%APPDATA%\Playnite\Extensions\<plugin-guid>\` must contain the updated DLLs. Stale DLLs from a previous version will cause `FileNotFoundException` at runtime.
 - `GsSentry` methods (`CaptureException`, `CaptureMessage`, `AddBreadcrumb`) use `GsDataManager.DataOrNull` instead of `GsDataManager.Data` to avoid a circular crash when called during `GsDataManager.Initialize()` before `_data` is assigned.
 - All `SentrySdk` calls are wrapped in try/catch so the plugin continues working if the Sentry SDK is unavailable (e.g., expired account). `GsApiClient` similarly falls back to a plain `HttpClient` if `SentryHttpMessageHandler` throws.

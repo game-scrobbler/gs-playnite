@@ -738,6 +738,8 @@ namespace GsPlugin.Api {
                         return null;
                     }
 
+                    res.statusCode = (int)response.StatusCode;
+
                     // On non-2xx, mark as failed and surface the server error message
                     if (!response.IsSuccessStatusCode) {
                         res.success = false;

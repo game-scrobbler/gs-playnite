@@ -372,6 +372,15 @@ namespace GsPlugin.Api {
         public string userId { get; set; }
         public string error { get; set; }
         public string errorCode { get; set; }
+
+        /// <summary>
+        /// HTTP status the verify call came back with, filled in by <c>GsApiClient.VerifyToken</c>.
+        /// The verify endpoint answers some rejections with a status and a human message but no
+        /// <see cref="errorCode"/>, so the status is the only reliable way to tell an expected
+        /// outcome from a fault. Never sent by the server, so it stays out of serialization.
+        /// </summary>
+        [JsonIgnore]
+        public int statusCode { get; set; }
     }
 
     // ──────────────────────────────────────────────────────────

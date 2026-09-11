@@ -77,6 +77,28 @@ namespace GsPlugin.Services {
         public static event EventHandler LinkingStatusChanged;
 
         /// <summary>
+        /// Stable identity for a linking failure that is actually worth looking at. The server's
+        /// wording and the linking context stay in extras: putting either in the title split one
+        /// failure mode into a separate Sentry issue per phrasing (GS-PLAYNITE-P7), which hides
+        /// how often it really happens.
+        /// </summary>
+        internal const string LinkingFailureMessage = "Account linking failed";
+
+        internal static readonly string[] LinkingFailureFingerprint = { "gs-playnite", "account-linking-failed" };
+
+        /// <summary>
+        /// Whether a rejected verify is the server reporting the user's own account state rather
+        /// than something the plugin did wrong.
+        ///
+        /// 409 Conflict is "this Playnite installation is already linked to another account". It
+        /// is a normal thing for a person to run into, it carries no errorCode to match on, and
+        /// its message is server-side English that must not become an issue title. Expired and
+        /// invalid tokens are handled separately because they do carry an errorCode.
+        /// </summary>
+        internal static bool IsExpectedLinkingRejection(TokenVerificationRes response) =>
+            response != null && response.statusCode == 409;
+
+        /// <summary>
         /// Initializes a new instance of the GsAccountLinkingService.
         /// </summary>
         /// <param name="apiClient">The API client for communicating with the GameScrobbler service.</param>
@@ -162,9 +184,17 @@ namespace GsPlugin.Services {
                         OnLinkingStatusChanged();
 
                         GsLogger.Error($"{context} linking did not complete: token verified but the server returned a not-linked result (install_id={GsDataManager.Data.InstallID}, userId={response.userId ?? "null"}).");
+                        // Install id and context are extras, not identity: in the title they would
+                        // give every affected install its own Sentry issue.
                         GsSentry.CaptureMessage(
-                            $"{context} linking verified but returned not-linked (install_id={GsDataManager.Data.InstallID})",
-                            SentryLevel.Warning);
+                            "Linking verified but returned not-linked",
+                            SentryLevel.Warning,
+                            fingerprint: new[] { "gs-playnite", "linking-verified-not-linked" },
+                            extras: new Dictionary<string, string> {
+                                { "context", context.ToString() },
+                                { "install_id", GsDataManager.Data.InstallID },
+                                { "user_id", response.userId ?? "null" }
+                            });
 
                         string notLinkedMessage = GsLocalization.Get(
                             "LOCGsPluginStatusTokenExpired",
@@ -217,18 +247,35 @@ namespace GsPlugin.Services {
 
                     GsLogger.Error($"{context} linking failed: {serverMessage}");
 
-                    // Expired/invalid tokens are expected user behavior (slow to click,
-                    // reusing old links) — log as breadcrumb, not a Sentry issue.
-                    if (isTokenExpiry) {
+                    // Expired/invalid tokens and a 409 are the server reporting the user's own
+                    // account state (slow to click, reusing an old link, this install already
+                    // belongs to another account), not a plugin fault. They are breadcrumbs.
+                    // The 409 carries no errorCode, so its status is the only reliable signal.
+                    if (isTokenExpiry || IsExpectedLinkingRejection(response)) {
                         GsSentry.AddBreadcrumb(
-                            message: $"{context} account linking failed: token expired/invalid",
-                            category: "linking"
+                            message: $"{context} account linking rejected",
+                            category: "linking",
+                            data: new Dictionary<string, string> {
+                                { "Context", context.ToString() },
+                                { "http_status", response?.statusCode.ToString() ?? "0" },
+                                { "error_code", errorCode ?? "none" }
+                            }
                         );
                     }
                     else {
+                        // The server message is extra, not identity: interpolating it into the
+                        // title split one failure mode into a separate Sentry issue per wording,
+                        // which hides the real rate.
                         GsSentry.CaptureMessage(
-                            $"{context} account linking failed: {serverMessage}",
-                            SentryLevel.Warning
+                            LinkingFailureMessage,
+                            SentryLevel.Warning,
+                            fingerprint: LinkingFailureFingerprint,
+                            extras: new Dictionary<string, string> {
+                                { "context", context.ToString() },
+                                { "http_status", response?.statusCode.ToString() ?? "0" },
+                                { "error_code", errorCode ?? "none" },
+                                { "server_message", serverMessage }
+                            }
                         );
                     }
                     return LinkingResult.CreateError(serverMessage, context, isTokenExpiry: isTokenExpiry);
