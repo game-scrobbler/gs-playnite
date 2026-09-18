@@ -16,6 +16,13 @@ namespace GsPlugin.Tests {
             Assert.Equal(new[] { "gs-playnite", "scrobble-start-failed" }, ScrobbleStartFailure.Fingerprint);
         }
 
+        [Fact]
+        public void FinishFailure_MessageAndFingerprintStayAnonymous() {
+            Assert.Equal("Failed to finish scrobble session", ScrobbleFinishFailure.Message);
+            Assert.Equal(new[] { "gs-playnite", "scrobble-finish-failed" }, ScrobbleFinishFailure.Fingerprint);
+            Assert.DoesNotContain("Game:", ScrobbleFinishFailure.Message);
+        }
+
         [Theory]
         [InlineData(0, false, 0, null, false)]
         [InlineData(0, true, 0, null, false)]

@@ -184,13 +184,7 @@ namespace GsPlugin.Api {
                     // Reporting them as GS-PLAYNITE-PT hid the real start-failure rate.
                     _logger.Info($"Scrobble start skipped: [{envelope.code}] {envelope.message}");
                     if (onAttempt == null) {
-                        GsSentry.AddBreadcrumb(
-                            message: "Scrobble start rejected",
-                            category: "scrobble",
-                            data: new Dictionary<string, string> {
-                                { "code", envelope.code ?? "" },
-                                { "http_status", diagnostics.StatusCode.ToString() }
-                            });
+                        AddExpectedRejectionBreadcrumb("start", envelope.code, diagnostics.StatusCode);
                     }
                     return null;
 
@@ -275,8 +269,10 @@ namespace GsPlugin.Api {
 
             string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/finish";
             var diagnostics = new HttpCallDiagnostics();
+            var attempts = 0;
 
             var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                attempts++;
                 diagnostics.Reset();
                 onAttempt?.Invoke();
                 return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(
@@ -295,6 +291,9 @@ namespace GsPlugin.Api {
 
                 case ApiOutcome.Fail when ScrobbleStartFailure.IsExpectedRejection(envelope.code):
                     _logger.Info($"Scrobble finish skipped: [{envelope.code}] {envelope.message}");
+                    if (onAttempt == null) {
+                        AddExpectedRejectionBreadcrumb("finish", envelope.code, diagnostics.StatusCode);
+                    }
                     return new ScrobbleFinishRes();
 
                 case ApiOutcome.Fail:
@@ -302,7 +301,8 @@ namespace GsPlugin.Api {
                     return null;
 
                 default:
-                    GsLogger.Error("Failed to finish scrobble session");
+                    ReportNullEnvelopeFinishFailure(
+                        sendData, onAttempt != null, attempts, diagnostics);
                     return null;
             }
         }
@@ -897,6 +897,16 @@ namespace GsPlugin.Api {
             GsSentry.CaptureException(exception, contextMessage);
         }
 
+        private static void AddExpectedRejectionBreadcrumb(string action, string code, int httpStatus) {
+            GsSentry.AddBreadcrumb(
+                message: $"Scrobble {action} rejected",
+                category: "scrobble",
+                data: new Dictionary<string, string> {
+                    { "code", code ?? "" },
+                    { "http_status", httpStatus.ToString() }
+                });
+        }
+
         /// <summary>
         /// Logs a null-envelope scrobble start and, on the live path only, reports one
         /// Sentry event with a stable fingerprint. Game/user identity stays in extras
@@ -921,6 +931,29 @@ namespace GsPlugin.Api {
                 startData?.user_id,
                 extras: extras,
                 fingerprint: ScrobbleStartFailure.Fingerprint);
+        }
+
+        /// <summary>
+        /// Logs a null-envelope scrobble finish. On the live path only, an unparsed
+        /// permanent 4xx (HTML WAF, empty body, missing status) is reported with a
+        /// stable fingerprint. Flush retries and 429/5xx stay local.
+        /// </summary>
+        private static void ReportNullEnvelopeFinishFailure(
+            ScrobbleFinishReq endData, bool isFlushRetry, int attempts, HttpCallDiagnostics diagnostics) {
+            GsLogger.Error("Failed to finish scrobble session");
+            if (isFlushRetry || !IsPermanentRejection(diagnostics?.StatusCode ?? 0)) {
+                return;
+            }
+
+            CaptureSentryMessage(
+                ScrobbleFinishFailure.Message,
+                SentryLevel.Warning,
+                endData?.game_name,
+                endData?.user_id,
+                endData?.session_id,
+                extras: ScrobbleStartFailure.BuildExtras(
+                    attempts, diagnostics, outcome: null, endData?.game_name),
+                fingerprint: ScrobbleFinishFailure.Fingerprint);
         }
 
         /// <summary>
@@ -1389,5 +1422,15 @@ namespace GsPlugin.Api {
             }
             return extras;
         }
+    }
+
+    /// <summary>
+    /// Stable identity for the null-envelope scrobble-finish path. Game titles
+    /// never enter the message or fingerprint.
+    /// </summary>
+    internal static class ScrobbleFinishFailure {
+        public const string Message = "Failed to finish scrobble session";
+
+        public static readonly string[] Fingerprint = { "gs-playnite", "scrobble-finish-failed" };
     }
 }
