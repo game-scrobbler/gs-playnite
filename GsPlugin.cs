@@ -272,7 +272,7 @@ namespace GsPlugin {
         /// Called when the application is started and initialized. This is a good place for one-time initialization tasks.
         /// </summary>
         public override async void OnApplicationStarted(OnApplicationStartedEventArgs args) {
-            if (_dataUnavailable || GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
+            if (_dataUnavailable || GsDataManager.IsTrackingPaused) { base.OnApplicationStarted(args); return; }
             var sw = System.Diagnostics.Stopwatch.StartNew();
             // Detect first run before any async work: no prior sync and no token yet.
             bool isFirstRun = GsDataManager.Data.LastSyncAt == null
@@ -301,8 +301,8 @@ namespace GsPlugin {
                 // are available even when the token is freshly registered on first run.
                 _ = FetchNotificationsAfterTokenAsync(tokenTask);
 
-                // Re-check opt-out after token registration (user may have opted out during startup)
-                if (GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
+                // Re-check after token registration (opt-out or opt-back-in can land during startup)
+                if (GsDataManager.IsTrackingPaused) { return; }
 
                 // Run refresh and update check in parallel — they are independent network calls.
                 // Best-effort: failures are logged but do not block library sync.
@@ -319,8 +319,8 @@ namespace GsPlugin {
                     // startup work below.
                 }
 
-                // Re-check opt-out after async steps (user may have opted out during startup)
-                if (GsDataManager.IsOptedOut) { base.OnApplicationStarted(args); return; }
+                // Re-check after async steps (opt-out or opt-back-in can land during startup)
+                if (GsDataManager.IsTrackingPaused) { return; }
 
                 // Flush pending scrobbles fire-and-forget so library sync starts immediately.
                 // The periodic timer below catches any items not flushed by the time it fires.
@@ -336,7 +336,7 @@ namespace GsPlugin {
                         _pendingFlushTimer = new Timer(_ => {
                             if (_disposed) return;
                             var api = _apiClient;
-                            if (api == null || GsDataManager.IsOptedOut) return;
+                            if (api == null || GsDataManager.IsTrackingPaused) return;
                             try {
                                 _ = api.FlushPendingScrobblesAsync().LogFaults("Periodic pending flush failed");
                             }
@@ -348,6 +348,11 @@ namespace GsPlugin {
                 }
 
                 await tokenTask;
+                if (GsDataManager.IsTrackingPaused) {
+                    _logger.Info("Startup tracking work skipped: waiting for Playnite restart.");
+                    return;
+                }
+
                 var startupSyncResult = await SyncLibraryWithDiffAsync();
                 if (startupSyncResult == SyncLibraryResult.Cooldown) {
                     _logger.Info("Startup library sync skipped: sync cooldown is still active.");
@@ -717,7 +722,7 @@ namespace GsPlugin {
         private async Task FetchNotificationsAfterTokenAsync(Task tokenTask) {
             try {
                 await tokenTask.ConfigureAwait(false);
-                if (GsDataManager.IsOptedOut) return;
+                if (GsDataManager.IsTrackingPaused) return;
                 await _notificationService.FetchAndShowNotificationsAsync().ConfigureAwait(false);
             }
             catch (Exception ex) {
@@ -731,6 +736,9 @@ namespace GsPlugin {
         /// are skipped rather than allowed to interleave and corrupt snapshots.
         /// </summary>
         private async Task<SyncLibraryResult> SyncLibraryWithDiffAsync() {
+            if (GsDataManager.IsTrackingPaused) {
+                return SyncLibraryResult.Skipped;
+            }
             if (Interlocked.CompareExchange(ref _librarySyncInFlight, 1, 0) != 0) {
                 _logger.Info("Library sync already in flight — skipping.");
                 return SyncLibraryResult.Skipped;
@@ -751,6 +759,9 @@ namespace GsPlugin {
         /// Guarded against concurrent execution — overlapping calls are skipped.
         /// </summary>
         private async Task SyncAchievementsWithDiffAsync() {
+            if (GsDataManager.IsTrackingPaused) {
+                return;
+            }
             if (Interlocked.CompareExchange(ref _achievementSyncInFlight, 1, 0) != 0) {
                 _logger.Info("Achievement sync already in flight — skipping.");
                 return;

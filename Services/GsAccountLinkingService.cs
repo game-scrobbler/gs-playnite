@@ -116,9 +116,14 @@ namespace GsPlugin.Services {
         /// <param name="context">The context in which linking is being performed</param>
         /// <returns>A LinkingResult indicating the outcome</returns>
         public async Task<LinkingResult> LinkAccountAsync(string token, LinkingContext context) {
-            // Block linking when user has opted out
-            if (GsDataManager.IsOptedOut) {
-                return LinkingResult.CreateError("Plugin is disabled. Opt back in to link your account.", context);
+            // Block linking while opted out or waiting for a Playnite restart after opt-in.
+            if (GsDataManager.IsTrackingPaused) {
+                var message = GsDataManager.IsOptedOut
+                    ? "Plugin is disabled. Opt back in to link your account."
+                    : GsLocalization.Get(
+                        "LOCGsPluginOptedOutRestartTitle",
+                        "Restart Playnite to continue");
+                return LinkingResult.CreateError(message, context);
             }
 
             // Validate token
