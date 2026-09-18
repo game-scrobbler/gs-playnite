@@ -318,6 +318,12 @@ namespace GsPlugin.Models {
         public static bool PendingRestartAfterOptIn { get; private set; }
 
         /// <summary>
+        /// True when tracking, sync, and telemetry must stay off: the user is opted out,
+        /// or they opted back in this process and Playnite has not restarted yet.
+        /// </summary>
+        public static bool IsTrackingPaused => IsOptedOut || PendingRestartAfterOptIn;
+
+        /// <summary>
         /// Manually fires DiagnosticsStateChanged for callers that modify
         /// diagnostics-visible state via MutateAndSave (which does not auto-fire).
         /// </summary>
@@ -769,13 +775,21 @@ namespace GsPlugin.Models {
         /// The user will need to re-link their account and sync their library again.
         /// Tracking and the hub stay paused until Playnite is restarted.
         /// </summary>
-        public static void PerformOptIn() {
+        /// <returns>
+        /// False if the durable save failed. The in-memory opted-out flag is restored
+        /// and <see cref="PendingRestartAfterOptIn"/> is left unset.
+        /// </returns>
+        public static bool PerformOptIn() {
             lock (_lock) {
                 _data.OptedOut = false;
-                SaveInternal(durable: true);
+                if (!SaveInternal(durable: true)) {
+                    _data.OptedOut = true;
+                    return false;
+                }
             }
             PendingRestartAfterOptIn = true;
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
+            return true;
         }
 
         /// <summary>

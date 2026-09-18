@@ -216,16 +216,16 @@ namespace GsPlugin {
 
         /// <summary>
         /// Shared wrapper for the Playnite event-handler overrides. Skips <paramref name="body"/>
-        /// when the user has opted out, turns any unhandled exception into a log entry plus a
+        /// when tracking is paused, turns any unhandled exception into a log entry plus a
         /// Sentry report so nothing escapes an "async void" handler and crashes Playnite, and
         /// always invokes <paramref name="callBase"/> afterwards, on every path.
         /// </summary>
         /// <param name="name">Handler name used in the log and Sentry messages.</param>
         /// <param name="callBase">Invokes base.OnXxx(args). Must run on every path.</param>
-        /// <param name="body">Handler work, run only when the user has not opted out.</param>
+        /// <param name="body">Handler work, run only when tracking is not paused.</param>
         private static async Task GuardedAsync(string name, Action callBase, Func<Task> body) {
             try {
-                if (GsDataManager.IsOptedOut) {
+                if (GsDataManager.IsTrackingPaused) {
                     return;
                 }
                 try {
@@ -509,7 +509,7 @@ namespace GsPlugin {
                 MenuSection = "@Game Scrobbler",
                 Action = _ => OpenDashboardWindow()
             };
-            if (GsDataManager.IsOptedOut || GsDataManager.PendingRestartAfterOptIn) {
+            if (GsDataManager.IsTrackingPaused) {
                 yield return new MainMenuItem {
                     Description = GsLocalization.Get("LOCGsPluginMenuOpenSettings", "Open Settings"),
                     MenuSection = "@Game Scrobbler",

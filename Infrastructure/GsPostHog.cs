@@ -44,7 +44,7 @@ namespace GsPlugin.Infrastructure {
                     return;
                 }
 
-                if (GsDataManager.Data.Flags.Contains("no-posthog") || GsDataManager.IsOptedOut) {
+                if (GsDataManager.Data.Flags.Contains("no-posthog") || GsDataManager.IsTrackingPaused) {
                     _logger.Info("PostHog disabled by user preference or opt-out");
                     return;
                 }
@@ -76,7 +76,7 @@ namespace GsPlugin.Infrastructure {
         public static void Capture(string eventName, Dictionary<string, object> properties = null) {
             var data = GsDataManager.DataOrNull;
             if (data == null) return;
-            if (data.Flags.Contains("no-posthog") || data.OptedOut) return;
+            if (data.Flags.Contains("no-posthog") || GsDataManager.IsTrackingPaused) return;
             if (_client == null) return;
 
             try {

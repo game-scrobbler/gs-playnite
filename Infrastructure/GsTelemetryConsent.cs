@@ -20,7 +20,7 @@ namespace GsPlugin.Infrastructure {
 
         internal static bool HasConsent(string disabledFlag) {
             var data = GsDataManager.DataOrNull;
-            return data != null && !data.OptedOut && data.Flags != null
+            return data != null && !GsDataManager.IsTrackingPaused && data.Flags != null
                 && !data.Flags.Contains(disabledFlag);
         }
 
