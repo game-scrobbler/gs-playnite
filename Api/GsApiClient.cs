@@ -178,8 +178,14 @@ namespace GsPlugin.Api {
                     _logger.Info("Scrobble start accepted without a session ID");
                     return new ScrobbleStartRes();
 
-                case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
-                    _logger.Info($"Scrobble start skipped: {envelope.message}");
+                case ApiOutcome.Fail when ScrobbleStartFailure.IsExpectedRejection(envelope.code):
+                    // Consent, auth, allow-list and throttle answers are the user's own
+                    // state (or an explicit retry invitation), not a plugin defect.
+                    // Reporting them as GS-PLAYNITE-PT hid the real start-failure rate.
+                    _logger.Info($"Scrobble start skipped: [{envelope.code}] {envelope.message}");
+                    if (onAttempt == null) {
+                        AddExpectedRejectionBreadcrumb("start", envelope.code, diagnostics.StatusCode);
+                    }
                     return null;
 
                 case ApiOutcome.Fail:
@@ -262,19 +268,32 @@ namespace GsPlugin.Api {
             }
 
             string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/finish";
+            var diagnostics = new HttpCallDiagnostics();
+            var attempts = 0;
 
             var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                attempts++;
+                diagnostics.Reset();
                 onAttempt?.Invoke();
-                return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(url, sendData, true);
-            }, maxRetries: 2, isFailure: r => r == null);
+                return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(
+                    url, sendData,
+                    onStatus: status => diagnostics.StatusCode = status,
+                    parseErrorBody: true,
+                    diagnostics: diagnostics,
+                    captureExceptions: false);
+            }, maxRetries: 2, isFailure: r => r == null,
+                isPermanent: () => IsPermanentRejection(diagnostics.StatusCode));
 
             switch (envelope?.Outcome) {
                 case ApiOutcome.Success:
                     _logger.Info($"Scrobble finish complete ({envelope.data?.duration_seconds}s)");
                     return new ScrobbleFinishRes();
 
-                case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
-                    _logger.Info($"Scrobble finish skipped: {envelope.message}");
+                case ApiOutcome.Fail when ScrobbleStartFailure.IsExpectedRejection(envelope.code):
+                    _logger.Info($"Scrobble finish skipped: [{envelope.code}] {envelope.message}");
+                    if (onAttempt == null) {
+                        AddExpectedRejectionBreadcrumb("finish", envelope.code, diagnostics.StatusCode);
+                    }
                     return new ScrobbleFinishRes();
 
                 case ApiOutcome.Fail:
@@ -282,7 +301,8 @@ namespace GsPlugin.Api {
                     return null;
 
                 default:
-                    GsLogger.Error("Failed to finish scrobble session");
+                    ReportNullEnvelopeFinishFailure(
+                        sendData, onAttempt != null, attempts, diagnostics);
                     return null;
             }
         }
@@ -877,6 +897,16 @@ namespace GsPlugin.Api {
             GsSentry.CaptureException(exception, contextMessage);
         }
 
+        private static void AddExpectedRejectionBreadcrumb(string action, string code, int httpStatus) {
+            GsSentry.AddBreadcrumb(
+                message: $"Scrobble {action} rejected",
+                category: "scrobble",
+                data: new Dictionary<string, string> {
+                    { "code", code ?? "" },
+                    { "http_status", httpStatus.ToString() }
+                });
+        }
+
         /// <summary>
         /// Logs a null-envelope scrobble start and, on the live path only, reports one
         /// Sentry event with a stable fingerprint. Game/user identity stays in extras
@@ -890,7 +920,7 @@ namespace GsPlugin.Api {
             GsLogger.Error(
                 $"Failed to start scrobble session (reason={reason ?? "unknown"}, http={diagnostics?.StatusCode ?? 0}, attempts={attempts})");
 
-            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry)) {
+            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry, diagnostics?.StatusCode ?? 0)) {
                 return;
             }
 
@@ -901,6 +931,29 @@ namespace GsPlugin.Api {
                 startData?.user_id,
                 extras: extras,
                 fingerprint: ScrobbleStartFailure.Fingerprint);
+        }
+
+        /// <summary>
+        /// Logs a null-envelope scrobble finish. On the live path only, an unparsed
+        /// permanent 4xx (HTML WAF, empty body, missing status) is reported with a
+        /// stable fingerprint. Flush retries and 429/5xx stay local.
+        /// </summary>
+        private static void ReportNullEnvelopeFinishFailure(
+            ScrobbleFinishReq endData, bool isFlushRetry, int attempts, HttpCallDiagnostics diagnostics) {
+            GsLogger.Error("Failed to finish scrobble session");
+            if (isFlushRetry || !IsPermanentRejection(diagnostics?.StatusCode ?? 0)) {
+                return;
+            }
+
+            CaptureSentryMessage(
+                ScrobbleFinishFailure.Message,
+                SentryLevel.Warning,
+                endData?.game_name,
+                endData?.user_id,
+                endData?.session_id,
+                extras: ScrobbleStartFailure.BuildExtras(
+                    attempts, diagnostics, outcome: null, endData?.game_name),
+                fingerprint: ScrobbleFinishFailure.Fingerprint);
         }
 
         /// <summary>
@@ -1310,11 +1363,29 @@ namespace GsPlugin.Api {
         public static readonly string[] Fingerprint = { "gs-playnite", "scrobble-start-failed" };
 
         /// <summary>
-        /// Report once on the live start path after the HTTP helper actually ran.
-        /// Circuit-open skips and pending-queue flush retries only log locally.
+        /// Consent, auth, allow-list and throttle answers the server will not change
+        /// on retry. They belong in a breadcrumb, not a Sentry issue (same rule as
+        /// <c>GsAccountLinkingService.IsExpectedLinkingRejection</c>).
         /// </summary>
-        public static bool ShouldCapture(int attempts, bool isFlushRetry) =>
-            attempts > 0 && !isFlushRetry;
+        public static bool IsExpectedRejection(string code) {
+            switch (code) {
+                case "UNSUPPORTED_PLUGIN":
+                case "OPTED_OUT":
+                case "TOKEN_REQUIRED":
+                case "TOKEN_INVALID":
+                case "RATE_LIMITED":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Report once on the live start path after the HTTP helper actually ran.
+        /// Circuit-open skips, pending-queue flush retries, and explicit 429s only log locally.
+        /// </summary>
+        public static bool ShouldCapture(int attempts, bool isFlushRetry, int httpStatus = 0, string code = null) =>
+            attempts > 0 && !isFlushRetry && httpStatus != 429 && !IsExpectedRejection(code);
 
         public static Dictionary<string, string> BuildExtras(
             int attempts, HttpCallDiagnostics diagnostics, string outcome, string gameName = null) {
@@ -1351,5 +1422,15 @@ namespace GsPlugin.Api {
             }
             return extras;
         }
+    }
+
+    /// <summary>
+    /// Stable identity for the null-envelope scrobble-finish path. Game titles
+    /// never enter the message or fingerprint.
+    /// </summary>
+    internal static class ScrobbleFinishFailure {
+        public const string Message = "Failed to finish scrobble session";
+
+        public static readonly string[] Fingerprint = { "gs-playnite", "scrobble-finish-failed" };
     }
 }

@@ -31,7 +31,12 @@ namespace GsPlugin.Api {
         Error,
     }
 
-    public class ApiResponse<T> {
+    /// <summary>
+    /// v3 JSend envelope. Implements <see cref="IStatusCarryingResponse"/> so a 4xx
+    /// body with <c>status=fail</c> (OPTED_OUT, TOKEN_INVALID, …) is returned to the
+    /// caller instead of collapsing to a null envelope and the GS-PLAYNITE-PT warning.
+    /// </summary>
+    public class ApiResponse<T> : IStatusCarryingResponse {
         public string status { get; set; }
         public T data { get; set; }
         public string code { get; set; }

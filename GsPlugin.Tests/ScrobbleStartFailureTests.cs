@@ -16,16 +16,39 @@ namespace GsPlugin.Tests {
             Assert.Equal(new[] { "gs-playnite", "scrobble-start-failed" }, ScrobbleStartFailure.Fingerprint);
         }
 
+        [Fact]
+        public void FinishFailure_MessageAndFingerprintStayAnonymous() {
+            Assert.Equal("Failed to finish scrobble session", ScrobbleFinishFailure.Message);
+            Assert.Equal(new[] { "gs-playnite", "scrobble-finish-failed" }, ScrobbleFinishFailure.Fingerprint);
+            Assert.DoesNotContain("Game:", ScrobbleFinishFailure.Message);
+        }
+
         [Theory]
-        [InlineData(0, false, false)]
-        [InlineData(0, true, false)]
-        [InlineData(1, true, false)]
-        [InlineData(3, true, false)]
-        [InlineData(1, false, true)]
-        [InlineData(3, false, true)]
+        [InlineData(0, false, 0, null, false)]
+        [InlineData(0, true, 0, null, false)]
+        [InlineData(1, true, 0, null, false)]
+        [InlineData(3, true, 0, null, false)]
+        [InlineData(1, false, 0, null, true)]
+        [InlineData(3, false, 0, null, true)]
+        [InlineData(1, false, 429, null, false)]
+        [InlineData(1, false, 403, "OPTED_OUT", false)]
+        [InlineData(1, false, 403, null, true)]
         public void ShouldCapture_OnlyLivePathAfterAnAttempt(
-            int attempts, bool isFlushRetry, bool expected) {
-            Assert.Equal(expected, ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry));
+            int attempts, bool isFlushRetry, int httpStatus, string code, bool expected) {
+            Assert.Equal(expected, ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry, httpStatus, code));
+        }
+
+        [Theory]
+        [InlineData("UNSUPPORTED_PLUGIN", true)]
+        [InlineData("OPTED_OUT", true)]
+        [InlineData("TOKEN_REQUIRED", true)]
+        [InlineData("TOKEN_INVALID", true)]
+        [InlineData("RATE_LIMITED", true)]
+        [InlineData("INTERNAL_ERROR", false)]
+        [InlineData(null, false)]
+        [InlineData("", false)]
+        public void IsExpectedRejection_MatchesConsentAuthAllowListAndThrottle(string code, bool expected) {
+            Assert.Equal(expected, ScrobbleStartFailure.IsExpectedRejection(code));
         }
 
         [Fact]
