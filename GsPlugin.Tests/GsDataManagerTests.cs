@@ -164,6 +164,20 @@ namespace GsPlugin.Tests {
                 Assert.False(GsDataManager.IsOptedOut);
             }
         }
+
+        [Fact]
+        public void PerformOptIn_SetsPendingRestartUntilInitialize() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                GsDataManager.PerformOptOut();
+                GsDataManager.PerformOptIn();
+                Assert.True(GsDataManager.PendingRestartAfterOptIn);
+
+                GsDataManager.Initialize(temp.Path, null);
+                Assert.False(GsDataManager.PendingRestartAfterOptIn);
+                Assert.False(GsDataManager.IsOptedOut);
+            }
+        }
+
         [Fact]
         public void Initialize_FreshInstall_BumpsIdentityGeneration() {
             using (var temp = TempPluginDir.CreateWithDataManager()) {

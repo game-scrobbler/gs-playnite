@@ -175,6 +175,17 @@
     <sys:String x:Key="LOCGsPluginDeleteAuthFailed">无法验证此安装。请重新关联您的账户后再尝试删除。</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">发生错误。请稍后重试。</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">插件已重新启用。请重启 Playnite 以恢复同步。</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRequesting">正在重新启用...</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRateLimited">尝试次数过多。请稍后再试。</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInFailed">重新启用失败。请重启 Playnite 后再试。</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInError">发生错误。请重启 Playnite 后再试。</sys:String>
+
+    <!-- ── Opted-out dashboard ── -->
+    <sys:String x:Key="LOCGsPluginOptedOutTitle">已停止收集数据</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutBody">你已退出 Game Scrobbler。你的 Playnite 游戏库、会话和成就已从我们的服务器删除，此仪表板不再加载任何统计信息。</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutHint">当前不会同步任何数据。你可以随时重新启用。</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartTitle">请重启 Playnite 以继续</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartBody">Game Scrobbler 已重新启用。请关闭并重新打开 Playnite，以恢复仪表板并开始同步。</sys:String>
 
     <!-- ── URI Handler ── -->
     <sys:String x:Key="LOCGsPluginInvalidLinkingToken">收到无效的关联令牌。</sys:String>
@@ -190,6 +201,7 @@
 
     <!-- ── Menu Items ── -->
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">立即同步库</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenDashboard">打开仪表板</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">打开设置</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">此请求期间安装信息已更改或插件已停用。请重试。</sys:String>

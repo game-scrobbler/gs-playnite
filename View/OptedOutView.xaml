@@ -1,0 +1,142 @@
+<UserControl x:Class="GsPlugin.View.OptedOutView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="AccentBrush" Color="#5B9CF6"/>
+        <SolidColorBrush x:Key="SuccessBrush" Color="#4CAF50"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#E53935"/>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#7DB3F8"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{DynamicResource NormalBorderBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextBrushDarker}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource GridItemBackgroundBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Background="{DynamicResource ControlBackgroundBrush}">
+        <Grid MinHeight="280">
+            <Border MaxWidth="440"
+                    Margin="24"
+                    Padding="22"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource GridItemBackgroundBrush}"
+                    BorderBrush="{DynamicResource NormalBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel>
+                    <TextBlock x:Name="EyebrowText"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}"
+                               Text="Game Scrobbler"/>
+
+                    <TextBlock x:Name="TitleText"
+                               Margin="0,8,0,0"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextBrush}"
+                               Text="{DynamicResource LOCGsPluginOptedOutTitle}"/>
+
+                    <TextBlock x:Name="BodyText"
+                               Margin="0,10,0,0"
+                               FontSize="13"
+                               LineHeight="20"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextBrushDarker}"
+                               Text="{DynamicResource LOCGsPluginOptedOutBody}"/>
+
+                    <TextBlock x:Name="HintText"
+                               Margin="0,10,0,0"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextBrushDarker}"
+                               Text="{DynamicResource LOCGsPluginOptedOutHint}"/>
+
+                    <WrapPanel x:Name="ActionsPanel" Margin="0,18,0,0">
+                        <Button x:Name="OptBackInButton"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Margin="0,0,8,8"
+                                Content="{DynamicResource LOCGsPluginOptBackInButton}"
+                                ToolTip="{DynamicResource LOCGsPluginOptBackInTooltip}"
+                                Click="OptBackIn_Click"/>
+                        <Button x:Name="OpenSettingsButton"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="0,0,0,8"
+                                Content="{DynamicResource LOCGsPluginMenuOpenSettings}"
+                                Click="OpenSettings_Click"/>
+                    </WrapPanel>
+
+                    <TextBlock x:Name="StatusText"
+                               Margin="0,4,0,0"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

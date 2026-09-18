@@ -456,13 +456,13 @@ namespace GsPlugin {
         /// Fullscreen has no sidebar, so theme developers place the dashboard control themselves.
         /// </summary>
         /// <param name="args">Requested element name and the current application mode.</param>
-        /// <returns>The requested control, or null when unknown/opted out.</returns>
+        /// <returns>The requested control, or null when unknown or data is unreadable.</returns>
         public override Control GetGameViewControl(GetGameViewControlArgs args) {
-            if (_dataUnavailable || GsDataManager.IsOptedOut) {
+            if (_dataUnavailable) {
                 return null;
             }
             if (args.Name == "Dashboard") {
-                return new MySidebarView(_apiClient, WebViewUserDataFolder);
+                return CreateDashboardSurface();
             }
             return null;
         }
@@ -473,7 +473,7 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>A collection of SidebarItem objects to be displayed in the sidebar.</returns>
         public override IEnumerable<SidebarItem> GetSidebarItems() {
-            if (_dataUnavailable || GsDataManager.IsOptedOut) yield break;
+            if (_dataUnavailable) yield break;
             // Load the icon from the plugin directory, with a fallback if the file is missing or corrupt
             object iconImage = null;
             try {
@@ -492,9 +492,7 @@ namespace GsPlugin {
                 Type = (SiderbarItemType)1,
                 Title = "Game Scrobbler",
                 Icon = iconImage,
-                Opened = () => {
-                    return new MySidebarView(_apiClient, WebViewUserDataFolder);
-                },
+                Opened = CreateDashboardSurface,
             };
         }
 
@@ -504,35 +502,21 @@ namespace GsPlugin {
         /// </summary>
         /// <returns>A collection of MainMenuItem objects to be displayed under Extensions → Game Scrobbler.</returns>
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args) {
-            // Nothing here works without data, and the settings entry the opted-out branch
-            // offers would open a view GetSettings() now declines to supply.
+            // Nothing here works without readable plugin data.
             if (_dataUnavailable) yield break;
-            if (GsDataManager.IsOptedOut) {
+            yield return new MainMenuItem {
+                Description = GsLocalization.Get("LOCGsPluginMenuOpenDashboard", "Open Dashboard"),
+                MenuSection = "@Game Scrobbler",
+                Action = _ => OpenDashboardWindow()
+            };
+            if (GsDataManager.IsOptedOut || GsDataManager.PendingRestartAfterOptIn) {
                 yield return new MainMenuItem {
-                    Description = "Open Settings",
+                    Description = GsLocalization.Get("LOCGsPluginMenuOpenSettings", "Open Settings"),
                     MenuSection = "@Game Scrobbler",
                     Action = _ => PlayniteApi.MainView.OpenPluginSettings(Id)
                 };
                 yield break;
             }
-            yield return new MainMenuItem {
-                Description = "Open Dashboard",
-                MenuSection = "@Game Scrobbler",
-                Action = _ => {
-                    var window = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions {
-                        ShowMinimizeButton = true,
-                        ShowMaximizeButton = true,
-                        ShowCloseButton = true
-                    });
-                    window.Title = "Game Scrobbler Dashboard";
-                    window.Width = 1200;
-                    window.Height = 800;
-                    window.Content = new MySidebarView(_apiClient, WebViewUserDataFolder);
-                    window.Owner = PlayniteApi.Dialogs.GetCurrentAppWindow();
-                    window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
-                    window.ShowDialog();
-                }
-            };
 
             yield return new MainMenuItem {
                 Description = GsLocalization.Get("LOCGsPluginMenuSyncLibrary", "Sync Library Now"),
@@ -581,6 +565,28 @@ namespace GsPlugin {
                 MenuSection = "@Game Scrobbler",
                 Action = _ => PlayniteApi.MainView.OpenPluginSettings(Id)
             };
+        }
+
+        private Control CreateDashboardSurface() {
+            return GsDashboardSurface.Create(
+                _apiClient,
+                WebViewUserDataFolder,
+                () => PlayniteApi.MainView.OpenPluginSettings(Id));
+        }
+
+        private void OpenDashboardWindow() {
+            var window = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions {
+                ShowMinimizeButton = true,
+                ShowMaximizeButton = true,
+                ShowCloseButton = true
+            });
+            window.Title = "Game Scrobbler Dashboard";
+            window.Width = 1200;
+            window.Height = 800;
+            window.Content = CreateDashboardSurface();
+            window.Owner = PlayniteApi.Dialogs.GetCurrentAppWindow();
+            window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
+            window.ShowDialog();
         }
 
         /// <summary>

@@ -445,8 +445,15 @@ namespace GsPlugin.Tests {
         public Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req) =>
             Task.FromResult(new DeleteDataRes { success = true, message = "mock" });
 
-        public Task<OptInRes> RequestOptIn(OptInReq req) =>
-            Task.FromResult(new OptInRes { success = true, message = "mock" });
+        public OptInRes OptInResponse { get; set; } = new OptInRes { success = true, message = "mock" };
+        public Exception OptInException { get; set; }
+
+        public Task<OptInRes> RequestOptIn(OptInReq req) {
+            if (OptInException != null) {
+                throw OptInException;
+            }
+            return Task.FromResult(OptInResponse);
+        }
 
         public Task<RegisterInstallTokenRes> RegisterInstallToken(string installId) =>
             Task.FromResult(new RegisterInstallTokenRes { success = true, token = "mock-token" });

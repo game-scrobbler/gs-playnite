@@ -41,7 +41,8 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 │   ├── GsAccountLinkingService.cs   — Account linking operations
 │   ├── GsNotificationService.cs      — Server notification fetch and display
 │   ├── GsUriHandler.cs              — Deep link processing
-│   └── GsUpdateChecker.cs           — Plugin update checking
+│   ├── GsUpdateChecker.cs           — Plugin update checking
+│   └── GsOptBackIn.cs               — Shared opt-back-in helper (settings + dashboard)
 │
 ├── Models/              — namespace: GsPlugin.Models
 │   ├── GsData.cs            — Persistent data (GsDataManager, GsTime, PendingScrobble)
@@ -63,6 +64,8 @@ GsPlugin.cs              — Entry point (namespace: GsPlugin)
 ├── View/                — namespace: GsPlugin.View
 │   ├── GsPluginSettingsView.xaml/.cs — Settings UI
 │   ├── GsConverters.cs               — StringToVisibilityConverter for binding-driven visibility
+│   ├── GsDashboardSurface.cs         — Picks WebView2 hub vs native opted-out panel
+│   ├── OptedOutView.xaml/.cs         — Native opted-out dashboard (no WebView2)
 │   └── MySidebarView.xaml/.cs        — Sidebar with WebView2
 │
 ├── scripts/             — PowerShell build/dev scripts
@@ -147,7 +150,8 @@ GsPlugin (entry point, IDisposable)
 - Keep DTOs source-aware: send the raw `plugin_id` plus `source_name = g.Source?.Name`; the backend canonicalizes recognized fork GUIDs to official plugin IDs before writing rows.
 
 ### Sidebar Dashboard
-- `MySidebarView(IGsApiClient apiClient, string userDataFolder = null)`. Plugin version and flags are sent server-side via the dashboard token POST body. `userDataFolder` is a private WebView2 profile inside the plugin's data folder; the default profile is derived from the host process and shared with every other extension hosting a WebView2, which would expose the dashboard's authenticated cookies and the `access_token` in its URL history. If that profile cannot be created the view fails closed and shows an error instead of silently using the shared one.
+- `GsDashboardSurface.Create(...)` is the single factory for sidebar, theme embed, and the Extensions window. Opted-out installs get `OptedOutView` (native WPF, no WebView2, no network). Active installs get `MySidebarView`.
+- `MySidebarView(IGsApiClient apiClient, string userDataFolder = null, Action openSettings = null)`. Plugin version and flags are sent server-side via the dashboard token POST body. `userDataFolder` is a private WebView2 profile inside the plugin's data folder; the default profile is derived from the host process and shared with every other extension hosting a WebView2, which would expose the dashboard's authenticated cookies and the `access_token` in its URL history. If that profile cannot be created the view fails closed and shows an error instead of silently using the shared one. If the user opts out while the WebView is already open, the hub is torn down and replaced with `OptedOutView`.
 - Dashboard URL passes only `theme` as a query param (cosmetic, needed for instant rendering); all other context is tamper-proof via the token.
 - Auto-refreshes the dashboard token when the sidebar becomes visible after 8+ minutes (tokens have a 10-minute TTL).
 - Handles `gs:refresh-token` postMessage from the frontend for manual retry when the session expires.
@@ -155,8 +159,8 @@ GsPlugin (entry point, IDisposable)
 ### Theme Integration (Desktop & Fullscreen)
 - The dashboard is exposed as a theme-embeddable custom element so it works in **Fullscreen mode**, which has no sidebar. The sidebar (`GetSidebarItems`) and the Extensions menu (`GetMainMenuItems`) are Desktop-only surfaces.
 - Registered in the `GsPlugin` constructor via `AddCustomElementSupport(SourceName = "GameScrobbler", ElementList = ["Dashboard"])`. Theme developers embed it with `<ContentControl x:Name="GameScrobbler_Dashboard" />` in either a Desktop or Fullscreen theme.
-- `GsPlugin.GetGameViewControl(GetGameViewControlArgs)` returns a fresh `MySidebarView(_apiClient)` when `args.Name == "Dashboard"`; returns `null` for unknown names or when opted out. `args.Mode` distinguishes `Desktop`/`Fullscreen` if mode-specific controls are ever needed. The same WebView2 dashboard is reused for all surfaces.
-- The returned `MySidebarView` self-disposes on `Unloaded`, so Playnite creating/destroying the control on theme reloads or view changes is safe.
+- `GsPlugin.GetGameViewControl(GetGameViewControlArgs)` returns `GsDashboardSurface.Create(...)` when `args.Name == "Dashboard"`; returns `null` for unknown names or unreadable plugin data. Opted-out installs still get the native opted-out panel so a theme slot is never a blank hole. `args.Mode` distinguishes `Desktop`/`Fullscreen` if mode-specific controls are ever needed.
+- The returned control self-disposes on `Unloaded`, so Playnite creating/destroying it on theme reloads or view changes is safe.
 
 ### Achievement Provider Architecture
 Achievement data comes from two optional addons via an aggregator pattern:
@@ -175,7 +179,7 @@ Achievement data comes from two optional addons via an aggregator pattern:
 - All user-facing strings are localized via XAML resource dictionaries in `Localization/` and accessed from C# via `GsLocalization.Get()`/`Format()` in `Infrastructure/GsLocalization.cs`.
 - Playnite auto-discovers locale files by naming convention (`Localization/{locale}.xaml`). The `en_US.xaml` is the fallback; locale-specific files override it.
 - Supported locales: `en_US` (English, default), `ru_RU` (Russian), `pt_BR` (Portuguese), `de_DE` (German), `fr_FR` (French), `zh_CN` (Chinese Simplified), `hi_IN` (Hindi).
-- All locale files must have the same set of keys (currently 126). When adding a new key, add it to **all 7 files**. `LocalizationKeyParityTests` enforces this: it fails with the missing/extra key names per locale, and also rejects duplicate keys within a file.
+- All locale files must have the same set of keys. When adding a new key, add it to **all 7 files**. `LocalizationKeyParityTests` enforces this: it fails with the missing/extra key names per locale, and also rejects duplicate keys within a file.
 - `GsLocalization.Get(key, fallback)` looks up from `Application.Current.Resources`; returns the fallback when no WPF app is running (e.g., in tests). `GsLocalization.Format(key, fallback, args)` wraps `string.Format()` on the resolved template.
 - For format strings with English pluralization (e.g., elapsed time), the code-behind fallback uses inline plural logic so tests see `"5 minutes ago"` while the XAML template is used at runtime for non-English locales (e.g., `"{0} мин. назад"`).
 - Settings view uses localized strings from `Localization/en_US.xaml` resource dictionary, organized into card-based sections.
@@ -184,7 +188,7 @@ Achievement data comes from two optional addons via an aggregator pattern:
 
 ### Test Project
 - **GsPlugin.Tests/** — xUnit test project (SDK-style .csproj, net462)
-- Test classes: `AccountLinkingConcurrencyTests`, `AccountLinkingResponseTests`, `AchievementItemTests`, `CultureInvarianceTests`, `GsAchievementAggregatorTests`, `GsAllowedPluginsTests`, `GsApiClientHttpTests`, `GsApiClientValidationTests`, `GsAssemblyIdentityTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataRecoveryTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsPendingScrobbleStateTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsScrobblingServiceReliabilityTests`, `GsSelfContainedFinishTests`, `GsSyncHashIndexTests`, `GsTelemetryTests`, `GsTimeTests`, `GsV4ChunkedSyncClientTests`, `HashContractTests`, `LinkingResultTests`, `LocalizationKeyParityTests`, `PlayniteAchievementsSqliteTests`, `ScrobbleStartFailureTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`. Class names, not file names: `AchievementProviderTests.cs` holds `AchievementItemTests` and `GsAchievementAggregatorTests`, and `GsSyncHashIndexTests.cs` holds both `GsSyncHashIndexTests` (migration, fingerprint, clearing) and `GsV4ChunkedSyncClientTests` (the v4 begin/chunk/commit/abort driver and its failure rendering).
+- Test classes: `AccountLinkingConcurrencyTests`, `AccountLinkingResponseTests`, `AchievementItemTests`, `CultureInvarianceTests`, `GsAchievementAggregatorTests`, `GsAllowedPluginsTests`, `GsApiClientHttpTests`, `GsApiClientValidationTests`, `GsAssemblyIdentityTests`, `GsCircuitBreakerTests`, `GsDataManagerTests`, `GsDataRecoveryTests`, `GsDataTests`, `GsFlushAndPairingTests`, `GsMetadataHashTests`, `GsOptBackInTests`, `GsPendingScrobbleStateTests`, `GsPluginSettingsViewModelTests`, `GsScrobblingServiceHashTests`, `GsScrobblingServiceReliabilityTests`, `GsSelfContainedFinishTests`, `GsSyncHashIndexTests`, `GsTelemetryTests`, `GsTimeTests`, `GsV4ChunkedSyncClientTests`, `HashContractTests`, `LinkingResultTests`, `LocalizationKeyParityTests`, `PlayniteAchievementsSqliteTests`, `ScrobbleStartFailureTests`, `SuccessStoryFileReaderTests`, `ValidateTokenTests`. Class names, not file names: `AchievementProviderTests.cs` holds `AchievementItemTests` and `GsAchievementAggregatorTests`, and `GsSyncHashIndexTests.cs` holds both `GsSyncHashIndexTests` (migration, fingerprint, clearing) and `GsV4ChunkedSyncClientTests` (the v4 begin/chunk/commit/abort driver and its failure rendering).
 - `TempPluginDir` is the shared temp-directory fixture (`Create`, `CreateWithDataManager`, `CreateWithHashIndex`, `CreateWithDataManagerAndHashIndex`). Use it instead of hand-rolling `Path.GetTempPath()` setup so directories are always cleaned up. The factory variants exist because `GsDataManager` and `GsSyncHashIndex` are static singletons and several tests deliberately depend on ambient identity generation rather than re-initializing.
 - `GsDataManagerTests` and `GsDataTests` include coverage for install-token persistence, `IdentityGeneration`, `RotateInstallId()`, `SetInstallTokenIfActive()`, `InstallIdForBody`, opt-out token clearing, and `RecordShownNotifications()`/`GetShownNotificationIds()` thread-safe notification state.
 

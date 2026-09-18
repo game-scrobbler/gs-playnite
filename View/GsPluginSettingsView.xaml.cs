@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -158,6 +159,8 @@ namespace GsPlugin.View {
             Dispatcher.Invoke(() => {
                 UpdateInstallTokenStatus();
                 UpdatePendingScrobblesStatus();
+                UpdateOptOutState();
+                UpdateConnectionStatus();
                 LastSyncStatusTextBlock.Text = GsPluginSettingsViewModel.LastSyncStatus;
             });
         }
@@ -371,12 +374,13 @@ namespace GsPlugin.View {
             bool isOptedOut = GsDataManager.IsOptedOut;
             DeleteMyDataButton.Visibility = isOptedOut ? Visibility.Collapsed : Visibility.Visible;
             OptBackInButton.Visibility = isOptedOut ? Visibility.Visible : Visibility.Collapsed;
+            OptedOutBanner.Visibility = isOptedOut ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <summary>
         /// Handles the Opt Back In button click.
         /// </summary>
-        private void OptBackIn_Click(object sender, RoutedEventArgs e) {
+        private async void OptBackIn_Click(object sender, RoutedEventArgs e) {
             var result = MessageBox.Show(
                 GsLocalization.Get("LOCGsPluginOptBackInConfirmBody",
                     "Re-enable the GameScrobbler plugin?\n\nYou will need to restart Playnite for all features to resume."),
@@ -384,11 +388,17 @@ namespace GsPlugin.View {
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (result != MessageBoxResult.Yes) return;
+            if (result != MessageBoxResult.Yes || _viewModel == null) return;
 
-            _viewModel?.OptBackIn();
-            UpdateOptOutState();
-            UpdateConnectionStatus();
+            OptBackInButton.IsEnabled = false;
+            try {
+                await _viewModel.OptBackIn();
+            }
+            finally {
+                UpdateOptOutState();
+                UpdateConnectionStatus();
+                OptBackInButton.IsEnabled = true;
+            }
         }
 
         /// <summary>
