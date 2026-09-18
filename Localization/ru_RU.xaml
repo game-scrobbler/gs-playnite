@@ -175,6 +175,17 @@ ID пользователя: {0}</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Не удалось подтвердить эту установку. Привяжите учётную запись заново и повторите удаление.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Произошла ошибка. Попробуйте позже.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Плагин включён заново. Перезапустите Playnite для возобновления синхронизации.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRequesting">Повторное включение...</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRateLimited">Слишком много попыток. Подождите и повторите снова.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInFailed">Не удалось включить плагин. Перезапустите Playnite и повторите попытку.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInError">Произошла ошибка. Перезапустите Playnite и повторите попытку.</sys:String>
+
+    <!-- ── Opted-out dashboard ── -->
+    <sys:String x:Key="LOCGsPluginOptedOutTitle">Сбор данных отключён</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutBody">Вы отключили Game Scrobbler. Ваша библиотека Playnite, сессии и достижения удалены с наших серверов, и эта панель больше не загружает статистику.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutHint">Синхронизация остановлена. Вы можете снова включить плагин в любой момент.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartTitle">Перезапустите Playnite, чтобы продолжить</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartBody">Game Scrobbler снова включён. Закройте и откройте Playnite, чтобы вернуть панель и возобновить синхронизацию.</sys:String>
 
     <!-- ── URI Handler ── -->
     <sys:String x:Key="LOCGsPluginInvalidLinkingToken">Получен недействительный токен привязки.</sys:String>
@@ -190,6 +201,7 @@ ID пользователя: {0}</sys:String>
 
     <!-- ── Menu Items ── -->
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Синхронизировать библиотеку</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenDashboard">Открыть панель</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Открыть настройки</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">Во время запроса установка изменилась или плагин был отключён. Повторите попытку.</sys:String>

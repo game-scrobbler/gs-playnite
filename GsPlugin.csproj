@@ -197,17 +197,22 @@
     <Compile Include="Services\GsNotificationService.cs" />
     <Compile Include="Services\GsUpdateChecker.cs" />
     <Compile Include="Services\GsUriHandler.cs" />
+    <Compile Include="Services\GsOptBackIn.cs" />
     <!-- Root -->
     <Compile Include="GsPlugin.cs" />
     <!-- View -->
     <Compile Include="View\GsPluginSettingsViewModel.cs" />
     <Compile Include="View\GsConverters.cs" />
+    <Compile Include="View\GsDashboardSurface.cs" />
     <Compile Include="View\GsPluginSettingsView.xaml.cs">
       <DependentUpon>GsPluginSettingsView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="View\MySidebarView.xaml.cs">
       <DependentUpon>MySidebarView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\OptedOutView.xaml.cs">
+      <DependentUpon>OptedOutView.xaml</DependentUpon>
     </Compile>
   </ItemGroup>
   <ItemGroup>
@@ -234,6 +239,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\MySidebarView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\OptedOutView.xaml">
+      <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>

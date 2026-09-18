@@ -175,6 +175,17 @@ Deseja vincular a uma conta diferente?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Não foi possível verificar esta instalação. Reconecte sua conta e tente excluir novamente.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Ocorreu um erro. Tente novamente mais tarde.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin reativado. Reinicie o Playnite para retomar a sincronização.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRequesting">Reativando...</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRateLimited">Muitas tentativas. Aguarde e tente novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInFailed">Falha ao reativar. Reinicie o Playnite para tentar novamente.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInError">Ocorreu um erro. Reinicie o Playnite para tentar novamente.</sys:String>
+
+    <!-- ── Opted-out dashboard ── -->
+    <sys:String x:Key="LOCGsPluginOptedOutTitle">O rastreamento está desligado</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutBody">Você desativou o Game Scrobbler. Sua biblioteca, sessões e conquistas do Playnite foram excluídas dos nossos servidores, e este painel não carrega mais estatísticas.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutHint">Nada está sendo sincronizado. Você pode reativar quando quiser.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartTitle">Reinicie o Playnite para continuar</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartBody">O Game Scrobbler está ativo novamente. Feche e abra o Playnite para restaurar o painel e retomar a sincronização.</sys:String>
 
     <!-- ── URI Handler ── -->
     <sys:String x:Key="LOCGsPluginInvalidLinkingToken">Token de vinculação inválido recebido.</sys:String>
@@ -190,6 +201,7 @@ Deseja vincular a uma conta diferente?</sys:String>
 
     <!-- ── Menu Items ── -->
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Sincronizar Biblioteca</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenDashboard">Abrir Painel</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Abrir Configurações</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">A instalação foi alterada ou desativada durante esta solicitação. Tente novamente.</sys:String>

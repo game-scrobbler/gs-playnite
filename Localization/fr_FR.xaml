@@ -175,6 +175,17 @@ Voulez-vous associer un autre compte ?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Cette installation n'a pas pu être vérifiée. Reconnectez votre compte, puis réessayez de supprimer.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Une erreur est survenue. Veuillez réessayer plus tard.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin réactivé. Veuillez redémarrer Playnite pour reprendre la synchronisation.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRequesting">Réactivation...</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRateLimited">Trop de tentatives. Veuillez patienter et réessayer.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInFailed">Échec de la réactivation. Veuillez redémarrer Playnite pour réessayer.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInError">Une erreur s'est produite. Veuillez redémarrer Playnite pour réessayer.</sys:String>
+
+    <!-- ── Opted-out dashboard ── -->
+    <sys:String x:Key="LOCGsPluginOptedOutTitle">Suivi désactivé</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutBody">Vous avez désactivé Game Scrobbler. Votre bibliothèque Playnite, vos sessions et vos succès ont été supprimés de nos serveurs, et ce tableau de bord ne charge plus aucune statistique.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutHint">Rien n’est synchronisé. Vous pouvez réactiver le plugin à tout moment.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartTitle">Redémarrez Playnite pour continuer</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartBody">Game Scrobbler est de nouveau actif. Fermez et rouvrez Playnite pour restaurer le tableau de bord et reprendre la synchronisation.</sys:String>
 
     <!-- ── URI Handler ── -->
     <sys:String x:Key="LOCGsPluginInvalidLinkingToken">Jeton d'association invalide reçu.</sys:String>
@@ -190,6 +201,7 @@ Voulez-vous associer un autre compte ?</sys:String>
 
     <!-- ── Menu Items ── -->
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Synchroniser maintenant</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenDashboard">Ouvrir le tableau de bord</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Ouvrir les paramètres</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">L’installation a été modifiée ou désactivée pendant cette requête. Veuillez réessayer.</sys:String>

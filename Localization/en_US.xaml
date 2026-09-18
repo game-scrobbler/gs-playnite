@@ -175,6 +175,17 @@ Do you want to link to a different account?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteAuthFailed">This installation couldn't be verified. Reconnect your account, then try deleting again.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">An error occurred. Please try again later.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin re-enabled. Please restart Playnite to resume syncing.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRequesting">Re-enabling...</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRateLimited">Too many attempts. Please wait and try again.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInFailed">Failed to re-enable. Please restart Playnite to try again.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInError">An error occurred. Please restart Playnite to try again.</sys:String>
+
+    <!-- ── Opted-out dashboard ── -->
+    <sys:String x:Key="LOCGsPluginOptedOutTitle">Tracking is off</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutBody">You opted out of Game Scrobbler. Your Playnite library, sessions, and achievements were deleted from our servers, and this dashboard no longer loads any stats.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutHint">Nothing is being synced. You can opt back in whenever you want.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartTitle">Restart Playnite to continue</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartBody">Game Scrobbler is on again. Close and reopen Playnite to restore the dashboard and start syncing.</sys:String>
 
     <!-- ── URI Handler ── -->
     <sys:String x:Key="LOCGsPluginInvalidLinkingToken">Invalid linking token received.</sys:String>
@@ -190,6 +201,7 @@ Do you want to link to a different account?</sys:String>
 
     <!-- ── Menu Items ── -->
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Sync Library Now</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenDashboard">Open Dashboard</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Open Settings</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">The installation changed or was disabled during this request. Please try again.</sys:String>

@@ -310,6 +310,14 @@ namespace GsPlugin.Models {
         public static event EventHandler DiagnosticsStateChanged;
 
         /// <summary>
+        /// True after a successful opt-back-in in this Playnite process. Tracking stays
+        /// off until restart, so the dashboard keeps showing the restart panel instead
+        /// of trying to load a hub with no install token. Process-local: not persisted,
+        /// and cleared when <see cref="Initialize"/> runs in a new session.
+        /// </summary>
+        public static bool PendingRestartAfterOptIn { get; private set; }
+
+        /// <summary>
         /// Manually fires DiagnosticsStateChanged for callers that modify
         /// diagnostics-visible state via MutateAndSave (which does not auto-fire).
         /// </summary>
@@ -347,6 +355,7 @@ namespace GsPlugin.Models {
         /// <param name="folderPath">The folder path where the custom data file will be stored.</param>
         /// <param name="oldID">Legacy parameter - no longer used as InstallID is exclusively managed by GsData.</param>
         public static void Initialize(string folderPath, string oldID) {
+            PendingRestartAfterOptIn = false;
             lock (_lock) {
                 _filePath = Path.Combine(folderPath, "gs_data.json");
                 // Never leave an earlier identity usable after a failed initialization.
@@ -751,18 +760,22 @@ namespace GsPlugin.Models {
                 _data.ClearIdentityBoundState(IdentityClearScope.InstallToken);
                 SaveInternal(durable: true);
             }
+            PendingRestartAfterOptIn = false;
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
         }
 
         /// <summary>
         /// Clears the opted-out state so the plugin resumes normal operation.
         /// The user will need to re-link their account and sync their library again.
+        /// Tracking and the hub stay paused until Playnite is restarted.
         /// </summary>
         public static void PerformOptIn() {
             lock (_lock) {
                 _data.OptedOut = false;
                 SaveInternal(durable: true);
             }
+            PendingRestartAfterOptIn = true;
+            DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
         }
 
         /// <summary>

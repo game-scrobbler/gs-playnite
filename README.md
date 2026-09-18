@@ -188,7 +188,7 @@ Playnite renders the dashboard wherever you place the control, and your layout c
 
 Notes:
 
-- The element resolves only when the Game Scrobbler plugin is installed and enabled. If the user has opted out of data collection, the control renders nothing.
+- The element resolves only when the Game Scrobbler plugin is installed and enabled. If the user has opted out of data collection, the control shows a native “tracking is off” panel with an Opt Back In action instead of the live dashboard.
 - The same dashboard is used on every surface (sidebar, Extensions menu, and your theme), so users see consistent content wherever it appears.
 - The control disposes itself when unloaded, so theme reloads and view changes are safe.
 

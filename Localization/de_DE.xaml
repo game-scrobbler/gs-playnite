@@ -175,6 +175,17 @@ Möchten Sie ein anderes Konto verknüpfen?</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteAuthFailed">Diese Installation konnte nicht verifiziert werden. Verknüpfen Sie Ihr Konto erneut und versuchen Sie dann erneut zu löschen.</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">Plugin wieder aktiviert. Bitte starten Sie Playnite neu, um die Synchronisierung fortzusetzen.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRequesting">Wird wieder aktiviert...</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRateLimited">Zu viele Versuche. Bitte warten Sie und versuchen Sie es erneut.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInFailed">Reaktivierung fehlgeschlagen. Bitte starten Sie Playnite neu und versuchen Sie es erneut.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInError">Ein Fehler ist aufgetreten. Bitte starten Sie Playnite neu und versuchen Sie es erneut.</sys:String>
+
+    <!-- ── Opted-out dashboard ── -->
+    <sys:String x:Key="LOCGsPluginOptedOutTitle">Erfassung ist deaktiviert</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutBody">Sie haben Game Scrobbler deaktiviert. Ihre Playnite-Bibliothek, Sitzungen und Erfolge wurden von unseren Servern gelöscht. Dieses Dashboard lädt keine Statistiken mehr.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutHint">Es wird nichts mehr synchronisiert. Sie können jederzeit wieder zustimmen.</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartTitle">Playnite neu starten, um fortzufahren</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartBody">Game Scrobbler ist wieder aktiv. Schließen Sie Playnite und öffnen Sie es erneut, um das Dashboard wiederherzustellen und die Synchronisierung zu starten.</sys:String>
 
     <!-- ── URI Handler ── -->
     <sys:String x:Key="LOCGsPluginInvalidLinkingToken">Ungültiger Verknüpfungs-Token empfangen.</sys:String>
@@ -190,6 +201,7 @@ Möchten Sie ein anderes Konto verknüpfen?</sys:String>
 
     <!-- ── Menu Items ── -->
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">Bibliothek jetzt synchronisieren</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenDashboard">Dashboard öffnen</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">Einstellungen öffnen</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">Die Installation wurde während dieser Anfrage geändert oder deaktiviert. Bitte versuchen Sie es erneut.</sys:String>

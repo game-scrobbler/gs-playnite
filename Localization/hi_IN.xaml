@@ -175,6 +175,17 @@
     <sys:String x:Key="LOCGsPluginDeleteAuthFailed">इस इंस्टॉलेशन को सत्यापित नहीं किया जा सका। अपना खाता पुनः कनेक्ट करें, फिर हटाने का पुनः प्रयास करें।</sys:String>
     <sys:String x:Key="LOCGsPluginDeleteError">एक त्रुटि हुई। कृपया बाद में पुनः प्रयास करें।</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInSuccess">प्लगइन फिर से सक्षम। सिंक फिर से शुरू करने के लिए Playnite रीस्टार्ट करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRequesting">फिर से सक्षम किया जा रहा है...</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInRateLimited">बहुत ज़्यादा प्रयास। कृपया प्रतीक्षा करें और फिर कोशिश करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInFailed">फिर से सक्षम नहीं हो सका। कृपया Playnite रीस्टार्ट करके फिर कोशिश करें।</sys:String>
+    <sys:String x:Key="LOCGsPluginOptBackInError">एक त्रुटि हुई। कृपया Playnite रीस्टार्ट करके फिर कोशिश करें।</sys:String>
+
+    <!-- ── Opted-out dashboard ── -->
+    <sys:String x:Key="LOCGsPluginOptedOutTitle">ट्रैकिंग बंद है</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutBody">आपने Game Scrobbler से ऑप्ट आउट किया है। आपकी Playnite लाइब्रेरी, सेशन और अचीवमेंट हमारे सर्वर से हटा दी गई हैं, और यह डैशबोर्ड अब कोई आँकड़े नहीं दिखाता।</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutHint">कुछ भी सिंक नहीं हो रहा। आप जब चाहें फिर से सक्षम कर सकते हैं।</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartTitle">जारी रखने के लिए Playnite रीस्टार्ट करें</sys:String>
+    <sys:String x:Key="LOCGsPluginOptedOutRestartBody">Game Scrobbler फिर से चालू है। डैशबोर्ड वापस लाने और सिंक शुरू करने के लिए Playnite बंद करके फिर खोलें।</sys:String>
 
     <!-- ── URI Handler ── -->
     <sys:String x:Key="LOCGsPluginInvalidLinkingToken">अमान्य लिंकिंग टोकन प्राप्त हुआ।</sys:String>
@@ -190,6 +201,7 @@
 
     <!-- ── Menu Items ── -->
     <sys:String x:Key="LOCGsPluginMenuSyncLibrary">अभी लाइब्रेरी सिंक करें</sys:String>
+    <sys:String x:Key="LOCGsPluginMenuOpenDashboard">डैशबोर्ड खोलें</sys:String>
     <sys:String x:Key="LOCGsPluginMenuOpenSettings">सेटिंग्स खोलें</sys:String>
 
     <sys:String x:Key="LOCGsPluginIdentityChangedDuringRequest">इस अनुरोध के दौरान इंस्टॉलेशन बदल गया या अक्षम कर दिया गया। कृपया फिर से प्रयास करें।</sys:String>
