@@ -178,8 +178,20 @@ namespace GsPlugin.Api {
                     _logger.Info("Scrobble start accepted without a session ID");
                     return new ScrobbleStartRes();
 
-                case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
-                    _logger.Info($"Scrobble start skipped: {envelope.message}");
+                case ApiOutcome.Fail when ScrobbleStartFailure.IsExpectedRejection(envelope.code):
+                    // Consent, auth, allow-list and throttle answers are the user's own
+                    // state (or an explicit retry invitation), not a plugin defect.
+                    // Reporting them as GS-PLAYNITE-PT hid the real start-failure rate.
+                    _logger.Info($"Scrobble start skipped: [{envelope.code}] {envelope.message}");
+                    if (onAttempt == null) {
+                        GsSentry.AddBreadcrumb(
+                            message: "Scrobble start rejected",
+                            category: "scrobble",
+                            data: new Dictionary<string, string> {
+                                { "code", envelope.code ?? "" },
+                                { "http_status", diagnostics.StatusCode.ToString() }
+                            });
+                    }
                     return null;
 
                 case ApiOutcome.Fail:
@@ -262,19 +274,27 @@ namespace GsPlugin.Api {
             }
 
             string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/finish";
+            var diagnostics = new HttpCallDiagnostics();
 
             var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                diagnostics.Reset();
                 onAttempt?.Invoke();
-                return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(url, sendData, true);
-            }, maxRetries: 2, isFailure: r => r == null);
+                return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(
+                    url, sendData,
+                    onStatus: status => diagnostics.StatusCode = status,
+                    parseErrorBody: true,
+                    diagnostics: diagnostics,
+                    captureExceptions: false);
+            }, maxRetries: 2, isFailure: r => r == null,
+                isPermanent: () => IsPermanentRejection(diagnostics.StatusCode));
 
             switch (envelope?.Outcome) {
                 case ApiOutcome.Success:
                     _logger.Info($"Scrobble finish complete ({envelope.data?.duration_seconds}s)");
                     return new ScrobbleFinishRes();
 
-                case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
-                    _logger.Info($"Scrobble finish skipped: {envelope.message}");
+                case ApiOutcome.Fail when ScrobbleStartFailure.IsExpectedRejection(envelope.code):
+                    _logger.Info($"Scrobble finish skipped: [{envelope.code}] {envelope.message}");
                     return new ScrobbleFinishRes();
 
                 case ApiOutcome.Fail:
@@ -890,7 +910,7 @@ namespace GsPlugin.Api {
             GsLogger.Error(
                 $"Failed to start scrobble session (reason={reason ?? "unknown"}, http={diagnostics?.StatusCode ?? 0}, attempts={attempts})");
 
-            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry)) {
+            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry, diagnostics?.StatusCode ?? 0)) {
                 return;
             }
 
@@ -1310,11 +1330,29 @@ namespace GsPlugin.Api {
         public static readonly string[] Fingerprint = { "gs-playnite", "scrobble-start-failed" };
 
         /// <summary>
-        /// Report once on the live start path after the HTTP helper actually ran.
-        /// Circuit-open skips and pending-queue flush retries only log locally.
+        /// Consent, auth, allow-list and throttle answers the server will not change
+        /// on retry. They belong in a breadcrumb, not a Sentry issue (same rule as
+        /// <c>GsAccountLinkingService.IsExpectedLinkingRejection</c>).
         /// </summary>
-        public static bool ShouldCapture(int attempts, bool isFlushRetry) =>
-            attempts > 0 && !isFlushRetry;
+        public static bool IsExpectedRejection(string code) {
+            switch (code) {
+                case "UNSUPPORTED_PLUGIN":
+                case "OPTED_OUT":
+                case "TOKEN_REQUIRED":
+                case "TOKEN_INVALID":
+                case "RATE_LIMITED":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Report once on the live start path after the HTTP helper actually ran.
+        /// Circuit-open skips, pending-queue flush retries, and explicit 429s only log locally.
+        /// </summary>
+        public static bool ShouldCapture(int attempts, bool isFlushRetry, int httpStatus = 0, string code = null) =>
+            attempts > 0 && !isFlushRetry && httpStatus != 429 && !IsExpectedRejection(code);
 
         public static Dictionary<string, string> BuildExtras(
             int attempts, HttpCallDiagnostics diagnostics, string outcome, string gameName = null) {

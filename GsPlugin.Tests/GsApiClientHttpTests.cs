@@ -154,6 +154,63 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public async Task StartGameSession_OptedOut403_ParsesEnvelopeWithoutRetryOrOpeningCircuit() {
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token")) {
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.Forbidden,
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        status = "fail",
+                        code = "OPTED_OUT",
+                        message = "This account has been opted out. Data collection is disabled."
+                    })
+                };
+                var breaker = new GsCircuitBreaker(failureThreshold: 1);
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                var result = await client.StartGameSession(new ScrobbleStartReq {
+                    user_id = "user-1",
+                    game_name = "Test",
+                    game_id = "g1",
+                    plugin_id = "p1"
+                });
+
+                Assert.Null(result);
+                Assert.Equal(1, handler.CallCount);
+                Assert.Equal(GsCircuitBreaker.CircuitState.Closed, breaker.State);
+            }
+        }
+
+        [Fact]
+        public async Task FinishGameSession_OptedOut403_DoesNotRetryAndDoesNotOpenCircuit() {
+            using (var temp = TempPluginDir.CreateWithDataManager("test-token")) {
+                var handler = new MockHttpHandler {
+                    StatusCode = HttpStatusCode.Forbidden,
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        status = "fail",
+                        code = "OPTED_OUT",
+                        message = "This account has been opted out. Data collection is disabled."
+                    })
+                };
+                var breaker = new GsCircuitBreaker(failureThreshold: 1);
+                var client = new GsApiClient(new HttpClient(handler), breaker);
+
+                var result = await client.FinishGameSession(new ScrobbleFinishReq {
+                    user_id = "user-1",
+                    game_name = "Test",
+                    game_id = "g1",
+                    plugin_id = "p1",
+                    session_id = Guid.NewGuid().ToString(),
+                    started_at = "2026-01-01T00:00:00Z",
+                    finished_at = "2026-01-01T00:05:00Z"
+                });
+
+                Assert.NotNull(result);
+                Assert.Equal(1, handler.CallCount);
+                Assert.Equal(GsCircuitBreaker.CircuitState.Closed, breaker.State);
+            }
+        }
+
+        [Fact]
         public async Task StartGameSession_OpenCircuit_SkipsHttp() {
             using (var temp = TempPluginDir.CreateWithDataManager("test-token")) {
                 var handler = new MockHttpHandler {
