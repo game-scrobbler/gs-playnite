@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using GsPlugin.Api;
+using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 using GsPlugin.Services;
 using Xunit;
@@ -40,6 +42,27 @@ namespace GsPlugin.Tests {
             Assert.Equal(GsOptBackIn.Outcome.Success, outcome);
             Assert.False(GsDataManager.IsOptedOut);
             Assert.True(GsDataManager.PendingRestartAfterOptIn);
+            Assert.True(GsDataManager.IsTrackingPaused);
+            Assert.False(GsTelemetryConsent.HasConsent("no-sentry"));
+            Assert.False(GsTelemetryConsent.HasConsent("no-posthog"));
+        }
+
+        [Fact]
+        public async Task TryAsync_SaveFailure_ReturnsFailedAndLeavesOptOut() {
+            GsDataManager.PerformOptOut();
+            var client = new MockGsApiClient {
+                OptInResponse = new OptInRes { success = true }
+            };
+            var path = Path.Combine(_temp.Path, "gs_data.json");
+
+            GsOptBackIn.Outcome outcome;
+            using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                outcome = await GsOptBackIn.TryAsync(client);
+            }
+
+            Assert.Equal(GsOptBackIn.Outcome.Failed, outcome);
+            Assert.True(GsDataManager.IsOptedOut);
+            Assert.False(GsDataManager.PendingRestartAfterOptIn);
         }
 
         [Fact]

@@ -41,8 +41,6 @@ namespace GsPlugin.View {
 
         private void OptedOutView_Unloaded(object sender, RoutedEventArgs e) {
             GsDataManager.DiagnosticsStateChanged -= OnDiagnosticsStateChanged;
-            Loaded -= OptedOutView_Loaded;
-            Unloaded -= OptedOutView_Unloaded;
         }
 
         private void OnDiagnosticsStateChanged(object sender, EventArgs e) {

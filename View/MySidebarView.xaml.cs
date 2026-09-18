@@ -161,7 +161,7 @@ namespace GsPlugin.View {
 
         private async void MySidebarView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e) {
             if (!(bool)e.NewValue || !_webView2Ready || CannotLoadHub()) {
-                if ((bool)e.NewValue && (GsDataManager.IsOptedOut || GsDataManager.PendingRestartAfterOptIn)) {
+                if ((bool)e.NewValue && GsDataManager.IsTrackingPaused) {
                     ShowOptedOutState();
                 }
                 return;
@@ -255,8 +255,7 @@ namespace GsPlugin.View {
         }
 
         private bool CannotLoadHub() {
-            return _optedOutUiShown || _disposed || GsDataManager.IsOptedOut
-                || GsDataManager.PendingRestartAfterOptIn;
+            return _optedOutUiShown || _disposed || GsDataManager.IsTrackingPaused;
         }
 
         private void ShowOptedOutState() {

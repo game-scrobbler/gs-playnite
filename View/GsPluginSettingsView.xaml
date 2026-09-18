@@ -198,14 +198,17 @@
                     Margin="0,0,0,12"
                     Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock FontSize="14"
+                    <TextBlock x:Name="OptedOutBannerTitle"
+                               FontSize="14"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextBrush}"
                                Text="{DynamicResource LOCGsPluginOptedOutTitle}"/>
-                    <TextBlock Style="{StaticResource MutedTextStyle}"
+                    <TextBlock x:Name="OptedOutBannerBody"
+                               Style="{StaticResource MutedTextStyle}"
                                Margin="0,6,0,0"
                                Text="{DynamicResource LOCGsPluginOptedOutBody}"/>
-                    <TextBlock Style="{StaticResource MutedTextStyle}"
+                    <TextBlock x:Name="OptedOutBannerHint"
+                               Style="{StaticResource MutedTextStyle}"
                                Margin="0,6,0,0"
                                Text="{DynamicResource LOCGsPluginOptedOutHint}"/>
                 </StackPanel>

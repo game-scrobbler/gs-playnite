@@ -173,6 +173,35 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public async Task LinkAccountAsync_WhenRestartPending_ReturnsErrorWithoutSending() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                GsDataManager.PerformOptOut();
+                Assert.True(GsDataManager.PerformOptIn());
+                var handler = new DelayedHttpHandler();
+
+                var result = await CreateService(handler).LinkAccountAsync("valid-token", LinkingContext.ManualSettings);
+
+                Assert.False(result.Success);
+                Assert.Contains("Restart", result.ErrorMessage);
+                Assert.Equal(0, handler.CallCount);
+            }
+        }
+
+        [Fact]
+        public async Task LinkAccountAsync_WhenOptedOut_ReturnsDisabledErrorWithoutSending() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                GsDataManager.PerformOptOut();
+                var handler = new DelayedHttpHandler();
+
+                var result = await CreateService(handler).LinkAccountAsync("valid-token", LinkingContext.ManualSettings);
+
+                Assert.False(result.Success);
+                Assert.Contains("disabled", result.ErrorMessage);
+                Assert.Equal(0, handler.CallCount);
+            }
+        }
+
+        [Fact]
         public async Task WaitingLinkAfterIdentityRotation_IsRejectedBeforeSending() {
             using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
                 var handler = new DelayedHttpHandler();

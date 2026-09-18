@@ -103,6 +103,7 @@ namespace GsPlugin.Tests {
         public void IsOptedOut_DefaultsFalse() {
             using (var temp = TempPluginDir.CreateWithDataManager()) {
                 Assert.False(GsDataManager.IsOptedOut);
+                Assert.False(GsDataManager.IsTrackingPaused);
             }
         }
 
@@ -145,10 +146,11 @@ namespace GsPlugin.Tests {
                 GsDataManager.PerformOptOut();
                 Assert.True(GsDataManager.IsOptedOut);
 
-                GsDataManager.PerformOptIn();
+                Assert.True(GsDataManager.PerformOptIn());
 
                 Assert.False(GsDataManager.IsOptedOut);
                 Assert.False(GsDataManager.Data.OptedOut);
+                Assert.True(GsDataManager.IsTrackingPaused);
             }
         }
 
@@ -156,7 +158,7 @@ namespace GsPlugin.Tests {
         public void PerformOptIn_PersistsToDisk() {
             using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.PerformOptOut();
-                GsDataManager.PerformOptIn();
+                Assert.True(GsDataManager.PerformOptIn());
 
                 // Re-initialize from disk
                 GsDataManager.Initialize(temp.Path, null);
@@ -169,12 +171,31 @@ namespace GsPlugin.Tests {
         public void PerformOptIn_SetsPendingRestartUntilInitialize() {
             using (var temp = TempPluginDir.CreateWithDataManager()) {
                 GsDataManager.PerformOptOut();
-                GsDataManager.PerformOptIn();
+                Assert.True(GsDataManager.PerformOptIn());
                 Assert.True(GsDataManager.PendingRestartAfterOptIn);
+                Assert.True(GsDataManager.IsTrackingPaused);
 
                 GsDataManager.Initialize(temp.Path, null);
                 Assert.False(GsDataManager.PendingRestartAfterOptIn);
                 Assert.False(GsDataManager.IsOptedOut);
+                Assert.False(GsDataManager.IsTrackingPaused);
+            }
+        }
+
+        [Fact]
+        public void PerformOptIn_SaveFailure_RestoresOptOutAndDoesNotPendRestart() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                GsDataManager.PerformOptOut();
+                var path = Path.Combine(temp.Path, "gs_data.json");
+                var originalBytes = File.ReadAllBytes(path);
+
+                using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                    Assert.False(GsDataManager.PerformOptIn());
+                    Assert.True(GsDataManager.IsOptedOut);
+                    Assert.False(GsDataManager.PendingRestartAfterOptIn);
+                    Assert.True(GsDataManager.IsTrackingPaused);
+                    Assert.Equal(originalBytes, File.ReadAllBytes(path));
+                }
             }
         }
 

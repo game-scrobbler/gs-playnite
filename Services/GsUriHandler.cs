@@ -50,8 +50,8 @@ namespace GsPlugin.Services {
         /// <param name="args">URI arguments containing the token</param>
         private async void HandleUriRequest(PlayniteUriEventArgs args) {
             try {
-                if (GsDataManager.IsOptedOut) {
-                    GsLogger.Info("URI request ignored: plugin is opted out");
+                if (GsDataManager.IsTrackingPaused) {
+                    GsLogger.Info("URI request ignored: tracking is paused");
                     return;
                 }
 

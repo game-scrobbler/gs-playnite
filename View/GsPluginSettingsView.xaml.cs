@@ -210,10 +210,16 @@ namespace GsPlugin.View {
         /// Updates the connection status display and related UI elements.
         /// </summary>
         private void UpdateConnectionStatus() {
-            bool isOptedOut = GsDataManager.IsOptedOut;
+            bool trackingPaused = GsDataManager.IsTrackingPaused;
 
-            if (isOptedOut) {
+            if (GsDataManager.IsOptedOut) {
                 ConnectionStatusTextBlock.Text = GsLocalization.Get("LOCGsPluginConnectionStatusOptedOut", "Opted Out");
+                ConnectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
+            }
+            else if (GsDataManager.PendingRestartAfterOptIn) {
+                ConnectionStatusTextBlock.Text = GsLocalization.Get(
+                    "LOCGsPluginOptedOutRestartTitle",
+                    "Restart Playnite to continue");
                 ConnectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
             }
             else {
@@ -223,16 +229,16 @@ namespace GsPlugin.View {
                     : new SolidColorBrush(Colors.Red);
             }
 
-            // Hide linking controls when opted out or already linked
-            var linkingVisibility = (!isOptedOut && GsPluginSettingsViewModel.ShowLinkingControls)
+            // Hide linking controls while tracking is paused or already linked
+            var linkingVisibility = (!trackingPaused && GsPluginSettingsViewModel.ShowLinkingControls)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             OpenWebsiteToLinkButton.Visibility = linkingVisibility;
             ManualTokenSeparator.Visibility = linkingVisibility;
             LinkingControlsGrid.Visibility = linkingVisibility;
 
-            // Show disconnect button only when linked and not opted out
-            DisconnectAccountButton.Visibility = (!isOptedOut && GsPluginSettingsViewModel.IsLinked)
+            // Show disconnect button only when linked and tracking is not paused
+            DisconnectAccountButton.Visibility = (!trackingPaused && GsPluginSettingsViewModel.IsLinked)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
@@ -372,9 +378,34 @@ namespace GsPlugin.View {
         /// </summary>
         private void UpdateOptOutState() {
             bool isOptedOut = GsDataManager.IsOptedOut;
-            DeleteMyDataButton.Visibility = isOptedOut ? Visibility.Collapsed : Visibility.Visible;
+            bool pendingRestart = GsDataManager.PendingRestartAfterOptIn;
+            DeleteMyDataButton.Visibility = isOptedOut || pendingRestart
+                ? Visibility.Collapsed
+                : Visibility.Visible;
             OptBackInButton.Visibility = isOptedOut ? Visibility.Visible : Visibility.Collapsed;
-            OptedOutBanner.Visibility = isOptedOut ? Visibility.Visible : Visibility.Collapsed;
+            OptedOutBanner.Visibility = isOptedOut || pendingRestart
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (pendingRestart) {
+                OptedOutBannerTitle.Text = GsLocalization.Get(
+                    "LOCGsPluginOptedOutRestartTitle",
+                    "Restart Playnite to continue");
+                OptedOutBannerBody.Text = GsLocalization.Get(
+                    "LOCGsPluginOptedOutRestartBody",
+                    "Game Scrobbler is on again. Close and reopen Playnite to restore the dashboard and start syncing.");
+                OptedOutBannerHint.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            OptedOutBannerTitle.Text = GsLocalization.Get("LOCGsPluginOptedOutTitle", "Tracking is off");
+            OptedOutBannerBody.Text = GsLocalization.Get(
+                "LOCGsPluginOptedOutBody",
+                "You opted out of Game Scrobbler. Your Playnite library, sessions, and achievements were deleted from our servers, and this dashboard no longer loads any stats.");
+            OptedOutBannerHint.Text = GsLocalization.Get(
+                "LOCGsPluginOptedOutHint",
+                "Nothing is being synced. You can opt back in whenever you want.");
+            OptedOutBannerHint.Visibility = Visibility.Visible;
         }
 
         /// <summary>
