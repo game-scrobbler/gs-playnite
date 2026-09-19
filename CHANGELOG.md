@@ -3,6 +3,14 @@
 ## [2.9.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.4...GsPlugin-v2.9.0) (2026-09-19)
 
 
+### Highlights
+
+* You now see a clear "tracking paused" screen in the dashboard when opted out, instead of a blank panel, with a one-click way to opt back in.
+* Fixed a bug where opting back in didn't fully re-enable tracking until Playnite was restarted, even though it looked like it had.
+* Fixed a bug where an opt-out could sometimes fail to save properly, leaving tracking in an inconsistent state.
+* Play sessions ending right after you opt out are no longer mistakenly flagged as errors.
+
+
 ### Features
 
 * **dashboard:** show a native opted-out panel instead of a blank iframe ([1321d9d](https://github.com/game-scrobbler/gs-playnite/commit/1321d9d0d50890f833a62b9f6141b02457709b67))
