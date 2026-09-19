@@ -112,6 +112,22 @@ namespace GsPlugin.Tests {
             }
         }
 
+        [Theory]
+        [InlineData("no-sentry")]
+        [InlineData("no-posthog")]
+        public async Task Transport_StaysBlockedWhileRestartIsPending(string flag) {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var transport = new CountingHandler();
+                using (var client = new HttpClient(new GsTelemetryConsentHandler(new GsTelemetryConsent(flag), transport))) {
+                    GsDataManager.PerformOptOut();
+                    Assert.True(GsDataManager.PerformOptIn());
+                    using (await client.PostAsync("https://telemetry.invalid/session", new StringContent("pending-restart"))) { }
+                    Assert.Equal(0, transport.Calls);
+                    Assert.False(GsTelemetryConsent.HasConsent(flag));
+                }
+            }
+        }
+
         private sealed class CountingHandler : HttpMessageHandler {
             public int Calls { get; private set; }
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {

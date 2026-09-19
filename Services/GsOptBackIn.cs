@@ -30,9 +30,11 @@ namespace GsPlugin.Services {
                         : Outcome.Failed;
                 }
 
-                GsDataManager.PerformOptIn();
-                GsSentry.ApplyPreferences();
-                GsPostHog.ApplyPreferences();
+                if (!GsDataManager.PerformOptIn()) {
+                    return Outcome.Failed;
+                }
+                // Telemetry stays paused until Playnite restarts. ApplyPreferences would
+                // otherwise see OptedOut=false and start Sentry/PostHog this session.
                 return Outcome.Success;
             }
             catch (Exception ex) {

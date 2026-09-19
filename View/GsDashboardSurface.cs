@@ -13,7 +13,7 @@ namespace GsPlugin.View {
             IGsApiClient apiClient,
             string webViewUserDataFolder,
             Action openSettings) {
-            if (GsDataManager.IsOptedOut || GsDataManager.PendingRestartAfterOptIn) {
+            if (GsDataManager.IsTrackingPaused) {
                 return new OptedOutView(apiClient, openSettings);
             }
             return new MySidebarView(apiClient, webViewUserDataFolder, openSettings);
