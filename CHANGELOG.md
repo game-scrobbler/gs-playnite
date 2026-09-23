@@ -5,25 +5,21 @@
 
 ### Highlights
 
-* You now see a clear "tracking paused" screen in the dashboard when opted out, instead of a blank panel, with a one-click way to opt back in.
-* Fixed a bug where opting back in didn't fully re-enable tracking until Playnite was restarted, even though it looked like it had.
-* Fixed a bug where an opt-out could sometimes fail to save properly, leaving tracking in an inconsistent state.
-* Play sessions ending right after you opt out are no longer mistakenly flagged as errors.
+* When you've opted out, the dashboard now shows a clear "Tracking is off" panel instead of a blank space, with a button to opt back in.
+* After opting back in, Game Scrobbler now asks you to restart Playnite and stays fully paused until you do, instead of partly resuming in the current session.
+* If opting back in can't be saved, you now stay opted out instead of ending up half re-enabled.
 
 
 ### Features
 
-* **dashboard:** show a native opted-out panel instead of a blank iframe ([1321d9d](https://github.com/game-scrobbler/gs-playnite/commit/1321d9d0d50890f833a62b9f6141b02457709b67))
 * **dashboard:** show a native opted-out panel instead of a blank iframe ([a848336](https://github.com/game-scrobbler/gs-playnite/commit/a848336ca28e6b7d21441f6887cf8e0b307150aa))
 
 
 ### Bug Fixes
 
 * **opt-in:** hide linking and skip startup work until restart ([5ee421a](https://github.com/game-scrobbler/gs-playnite/commit/5ee421ac013ddfcbcca2a708e8b44e57be523d40))
-* **opt-in:** keep tracking paused until restart and fail closed on save ([1b6588d](https://github.com/game-scrobbler/gs-playnite/commit/1b6588d17ce6b50834d25418f8b97f7d1b6397bb))
 * **opt-in:** keep tracking paused until restart and fail closed on save ([72ac1b4](https://github.com/game-scrobbler/gs-playnite/commit/72ac1b40536a0501636a426f06399ad60be044f3))
 * **scrobble:** breadcrumb expected finish rejections and report unparsed 4xx ([a84074a](https://github.com/game-scrobbler/gs-playnite/commit/a84074a64a87d31014e7c6adddc44bfa0ec5bb49))
-* **scrobble:** stop reporting OPTED_OUT 403s as GS-PLAYNITE-PT ([8bdc61f](https://github.com/game-scrobbler/gs-playnite/commit/8bdc61f9aa713c929e11eac32aa6928339b0977c))
 * **scrobble:** stop reporting OPTED_OUT 403s as GS-PLAYNITE-PT ([f3c7817](https://github.com/game-scrobbler/gs-playnite/commit/f3c781753cb618d4e74721ee58d130ef31a7a476))
 
 ## [2.8.4](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.3...GsPlugin-v2.8.4) (2026-09-11)
