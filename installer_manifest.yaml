@@ -1,6 +1,14 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.9.0
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-09-23
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.9.0/GsPlugin-v2.9.0.pext
+    Changelog:
+      - "When you\u0027ve opted out, the dashboard now shows a clear \"Tracking is off\" panel instead of a blank space, with a button to opt back in."
+      - "After opting back in, Game Scrobbler now asks you to restart Playnite and stays fully paused until you do, instead of partly resuming in the current session."
+      - "If opting back in can\u0027t be saved, you now stay opted out instead of ending up half re-enabled."
   - Version: 2.8.4
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-09-11
