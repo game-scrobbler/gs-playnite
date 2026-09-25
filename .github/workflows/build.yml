@@ -120,20 +120,57 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: gh release upload ${{ steps.release.outputs.tag_name }} .\${{ steps.release.outputs.tag_name }}.pext
 
-      - name: Update Installer Manifest
-        if: ${{ steps.release.outputs.release_created }}
-        run: |
-          $version = "${{ steps.release.outputs.tag_name }}".Replace("GsPlugin-v", "")
-          Write-Host "Updating installer manifest for version $version"
-          powershell -ExecutionPolicy Bypass -File "$Env:GITHUB_WORKSPACE\scripts\update-installer-manifest.ps1" -Version $version -TagName "${{ steps.release.outputs.tag_name }}"
-
-      - name: Commit and Push Manifest Changes
-        if: ${{ steps.release.outputs.release_created }}
+      # The manifest steps key off repository state, not release_created. release-please reports
+      # release_created only on the run that creates the release, so a manifest update that failed
+      # after the release was published could not be retried: re-running the job skipped these
+      # steps and went green while Playnite still could not see the new version. Now any later
+      # main run, including a re-run, finishes the job once the release's .pext is published.
+      - name: Check Installer Manifest
+        id: manifest
+        if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $version = (Get-Content -Raw .release-please-manifest.json | ConvertFrom-Json).'.'
+          $tag = "GsPlugin-v$version"
+          if (Select-String -Path installer_manifest.yaml -Pattern "^\s*- Version: $([regex]::Escape($version))\s*$" -Quiet) {
+            Write-Host "installer_manifest.yaml already lists $version"
+            exit 0
+          }
+          $assets = gh release view $tag --json assets --jq '.assets[].name'
+          if ($LASTEXITCODE -ne 0 -or $assets -notcontains "$tag.pext") {
+            Write-Host "$tag has no published .pext, leaving installer_manifest.yaml alone"
+            exit 0
+          }
+          Write-Host "installer_manifest.yaml is missing released version $version"
+          "needed=true" >> $Env:GITHUB_OUTPUT
+          "version=$version" >> $Env:GITHUB_OUTPUT
+          "tag=$tag" >> $Env:GITHUB_OUTPUT
+
+      - name: Update Installer Manifest
+        if: steps.manifest.outputs.needed == 'true'
+        run: |
+          Write-Host "Updating installer manifest for version ${{ steps.manifest.outputs.version }}"
+          powershell -ExecutionPolicy Bypass -File "$Env:GITHUB_WORKSPACE\scripts\update-installer-manifest.ps1" -Version "${{ steps.manifest.outputs.version }}" -TagName "${{ steps.manifest.outputs.tag }}"
+
+      # A merge that lands on main while this job builds would reject a plain push, so rebase onto
+      # it and retry. A rebase conflict still fails the job. Both steps branch on $LASTEXITCODE,
+      # so native command failures must not throw.
+      - name: Commit and Push Manifest Changes
+        if: steps.manifest.outputs.needed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add installer_manifest.yaml
-          git diff --cached --quiet || git commit -m "chore: update installer_manifest.yaml for ${{ steps.release.outputs.tag_name }}"
-          git push
+          git diff --cached --quiet || git commit -m "chore: update installer_manifest.yaml for ${{ steps.manifest.outputs.tag }}"
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            git push origin HEAD:main
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            git pull --rebase origin main
+            if ($LASTEXITCODE -ne 0) { throw "Rebasing the manifest commit onto main failed" }
+          }
+          throw "Could not push installer_manifest.yaml after 3 attempts"

@@ -268,6 +268,7 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks
 - Highlights are reviewed/edited in the release PR like any other change — edit the bullets there before merging to change what users see in Playnite.
 - The script is idempotent (no-ops when `### Highlights` already exists for the version, which also breaks the push→synchronize workflow loop) and best-effort: missing API key, API failure, or bad output warns and exits 0 so the release PR is never blocked.
 - `scripts/update-installer-manifest.ps1` prefers `### Highlights` bullets for the manifest; when absent it falls back to the raw Features/Bug Fixes bullets.
+- The manifest steps in `build.yml` run whenever `installer_manifest.yaml` lacks the version in `.release-please-manifest.json` and that release has its `.pext` published, not only when `release_created` is true. `release_created` is true on one run only, so gating on it made a failed manifest update unrecoverable: a re-run skipped the steps and went green. Now a re-run or the next push to main completes it (with that day's `ReleaseDate`). The Sentry release steps are still gated on `release_created`.
 
 ### Sentry Release Management
 - Runtime: Plugin reports version as `GsPlugin@X.Y.Z` from AssemblyInfo
