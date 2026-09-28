@@ -36,6 +36,7 @@ namespace GsPlugin.View {
 
             // Subscribe to static linking status changes (single source of truth)
             GsAccountLinkingService.LinkingStatusChanged += OnLinkingStatusChanged;
+
             // Subscribe to token/queue state changes for diagnostics indicators
             GsDataManager.DiagnosticsStateChanged += OnDiagnosticsStateChanged;
         }
@@ -46,6 +47,7 @@ namespace GsPlugin.View {
         }
 
         #region View Lifecycle Events
+
         /// <summary>
         /// Handles cleanup when the view is unloaded.
         /// </summary>
@@ -78,10 +80,13 @@ namespace GsPlugin.View {
         private void InitializeViewData() {
             // Display the installation ID
             IDTextBlock.Text = GsDataManager.Data.InstallID;
+
             // Display last sync status (static property — cannot use XAML {Binding})
             LastSyncStatusTextBlock.Text = GsPluginSettingsViewModel.LastSyncStatus;
+
             // Display install token status
             UpdateInstallTokenStatus();
+
             // Display pending scrobble count if any
             UpdatePendingScrobblesStatus();
         }
@@ -180,6 +185,7 @@ namespace GsPlugin.View {
                 if (settings != null) {
                     settings.PropertyChanged += Settings_PropertyChanged;
                 }
+
                 _subscribedSettings = settings;
             }
         }
@@ -193,10 +199,12 @@ namespace GsPlugin.View {
             switch (e.PropertyName) {
                 case nameof(GsPluginSettings.IsLinking):
                     UpdateLinkingState();
+
                     // Also check connection status when linking completes
                     if (!_viewModel.Settings.IsLinking) {
                         UpdateConnectionStatus();
                     }
+
                     break;
 
                 case nameof(GsPluginSettings.IsDeleting):
@@ -206,6 +214,7 @@ namespace GsPlugin.View {
         }
 
         #region UI Update Methods
+
         /// <summary>
         /// Updates the connection status display and related UI elements.
         /// </summary>
@@ -250,9 +259,11 @@ namespace GsPlugin.View {
             if (_viewModel?.Settings == null) return;
 
             bool isLinking = _viewModel.Settings.IsLinking;
+
             // Disable controls during linking
             TokenTextBox.IsEnabled = !isLinking;
             LinkAccountButton.IsEnabled = !isLinking;
+
             // Update button text
             LinkAccountButton.Content = isLinking
                 ? GsLocalization.Get("LOCGsPluginLinkingInProgress", "Linking...")
@@ -262,6 +273,7 @@ namespace GsPlugin.View {
         #endregion
 
         #region User Interaction Handlers
+
         /// <summary>
         /// Shows the standard localized error dialog for a failed user action.
         /// </summary>

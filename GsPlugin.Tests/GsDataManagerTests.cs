@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Xunit;
 using GsPlugin.Models;
+using Xunit;
 
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]

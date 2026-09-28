@@ -52,6 +52,7 @@ namespace GsPlugin.View {
                 ShowOptedOutCopy();
                 return;
             }
+
             ShowRestartCopy();
         }
 

@@ -7,17 +7,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
-using Playnite.SDK;
-using Playnite.SDK.Events;
-using Playnite.SDK.Plugins;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 using GsPlugin.Services;
 using GsPlugin.View;
+using Playnite.SDK;
+using Playnite.SDK.Events;
+using Playnite.SDK.Plugins;
 
 namespace GsPlugin {
-
     public class GsPlugin : GenericPlugin {
         private static readonly ILogger _logger = LogManager.GetLogger();
 
@@ -31,6 +30,7 @@ namespace GsPlugin {
             var pluginDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             AppDomain.CurrentDomain.AssemblyResolve += (sender, args) => {
                 var name = new AssemblyName(args.Name);
+
                 // Only resolve deps we ship next to GsPlugin.dll. Playnite's AppDomain is
                 // shared across every extension — blindly LoadFrom for arbitrary names can
                 // pull the wrong assembly (or re-enter resolve). Sentry version skew across
@@ -84,6 +84,7 @@ namespace GsPlugin {
             // ApplyPreferences() regardless of consent. It filters by plugin origin, captures to
             // Sentry only when telemetry is enabled, and always calls SetObserved().
         }
+
         /// <summary>
         /// Private WebView2 profile directory, kept inside the plugin's own data folder. The default
         /// profile is derived from the host process and is therefore shared by every Playnite
@@ -101,6 +102,7 @@ namespace GsPlugin {
         private GsUpdateChecker _updateChecker;
         private GsNotificationService _notificationService;
         private bool _disposed;
+
         /// <summary>
         /// Set when <see cref="GsDataManager.Initialize"/> could not read the data file. Every
         /// entry point below returns early on it, because the services it would use were never
@@ -111,18 +113,21 @@ namespace GsPlugin {
         private int _librarySyncInFlight;
         private int _achievementSyncInFlight;
         private Timer _pendingFlushTimer;
+
         /// <summary>
         /// Synchronizes _pendingFlushTimer creation (OnApplicationStarted, after several
         /// awaits) with its disposal (Dispose()) so a shutdown racing startup can't leave
         /// an orphaned timer created after _disposed was already set.
         /// </summary>
         private readonly object _timerLock = new object();
+
         /// <summary>
         /// Serializes the install-token registration flow so startup (EnsureInstallTokenAsync)
         /// and on-demand callers (EnsureInstallTokenReadyAsync, e.g. the "Delete My Data"
         /// button) cannot register concurrently and double-register the install.
         /// </summary>
         private readonly SemaphoreSlim _installTokenGate = new SemaphoreSlim(1, 1);
+
         /// <summary>
         /// Unique identifier for the plugin itself.
         /// </summary>
@@ -133,7 +138,6 @@ namespace GsPlugin {
         /// </summary>
         /// <param name="api">Instance of Playnite API to be injected.</param>
         public GsPlugin(IPlayniteAPI api) : base(api) {
-
             // Initialize GsDataManager
             try {
                 GsDataManager.Initialize(GetPluginUserDataPath(), null);
@@ -164,6 +168,7 @@ namespace GsPlugin {
                 catch (Exception notifyEx) {
                     _logger.Error(notifyEx, "Could not surface the unreadable-data notification");
                 }
+
                 return;
             }
 
@@ -183,6 +188,7 @@ namespace GsPlugin {
 
             // Create settings with linking service and achievement helper dependencies
             _settings = new GsPluginSettingsViewModel(this, _linkingService, _achievementHelper, _apiClient);
+
             // Load saved privacy preferences before starting either telemetry SDK.
             GsSentry.ApplyPreferences();
             GsPostHog.ApplyPreferences();
@@ -228,6 +234,7 @@ namespace GsPlugin {
                 if (GsDataManager.IsTrackingPaused) {
                     return;
                 }
+
                 try {
                     await body();
                 }
@@ -274,6 +281,7 @@ namespace GsPlugin {
         public override async void OnApplicationStarted(OnApplicationStartedEventArgs args) {
             if (_dataUnavailable || GsDataManager.IsTrackingPaused) { base.OnApplicationStarted(args); return; }
             var sw = System.Diagnostics.Stopwatch.StartNew();
+
             // Detect first run before any async work: no prior sync and no token yet.
             bool isFirstRun = GsDataManager.Data.LastSyncAt == null
                 && string.IsNullOrEmpty(GsDataManager.Data.InstallToken);
@@ -395,6 +403,7 @@ namespace GsPlugin {
                 if (isFirstRun) {
                     PlayniteApi.Notifications.Remove("gs-first-run-setup");
                 }
+
                 base.OnApplicationStarted(args);
             }
         }
@@ -466,9 +475,11 @@ namespace GsPlugin {
             if (_dataUnavailable) {
                 return null;
             }
+
             if (args.Name == "Dashboard") {
                 return CreateDashboardSurface();
             }
+
             return null;
         }
 
@@ -479,6 +490,7 @@ namespace GsPlugin {
         /// <returns>A collection of SidebarItem objects to be displayed in the sidebar.</returns>
         public override IEnumerable<SidebarItem> GetSidebarItems() {
             if (_dataUnavailable) yield break;
+
             // Load the icon from the plugin directory, with a fallback if the file is missing or corrupt
             object iconImage = null;
             try {
@@ -555,6 +567,7 @@ namespace GsPlugin {
                         if (result != SyncLibraryResult.Error) {
                             _ = SyncAchievementsWithDiffAsync().LogFaults("Manual achievement sync failed");
                         }
+
                         PlayniteApi.Dialogs.ShowMessage(message, "Game Scrobbler");
                     }
                     catch (Exception ex) {
@@ -632,6 +645,7 @@ namespace GsPlugin {
                 if (!string.IsNullOrEmpty(GsDataManager.Data.InstallToken)) {
                     return;
                 }
+
                 await EnsureInstallTokenCoreAsync();
             }
             finally {
@@ -661,6 +675,7 @@ namespace GsPlugin {
                     if (attempt > 0) {
                         await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
                     }
+
                     result = await _apiClient.RegisterInstallToken(installId);
                     if (result != null) break;
                     _logger.Warn($"EnsureInstallTokenAsync: attempt {attempt + 1}/3 returned null");
@@ -681,6 +696,7 @@ namespace GsPlugin {
                     else {
                         _logger.Warn("EnsureInstallTokenAsync: opt-out occurred during registration; token discarded");
                     }
+
                     return;
                 }
 
@@ -702,6 +718,7 @@ namespace GsPlugin {
                     else {
                         _logger.Warn("EnsureInstallTokenAsync: re-registration after rotation failed; will retry on next startup");
                     }
+
                     return;
                 }
 
@@ -739,14 +756,17 @@ namespace GsPlugin {
             if (GsDataManager.IsTrackingPaused) {
                 return SyncLibraryResult.Skipped;
             }
+
             if (Interlocked.CompareExchange(ref _librarySyncInFlight, 1, 0) != 0) {
                 _logger.Info("Library sync already in flight — skipping.");
                 return SyncLibraryResult.Skipped;
             }
+
             try {
                 if (GsSyncHashIndex.HasLibraryBaseline) {
                     return await _scrobblingService.SyncLibraryDiffAsync(PlayniteApi.Database.Games);
                 }
+
                 return await _scrobblingService.SyncLibraryFullAsync(PlayniteApi.Database.Games);
             }
             finally {
@@ -762,10 +782,12 @@ namespace GsPlugin {
             if (GsDataManager.IsTrackingPaused) {
                 return;
             }
+
             if (Interlocked.CompareExchange(ref _achievementSyncInFlight, 1, 0) != 0) {
                 _logger.Info("Achievement sync already in flight — skipping.");
                 return;
             }
+
             try {
                 if (GsSyncHashIndex.HasAchievementsBaseline) {
                     await _scrobblingService.SyncAchievementsDiffAsync(PlayniteApi.Database.Games);
@@ -811,6 +833,7 @@ namespace GsPlugin {
 
                 try {
                     GsSentry.Shutdown();
+
                     // Only here. Consent changes call Shutdown() too, and detaching the global
                     // handlers there would let a privacy preference disable the plugin's own
                     // fault observation; process teardown is the one moment it is right to.
@@ -836,5 +859,4 @@ namespace GsPlugin {
             base.Dispose();
         }
     }
-
 }

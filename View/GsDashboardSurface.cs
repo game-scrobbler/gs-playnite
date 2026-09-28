@@ -16,6 +16,7 @@ namespace GsPlugin.View {
             if (GsDataManager.IsTrackingPaused) {
                 return new OptedOutView(apiClient, openSettings);
             }
+
             return new MySidebarView(apiClient, webViewUserDataFolder, openSettings);
         }
     }

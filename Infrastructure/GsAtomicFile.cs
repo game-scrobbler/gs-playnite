@@ -20,6 +20,7 @@ namespace GsPlugin.Infrastructure {
             if (string.IsNullOrEmpty(filePath)) {
                 return;
             }
+
             var tempPath = filePath + ".tmp";
             if (!File.Exists(filePath) && File.Exists(tempPath)) {
                 try {
@@ -112,6 +113,7 @@ namespace GsPlugin.Infrastructure {
         /// </param>
         public static void WriteJson<T>(string filePath, T value, JsonSerializerOptions options, bool durable = false) {
             var tempPath = filePath + ".tmp";
+
             // Opening the temp file gets the same retry as the replace below. A save that just
             // failed leaves this exact path freshly written and abandoned, which is precisely the
             // file a scanner is holding, so the open is exposed to the hazard the replace already
@@ -144,6 +146,7 @@ namespace GsPlugin.Infrastructure {
             if (string.IsNullOrEmpty(path) || !File.Exists(path)) {
                 return;
             }
+
             try {
                 File.Delete(path);
             }

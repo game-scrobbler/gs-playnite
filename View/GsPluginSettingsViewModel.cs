@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows.Threading;
-using Playnite.SDK;
-using Playnite.SDK.Data;
-using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Services;
+using Playnite.SDK;
+using Playnite.SDK.Data;
+using Sentry;
 using PluginClass = GsPlugin.GsPlugin;
 
 namespace GsPlugin.Models {
@@ -60,11 +60,13 @@ namespace GsPlugin.Models {
                             ? $"{p.ProviderName} (v{version})"
                             : p.ProviderName);
                     }
+
                     _achievementProviderStatusText = parts.Count > 0
                         ? GsLocalization.Format("LOCGsPluginAchievementProviderDetectedFormat",
                             string.Join(", ", parts) + " detected", string.Join(", ", parts))
                         : "";
                 }
+
                 return _achievementProviderStatusText;
             }
         }
@@ -109,6 +111,7 @@ namespace GsPlugin.Models {
         }
 
         #region Constructor
+
         /// <summary>
         /// Initializes a new instance of the GsPluginSettingsViewModel.
         /// </summary>
@@ -144,6 +147,7 @@ namespace GsPlugin.Models {
             else {
                 CreateDefaultSettings();
             }
+
             // Subscribe to property changes for UI updates
             if (Settings != null) {
                 Settings.PropertyChanged += (s, e) => OnPropertyChanged("Settings");
@@ -297,6 +301,7 @@ namespace GsPlugin.Models {
                 Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginPleaseEnterToken", "Please enter a token");
                 return false;
             }
+
             return true;
         }
 
@@ -313,6 +318,7 @@ namespace GsPlugin.Models {
 
                 if (result.Success) {
                     Settings.LinkStatusMessage = GsLocalization.Get("LOCGsPluginLinkSuccess", "Successfully linked account!");
+
                     // Note: OnLinkingStatusChanged() is already called inside LinkAccountAsync
                 }
                 else if (result.IsTokenExpiry) {
@@ -335,6 +341,7 @@ namespace GsPlugin.Models {
             finally {
                 Settings.IsLinking = false;
                 StopCountdown();
+
                 // Preserve the token on network errors so the user can retry without re-entering it
                 if (!preserveToken) {
                     Settings.LinkToken = "";
@@ -355,6 +362,7 @@ namespace GsPlugin.Models {
                 _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
                 _countdownTimer.Tick += (s, e) => UpdateCountdownText();
             }
+
             _countdownTimer.Start();
         }
 
@@ -378,6 +386,7 @@ namespace GsPlugin.Models {
                 Settings.TokenCountdown = "";
                 return;
             }
+
             Settings.TokenCountdown = GsLocalization.Format("LOCGsPluginTokenCountdownFormat", "Token expires in ~{0}:{1}", (int)remaining.TotalMinutes, remaining.Seconds.ToString("D2"));
         }
 
@@ -417,6 +426,7 @@ namespace GsPlugin.Models {
                     GsPostHog.ApplyPreferences();
                     GsSyncHashIndex.ClearAll();
                     Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteSuccess", "Your data has been deleted. The plugin is now disabled.");
+
                     // Notify UI to refresh connection status and button visibility
                     OnLinkingStatusChanged();
                 }

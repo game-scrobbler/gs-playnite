@@ -2,8 +2,8 @@ using System;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
-using Xunit;
 using GsPlugin.Services;
+using Xunit;
 
 namespace GsPlugin.Tests {
     public class PlayniteAchievementsSqliteTests : IDisposable {

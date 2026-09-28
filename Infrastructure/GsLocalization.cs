@@ -21,6 +21,7 @@ namespace GsPlugin.Infrastructure {
             catch {
                 // Silently fall back — resource lookup should never crash the plugin.
             }
+
             return fallback ?? key;
         }
 

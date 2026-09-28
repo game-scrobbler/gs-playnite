@@ -4,10 +4,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
-using Playnite.SDK;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
+using Playnite.SDK;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -137,6 +137,7 @@ namespace GsPlugin.Services {
                     GsLogger.Warn($"Notification action_url rejected (untrusted host): {actionUrl}");
                     return null;
                 }
+
                 return () => {
                     try {
                         Process.Start(new ProcessStartInfo(actionUrl) { UseShellExecute = true });

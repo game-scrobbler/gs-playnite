@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
-using Xunit;
 using GsPlugin.Api;
 using GsPlugin.Models;
+using Xunit;
 
 namespace GsPlugin.Tests {
     /// <summary>

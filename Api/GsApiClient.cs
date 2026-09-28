@@ -9,10 +9,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Playnite.SDK;
-using Sentry;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
+using Playnite.SDK;
+using Sentry;
 
 namespace GsPlugin.Api {
     public class GsApiClient : IGsApiClient {
@@ -116,6 +116,7 @@ namespace GsPlugin.Api {
             if (HasIdentity(userId)) {
                 return true;
             }
+
             _logger.Error($"{caller} called with no user_id and no install token");
             return false;
         }
@@ -129,6 +130,7 @@ namespace GsPlugin.Api {
             if (req != null) {
                 return true;
             }
+
             _logger.Error($"{caller} called with null {argName}");
             return false;
         }
@@ -186,11 +188,13 @@ namespace GsPlugin.Api {
                     if (onAttempt == null) {
                         AddExpectedRejectionBreadcrumb("start", envelope.code, diagnostics.StatusCode);
                     }
+
                     return null;
 
                 case ApiOutcome.Fail:
                 case ApiOutcome.Error:
                     _logger.Warn($"Scrobble start rejected by server: [{envelope.code}] {envelope.message}");
+
                     // Flush retries already reported the live failure; do not open a new
                     // issue every 5 minutes for the same queued start.
                     if (onAttempt == null) {
@@ -203,6 +207,7 @@ namespace GsPlugin.Api {
                                 attempts, diagnostics, envelope.Outcome.ToString(), startData.game_name),
                             fingerprint: new[] { "gs-playnite", "scrobble-start-fail", envelope.code ?? "unknown" });
                     }
+
                     return null;
 
                 default:
@@ -250,6 +255,7 @@ namespace GsPlugin.Api {
                 else {
                     _logger.Info($"Finishing session without session_id (game: {sendData.game_name ?? "unknown"}), {fallback}");
                 }
+
                 sendData.session_id = null;
             }
 
@@ -294,6 +300,7 @@ namespace GsPlugin.Api {
                     if (onAttempt == null) {
                         AddExpectedRejectionBreadcrumb("finish", envelope.code, diagnostics.StatusCode);
                     }
+
                     return new ScrobbleFinishRes();
 
                 case ApiOutcome.Fail:
@@ -407,6 +414,7 @@ namespace GsPlugin.Api {
                         if (!attempted && _circuitBreaker.IsBlocking) {
                             break;
                         }
+
                         // Mutate-then-save under GsDataManager's lock, rather than incrementing
                         // the field directly and calling Save() separately — keeps this in line
                         // with every other queue mutation (see RemovePendingScrobble) instead of
@@ -423,6 +431,7 @@ namespace GsPlugin.Api {
                                     { "queued_at", item.QueuedAt.ToString("O") }
                                 });
                         }
+
                         // else: item stays in the queue with its incremented FlushAttempts counter,
                         // already persisted by IncrementPendingScrobbleFlushAttempts above.
                         // Keep FIFO order: a finish must never overtake its failed start, even if
@@ -470,6 +479,7 @@ namespace GsPlugin.Api {
                 _logger.Error("SyncLibraryFullBegin called with no install token");
                 return null;
             }
+
             return await PostV4Async<V4SyncBeginRes>(
                 $"{_apiBaseUrl}/api/playnite/v4/library/sync-full/begin", req, nameof(SyncLibraryFullBegin));
         }
@@ -518,6 +528,7 @@ namespace GsPlugin.Api {
                 _logger.Error("SyncAchievementsFullBegin called with no install token");
                 return null;
             }
+
             return await PostV4Async<V4SyncBeginRes>(
                 $"{_apiBaseUrl}/api/playnite/v4/achievements/sync-full/begin", req, nameof(SyncAchievementsFullBegin));
         }
@@ -554,6 +565,7 @@ namespace GsPlugin.Api {
             if (!RequireRequest(req, logName)) {
                 return null;
             }
+
             // 0 until a response arrives, so a transport failure stays retryable.
             var lastStatus = 0;
             return await _circuitBreaker.ExecuteAsync(
@@ -582,6 +594,7 @@ namespace GsPlugin.Api {
             if (string.IsNullOrEmpty(syncId)) {
                 return;
             }
+
             try {
                 await PostJsonAsync<object>(url, new V4SyncAbortReq { sync_id = syncId }, true);
             }
@@ -618,6 +631,7 @@ namespace GsPlugin.Api {
                 new RegisterInstallTokenReq { playnite_user_id = installId },
                 attachToken: false,
                 logName: nameof(RegisterInstallToken),
+
                 // An unreadable body still means the server answered: returning an empty failure
                 // rather than null tells EnsureInstallTokenAsync to stop retrying. Only a
                 // transport exception (null from the helper) keeps the retry loop going.
@@ -708,6 +722,7 @@ namespace GsPlugin.Api {
             if (string.IsNullOrEmpty(queueId)) {
                 return null;
             }
+
             return await GetJsonAsync<QueueStatusRes>($"{_apiBaseUrl}/api/playnite/queue/status/{queueId}");
         }
 
@@ -975,15 +990,19 @@ namespace GsPlugin.Api {
             if (!string.IsNullOrEmpty(gameName)) {
                 data["game"] = gameName;
             }
+
             if (!string.IsNullOrEmpty(userId)) {
                 data["user_id"] = userId;
             }
+
             if (!string.IsNullOrEmpty(sessionId)) {
                 data["session_id"] = sessionId;
             }
+
             if (data.Count > 0) {
                 GsSentry.AddBreadcrumb(message: "scrobble failure context", category: "scrobble", data: data);
             }
+
             GsSentry.CaptureMessage(message, level, fingerprint, extras);
         }
 
@@ -1051,6 +1070,7 @@ namespace GsPlugin.Api {
             using (var gzip = new GZipStream(compressedStream, CompressionLevel.Fastest, leaveOpen: true)) {
                 gzip.Write(jsonBytes, 0, jsonBytes.Length);
             }
+
             compressedStream.Position = 0;
             var content = new StreamContent(compressedStream);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
@@ -1103,6 +1123,7 @@ namespace GsPlugin.Api {
                     else {
                         response = await _httpClient.PostAsync(url, content).ConfigureAwait(false);
                     }
+
                     // Report the status before reading the body: if the body read
                     // throws, the server still answered, and a 4xx must stay
                     // classified as a permanent rejection rather than falling back
@@ -1151,6 +1172,7 @@ namespace GsPlugin.Api {
                                 try {
                                     var errorResponse =
                                         JsonSerializer.Deserialize<TResponse>(responseBody, _jsonOptions);
+
                                     // Deserializing without throwing proves nothing: System.Text.Json
                                     // fills a body it does not recognize with defaults, so a generic
                                     // 401 {"error":"invalid_token"} would come back as a non-null
@@ -1169,6 +1191,7 @@ namespace GsPlugin.Api {
                                 }
                             }
                         }
+
                         return null;
                     }
 
@@ -1194,6 +1217,7 @@ namespace GsPlugin.Api {
                             _logger.Warn($"Deserialization returned null for {url}. Response: {responseBody}");
                             diagnostics?.SetFailure("json");
                         }
+
                         return deserializedResponse;
                     }
                     catch (JsonException jsonEx) {
@@ -1216,6 +1240,7 @@ namespace GsPlugin.Api {
                     if (captureExceptions) {
                         CaptureHttpException(ex, url, jsonData, response, responseBody);
                     }
+
                     return null;
                 }
             }
@@ -1269,6 +1294,7 @@ namespace GsPlugin.Api {
                     if (jsonData != null) {
                         request.Content = CreateJsonContent(jsonData);
                     }
+
                     if (attachToken) {
                         var installToken = GsDataManager.DataOrNull?.InstallToken;
                         if (!string.IsNullOrEmpty(installToken)) {
@@ -1328,6 +1354,7 @@ namespace GsPlugin.Api {
                 else {
                     _logger.Warn(ex, $"{logName} HTTP error");
                 }
+
                 return null;
             }
         }
@@ -1424,18 +1451,23 @@ namespace GsPlugin.Api {
             if (diagnostics != null && diagnostics.StatusCode > 0) {
                 extras["http_status"] = diagnostics.StatusCode.ToString();
             }
+
             if (!string.IsNullOrEmpty(diagnostics?.ExceptionType)) {
                 extras["exception_type"] = diagnostics.ExceptionType;
             }
+
             if (!string.IsNullOrEmpty(diagnostics?.ResponseContentType)) {
                 extras["response_content_type"] = diagnostics.ResponseContentType;
             }
+
             if (!string.IsNullOrEmpty(outcome)) {
                 extras["outcome"] = outcome;
             }
+
             if (!string.IsNullOrEmpty(gameName)) {
                 extras["game"] = gameName;
             }
+
             return extras;
         }
     }

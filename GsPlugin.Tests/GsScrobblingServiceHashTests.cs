@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Xunit;
 using GsPlugin.Api;
 using GsPlugin.Services;
+using Xunit;
 
 namespace GsPlugin.Tests {
     public class GsScrobblingServiceHashTests {

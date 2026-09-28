@@ -57,6 +57,7 @@ namespace GsPlugin.Services {
                         }
                     }
                 }
+
                 return null;
             });
         }
@@ -97,6 +98,7 @@ namespace GsPlugin.Services {
                             DateTime? dateUnlocked = null;
                             if (!reader.IsDBNull(3)) {
                                 var unlockStr = reader.GetString(3);
+
                                 // InvariantCulture, not null: a null provider means CurrentCulture,
                                 // so an ISO timestamp read under a non-Gregorian calendar (th-TH,
                                 // ar-SA) parses to a wildly wrong year and is then uploaded.

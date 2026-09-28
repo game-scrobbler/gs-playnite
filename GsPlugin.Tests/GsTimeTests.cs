@@ -1,6 +1,6 @@
 using System;
-using Xunit;
 using GsPlugin.Models;
+using Xunit;
 
 namespace GsPlugin.Tests {
     public class GsTimeTests {

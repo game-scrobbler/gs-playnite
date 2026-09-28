@@ -2,11 +2,11 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
+using GsPlugin.Infrastructure;
+using GsPlugin.Models;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Sentry;
-using GsPlugin.Infrastructure;
-using GsPlugin.Models;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -60,10 +60,12 @@ namespace GsPlugin.Services {
                 // Log the arguments for debugging (mask sensitive token values)
                 for (int i = 0; i < args.Arguments.Length; i++) {
                     string logValue = args.Arguments[i];
+
                     // Mask token values (argument after "link" command)
                     if (i == 1 && args.Arguments.Length >= 2 && args.Arguments[0].Equals("link", StringComparison.OrdinalIgnoreCase)) {
                         logValue = logValue.Length > 4 ? logValue.Substring(0, 4) + "****" : "****";
                     }
+
                     GsLogger.Info($"Argument {i}: {logValue}");
                 }
 
@@ -142,6 +144,7 @@ namespace GsPlugin.Services {
             catch (Exception ex) {
                 GsLogger.Warn($"Failed to parse expires_at from deep link: {ex.Message}");
             }
+
             return null;
         }
 
@@ -189,6 +192,7 @@ namespace GsPlugin.Services {
                         if (retry != MessageBoxResult.Yes) {
                             return;
                         }
+
                         // Loop continues to next attempt
                     }
                     else {
@@ -246,7 +250,6 @@ namespace GsPlugin.Services {
                 }
             }
         }
-
 
         /// <summary>
         /// Handles empty token scenario.

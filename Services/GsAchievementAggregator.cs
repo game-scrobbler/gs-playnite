@@ -45,6 +45,7 @@ namespace GsPlugin.Services {
                 var counts = p.GetCounts(gameId);
                 if (counts.HasValue && counts.Value.total > 0) return counts;
             }
+
             return null;
         }
 
@@ -56,10 +57,12 @@ namespace GsPlugin.Services {
         public AchievementReadResult ReadAchievements(Guid gameId) {
             foreach (var p in ResolutionOrder()) {
                 var result = AchievementReadResult.Read(p, gameId);
+
                 // A failed preferred provider cannot safely be replaced with a potentially
                 // older fallback snapshot. Retry the snapshot after the read recovers.
                 if (!result.IsAvailable || result.Achievements.Count > 0) return result;
             }
+
             return AchievementReadResult.Available(null);
         }
 

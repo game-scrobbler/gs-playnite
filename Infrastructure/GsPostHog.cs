@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using GsPlugin.Models;
 using Microsoft.Extensions.Options;
 using Playnite.SDK;
 using PostHog;
-using GsPlugin.Models;
 
 namespace GsPlugin.Infrastructure {
     /// <summary>
@@ -142,6 +142,7 @@ namespace GsPlugin.Infrastructure {
                 });
                 if (!disposeTask.Wait(TimeSpan.FromSeconds(2))) {
                     _logger.Warn("PostHog dispose timed out during shutdown; abandoning");
+
                     // Dispose keeps running in the background after we give up waiting on it —
                     // observe any fault it eventually throws so it doesn't surface later as an
                     // unobserved task exception.

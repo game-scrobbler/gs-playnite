@@ -44,6 +44,7 @@ namespace GsPlugin.Infrastructure {
                     RequestMessage = request
                 });
             }
+
             return base.SendAsync(request, cancellationToken);
         }
     }

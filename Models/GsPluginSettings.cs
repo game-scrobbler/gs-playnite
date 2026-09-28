@@ -24,6 +24,7 @@ namespace GsPlugin.Models {
                 OnPropertyChanged();
             }
         }
+
         private bool _disableScrobbling = false;
         public bool DisableScrobbling {
             get => _disableScrobbling;
@@ -86,6 +87,7 @@ namespace GsPlugin.Models {
                 OnPropertyChanged();
             }
         }
+
         private bool _isLinking = false;
         public bool IsLinking {
             get => _isLinking;
@@ -94,6 +96,7 @@ namespace GsPlugin.Models {
                 OnPropertyChanged();
             }
         }
+
         private string _linkStatusMessage = "";
         public string LinkStatusMessage {
             get => _linkStatusMessage;
@@ -120,6 +123,7 @@ namespace GsPlugin.Models {
                 OnPropertyChanged();
             }
         }
+
         private string _deleteStatusMessage = "";
         public string DeleteStatusMessage {
             get => _deleteStatusMessage;

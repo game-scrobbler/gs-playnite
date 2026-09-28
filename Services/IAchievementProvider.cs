@@ -29,7 +29,9 @@ namespace GsPlugin.Services {
             if (provider is IReliableAchievementProvider reliable) {
                 return reliable.ReadAchievements(gameId);
             }
+
             var items = provider.GetAchievements(gameId);
+
             // Older providers cannot distinguish absence from a read failure. Preserve the
             // existing baseline when their answer is ambiguous.
             return items == null ? Unavailable(provider.ProviderName) : Available(items, provider.ProviderName);

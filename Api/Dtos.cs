@@ -6,7 +6,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Scrobble DTOs
     // ──────────────────────────────────────────────────────────
-
     public class ScrobbleStartReq {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string user_id { get; set; }
@@ -23,7 +22,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // v3 standard API envelope
     // ──────────────────────────────────────────────────────────
-
     public enum ApiOutcome {
         Success,
         Queued,
@@ -97,6 +95,7 @@ namespace GsPlugin.Api {
 
     public class QueueStatusData {
         public string id { get; set; }
+
         /// <summary>pending | processing | completed | partial | failed | retrying</summary>
         public string status { get; set; }
         public string errorMessage { get; set; }
@@ -115,6 +114,7 @@ namespace GsPlugin.Api {
         public string finished_at { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string session_id { get; set; }
+
         /// <summary>
         /// When this session began, echoed verbatim from the start event so the
         /// finish can stand on its own.
@@ -187,7 +187,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // v4 chunked full sync
     // ──────────────────────────────────────────────────────────
-
     public class LibraryV4FullSyncBeginReq {
         public int expected_total_items { get; set; }
         public string result_snapshot_hash { get; set; }
@@ -260,8 +259,10 @@ namespace GsPlugin.Api {
         public List<GameSyncDto> added { get; set; }
         public List<GameSyncDto> updated { get; set; }
         public List<string> removed { get; set; }
+
         /// <summary>Hash of the library *before* this diff (the previous synced baseline).</summary>
         public string base_snapshot_hash { get; set; }
+
         /// <summary>
         /// Hash of the library *after* this diff (the current full-library state).
         /// The server stores this verbatim as the next baseline instead of
@@ -277,7 +278,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Achievement DTOs
     // ──────────────────────────────────────────────────────────
-
     public class AchievementItemDto {
         public string name { get; set; }
         public string description { get; set; }
@@ -313,6 +313,7 @@ namespace GsPlugin.Api {
         public string user_id { get; set; }
         public List<GameAchievementsDto> changed { get; set; }
         public string base_snapshot_hash { get; set; }
+
         /// <summary>
         /// Hash of the achievement snapshot *after* this diff. Stored verbatim
         /// as the next server baseline (mirrors library diff sync).
@@ -324,7 +325,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Install Token / Registration DTOs
     // ──────────────────────────────────────────────────────────
-
     public class RegisterInstallTokenReq {
         public string playnite_user_id { get; set; }
     }
@@ -346,7 +346,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Allowed Plugins DTOs
     // ──────────────────────────────────────────────────────────
-
     public class AllowedPluginsRes {
         public int schemaVersion { get; set; }
         public bool supportsSourceAliases { get; set; }
@@ -365,7 +364,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Token Verification DTOs
     // ──────────────────────────────────────────────────────────
-
     public class TokenVerificationReq {
         public string token { get; set; }
         public string playniteId { get; set; }
@@ -391,7 +389,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Account Unlinking DTOs
     // ──────────────────────────────────────────────────────────
-
     public class UnlinkRes {
         public bool success { get; set; }
         public string error { get; set; }
@@ -400,7 +397,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Data Deletion DTOs
     // ──────────────────────────────────────────────────────────
-
     public class DeleteDataReq {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string user_id { get; set; }
@@ -442,7 +438,6 @@ namespace GsPlugin.Api {
     // ──────────────────────────────────────────────────────────
     // Notification DTOs
     // ──────────────────────────────────────────────────────────
-
     public class PlayniteNotificationDto {
         public string id { get; set; }
         public string title { get; set; }

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using GsPlugin.Models;
 using Playnite.SDK;
 using Sentry;
-using GsPlugin.Models;
 
 namespace GsPlugin.Infrastructure {
     /// <summary>
@@ -65,6 +65,7 @@ namespace GsPlugin.Infrastructure {
                     _unhandledExceptionHandler = OnAppDomainUnhandledException;
                     AppDomain.CurrentDomain.UnhandledException += _unhandledExceptionHandler;
                 }
+
                 if (_unobservedTaskExceptionHandler == null) {
                     _unobservedTaskExceptionHandler = OnUnobservedTaskException;
                     System.Threading.Tasks.TaskScheduler.UnobservedTaskException += _unobservedTaskExceptionHandler;
@@ -82,6 +83,7 @@ namespace GsPlugin.Infrastructure {
                     AppDomain.CurrentDomain.UnhandledException -= _unhandledExceptionHandler;
                     _unhandledExceptionHandler = null;
                 }
+
                 if (_unobservedTaskExceptionHandler != null) {
                     System.Threading.Tasks.TaskScheduler.UnobservedTaskException -= _unobservedTaskExceptionHandler;
                     _unobservedTaskExceptionHandler = null;
@@ -122,6 +124,7 @@ namespace GsPlugin.Infrastructure {
                 if (fromUs) {
                     _logger.Error(e.Exception, "UnobservedTaskException captured (from GsPlugin)");
                     CaptureException(e.Exception, "TaskScheduler.UnobservedTaskException");
+
                     // Only ours. SetObserved() suppresses the fault process-wide, and this handler
                     // now runs regardless of telemetry consent, so calling it on another
                     // extension's task would silently override whatever escalation the host or
@@ -216,10 +219,12 @@ namespace GsPlugin.Infrastructure {
                     options.SendDefaultPii = false;
                     options.SampleRate = disableSentryFlag ? 0.0f : 1.0f;
                     options.TracesSampleRate = disableSentryFlag ? 0.0f : 0.1f;
+
                     // Never enable continuous profiling in-process — it keeps background
                     // workers alive and has been implicated in Playnite refusing to quit.
                     options.ProfilesSampleRate = 0.0f;
                     options.AutoSessionTracking = !disableSentryFlag;
+
                     // CaptureFailedRequests + FailedRequestStatusCodes.Add((400,499)) constructs
                     // Sentry.HttpStatusCodeRange. Playnite loads all plugins into one AppDomain;
                     // if another extension already loaded an older Sentry.dll, that Add() throws
@@ -231,6 +236,7 @@ namespace GsPlugin.Infrastructure {
                     options.IsGlobalModeEnabled = false;
                     options.DiagnosticLevel = SentryLevel.Warning;
                     options.AttachStacktrace = true;
+
                     // Cap breadcrumb buffer to reduce per-session memory overhead.
                     options.MaxBreadcrumbs = 50;
 
@@ -245,6 +251,7 @@ namespace GsPlugin.Infrastructure {
 
                     options.SetBeforeSend((sentryEvent, hint) => {
                         if (!consent.IsAllowed) return null;
+
                         // Always allow explicitly captured messages (our own CaptureMessage calls)
                         if (sentryEvent.Exception == null) {
                             return Scrub(sentryEvent);
@@ -262,6 +269,7 @@ namespace GsPlugin.Infrastructure {
                                 if (se.Module != null && se.Module.StartsWith(ourNamespace)) {
                                     return Scrub(sentryEvent);
                                 }
+
                                 if (se.Stacktrace?.Frames != null) {
                                     foreach (var frame in se.Stacktrace.Frames) {
                                         if (frame.Module != null && frame.Module.StartsWith(ourNamespace)) {
@@ -293,7 +301,6 @@ namespace GsPlugin.Infrastructure {
                 catch (Exception ex) {
                     _logger.Debug(ex, "Failed to configure Sentry scope (non-critical)");
                 }
-
 
                 _initialized = true;
                 _logger.Info($"Sentry initialized. Tracking enabled: {!disableSentryFlag}");
@@ -397,6 +404,7 @@ namespace GsPlugin.Infrastructure {
                         if (se.Stacktrace?.Frames == null) {
                             continue;
                         }
+
                         foreach (var frame in se.Stacktrace.Frames) {
                             frame.AbsolutePath = ScrubText(frame.AbsolutePath);
                             frame.FileName = ScrubText(frame.FileName);
@@ -407,6 +415,7 @@ namespace GsPlugin.Infrastructure {
             catch (Exception ex) {
                 _logger.Debug(ex, "Sentry PII scrub failed; sending event unscrubbed");
             }
+
             return sentryEvent;
         }
 
@@ -423,6 +432,7 @@ namespace GsPlugin.Infrastructure {
                             return true;
                         }
                     }
+
                     return false;
                 }
 
@@ -491,6 +501,7 @@ namespace GsPlugin.Infrastructure {
             IReadOnlyCollection<string> fingerprint = null,
             IReadOnlyDictionary<string, string> extras = null) {
             if (!_initialized || _consent?.IsAllowed != true) return;
+
             // Skip if Sentry is disabled, data not yet initialized, or user opted out
             var data = GsDataManager.DataOrNull;
             if (data == null) return;
@@ -504,6 +515,7 @@ namespace GsPlugin.Infrastructure {
                     if (fingerprint != null && fingerprint.Count > 0) {
                         scope.SetFingerprint(fingerprint);
                     }
+
                     if (extras != null) {
                         foreach (var kv in extras) {
                             if (!string.IsNullOrEmpty(kv.Key) && kv.Value != null) {
@@ -523,6 +535,7 @@ namespace GsPlugin.Infrastructure {
         /// <param name="message">An optional message describing the context of the exception.</param>
         public static void CaptureException(Exception exception, string message = null) {
             if (!_initialized || _consent?.IsAllowed != true) return;
+
             // Skip if Sentry is disabled or data not yet initialized
             var data = GsDataManager.DataOrNull;
             if (data == null) return;
@@ -551,6 +564,7 @@ namespace GsPlugin.Infrastructure {
         /// <param name="level">The severity level of the breadcrumb.</param>
         public static void AddBreadcrumb(string message, string category = null, Dictionary<string, string> data = null, BreadcrumbLevel level = BreadcrumbLevel.Info) {
             if (!_initialized || _consent?.IsAllowed != true) return;
+
             // Skip if Sentry is disabled or data not yet initialized
             var gsData = GsDataManager.DataOrNull;
             if (gsData == null) return;

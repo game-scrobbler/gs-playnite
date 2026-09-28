@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
-using Xunit;
 using GsPlugin.Services;
+using Xunit;
 
 namespace GsPlugin.Tests {
     public class SuccessStoryFileReaderTests : IDisposable {
