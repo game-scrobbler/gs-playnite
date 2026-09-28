@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Xunit;
 using GsPlugin.Api;
+using Xunit;
 using static GsPlugin.Api.GsApiClient;
 
 namespace GsPlugin.Tests {

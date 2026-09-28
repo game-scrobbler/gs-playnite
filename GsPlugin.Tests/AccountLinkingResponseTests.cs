@@ -1,7 +1,7 @@
-using Xunit;
 using GsPlugin.Api;
 using GsPlugin.Models;
 using GsPlugin.Services;
+using Xunit;
 
 namespace GsPlugin.Tests {
     /// <summary>

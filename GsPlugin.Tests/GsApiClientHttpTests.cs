@@ -5,9 +5,9 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
 using GsPlugin.Api;
 using GsPlugin.Models;
+using Xunit;
 
 namespace GsPlugin.Tests {
     /// <summary>

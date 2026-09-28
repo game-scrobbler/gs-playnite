@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Xunit;
 using GsPlugin.Api;
 using GsPlugin.Models;
 using GsPlugin.Services;
+using Xunit;
 
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]
