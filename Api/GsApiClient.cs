@@ -1129,6 +1129,11 @@ namespace GsPlugin.Api {
                         _logger.Warn(
                             $"POST {url} returned {(int)response.StatusCode} ({response.StatusCode}): {body}");
                         diagnostics?.SetFailure("http");
+                        if (diagnostics != null) {
+                            diagnostics.ResponseContentType = string.IsNullOrWhiteSpace(responseBody)
+                                ? "none"
+                                : response.Content?.Headers?.ContentType?.MediaType ?? "unknown";
+                        }
 
                         if (ensureSuccess) {
                             var httpEx = new HttpRequestException(
@@ -1339,10 +1344,18 @@ namespace GsPlugin.Api {
         public string FailureKind { get; set; }
         public string ExceptionType { get; set; }
 
+        /// <summary>
+        /// Media type of an error response, or "none" when it had no body. A proxy's HTML error
+        /// page and an application rejection can share a status code; this is what tells them
+        /// apart on the Sentry event.
+        /// </summary>
+        public string ResponseContentType { get; set; }
+
         public void Reset() {
             StatusCode = 0;
             FailureKind = null;
             ExceptionType = null;
+            ResponseContentType = null;
         }
 
         public void SetFailure(string kind, Exception ex = null) {
@@ -1413,6 +1426,9 @@ namespace GsPlugin.Api {
             }
             if (!string.IsNullOrEmpty(diagnostics?.ExceptionType)) {
                 extras["exception_type"] = diagnostics.ExceptionType;
+            }
+            if (!string.IsNullOrEmpty(diagnostics?.ResponseContentType)) {
+                extras["response_content_type"] = diagnostics.ResponseContentType;
             }
             if (!string.IsNullOrEmpty(outcome)) {
                 extras["outcome"] = outcome;

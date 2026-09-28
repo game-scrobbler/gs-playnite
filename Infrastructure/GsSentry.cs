@@ -138,6 +138,25 @@ namespace GsPlugin.Infrastructure {
             }
         }
 
+        /// <summary>
+        /// Playnite ships as Playnite.DesktopApp.exe and Playnite.FullscreenApp.exe. If the
+        /// process name cannot be read, assume Playnite rather than silently losing reports.
+        /// </summary>
+        internal static bool IsPlayniteHost() {
+            try {
+                using (var process = System.Diagnostics.Process.GetCurrentProcess()) {
+                    return IsPlayniteProcessName(process.ProcessName);
+                }
+            }
+            catch (Exception) {
+                return true;
+            }
+        }
+
+        internal static bool IsPlayniteProcessName(string processName) =>
+            string.Equals(processName, "Playnite.DesktopApp", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processName, "Playnite.FullscreenApp", StringComparison.OrdinalIgnoreCase);
+
         private static void InitializeCore(Func<System.Net.Http.HttpMessageHandler> createHandler, Action<Exception> onError) {
             try {
                 _logger.Info("Initializing Sentry error tracking");
@@ -152,6 +171,16 @@ namespace GsPlugin.Infrastructure {
                     // for none. Not initializing is the only way to be silent; the Capture* wrappers
                     // below already no-op, so nothing else needs to change.
                     _logger.Info("Sentry disabled by user preference or opt-out — not initializing");
+                    return;
+                }
+
+                // The DSN below is the production project. A test run or a reflection harness
+                // driving bin/Release reaches this with consent granted (fresh data defaults to
+                // it), and every CaptureMessage it makes lands in the production issue stream:
+                // GS-PLAYNITE-Q0 was five CI runs doing exactly that. Callers that want the SDK
+                // outside Playnite must supply their own transport.
+                if (createHandler == null && !IsPlayniteHost()) {
+                    _logger.Info("Not running inside Playnite — Sentry not initialized");
                     return;
                 }
 

@@ -102,6 +102,19 @@ namespace GsPlugin.Tests {
 
             Assert.Equal("http", extras["failure_kind"]);
             Assert.Equal("502", extras["http_status"]);
+            Assert.False(extras.ContainsKey("response_content_type"));
+        }
+
+        [Fact]
+        public void BuildExtras_ReportsErrorResponseContentType() {
+            var extras = ScrobbleStartFailure.BuildExtras(1, new HttpCallDiagnostics {
+                StatusCode = 403,
+                FailureKind = "http",
+                ResponseContentType = "text/html"
+            }, null);
+
+            Assert.Equal("403", extras["http_status"]);
+            Assert.Equal("text/html", extras["response_content_type"]);
         }
     }
 }
