@@ -4,11 +4,11 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using Playnite.SDK;
-using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
+using Playnite.SDK;
+using Sentry;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -28,11 +28,13 @@ namespace GsPlugin.Services {
         public string ErrorMessage { get; set; }
         public Exception Exception { get; set; }
         public LinkingContext Context { get; set; }
+
         /// <summary>
         /// True when the failure was caused by a network/connectivity problem rather than
         /// a server-side token rejection. Callers can use this to offer a retry action.
         /// </summary>
         public bool IsNetworkError { get; set; }
+
         /// <summary>
         /// True when the failure was caused by an expired or invalid link token.
         /// Callers can use this to offer contextual recovery (e.g. open linking page).
@@ -67,6 +69,7 @@ namespace GsPlugin.Services {
         private static readonly ILogger _logger = LogManager.GetLogger();
         private readonly IGsApiClient _apiClient;
         private readonly IPlayniteAPI _playniteApi;
+
         // Deep links and settings can both change the account. Serialize their requests so a
         // slower response cannot reverse a newer link/unlink operation on the same install.
         private static readonly SemaphoreSlim IdentityOperations = new SemaphoreSlim(1, 1);
@@ -138,6 +141,7 @@ namespace GsPlugin.Services {
                 if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
                     return IdentityChangedResult(context);
                 }
+
                 return await LinkAccountCoreAsync(token, context, expectedInstallId, expectedGeneration);
             }
             finally {
@@ -147,7 +151,6 @@ namespace GsPlugin.Services {
 
         private async Task<LinkingResult> LinkAccountCoreAsync(string token, LinkingContext context,
             string expectedInstallId, int expectedGeneration) {
-
             GsLogger.Info($"Starting {context} account linking (install_id={GsDataManager.Data.InstallID}).");
             GsSentry.AddBreadcrumb(
                 message: $"Starting {context} account linking",
@@ -186,9 +189,11 @@ namespace GsPlugin.Services {
                             d => d.LinkedUserId = null)) {
                             return IdentityChangedResult(context);
                         }
+
                         OnLinkingStatusChanged();
 
                         GsLogger.Error($"{context} linking did not complete: token verified but the server returned a not-linked result (install_id={GsDataManager.Data.InstallID}, userId={response.userId ?? "null"}).");
+
                         // Install id and context are extras, not identity: in the title they would
                         // give every affected install its own Sentry issue.
                         GsSentry.CaptureMessage(
@@ -219,6 +224,7 @@ namespace GsPlugin.Services {
                         d => d.LinkedUserId = response.userId)) {
                         return IdentityChangedResult(context);
                     }
+
                     // Notify listeners of status change
                     OnLinkingStatusChanged();
 
@@ -241,6 +247,7 @@ namespace GsPlugin.Services {
                 }
                 else {
                     string serverMessage = response?.message ?? GsLocalization.Get("LOCGsPluginUnknownLinkingError", "Unknown error occurred during linking");
+
                     // Prefer structured errorCode; fall back to message matching
                     // only for older server versions that don't send errorCode.
                     string errorCode = response?.errorCode;
@@ -283,6 +290,7 @@ namespace GsPlugin.Services {
                             }
                         );
                     }
+
                     return LinkingResult.CreateError(serverMessage, context, isTokenExpiry: isTokenExpiry);
                 }
             }
@@ -303,6 +311,7 @@ namespace GsPlugin.Services {
         public static bool ValidateToken(string token) {
             if (string.IsNullOrWhiteSpace(token)) return false;
             if (token.Length > 512) return false;
+
             // Allow alphanumeric, hyphens, underscores, dots, plus, equals, slashes (covers JWT/base64 tokens).
             // Anchor with \z, not $: in .NET $ also matches immediately before a trailing newline, so
             // a token with a trailing newline would otherwise pass and be sent to the server verbatim.
@@ -377,6 +386,7 @@ namespace GsPlugin.Services {
                 if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
                     return IdentityChangedResult(LinkingContext.ManualSettings);
                 }
+
                 return await UnlinkAccountCoreAsync(expectedInstallId, expectedGeneration);
             }
             finally {
@@ -385,7 +395,6 @@ namespace GsPlugin.Services {
         }
 
         private async Task<LinkingResult> UnlinkAccountCoreAsync(string expectedInstallId, int expectedGeneration) {
-
             try {
                 var response = await _apiClient.UnlinkAccount();
 
@@ -407,8 +416,10 @@ namespace GsPlugin.Services {
                         d => d.ClearIdentityBoundState(IdentityClearScope.None))) {
                         return IdentityChangedResult(LinkingContext.ManualSettings);
                     }
+
                     GsSyncHashIndex.Reset();
                     OnLinkingStatusChanged();
+
                     // Refresh diagnostics widgets (pending scrobble count, last-sync text)
                     // since MutateAndSave does not emit DiagnosticsStateChanged.
                     GsDataManager.NotifyDiagnosticsChanged();
@@ -443,6 +454,5 @@ namespace GsPlugin.Services {
         public static void OnLinkingStatusChanged() {
             LinkingStatusChanged?.Invoke(null, EventArgs.Empty);
         }
-
     }
 }

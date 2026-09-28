@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using Playnite.SDK;
 using GsPlugin.Infrastructure;
+using Playnite.SDK;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -103,8 +103,10 @@ namespace GsPlugin.Services {
     public class IntegrationAccountDto {
         /// <summary>Provider slug matching the backend's provider_id (e.g. "steam", "gog").</summary>
         public string provider_id { get; set; }
+
         /// <summary>External account identifier (e.g. Steam64 ID, GOG user ID).</summary>
         public string account_id { get; set; }
+
         /// <summary>Playnite library plugin GUID that owns this account.</summary>
         public string plugin_id { get; set; }
     }

@@ -77,18 +77,23 @@ namespace GsPlugin.Infrastructure {
             if (!PublicKeyTokensMatch(requested, candidate)) {
                 return false;
             }
+
             if (requested.Version == null || candidate.Version == null) {
                 return true;
             }
+
             if (requested.Version == EmptyVersion) {
                 return true;
             }
+
             if (candidate.Version < requested.Version) {
                 return false;
             }
+
             if (candidate.Version.Major == requested.Version.Major) {
                 return true;
             }
+
             return CrossMajorLookup.Contains(ReferenceKey(requested.Name, requested.Version));
         }
 

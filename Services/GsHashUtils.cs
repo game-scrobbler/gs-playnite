@@ -31,10 +31,12 @@ namespace GsPlugin.Services {
             if (string.IsNullOrEmpty(raw)) {
                 return "";
             }
+
             if (DateTime.TryParse(raw, CultureInfo.InvariantCulture,
                     DateTimeStyles.RoundtripKind, out var dt)) {
                 return FormatDateForHash(dt);
             }
+
             return raw;
         }
 
@@ -164,6 +166,7 @@ namespace GsPlugin.Services {
             IEnumerable<(string name, bool unlocked, float? rarity)> achievements) {
             var list = achievements.ToList();
             var unlockedCount = list.Count(a => a.unlocked);
+
             // Per-achievement name + unlock state + rarity, field-separated with a control
             // character so names containing digits/delimiters cannot collide, then ordered so
             // the digest is stable regardless of the provider's iteration order.
@@ -185,6 +188,7 @@ namespace GsPlugin.Services {
             if (accounts == null || accounts.Count == 0) {
                 return "";
             }
+
             // StringComparer.Ordinal, matching every other hash recipe in this file: the default
             // string comparer is CurrentCulture-linguistic, so a Windows locale change would reorder
             // these and flip the hash, spuriously flagging integration accounts as changed.
@@ -195,6 +199,7 @@ namespace GsPlugin.Services {
             foreach (var a in sorted) {
                 sb.Append(a.provider_id).Append(':').Append(a.account_id).Append(';');
             }
+
             return Sha256Hex(sb.ToString());
         }
 
@@ -226,6 +231,7 @@ namespace GsPlugin.Services {
                     sha256.TransformBlock(bytes, 0, bytes.Length, null, 0);
                     sha256.TransformBlock(separator, 0, 1, null, 0);
                 }
+
                 sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
                 return BitConverter.ToString(sha256.Hash).Replace("-", "").ToLowerInvariant();
             }

@@ -10,7 +10,6 @@ using Microsoft.Web.WebView2.Core;
 
 namespace GsPlugin.View {
     public partial class MySidebarView : UserControl, IDisposable {
-
         private readonly IGsApiClient _apiClient;
         private readonly string _userDataFolder;
         private readonly Action _openSettings;
@@ -64,6 +63,7 @@ namespace GsPlugin.View {
                             ShowOptedOutState();
                             return;
                         }
+
                         GsLogger.Error($"Could not create a private WebView2 profile: {envEx.Message}");
                         ShowErrorMessage(GsLocalization.Get("LOCGsPluginDashboardProfileFailed",
                             "Game Scrobbler could not open a private browser profile for the dashboard, "
@@ -113,6 +113,7 @@ namespace GsPlugin.View {
                     ShowOptedOutState();
                     return;
                 }
+
                 GsLogger.Error("Failed to initialize sidebar WebView2", ex);
                 GsSentry.CaptureException(ex, "Failed to initialize sidebar WebView2");
                 ShowErrorMessage("Failed to load Game Scrobbler dashboard. Please check that WebView2 runtime is installed.");
@@ -124,6 +125,7 @@ namespace GsPlugin.View {
                 try {
                     var uri = new Uri(args.Uri);
                     bool isTrustedHost = uri.Host == "gamescrobbler.com" || uri.Host.EndsWith(".gamescrobbler.com");
+
                     // Require https even for the trusted host: an on-path attacker (e.g. open
                     // Wi-Fi) could otherwise serve arbitrary content over plain http inside this
                     // trusted, chrome-less sidebar frame.
@@ -164,8 +166,10 @@ namespace GsPlugin.View {
                 if ((bool)e.NewValue && GsDataManager.IsTrackingPaused) {
                     ShowOptedOutState();
                 }
+
                 return;
             }
+
             if ((DateTime.UtcNow - _lastNavigatedAtUtc).TotalMinutes > 8) {
                 GsLogger.Info("Sidebar became visible after token likely expired — refreshing dashboard");
                 await NavigateToDashboard();
@@ -241,6 +245,7 @@ namespace GsPlugin.View {
                     ShowOptedOutState();
                     return;
                 }
+
                 GsLogger.Error("Failed to navigate to dashboard", ex);
                 GsSentry.CaptureException(ex, "Failed to navigate to dashboard");
                 ShowErrorMessage("Failed to load Game Scrobbler dashboard. Please try again later.");
@@ -251,6 +256,7 @@ namespace GsPlugin.View {
             if (!GsDataManager.IsOptedOut) {
                 return;
             }
+
             Dispatcher.BeginInvoke(new Action(ShowOptedOutState));
         }
 
@@ -262,6 +268,7 @@ namespace GsPlugin.View {
             if (_optedOutUiShown || _disposed) {
                 return;
             }
+
             _optedOutUiShown = true;
             _webView2Ready = false;
             TearDownWebView();
@@ -302,6 +309,7 @@ namespace GsPlugin.View {
                     MyWebView2.CoreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested;
                     MyWebView2.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
                 }
+
                 MyWebView2?.Dispose();
             }
             catch (Exception ex) {

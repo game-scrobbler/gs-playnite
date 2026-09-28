@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Playnite.SDK;
-using Playnite.SDK.Models;
 using GsPlugin.Api;
 using GsPlugin.Models;
+using Playnite.SDK;
+using Playnite.SDK.Models;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -90,11 +90,13 @@ namespace GsPlugin.Services {
                                 parsed.Add(guid);
                             }
                         }
+
                         _allowedPluginIds = parsed.Count > 0 ? parsed : new HashSet<Guid>(HardcodedPluginIds);
                     }
                     else {
                         _allowedPluginIds = new HashSet<Guid>(HardcodedPluginIds);
                     }
+
                     return _allowedPluginIds;
                 }
             }
@@ -152,6 +154,7 @@ namespace GsPlugin.Services {
                         if (plugin.status == "active" && Guid.TryParse(plugin.pluginId, out var guid)) {
                             newIds.Add(guid);
                         }
+
                         if (plugin.status == "active" && plugin.sourceAliases != null) {
                             foreach (var alias in plugin.sourceAliases) {
                                 var normalizedAlias = NormalizeSourceName(alias);

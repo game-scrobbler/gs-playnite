@@ -105,6 +105,7 @@ namespace GsPlugin.Api {
                         if (isPermanent != null && isPermanent()) {
                             _logger.Warn(
                                 $"API call attempt {attempt + 1} was rejected permanently; not retrying");
+
                             // The service answered, so the circuit is healthy even though
                             // this request was refused. Resolve a HalfOpen probe rather
                             // than returning with the state machine still mid-probe.
@@ -152,8 +153,9 @@ namespace GsPlugin.Api {
             lock (_lock) {
                 jitter = _random.Next(0, 1000);
             }
+
             var waitTime = TimeSpan.FromMilliseconds(
-                baseDelay.TotalMilliseconds * Math.Pow(2, attempt) + jitter);
+                (baseDelay.TotalMilliseconds * Math.Pow(2, attempt)) + jitter);
             _logger.Info($"Waiting {waitTime.TotalSeconds:F1} seconds before retry attempt {attempt + 2}");
             await Task.Delay(waitTime);
         }
@@ -179,6 +181,7 @@ namespace GsPlugin.Api {
                             _logger.Info("Circuit breaker moving from Open to HalfOpen state");
                             return true;
                         }
+
                         return false;
                     case CircuitState.HalfOpen:
                         return true;
@@ -213,6 +216,7 @@ namespace GsPlugin.Api {
                     recovered = true;
                 }
             }
+
             if (recovered) {
                 OnCircuitClosed?.Invoke();
             }

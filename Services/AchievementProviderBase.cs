@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Playnite.SDK;
 using GsPlugin.Infrastructure;
+using Playnite.SDK;
 
 namespace GsPlugin.Services {
     /// <summary>

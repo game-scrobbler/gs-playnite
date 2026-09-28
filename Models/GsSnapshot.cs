@@ -38,6 +38,7 @@ namespace GsPlugin.Models {
         public Dictionary<string, GameAchievementSnapshot> Achievements { get; set; } = new Dictionary<string, GameAchievementSnapshot>();
         public DateTime? LibraryFullSyncAt { get; set; }
         public DateTime? AchievementsFullSyncAt { get; set; }
+
         /// <summary>
         /// Matched GsData.IdentityGeneration at write time. GsSyncHashIndex.Initialize compares
         /// the migrated generation against the current one and discards a stale-identity baseline.
