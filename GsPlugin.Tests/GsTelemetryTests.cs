@@ -50,6 +50,37 @@ namespace GsPlugin.Tests {
             }
         }
 
+        [Fact]
+        public void Initialize_OutsidePlaynite_NeverStartsTheProductionSdk() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                try {
+                    Assert.True(GsTelemetryConsent.HasConsent("no-sentry"));
+                    GsSentry.Initialize();
+                    Assert.False(GsSentry.IsInitialized);
+                    GsSentry.ApplyPreferences();
+                    Assert.False(GsSentry.IsInitialized);
+                }
+                finally {
+                    GsSentry.Shutdown();
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("Playnite.DesktopApp", true)]
+        [InlineData("Playnite.FullscreenApp", true)]
+        [InlineData("playnite.desktopapp", true)]
+        [InlineData("testhost", false)]
+        [InlineData("testhost.x86", false)]
+        [InlineData("PlayniteToolbox", false)]
+        [InlineData("Playnite.TestHost", false)]
+        [InlineData("Playnite.DesktopApp.Tests", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void IsPlayniteProcessName_AcceptsOnlyPlayniteExecutables(string name, bool expected) {
+            Assert.Equal(expected, GsSentry.IsPlayniteProcessName(name));
+        }
+
         [Theory]
         [InlineData(@"Could not read C:\Users\Alice\AppData\state.json", @"Could not read C:\Users\%USER%\AppData\state.json")]
         [InlineData(@"Could not read 'D:\Users\Alice Jones\state.json'", @"Could not read 'C:\Users\%USER%\state.json'")]
