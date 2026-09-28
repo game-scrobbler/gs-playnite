@@ -188,6 +188,7 @@ jobs:
           for ($attempt = 1; $attempt -le 3; $attempt++) {
             git push origin HEAD:main
             if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -eq 3) { break }
             git pull --rebase origin main
             if ($LASTEXITCODE -ne 0) { throw "Rebasing the manifest commit onto main failed" }
           }
