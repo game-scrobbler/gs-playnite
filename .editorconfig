@@ -43,6 +43,71 @@ csharp_style_allow_blank_line_after_token_in_conditional_expression_experimental
 csharp_style_allow_blank_line_after_token_in_arrow_expression_clause_experimental = true:silent
 csharp_style_prefer_simple_property_accessors = true:suggestion
 
+#### StyleCop.Analyzers ####
+# Rules at warning are auto-fixed by scripts/format-code.ps1 and enforced by the
+# pre-commit hook, because bare "dotnet format" applies analyzer fixes.
+
+# Off: contradicts the established conventions of this codebase.
+# this. prefix
+dotnet_diagnostic.SA1101.severity = none
+# regions
+dotnet_diagnostic.SA1124.severity = none
+# aligned trailing comments
+dotnet_diagnostic.SA1025.severity = none
+# string.Empty over ""
+dotnet_diagnostic.SA1122.severity = none
+# generic constraints on their own line
+dotnet_diagnostic.SA1127.severity = none
+# constructor initializer on its own line
+dotnet_diagnostic.SA1128.severity = none
+# _camelCase private fields
+dotnet_diagnostic.SA1309.severity = none
+# _camelCase static readonly fields
+dotnet_diagnostic.SA1311.severity = none
+# trailing commas
+dotnet_diagnostic.SA1413.severity = none
+# blank line between every element
+dotnet_diagnostic.SA1516.severity = none
+# XML doc generation is intentionally off
+dotnet_diagnostic.SA0001.severity = none
+
+# Off: conflicts with csharp_new_line_before_open_brace = none
+dotnet_diagnostic.SA1500.severity = none
+
+# Off: conflicts with csharp_preserve_single_line_statements = true
+dotnet_diagnostic.SA1107.severity = none
+dotnet_diagnostic.SA1501.severity = none
+dotnet_diagnostic.SA1502.severity = none
+
+# Off: the documentation fixers write placeholder text into doc comments.
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.DocumentationRules.severity = none
+
+# Off: DTO property names are the snake_case/camelCase JSON wire contract.
+dotnet_diagnostic.SA1300.severity = none
+
+# Off: Api/Dtos.cs deliberately holds every DTO at namespace level.
+dotnet_diagnostic.SA1402.severity = none
+
+# Suggestion: worth following in new code, but no safe bulk fix exists.
+# parenthesis placement and spacing
+dotnet_diagnostic.SA1009.severity = suggestion
+dotnet_diagnostic.SA1111.severity = suggestion
+# parameter wrapping; SA1115 also conflicts with SA1515 when a comment sits between arguments
+dotnet_diagnostic.SA1115.severity = suggestion
+dotnet_diagnostic.SA1116.severity = suggestion
+dotnet_diagnostic.SA1117.severity = suggestion
+dotnet_diagnostic.SA1118.severity = suggestion
+# member ordering
+dotnet_diagnostic.SA1201.severity = suggestion
+dotnet_diagnostic.SA1202.severity = suggestion
+dotnet_diagnostic.SA1203.severity = suggestion
+dotnet_diagnostic.SA1204.severity = suggestion
+dotnet_diagnostic.SA1214.severity = suggestion
+# non-private fields
+dotnet_diagnostic.SA1401.severity = suggestion
+# omitted braces; matches csharp_prefer_braces = true:silent
+dotnet_diagnostic.SA1503.severity = suggestion
+
 [*.{cs,vb}]
 #### Naming styles ####
 
