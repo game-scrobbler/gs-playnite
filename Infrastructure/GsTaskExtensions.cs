@@ -18,14 +18,18 @@ namespace GsPlugin.Infrastructure {
         /// await semantics: awaiting the result still throws when the task faults, exactly
         /// as awaiting the bare task would. Callers that must not throw need their own
         /// try/catch around the await, and the fault is logged either way.
+        ///
+        /// A null task has nothing to observe and yields a completed task, so a caller that
+        /// passes the result on (for example to <see cref="Task.WhenAll(Task[])"/>) never
+        /// receives a null.
         /// </summary>
         /// <param name="task">The task to observe.</param>
         /// <param name="label">Message logged alongside the exception.</param>
         /// <param name="asError">Log at Error level instead of the default Warn level.</param>
-        /// <returns>The same task instance that was passed in.</returns>
+        /// <returns>The same task instance that was passed in, or a completed task for null.</returns>
         internal static Task LogFaults(this Task task, string label, bool asError = false) {
             if (task == null) {
-                return null;
+                return Task.CompletedTask;
             }
 
             task.ContinueWith(t => {

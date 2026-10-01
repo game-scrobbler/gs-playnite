@@ -280,7 +280,7 @@ namespace GsPlugin.Models {
         /// <summary>
         /// Performs account linking with the provided token.
         /// </summary>
-        public async void LinkAccount() {
+        public async Task LinkAccount() {
             try {
                 if (!ValidateLinkToken()) return;
                 StartCountdown();
@@ -397,7 +397,7 @@ namespace GsPlugin.Models {
         /// <summary>
         /// Requests data deletion from the server and transitions the plugin to opted-out state.
         /// </summary>
-        public async void DeleteMyData() {
+        public async Task DeleteMyData() {
             try {
                 Settings.IsDeleting = true;
                 Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeletingRequesting", "Requesting data deletion...");

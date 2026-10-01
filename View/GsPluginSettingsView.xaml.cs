@@ -289,7 +289,7 @@ namespace GsPlugin.View {
         /// Handles the link account button click event.
         /// </summary>
         private void LinkAccount_Click(object sender, RoutedEventArgs e) {
-            _viewModel?.LinkAccount();
+            _ = _viewModel?.LinkAccount().LogFaults("Unhandled exception in LinkAccount", asError: true);
         }
 
         /// <summary>
@@ -369,7 +369,7 @@ namespace GsPlugin.View {
 
             if (confirmResult != MessageBoxResult.Yes) return;
 
-            _viewModel?.DeleteMyData();
+            _ = _viewModel?.DeleteMyData().LogFaults("Unhandled exception in DeleteMyData", asError: true);
         }
 
         /// <summary>
