@@ -50,9 +50,9 @@ if ($changelogMatch.Success) {
 
     # Extract bullet points
     $bulletPattern = "^\s*\*\s+(.+?)$"
-    $matches = [regex]::Matches($bulletSource, $bulletPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
+    $bulletMatches = [regex]::Matches($bulletSource, $bulletPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
 
-    foreach ($match in $matches) {
+    foreach ($match in $bulletMatches) {
         $line = $match.Groups[1].Value.Trim()
         # Clean up the line - remove commit links and extra formatting
         $line = $line -replace '\[([a-f0-9]+)\]\([^\)]+\)', ''
