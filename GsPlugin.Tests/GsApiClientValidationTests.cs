@@ -175,8 +175,8 @@ namespace GsPlugin.Tests {
         [Fact]
         public async Task MockClient_FlushPendingScrobblesAsync_DoesNotThrow() {
             IGsApiClient client = new MockGsApiClient();
-            // Should complete without throwing
-            await client.FlushPendingScrobblesAsync();
+            var ex = await Record.ExceptionAsync(() => client.FlushPendingScrobblesAsync());
+            Assert.Null(ex);
         }
 
         // --- GameSyncDto DTO tests (slim v3 shape — see ADR-011 in gs-mono) ---

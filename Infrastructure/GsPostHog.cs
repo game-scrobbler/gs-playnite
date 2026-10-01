@@ -23,6 +23,9 @@ namespace GsPlugin.Infrastructure {
             else Shutdown();
         }
 
+        // Not a secret. A PostHog project key is a public, write-only ingestion key that PostHog
+        // documents as safe to embed in client apps; it cannot read any data, and every shipped
+        // .pext necessarily carries it.
         private const string ApiKey = "phc_la6sOuOYr4cEb9Rpq27MMi6Mv8EhCLsVi6ovp6azdSi";
         private const string HostUrl = "https://eu.i.posthog.com";
 
