@@ -3,18 +3,19 @@ name: Release Highlights
 # Adds an AI-drafted "### Highlights" section to CHANGELOG.md on release-please
 # PRs. The bullets are reviewed (and editable) in the release PR like any other
 # change; update-installer-manifest.ps1 prefers them for the Playnite changelog.
+#
+# Triggered by pushes to the release branch rather than by the pull request, so
+# the job never checks out a pull request head: only accounts with write access
+# can push these branches, and a fork cannot reach the job at all.
 on:
-  pull_request:
-    branches: ["main"]
+  push:
+    branches: ["release-please--**"]
 
 jobs:
   highlights:
-    # Same-repo release-please branches only. Fork PRs never receive secrets on
-    # the pull_request trigger, but this guard stops spoofed-branch-name runs
-    # from even starting.
-    if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.head_ref, 'release-please--')
+    # Deleting a branch also fires push, and delete_branch_on_merge removes the
+    # release branch once its PR merges. There is nothing to check out then.
+    if: ${{ !github.event.deleted }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,7 +23,6 @@ jobs:
       - name: Checkout release PR branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ github.head_ref }}
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
