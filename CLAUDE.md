@@ -274,3 +274,7 @@ Hook scripts in `hooks/` are installed to `.git/hooks/` via `scripts/setup-hooks
 - CI/CD: GitHub Actions creates Sentry releases, uploads portable PDB files (`--type=portablepdb`), and associates commits
 - release-please keeps versions synchronized across `AssemblyInfo.cs`, `extension.yaml`, and manifests
 - Only runs when release-please creates a GitHub release (conditional on `${{ steps.release.outputs.release_created }}`)
+
+### Code Scanning (CodeQL & SonarCloud)
+- `.github/workflows/codeql.yml` runs GitHub Advanced Security CodeQL (`security-extended`) on push/PR to `main` and weekly. C# uses `build-mode: manual` with full MSBuild on `windows-2022`, because `build-mode: none` cannot see the XAML-generated `.g.cs` partials. The `actions` language scans the workflows themselves. Repository "default setup" must stay disabled, or GitHub rejects this workflow's uploads.
+- `.github/workflows/sonarcloud.yml` wraps the MSBuild build in `dotnet-sonarscanner begin/end` (CI-based analysis, so SonarCloud's Automatic Analysis must be off). Coverage comes from `dotnet-coverage` (VS XML format, `sonar.cs.vscoveragexml.reportsPaths`), which instruments the net462 test run; coverlet is not used. It needs the `SONAR_TOKEN` secret and is skipped for fork PRs, which get no secrets.

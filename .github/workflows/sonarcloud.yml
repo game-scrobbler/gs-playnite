@@ -1,0 +1,79 @@
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened]
+
+name: SonarCloud
+
+env:
+  SONAR_ORGANIZATION: game-scrobbler
+  SONAR_PROJECT_KEY: game-scrobbler_gs-playnite
+  SONAR_SCANNER_VERSION: "11.3.0"
+  DOTNET_COVERAGE_VERSION: "18.11.2"
+
+concurrency:
+  group: sonarcloud-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    # Fork PRs receive no SONAR_TOKEN.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-2022
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # Full history lets SonarCloud attribute new-code issues through blame.
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java (SonarScanner runtime)
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+
+      - name: Install Scanner and Coverage Tools
+        run: |
+          dotnet tool install dotnet-sonarscanner --version $Env:SONAR_SCANNER_VERSION --tool-path .sonar\scanner
+          dotnet tool install dotnet-coverage --version $Env:DOTNET_COVERAGE_VERSION --tool-path .sonar\coverage
+
+      - name: NuGet Restore
+        run: nuget restore .\GsPlugin.sln
+
+      # The scanner has to wrap the full MSBuild build: dotnet build cannot compile the WPF
+      # project, and the analysis only sees what the begin/end pair observed being compiled.
+      - name: Build, Test and Analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          .\.sonar\scanner\dotnet-sonarscanner begin `
+            /k:"$Env:SONAR_PROJECT_KEY" `
+            /o:"$Env:SONAR_ORGANIZATION" `
+            /d:sonar.token="$Env:SONAR_TOKEN" `
+            /d:sonar.host.url="https://sonarcloud.io" `
+            /d:sonar.cs.vscoveragexml.reportsPaths="coverage.xml" `
+            /d:sonar.coverage.exclusions="GsPlugin.Tests/**"
+          if ($LASTEXITCODE -ne 0) { throw "SonarScanner begin failed" }
+          msbuild $Env:GITHUB_WORKSPACE\GsPlugin.sln -p:Configuration=Release -restore -clp:ErrorsOnly
+          if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+          .\.sonar\coverage\dotnet-coverage collect "dotnet test GsPlugin.Tests\GsPlugin.Tests.csproj --configuration Release --no-build --verbosity normal" -f xml -o coverage.xml
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+          .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.token="$Env:SONAR_TOKEN"
+          if ($LASTEXITCODE -ne 0) { throw "SonarScanner end failed" }
