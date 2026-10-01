@@ -315,8 +315,14 @@ namespace GsPlugin.Services {
             // Allow alphanumeric, hyphens, underscores, dots, plus, equals, slashes (covers JWT/base64 tokens).
             // Anchor with \z, not $: in .NET $ also matches immediately before a trailing newline, so
             // a token with a trailing newline would otherwise pass and be sent to the server verbatim.
-            if (!Regex.IsMatch(token, @"^[a-zA-Z0-9\-_\.+=\/]+\z")) return false;
-            return true;
+            try {
+                return Regex.IsMatch(token, @"^[a-zA-Z0-9\-_\.+=\/]+\z", RegexOptions.None, TimeSpan.FromSeconds(1));
+            }
+            catch (RegexMatchTimeoutException) {
+                // Not expected: the pattern is linear and the length is capped above. A token
+                // that cannot be validated is rejected rather than sent.
+                return false;
+            }
         }
 
         /// <summary>

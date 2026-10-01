@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using GsPlugin.Infrastructure;
@@ -88,6 +89,20 @@ namespace GsPlugin.Tests {
         [InlineData("No user path here", "No user path here")]
         public void ScrubText_RemovesProfileNameWithoutBreakingThePath(string input, string expected) {
             Assert.Equal(expected, GsSentry.ScrubText(input));
+        }
+
+        [Fact]
+        public void ScrubText_FailsClosedWhenTheMatchTimesOut() {
+            // Nested quantifiers backtrack exponentially on a near miss, so this cannot finish
+            // within the timeout. Scrub() sends an event unscrubbed if ScrubText throws, so the
+            // timeout has to come back as a redaction, never as the original value.
+            var slow = new Regex(@"(a+)+\\Users", RegexOptions.None, TimeSpan.FromMilliseconds(1));
+            var input = @"C:\Users\Alice\" + new string('a', 40) + "!";
+
+            var scrubbed = GsSentry.ScrubText(input, slow);
+
+            Assert.Equal(GsSentry.ScrubTimedOutPlaceholder, scrubbed);
+            Assert.DoesNotContain("Alice", scrubbed);
         }
 
         [Theory]

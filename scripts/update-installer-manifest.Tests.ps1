@@ -41,8 +41,8 @@ BeforeAll {
         New-Item -ItemType Directory -Path $workspace -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $workspace 'scripts') -Force | Out-Null
         Copy-Item -Path $script:RealScriptPath -Destination (Join-Path $workspace 'scripts\update-installer-manifest.ps1')
-        Copy-Item -LiteralPath (Split-Path -Parent $script:YamlModulePath) `
-            -Destination (Join-Path $workspace 'powershell-yaml') -Recurse
+        $yamlModuleDir = Split-Path -Parent $script:YamlModulePath
+        Copy-Item -LiteralPath $yamlModuleDir -Destination (Join-Path $workspace 'powershell-yaml') -Recurse
 
         return $workspace
     }

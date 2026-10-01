@@ -11,8 +11,10 @@ namespace GsPlugin.Api {
     public class GsCircuitBreaker {
         private static readonly ILogger _logger = LogManager.GetLogger();
 
-        // Reuse a single Random instance for jitter calculation to improve performance
-        // and ensure better randomness distribution
+        // One shared Random for retry jitter. Jitter only keeps installs from retrying in
+        // lockstep and is not a security boundary, so a predictable generator is fine.
+        // System.Random is not thread-safe and this instance is shared by every breaker,
+        // so callers lock on it rather than on a breaker's own _lock.
         private static readonly Random _random = new Random();
 
         public enum CircuitState {
@@ -148,9 +150,9 @@ namespace GsPlugin.Api {
         /// <summary>
         /// Exponential backoff with jitter: delay = baseDelay * 2^attempt + random(0-1000ms).
         /// </summary>
-        private async Task WaitWithBackoffAsync(TimeSpan baseDelay, int attempt) {
+        private static async Task WaitWithBackoffAsync(TimeSpan baseDelay, int attempt) {
             int jitter;
-            lock (_lock) {
+            lock (_random) {
                 jitter = _random.Next(0, 1000);
             }
 

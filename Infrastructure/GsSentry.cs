@@ -368,13 +368,43 @@ namespace GsPlugin.Infrastructure {
             var pattern = string.IsNullOrEmpty(root)
                 ? standardProfile
                 : Regex.Escape(root) + @"(?=$|[\\/""'\s])|" + standardProfile;
-            return new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            return new Regex(
+                pattern,
+                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                TimeSpan.FromMilliseconds(ScrubMatchTimeoutMilliseconds));
         }
 
-        internal static string ScrubText(string value) =>
-            string.IsNullOrEmpty(value)
-                ? value
-                : UserProfilePathRegex.Replace(value, @"C:\Users\%USER%");
+        /// <summary>
+        /// Bounds each profile-path match. The pattern is linear, so this is a guard against a
+        /// pathological input rather than a limit expected to fire. A const, not a static
+        /// TimeSpan field, because <see cref="UserProfilePathRegex"/> is built during static
+        /// initialization and would otherwise read the field before it is assigned.
+        /// </summary>
+        private const int ScrubMatchTimeoutMilliseconds = 1000;
+
+        /// <summary>Replaces a whole value whose scrub could not finish.</summary>
+        internal const string ScrubTimedOutPlaceholder = "[redacted: profile path scrub timed out]";
+
+        internal static string ScrubText(string value) => ScrubText(value, UserProfilePathRegex);
+
+        /// <summary>
+        /// A match timeout has to fail closed here. <see cref="Scrub"/> sends the event unscrubbed
+        /// on any exception, so letting <see cref="RegexMatchTimeoutException"/> escape would turn a
+        /// slow match into a leaked account name. The value may still contain the profile path, so
+        /// none of it is kept.
+        /// </summary>
+        internal static string ScrubText(string value, Regex profilePathRegex) {
+            if (string.IsNullOrEmpty(value)) {
+                return value;
+            }
+
+            try {
+                return profilePathRegex.Replace(value, @"C:\Users\%USER%");
+            }
+            catch (RegexMatchTimeoutException) {
+                return ScrubTimedOutPlaceholder;
+            }
+        }
 
         /// <summary>
         /// Removes personal data from an event immediately before it leaves the device.
