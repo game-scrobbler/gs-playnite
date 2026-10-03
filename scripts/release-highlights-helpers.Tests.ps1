@@ -10,9 +10,9 @@
     Response.StatusCode is the HTTP status, with the API's JSON error body in
     ErrorDetails.Message.
 
-    assert-release-highlights.ps1 ends with `exit`, so it runs as a child
-    `pwsh -File` process, the same way generate-release-highlights.Tests.ps1
-    runs the generator.
+    assert-release-highlights.ps1 ends with `exit`, so it is invoked with `&`,
+    which ends only that script and sets $LASTEXITCODE. Running it in-process
+    is what lets Pester measure its coverage.
 
     Run with: Invoke-Pester -Path scripts/release-highlights-helpers.Tests.ps1
 #>
@@ -180,10 +180,17 @@ Describe 'assert-release-highlights.ps1' {
         Remove-Item -Path $script:TestDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
+    BeforeAll {
+        function Invoke-AssertScript {
+            $global:LASTEXITCODE = 0
+            & $script:AssertScriptPath -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath *>&1 | Out-String
+        }
+    }
+
     It 'exits 0 when the release has Highlights' {
         Set-Content -Path $script:ChangelogPath -Value "## [1.2.0](x)`n`n### Highlights`n`n* Thing`n" -NoNewline
 
-        $output = & pwsh -NoProfile -NonInteractive -File $script:AssertScriptPath -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath 2>&1 | Out-String
+        $output = Invoke-AssertScript
 
         $LASTEXITCODE | Should -Be 0
         $output.Contains('has Highlights for 1.2.0') | Should -BeTrue
@@ -192,7 +199,7 @@ Describe 'assert-release-highlights.ps1' {
     It 'exits 1 with an error annotation when the release has no Highlights' {
         Set-Content -Path $script:ChangelogPath -Value "## [1.2.0](x)`n`n### Bug Fixes`n`n* fix`n" -NoNewline
 
-        $output = & pwsh -NoProfile -NonInteractive -File $script:AssertScriptPath -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath 2>&1 | Out-String
+        $output = Invoke-AssertScript
 
         $LASTEXITCODE | Should -Be 1
         $output.Contains('::error::') | Should -BeTrue
@@ -203,7 +210,7 @@ Describe 'assert-release-highlights.ps1' {
         Set-Content -Path $script:ManifestPath -Value '{}' -NoNewline
         Set-Content -Path $script:ChangelogPath -Value "## [1.2.0](x)`n`n### Highlights`n`n* Thing`n" -NoNewline
 
-        $output = & pwsh -NoProfile -NonInteractive -File $script:AssertScriptPath -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath 2>&1 | Out-String
+        $output = Invoke-AssertScript
 
         $LASTEXITCODE | Should -Be 1
         $output.Contains('Could not read the release version') | Should -BeTrue

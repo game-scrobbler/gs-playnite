@@ -5,18 +5,13 @@
 .DESCRIPTION
     The script under test communicates its control flow via top-level `exit`
     statements (best-effort/idempotent design - see CLAUDE.md "Release
-    Highlights"). Because `exit` inside a dot-sourced or `&`-invoked script
-    would terminate the whole PowerShell/Pester host process, every scenario
-    here launches the script as a real child `pwsh -File` process and asserts
-    on its exit code, stdout, and any resulting file changes. This mirrors how
-    the script is actually invoked in CI (release-highlights.yml).
-
-    The Anthropic API call itself is intentionally not exercised - there is no
-    live API key in a test environment, and the call happens inside a
-    separate process so it cannot be mocked. The `-DryRun` switch exists in
-    the script specifically "for local testing of the changelog
-    insertion/idempotency logic only", so these tests lean on it to cover the
-    insertion/idempotency behavior that would otherwise be untestable.
+    Highlights"). It runs in-process with `&`: `exit` in a script invoked that
+    way ends only that script and sets $LASTEXITCODE (it is dot-sourcing that
+    would end the caller). In-process runs are what let Pester measure the
+    script's coverage for SonarQube Cloud and let these tests mock `git` and
+    `Invoke-RestMethod`, so the API path is exercised without a network or a
+    key. A terminating error, which CI reports as a failed step, surfaces here
+    as a thrown exception rather than a non-zero exit code.
 
     Run with: Invoke-Pester -Path scripts/generate-release-highlights.Tests.ps1
 #>
@@ -33,15 +28,14 @@ BeforeAll {
             [hashtable]$EnvOverrides = @{}
         )
 
-        $pwshArgs = @(
-            '-NoProfile', '-NonInteractive', '-File', $script:ScriptPath,
-            '-ChangelogFile', $ChangelogFile,
-            '-ManifestFile', $ManifestFile
-        )
-        if ($DryRun) { $pwshArgs += '-DryRun' }
-        if ($Model) { $pwshArgs += @('-Model', $Model) }
+        $scriptArgs = @{
+            ChangelogFile = $ChangelogFile
+            ManifestFile  = $ManifestFile
+        }
+        if ($DryRun) { $scriptArgs.DryRun = $true }
+        if ($Model) { $scriptArgs.Model = $Model }
 
-        # Snapshot and override environment variables for the child process.
+        # Snapshot and override environment variables for the script.
         # ANTHROPIC_API_KEY is always explicitly controlled so tests never
         # depend on whatever is ambient in the host environment.
         $keysToControl = @('ANTHROPIC_API_KEY') + @($EnvOverrides.Keys) | Select-Object -Unique
@@ -53,7 +47,10 @@ BeforeAll {
         }
 
         try {
-            $output = & pwsh @pwshArgs 2>&1
+            # A script that ends without `exit` leaves $LASTEXITCODE alone, so
+            # start from 0 rather than whatever the previous test left.
+            $global:LASTEXITCODE = 0
+            $output = & $script:ScriptPath @scriptArgs *>&1
             $exitCode = $LASTEXITCODE
         }
         finally {
@@ -94,16 +91,15 @@ Describe 'generate-release-highlights.ps1' {
             (Get-Content -Path $script:ChangelogPath -Raw).Contains('### Highlights') | Should -BeFalse
         }
 
-        It 'fails hard (non-zero exit) when the manifest file does not exist at all' {
+        It 'fails hard (terminating error) when the manifest file does not exist at all' {
             # Unlike a malformed-but-present manifest, a missing file makes
             # Get-Content throw a terminating error (ErrorActionPreference =
             # Stop), which is not caught anywhere before the version check.
+            # In CI that fails the step.
             Set-Content -Path $script:ChangelogPath -Value "## [1.0.0] (2026-01-01)`n* something" -NoNewline
             $missingManifest = Join-Path $script:TestDir 'does-not-exist.json'
 
-            $result = Invoke-HighlightsScript -ChangelogFile $script:ChangelogPath -ManifestFile $missingManifest
-
-            $result.ExitCode | Should -Not -Be 0
+            { Invoke-HighlightsScript -ChangelogFile $script:ChangelogPath -ManifestFile $missingManifest } | Should -Throw
         }
     }
 
@@ -195,6 +191,92 @@ Describe 'generate-release-highlights.ps1' {
             $result.ExitCode | Should -Be 0
             $result.Output.Contains('Highlights already present') | Should -BeTrue
             $afterSecondRun | Should -Be $afterFirstRun
+        }
+    }
+
+    Context 'calling the API (git and Invoke-RestMethod mocked)' {
+        BeforeAll {
+            function New-ApiResponse([string]$StopReason, [string]$Text) {
+                [PSCustomObject]@{
+                    stop_reason = $StopReason
+                    content     = @(
+                        [PSCustomObject]@{ type = 'thinking'; thinking = '' },
+                        [PSCustomObject]@{ type = 'text'; text = $Text }
+                    )
+                    usage       = [PSCustomObject]@{ input_tokens = 1200; output_tokens = 340 }
+                }
+            }
+
+            function New-ApiError([int]$Status, [string]$Body) {
+                $message = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]$Status)
+                $exception = [Microsoft.PowerShell.Commands.HttpResponseException]::new("Response status code does not indicate success: $Status.", $message)
+                $record = [System.Management.Automation.ErrorRecord]::new($exception, 'WebCmdletWebResponseException', 'InvalidOperation', $null)
+                $record.ErrorDetails = [System.Management.Automation.ErrorDetails]::new($Body)
+                return $record
+            }
+        }
+
+        BeforeEach {
+            Set-Content -Path $script:ManifestPath -Value '{ ".": "1.0.0" }' -NoNewline
+            Set-Content -Path $script:ChangelogPath -Value "## [1.0.0] (2026-01-01)`n`n### Bug Fixes`n* fix" -NoNewline
+            Mock git { $global:LASTEXITCODE = 0; '' }
+        }
+
+        It 'inserts the model bullets and sends a request with room for thinking and the no-changes instruction' {
+            Mock Invoke-RestMethod { New-ApiResponse 'end_turn' "* First thing`n* Second thing" }
+
+            $result = Invoke-HighlightsScript -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath -EnvOverrides @{ ANTHROPIC_API_KEY = 'test-key' }
+
+            $result.ExitCode | Should -Be 0
+            $result.Output.Contains('stop_reason=end_turn, input_tokens=1200, output_tokens=340') | Should -BeTrue
+            $updated = Get-Content -Path $script:ChangelogPath -Raw
+            $updated.Contains("### Highlights`n`n* First thing`n* Second thing") | Should -BeTrue
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly -ParameterFilter {
+                $request = $Body | ConvertFrom-Json
+                $request.max_tokens -eq 16000 -and $request.messages[0].content.Contains('NO_PLAYER_FACING_CHANGES') -and $TimeoutSec -eq 300
+            }
+        }
+
+        It 'writes the generic highlight when the model reports no player-facing changes' {
+            Mock Invoke-RestMethod { New-ApiResponse 'end_turn' 'NO_PLAYER_FACING_CHANGES' }
+
+            $result = Invoke-HighlightsScript -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath -EnvOverrides @{ ANTHROPIC_API_KEY = 'test-key' }
+
+            $result.ExitCode | Should -Be 0
+            (Get-Content -Path $script:ChangelogPath -Raw).Contains("### Highlights`n`n* Bug fixes and under-the-hood improvements for a smoother experience.") | Should -BeTrue
+        }
+
+        It 'skips with the reason and the model text when the answer has no bullets' {
+            Mock Invoke-RestMethod { New-ApiResponse 'end_turn' 'There are no changes worth mentioning.' }
+
+            $result = Invoke-HighlightsScript -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath -EnvOverrides @{ ANTHROPIC_API_KEY = 'test-key' }
+
+            $result.ExitCode | Should -Be 0
+            $result.Output.Contains('::warning::Model returned 0 bullet lines, expected 1-8') | Should -BeTrue
+            $result.Output.Contains('There are no changes worth mentioning.') | Should -BeTrue
+            (Get-Content -Path $script:ChangelogPath -Raw).Contains('### Highlights') | Should -BeFalse
+        }
+
+        It 'skips an answer cut off by max_tokens' {
+            Mock Invoke-RestMethod { New-ApiResponse 'max_tokens' "* First thing`n* Second thi" }
+
+            $result = Invoke-HighlightsScript -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath -EnvOverrides @{ ANTHROPIC_API_KEY = 'test-key' }
+
+            $result.ExitCode | Should -Be 0
+            $result.Output.Contains("stop_reason 'max_tokens'") | Should -BeTrue
+            (Get-Content -Path $script:ChangelogPath -Raw).Contains('### Highlights') | Should -BeFalse
+        }
+
+        It 'reports the API error type and message when the call fails' {
+            Mock Invoke-RestMethod {
+                throw (New-ApiError 402 '{"type":"error","error":{"type":"billing_error","message":"Your credit balance is too low."},"request_id":"req_9"}')
+            }
+
+            $result = Invoke-HighlightsScript -ChangelogFile $script:ChangelogPath -ManifestFile $script:ManifestPath -EnvOverrides @{ ANTHROPIC_API_KEY = 'test-key' }
+
+            $result.ExitCode | Should -Be 0
+            $result.Output.Contains('::warning::Anthropic API call failed: HTTP 402 billing_error: Your credit balance is too low. (request_id req_9)') | Should -BeTrue
+            (Get-Content -Path $script:ChangelogPath -Raw).Contains('### Highlights') | Should -BeFalse
         }
     }
 
