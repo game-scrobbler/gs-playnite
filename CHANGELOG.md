@@ -5,9 +5,8 @@
 
 ### Highlights
 
-* Account linking and data-deletion actions are now more reliable and won't risk crashing Playnite if something goes wrong.
-* Fixed a rare issue where a test connection could accidentally send fake activity to your stats.
-* Improved error reporting helps us spot and fix scrobbling problems faster, without exposing any of your personal info.
+* Linking your account or deleting your data in Settings no longer risks crashing Playnite if something unexpected goes wrong.
+* Bug fixes and under-the-hood improvements for a smoother experience.
 
 
 ### Bug Fixes
