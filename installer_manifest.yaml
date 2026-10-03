@@ -1,6 +1,13 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 
 Packages:
+  - Version: 2.9.1
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-10-03
+    PackageUrl: https://github.com/game-scrobbler/gs-playnite/releases/download/GsPlugin-v2.9.1/GsPlugin-v2.9.1.pext
+    Changelog:
+      - "Linking your account or deleting your data in Settings no longer risks crashing Playnite if something unexpected goes wrong."
+      - "Bug fixes and under-the-hood improvements for a smoother experience."
   - Version: 2.9.0
     RequiredApiVersion: 6.12.0
     ReleaseDate: 2026-09-23
