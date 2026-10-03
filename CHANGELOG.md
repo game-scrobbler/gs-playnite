@@ -3,6 +3,13 @@
 ## [2.9.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.9.0...GsPlugin-v2.9.1) (2026-10-03)
 
 
+### Highlights
+
+* Account linking and data-deletion actions are now more reliable and won't risk crashing Playnite if something goes wrong.
+* Fixed a rare issue where a test connection could accidentally send fake activity to your stats.
+* Improved error reporting helps us spot and fix scrobbling problems faster, without exposing any of your personal info.
+
+
 ### Bug Fixes
 
 * **release:** fail the highlights job when a release has no Highlights ([d8c2cc2](https://github.com/game-scrobbler/gs-playnite/commit/d8c2cc2934e4fd785dac76d26e72d16f846fd8a7))
