@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.9.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.9.0...GsPlugin-v2.9.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **release:** fail the highlights job when a release has no Highlights ([d8c2cc2](https://github.com/game-scrobbler/gs-playnite/commit/d8c2cc2934e4fd785dac76d26e72d16f846fd8a7))
+* **release:** fail the highlights job when a release has no Highlights ([3f6af1e](https://github.com/game-scrobbler/gs-playnite/commit/3f6af1ee113fa01225fb90a2e43a72f7f87f94aa))
+* resolve SonarCloud findings, fail closed on Sentry scrub timeout ([ba56797](https://github.com/game-scrobbler/gs-playnite/commit/ba567979d80a8df4c292cfcb028cb813c74a8e5a))
+* **settings:** run link and data deletion as tasks instead of async void ([90985ea](https://github.com/game-scrobbler/gs-playnite/commit/90985ea2690f87c7501d4ea2f57b6351a7ddae45))
+* **telemetry:** fail closed when the Sentry profile-path scrub times out ([2b70317](https://github.com/game-scrobbler/gs-playnite/commit/2b70317f60b2bea6793bcb0e4f4450f0c856ef3d))
+* **telemetry:** keep non-Playnite hosts off the production DSN ([1c6edf4](https://github.com/game-scrobbler/gs-playnite/commit/1c6edf485b49f4edffd01959e30a12d683406d2d))
+* **telemetry:** keep non-Playnite hosts off the production DSN ([8ee3d53](https://github.com/game-scrobbler/gs-playnite/commit/8ee3d53a4024018bf8a7b0aca05bd817d516678e))
+
 ## [2.9.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.4...GsPlugin-v2.9.0) (2026-09-19)
 
 
