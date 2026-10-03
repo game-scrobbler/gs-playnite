@@ -41,3 +41,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
           git diff --cached --quiet || { git commit -m "docs: add release highlights"; git push; }
+
+      # Generation never fails the job, so this is the alert: a failed API call,
+      # exhausted credit or unusable answer leaves the release without Highlights,
+      # and this step turns that into a failed check on the release PR. It lives
+      # here rather than in a pull_request workflow because that one would also run
+      # on release-please's own push, before this job adds the section, and fail
+      # on every release PR update.
+      - name: Require Highlights
+        shell: pwsh
+        run: ./scripts/assert-release-highlights.ps1

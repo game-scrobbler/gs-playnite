@@ -14,15 +14,28 @@ param(
     [Parameter(Mandatory = $false)]
     [int]$MaxDiffChars = 60000,
 
+    # Thinking is on by default for this model and counts toward max_tokens, so the
+    # cap has to leave room for it before the answer. Only generated tokens are billed.
+    [Parameter(Mandatory = $false)]
+    [int]$MaxTokens = 16000,
+
+    # Used as the only bullet when the model reports that nothing in the release
+    # changes what a player notices.
+    [Parameter(Mandatory = $false)]
+    [string]$GenericHighlight = "Bug fixes and under-the-hood improvements for a smoother experience.",
+
     # Skips git + API calls and inserts canned bullets. For local testing of the
     # changelog insertion/idempotency logic only.
     [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot/release-highlights-helpers.ps1"
 
-# Highlights are best-effort: any failure warns and exits 0 so the release PR is
-# never blocked. update-installer-manifest.ps1 falls back to raw changelog bullets.
+# Highlights are best-effort: any failure warns and exits 0, so this step never fails
+# the job. The workflow's next check (assert-release-highlights.ps1) fails it instead
+# when the section is missing. If the release PR merged without Highlights anyway,
+# update-installer-manifest.ps1 would fall back to the raw changelog bullets.
 function Write-Skip([string]$Message) {
     Write-Host "::warning::$Message - skipping highlights generation (installer manifest will fall back to raw changelog bullets)"
 }
@@ -88,6 +101,7 @@ Rules:
 - Address the reader as "you"/"your" where it reads naturally.
 - Every word must make sense to a non-programmer. Never use words like: sync hash, snapshot, session, token, API, server, endpoint, DTO, retry, error handling, thread, timer, JSON, plugin ID.
 - Omit purely internal changes (refactors, CI, tests, logging, telemetry) entirely. Do NOT write a filler bullet like "various behind-the-scenes improvements".
+- If nothing in this release changes what a player notices, output exactly this one line and nothing else: $($script:NoPlayerFacingChangesSentinel)
 - Merge related commits into one bullet.
 - Never claim a feature or fix that is not supported by the commits and diff below.
 
@@ -104,31 +118,30 @@ $diff
     try {
         $body = @{
             model      = $Model
-            max_tokens = 1024
+            max_tokens = $MaxTokens
             system     = $systemPrompt
             messages   = @(@{ role = "user"; content = $userPrompt })
         } | ConvertTo-Json -Depth 6
-        $response = Invoke-RestMethod -Uri "https://api.anthropic.com/v1/messages" -Method Post -Body $body -Headers @{
+        $response = Invoke-RestMethod -Uri "https://api.anthropic.com/v1/messages" -Method Post -Body $body -TimeoutSec 300 -Headers @{
             "x-api-key"         = $env:ANTHROPIC_API_KEY
             "anthropic-version" = "2023-06-01"
             "content-type"      = "application/json"
         }
     }
     catch {
-        Write-Skip "Anthropic API call failed: $($_.Exception.Message)"
+        Write-Skip "Anthropic API call failed: $(Format-AnthropicFailure -ErrorRecord $_)"
         exit 0
     }
 
-    $text = ($response.content | Where-Object { $_.type -eq "text" } | ForEach-Object { $_.text }) -join "`n"
-    $bullets = @($text -split "\r?\n" |
-        ForEach-Object { $_.Trim() } |
-        Where-Object { $_ -match "^[\*\-]\s+\S" } |
-        ForEach-Object { "* " + ($_ -replace "^[\*\-]\s+", "") })
-
-    if ($bullets.Count -lt 1 -or $bullets.Count -gt 8) {
-        Write-Skip "Model returned $($bullets.Count) bullet lines, expected 1-8"
+    Write-Host "Model response: stop_reason=$($response.stop_reason), input_tokens=$($response.usage.input_tokens), output_tokens=$($response.usage.output_tokens)"
+    $result = Get-HighlightsResult -Response $response -GenericHighlight $GenericHighlight
+    if ($result.Problem) {
+        Write-Skip $result.Problem
+        Write-Host "Model text:"
+        Write-Host $(if ($result.Text) { $result.Text } else { "<none>" })
         exit 0
     }
+    $bullets = $result.Bullets
 }
 
 $highlightsBlock = "### Highlights`n`n" + ($bullets -join "`n")

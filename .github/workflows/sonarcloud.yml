@@ -57,6 +57,30 @@ jobs:
       - name: NuGet Restore
         run: nuget restore .\GsPlugin.sln
 
+      # SonarQube Cloud has no PowerShell coverage importer, so Pester's JaCoCo report is
+      # converted to the generic format (sonar.coverageReportPaths). Pester only measures
+      # its own process, which is why the script tests run the scripts in-process. The
+      # manifest updater's tests are skipped here: they need the powershell-yaml checkout
+      # and run the updater in a Windows PowerShell child process, so they add no
+      # coverage. Release Build runs the whole suite. Run.Exit would exit even on success
+      # and skip the conversion, so the result is checked instead.
+      - name: PowerShell Script Coverage (Pester)
+        run: |
+          Install-Module Pester -RequiredVersion 5.6.1 -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester -RequiredVersion 5.6.1
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = 'scripts'
+          $cfg.Run.ExcludePath = @('*update-installer-manifest.Tests.ps1')
+          $cfg.Run.PassThru = $true
+          $cfg.Output.CIFormat = 'GithubActions'
+          $cfg.CodeCoverage.Enabled = $true
+          $cfg.CodeCoverage.Path = 'scripts'
+          $cfg.CodeCoverage.OutputFormat = 'JaCoCo'
+          $cfg.CodeCoverage.OutputPath = 'pester-coverage.jacoco.xml'
+          $result = Invoke-Pester -Configuration $cfg
+          if ($result.Result -ne 'Passed') { throw "Pester tests failed" }
+          ./scripts/convert-pester-coverage.ps1 -JaCoCoPath pester-coverage.jacoco.xml -OutputPath pester-coverage.xml -SourceRoot $Env:GITHUB_WORKSPACE
+
       # The scanner has to wrap the full MSBuild build: dotnet build cannot compile the WPF
       # project, and the analysis only sees what the begin/end pair observed being compiled.
       - name: Build, Test and Analyze
@@ -69,7 +93,8 @@ jobs:
             /d:sonar.token="$Env:SONAR_TOKEN" `
             /d:sonar.host.url="https://sonarcloud.io" `
             /d:sonar.cs.vscoveragexml.reportsPaths="coverage.xml" `
-            /d:sonar.coverage.exclusions="GsPlugin.Tests/**"
+            /d:sonar.coverageReportPaths="pester-coverage.xml" `
+            /d:sonar.coverage.exclusions="GsPlugin.Tests/**,**/*.Tests.ps1"
           if ($LASTEXITCODE -ne 0) { throw "SonarScanner begin failed" }
           msbuild $Env:GITHUB_WORKSPACE\GsPlugin.sln -p:Configuration=Release -restore -clp:ErrorsOnly
           if ($LASTEXITCODE -ne 0) { throw "Build failed" }
