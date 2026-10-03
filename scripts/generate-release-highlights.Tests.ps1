@@ -249,4 +249,12 @@ Describe 'generate-release-highlights.ps1 parameter defaults' {
     It 'defaults MaxDiffChars to 60000' {
         Get-DefaultValue 'MaxDiffChars' | Should -Be 60000
     }
+
+    It 'defaults MaxTokens to 16000, leaving room for thinking before the answer' {
+        Get-DefaultValue 'MaxTokens' | Should -Be 16000
+    }
+
+    It 'defaults GenericHighlight to the no-player-facing-changes sentence' {
+        Get-DefaultValue 'GenericHighlight' | Should -Be 'Bug fixes and under-the-hood improvements for a smoother experience.'
+    }
 }
