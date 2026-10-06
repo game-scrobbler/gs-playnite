@@ -26,21 +26,29 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
+      # release-please lists a change twice when a PR whose title reads like one of
+      # its commits lands as a merge commit. PR titles are kept in plain English to
+      # avoid that; this catches any that slip through. It uses the full history
+      # fetched above to keep the PR's own commit rather than the merge commit.
+      - name: Remove duplicate changelog entries
+        shell: pwsh
+        run: ./scripts/remove-duplicate-changelog-entries.ps1
+
       - name: Generate release highlights
         shell: pwsh
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: ./scripts/generate-release-highlights.ps1
 
-      # The generation script is idempotent (no-op when Highlights already
-      # exist), so the synchronize event triggered by this push does not loop.
-      - name: Commit highlights to release PR
+      # Both scripts are idempotent (no-ops once Highlights exist and nothing is
+      # repeated), so the push this step makes does not start a loop.
+      - name: Commit release notes to release PR
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
-          git diff --cached --quiet || { git commit -m "docs: add release highlights"; git push; }
+          git diff --cached --quiet || { git commit -m "docs: update release notes"; git push; }
 
       # Generation never fails the job, so this is the alert: a failed API call,
       # exhausted credit or unusable answer leaves the release without Highlights,
