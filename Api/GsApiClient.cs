@@ -924,18 +924,31 @@ namespace GsPlugin.Api {
 
         /// <summary>
         /// Logs a null-envelope scrobble start and, on the live path only, reports one
-        /// Sentry event with a stable fingerprint. Game/user identity stays in extras
-        /// and breadcrumbs so Sentry cannot split GS-PLAYNITE-M5-style issues per title.
+        /// Sentry event with a stable fingerprint unless the failure is transient (the
+        /// queue replays those). Game/user identity stays in extras and breadcrumbs so
+        /// Sentry cannot split GS-PLAYNITE-M5-style issues per title.
         /// </summary>
         private static void ReportNullEnvelopeStartFailure(
             ScrobbleStartReq startData, bool isFlushRetry, int attempts, HttpCallDiagnostics diagnostics) {
             var extras = ScrobbleStartFailure.BuildExtras(
                 attempts, diagnostics, outcome: null, startData?.game_name);
             extras.TryGetValue("failure_kind", out var reason);
+            var status = diagnostics?.StatusCode ?? 0;
             GsLogger.Error(
-                $"Failed to start scrobble session (reason={reason ?? "unknown"}, http={diagnostics?.StatusCode ?? 0}, attempts={attempts})");
+                $"Failed to start scrobble session (reason={reason ?? "unknown"}, http={status}, attempts={attempts})");
 
-            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry, diagnostics?.StatusCode ?? 0)) {
+            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry, status, failureKind: diagnostics?.FailureKind)) {
+                if (!isFlushRetry && ScrobbleStartFailure.IsTransient(status, diagnostics?.FailureKind)) {
+                    // Context for any later event: the start is queued, not lost.
+                    GsSentry.AddBreadcrumb(
+                        message: "Scrobble start deferred to the pending queue",
+                        category: "scrobble",
+                        data: new Dictionary<string, string> {
+                            { "failure_kind", reason ?? "" },
+                            { "http_status", status.ToString() }
+                        });
+                }
+
                 return;
             }
 
@@ -1232,9 +1245,7 @@ namespace GsPlugin.Api {
                         responseData: $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}",
                         isError: true);
 
-                    var kind = ex is TaskCanceledException || ex is TimeoutException
-                        ? "timeout"
-                        : "transport";
+                    var kind = HttpCallDiagnostics.ClassifyException(ex);
                     diagnostics?.SetFailure(kind, ex);
                     _logger.Warn(ex, $"POST {url} {kind} error: {ex.GetType().Name}");
                     if (captureExceptions) {
@@ -1391,6 +1402,24 @@ namespace GsPlugin.Api {
                 ExceptionType = ex.GetType().Name;
             }
         }
+
+        /// <summary>
+        /// Names what a thrown request failed on. Only the network's own exceptions count as
+        /// "transport": the POST helper's catch also sees serializer and disposal faults, and
+        /// those are plugin defects that must not be filed as a retryable network blip.
+        /// </summary>
+        public static string ClassifyException(Exception ex) {
+            if (ex is TaskCanceledException || ex is TimeoutException) {
+                return "timeout";
+            }
+
+            if (ex is HttpRequestException || ex is WebException || ex is IOException
+                || ex is System.Net.Sockets.SocketException) {
+                return "transport";
+            }
+
+            return "exception";
+        }
     }
 
     /// <summary>
@@ -1421,11 +1450,23 @@ namespace GsPlugin.Api {
         }
 
         /// <summary>
-        /// Report once on the live start path after the HTTP helper actually ran.
-        /// Circuit-open skips, pending-queue flush retries, and explicit 429s only log locally.
+        /// A failure the next try can answer differently: no response at all (transport,
+        /// timeout) or a status that invites a retry (408, 429, 5xx). The start was persisted
+        /// before the request, so the pending-queue flush replays it. Capturing each blip
+        /// filed recovered sessions under GS-PLAYNITE-PT and regressed the issue for nothing.
         /// </summary>
-        public static bool ShouldCapture(int attempts, bool isFlushRetry, int httpStatus = 0, string code = null) =>
-            attempts > 0 && !isFlushRetry && httpStatus != 429 && !IsExpectedRejection(code);
+        public static bool IsTransient(int httpStatus, string failureKind) =>
+            failureKind == "transport" || failureKind == "timeout"
+            || httpStatus == (int)HttpStatusCode.RequestTimeout || httpStatus == 429 || httpStatus >= 500;
+
+        /// <summary>
+        /// Report once on the live start path after the HTTP helper actually ran, and only for
+        /// a failure retrying cannot fix. Circuit-open skips, pending-queue flush retries,
+        /// expected rejections and transient failures only log locally.
+        /// </summary>
+        public static bool ShouldCapture(
+            int attempts, bool isFlushRetry, int httpStatus = 0, string code = null, string failureKind = null) =>
+            attempts > 0 && !isFlushRetry && !IsTransient(httpStatus, failureKind) && !IsExpectedRejection(code);
 
         public static Dictionary<string, string> BuildExtras(
             int attempts, HttpCallDiagnostics diagnostics, string outcome, string gameName = null) {
