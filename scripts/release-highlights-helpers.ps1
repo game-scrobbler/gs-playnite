@@ -101,3 +101,83 @@ function Test-HighlightsPresent {
     }
     return [regex]::IsMatch($highlights.Groups[1].Value, "(?m)^\s*\*\s+\S")
 }
+
+# Removes repeated entries from one release's CHANGELOG section. release-please lists a
+# change twice when a PR lands as a merge commit whose title reads like one of its
+# commits: GitHub puts the PR title in the merge commit's body, and release-please parses
+# that as a second change. Entries repeat only within one subsection, since both carry
+# the same type. The kept entry is the one whose commit is not a merge, so its link points
+# at the change itself. $IsMergeCommit takes a SHA and returns whether it is a merge.
+function Remove-DuplicateChangelogEntries {
+    param(
+        [Parameter(Mandatory = $true)] [AllowEmptyString()] [string]$Changelog,
+        [Parameter(Mandatory = $true)] [string]$Version,
+        [Parameter(Mandatory = $true)] [scriptblock]$IsMergeCommit
+    )
+
+    $lines = $Changelog -split "\n"
+    $escapedVersion = [regex]::Escape($Version)
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match "^## \[$escapedVersion\]") {
+            $start = $i
+            break
+        }
+    }
+    if ($start -lt 0) {
+        return [PSCustomObject]@{ Changelog = $Changelog; Removed = @() }
+    }
+
+    # "* text ([abc1234](https://.../commit/<full sha>))", sometimes followed by
+    # ", closes [#84](...)" when the commit closes an issue. Only the text before the
+    # link is compared: the merge commit's copy never carries the "closes" part.
+    $entryPattern = '^\* (?<text>.+?) \(\[(?<short>[0-9a-f]{7,40})\]\((?<url>[^)]*)\)\)'
+    $groups = [ordered]@{}
+    $subsection = ""
+    for ($i = $start + 1; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^## \[') {
+            break
+        }
+        if ($lines[$i] -match '^### ') {
+            $subsection = $lines[$i].Trim()
+            continue
+        }
+        $entry = [regex]::Match($lines[$i], $entryPattern)
+        if (-not $entry.Success) {
+            continue
+        }
+        $sha = $entry.Groups["short"].Value
+        $fullSha = [regex]::Match($entry.Groups["url"].Value, '[0-9a-f]{40}$')
+        if ($fullSha.Success) {
+            $sha = $fullSha.Value
+        }
+        $key = "$subsection`n$($entry.Groups['text'].Value)"
+        if (-not $groups.Contains($key)) {
+            $groups[$key] = [System.Collections.Generic.List[object]]::new()
+        }
+        $groups[$key].Add([PSCustomObject]@{ Index = $i; Sha = $sha })
+    }
+
+    $drop = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($group in $groups.Values) {
+        if ($group.Count -lt 2) {
+            continue
+        }
+        $keep = $group | Where-Object { -not (& $IsMergeCommit $_.Sha) } | Select-Object -First 1
+        if (-not $keep) {
+            $keep = $group[0]
+        }
+        foreach ($item in $group) {
+            if ($item.Index -ne $keep.Index) {
+                $null = $drop.Add($item.Index)
+            }
+        }
+    }
+
+    $removed = @(for ($i = 0; $i -lt $lines.Count; $i++) { if ($drop.Contains($i)) { $lines[$i].TrimEnd("`r") } })
+    $kept = for ($i = 0; $i -lt $lines.Count; $i++) { if (-not $drop.Contains($i)) { $lines[$i] } }
+    [PSCustomObject]@{
+        Changelog = (@($kept) -join "`n")
+        Removed   = $removed
+    }
+}

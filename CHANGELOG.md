@@ -11,12 +11,10 @@
 
 ### Bug Fixes
 
-* **release:** fail the highlights job when a release has no Highlights ([d8c2cc2](https://github.com/game-scrobbler/gs-playnite/commit/d8c2cc2934e4fd785dac76d26e72d16f846fd8a7))
 * **release:** fail the highlights job when a release has no Highlights ([3f6af1e](https://github.com/game-scrobbler/gs-playnite/commit/3f6af1ee113fa01225fb90a2e43a72f7f87f94aa))
 * resolve SonarCloud findings, fail closed on Sentry scrub timeout ([ba56797](https://github.com/game-scrobbler/gs-playnite/commit/ba567979d80a8df4c292cfcb028cb813c74a8e5a))
 * **settings:** run link and data deletion as tasks instead of async void ([90985ea](https://github.com/game-scrobbler/gs-playnite/commit/90985ea2690f87c7501d4ea2f57b6351a7ddae45))
 * **telemetry:** fail closed when the Sentry profile-path scrub times out ([2b70317](https://github.com/game-scrobbler/gs-playnite/commit/2b70317f60b2bea6793bcb0e4f4450f0c856ef3d))
-* **telemetry:** keep non-Playnite hosts off the production DSN ([1c6edf4](https://github.com/game-scrobbler/gs-playnite/commit/1c6edf485b49f4edffd01959e30a12d683406d2d))
 * **telemetry:** keep non-Playnite hosts off the production DSN ([8ee3d53](https://github.com/game-scrobbler/gs-playnite/commit/8ee3d53a4024018bf8a7b0aca05bd817d516678e))
 
 ## [2.9.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.4...GsPlugin-v2.9.0) (2026-09-19)
@@ -60,7 +58,6 @@
 * **loading:** serve the cross-major references our own package set needs ([651f817](https://github.com/game-scrobbler/gs-playnite/commit/651f8177f1d83adb8d0014f62f785f98f00ec94d))
 * make 2.8.3 loadable again and quiet expected linking rejections ([b65c897](https://github.com/game-scrobbler/gs-playnite/commit/b65c8978af45cc973636726bc81a46d676aa6e71))
 * **persistence:** give a locked file long enough to be retried ([ae50d7d](https://github.com/game-scrobbler/gs-playnite/commit/ae50d7d2cebc8b07e7df4df7f92a3c78e025f6b3))
-* **sync:** make v4 upload failures diagnosable in the log ([1b49e0f](https://github.com/game-scrobbler/gs-playnite/commit/1b49e0f1c7f2d0543e02f94d6880477a3feeea6a))
 * **sync:** make v4 upload failures diagnosable in the log ([57804e4](https://github.com/game-scrobbler/gs-playnite/commit/57804e42096fa3717a9ff22ea0ad6fa3cbab6cce))
 
 ## [2.8.3](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.2...GsPlugin-v2.8.3) (2026-09-08)
@@ -87,11 +84,9 @@
 * **host:** require exact assembly signing identities ([a2a6304](https://github.com/game-scrobbler/gs-playnite/commit/a2a63040fd292c810352caa99727cd1a93b48195))
 * **release:** align Sentry release names and portable symbols ([a6bfccc](https://github.com/game-scrobbler/gs-playnite/commit/a6bfcccd45f357970b273a91da92d02a376179b4))
 * **release:** preserve changelog text across manifest updates ([0163190](https://github.com/game-scrobbler/gs-playnite/commit/0163190df6398a972ca1879f165c1733f2ac3621))
-* **reliability:** address code review findings across sync, queue and telemetry ([c788553](https://github.com/game-scrobbler/gs-playnite/commit/c7885534f71247d26c7595fee1e71966fcaba277))
 * **reliability:** address code review findings across sync, queue and telemetry ([dfea5bf](https://github.com/game-scrobbler/gs-playnite/commit/dfea5bf640f542e0bddb30cca5ca463531107303))
 * **reliability:** address CodeRabbit review findings on [#97](https://github.com/game-scrobbler/gs-playnite/issues/97) ([35911cb](https://github.com/game-scrobbler/gs-playnite/commit/35911cb51d5f8c3cfa9f69151066a9c5f4cdc8e9))
 * **scrobble:** attach game name to typed start-fail Sentry extras ([83b7ecf](https://github.com/game-scrobbler/gs-playnite/commit/83b7ecfddf71cccb9f595ffec2d87daad8a9ff9f))
-* **scrobble:** classify start failures and stop per-game Sentry issues ([360b198](https://github.com/game-scrobbler/gs-playnite/commit/360b198f44d441bcdfb10a3cc133946e7138b42c))
 * **scrobble:** classify start failures and stop per-game Sentry issues ([b983041](https://github.com/game-scrobbler/gs-playnite/commit/b98304151ae8064c454e6a5c583efa826ed324d6))
 * **scrobbling:** persist session events before network waits ([ea83df9](https://github.com/game-scrobbler/gs-playnite/commit/ea83df9b373b14722cc97e7833c50015e9b355e4))
 * **state:** preserve identity and durable queue transitions ([5b13fb4](https://github.com/game-scrobbler/gs-playnite/commit/5b13fb4719792c7fdfe0442f759b3d418ca95e87))
@@ -111,7 +106,6 @@
 
 ### Bug Fixes
 
-* **sync:** serialize hashed dates in the form they are hashed ([2ae8ae4](https://github.com/game-scrobbler/gs-playnite/commit/2ae8ae43073f4d2cb0d9b4a6a21f7cbc72968064))
 * **sync:** serialize hashed dates in the form they are hashed ([4abe345](https://github.com/game-scrobbler/gs-playnite/commit/4abe345ec0c9c3c94a96317983602a709762ebb7))
 
 ## [2.8.1](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.8.0...GsPlugin-v2.8.1) (2026-08-10)
@@ -125,9 +119,7 @@
 
 ### Bug Fixes
 
-* **sync:** confirm queue completion before committing sync baseline ([8f3568c](https://github.com/game-scrobbler/gs-playnite/commit/8f3568c38b721bf44132af02fe667b36e4b72bed))
 * **sync:** confirm queue completion before committing sync baseline ([cdb43bd](https://github.com/game-scrobbler/gs-playnite/commit/cdb43bd9d82a167cf54e82e54df46a7387077256))
-* **telemetry:** bound PostHog client dispose during shutdown ([a775fd7](https://github.com/game-scrobbler/gs-playnite/commit/a775fd70a24a0cd78f9bc7cfd67f4a1b33233bef))
 * **telemetry:** bound PostHog client dispose during shutdown ([625154c](https://github.com/game-scrobbler/gs-playnite/commit/625154cded28948ea49076bc5c82499255d6bc4c)), closes [#84](https://github.com/game-scrobbler/gs-playnite/issues/84)
 * **telemetry:** observe PostHog dispose fault after shutdown timeout ([1176e0f](https://github.com/game-scrobbler/gs-playnite/commit/1176e0f3fe59bc2f98d320e31a3538fa65d3780a))
 
@@ -150,7 +142,6 @@
 
 ### Bug Fixes
 
-* **achievements:** prefer live plugin over stale on-disk provider data ([cfb58db](https://github.com/game-scrobbler/gs-playnite/commit/cfb58db9bd0c9eb9afd24d7c50bb7b04e5e9cab3))
 * **achievements:** prefer live plugin over stale on-disk provider data ([192f620](https://github.com/game-scrobbler/gs-playnite/commit/192f620aa624fd37acc684d47792c440935202b1)), closes [#66](https://github.com/game-scrobbler/gs-playnite/issues/66)
 * **hooks:** address review feedback on the format check ([4566ec3](https://github.com/game-scrobbler/gs-playnite/commit/4566ec3d46c18f86069827f76c6b0177abc27111))
 * **hooks:** run format check under a capable .NET SDK ([562af21](https://github.com/game-scrobbler/gs-playnite/commit/562af21101cff53c9648e5a2bb372ad93cf14f76))
@@ -159,7 +150,6 @@
 * **linking:** stop reporting success when verify returns not-linked ([ffdd5f2](https://github.com/game-scrobbler/gs-playnite/commit/ffdd5f254ff708376893f7ac116b0a1dbe446001))
 * **privacy:** make Delete My Data resilient to token and opt-out states ([331c148](https://github.com/game-scrobbler/gs-playnite/commit/331c1481091525ca8b6e3e2ca697668701922914)), closes [#61](https://github.com/game-scrobbler/gs-playnite/issues/61)
 * **token:** serialize install-token registration across concurrent callers ([1974510](https://github.com/game-scrobbler/gs-playnite/commit/1974510f2ae9c1a9896136fb828b68355654e0de))
-* **token:** serialize install-token registration across concurrent callers ([46bf711](https://github.com/game-scrobbler/gs-playnite/commit/46bf7113ba54f7b265427d138ecab7b02237888e))
 
 ## [2.7.0](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.6.0...GsPlugin-v2.7.0) (2026-07-15)
 
