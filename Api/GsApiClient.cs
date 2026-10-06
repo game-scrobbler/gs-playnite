@@ -1389,20 +1389,6 @@ namespace GsPlugin.Api {
         /// </summary>
         public string ResponseContentType { get; set; }
 
-        public void Reset() {
-            StatusCode = 0;
-            FailureKind = null;
-            ExceptionType = null;
-            ResponseContentType = null;
-        }
-
-        public void SetFailure(string kind, Exception ex = null) {
-            FailureKind = kind;
-            if (ex != null) {
-                ExceptionType = ex.GetType().Name;
-            }
-        }
-
         /// <summary>
         /// Names what a thrown request failed on. Only the network's own exceptions count as
         /// "transport": the POST helper's catch also sees serializer and disposal faults, and
@@ -1419,6 +1405,20 @@ namespace GsPlugin.Api {
             }
 
             return "exception";
+        }
+
+        public void Reset() {
+            StatusCode = 0;
+            FailureKind = null;
+            ExceptionType = null;
+            ResponseContentType = null;
+        }
+
+        public void SetFailure(string kind, Exception ex = null) {
+            FailureKind = kind;
+            if (ex != null) {
+                ExceptionType = ex.GetType().Name;
+            }
         }
     }
 

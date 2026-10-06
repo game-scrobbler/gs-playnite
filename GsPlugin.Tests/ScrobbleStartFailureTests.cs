@@ -87,25 +87,36 @@ namespace GsPlugin.Tests {
             Assert.True(ScrobbleStartFailure.ShouldCapture(1, false, httpStatus, null, failureKind));
         }
 
-        public static TheoryData<Exception, string> ClassifiedExceptions => new TheoryData<Exception, string> {
-            { new TaskCanceledException(), "timeout" },
-            { new TimeoutException(), "timeout" },
-            { new HttpRequestException("send failed", new WebException("name not resolved")), "transport" },
-            { new WebException("connection reset"), "transport" },
-            { new IOException("unexpected EOF"), "transport" },
-            { new SocketException(10054), "transport" },
-            { new InvalidOperationException(), "exception" },
-            { new ObjectDisposedException("HttpClient"), "exception" },
-            { new NotSupportedException(), "exception" },
-            { new NullReferenceException(), "exception" },
-        };
-
         // The POST helper catches every exception, so "transport" has to mean the network.
-        // Anything else is a plugin fault and must stay reportable.
+        // Anything else is a plugin fault and must stay reportable. Rows pass the Type, not
+        // an instance, so Test Explorer can enumerate them (exceptions are not serializable).
         [Theory]
-        [MemberData(nameof(ClassifiedExceptions))]
-        public void ClassifyException_OnlyNetworkFaultsAreTransport(Exception ex, string expected) {
+        [InlineData(typeof(TaskCanceledException), "timeout")]
+        [InlineData(typeof(TimeoutException), "timeout")]
+        [InlineData(typeof(HttpRequestException), "transport")]
+        [InlineData(typeof(WebException), "transport")]
+        [InlineData(typeof(IOException), "transport")]
+        [InlineData(typeof(SocketException), "transport")]
+        [InlineData(typeof(InvalidOperationException), "exception")]
+        [InlineData(typeof(ObjectDisposedException), "exception")]
+        [InlineData(typeof(NotSupportedException), "exception")]
+        [InlineData(typeof(NullReferenceException), "exception")]
+        public void ClassifyException_OnlyNetworkFaultsAreTransport(Type exceptionType, string expected) {
+            // ObjectDisposedException has no parameterless constructor; it takes the object name.
+            var ex = exceptionType.GetConstructor(Type.EmptyTypes) != null
+                ? (Exception)Activator.CreateInstance(exceptionType)
+                : (Exception)Activator.CreateInstance(exceptionType, "HttpClient");
+
             Assert.Equal(expected, HttpCallDiagnostics.ClassifyException(ex));
+        }
+
+        // .NET Framework's HttpClient reports DNS, connect and TLS failures as an
+        // HttpRequestException wrapping a WebException; the outer type decides.
+        [Fact]
+        public void ClassifyException_WrappedWebExceptionIsTransport() {
+            var ex = new HttpRequestException("send failed", new WebException("name not resolved"));
+
+            Assert.Equal("transport", HttpCallDiagnostics.ClassifyException(ex));
         }
 
         [Theory]
