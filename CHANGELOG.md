@@ -3,6 +3,11 @@
 ## [2.9.2](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.9.1...GsPlugin-v2.9.2) (2026-10-06)
 
 
+### Highlights
+
+* Bug fixes and under-the-hood improvements for a smoother experience.
+
+
 ### Bug Fixes
 
 * **scrobble:** report a 4xx start rejection even when its body read fails ([730c121](https://github.com/game-scrobbler/gs-playnite/commit/730c1216d5fefd54967da17ecfdbf3049e52a8c2))
