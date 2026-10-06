@@ -58,6 +58,8 @@ namespace GsPlugin.Tests {
         [InlineData(502, "html")]
         [InlineData(503, "http")]
         [InlineData(504, "empty")]
+        [InlineData(503, "transport")]
+        [InlineData(200, "transport")]
         public void ShouldCapture_SkipsTransientFailuresTheQueueReplays(int httpStatus, string failureKind) {
             Assert.True(ScrobbleStartFailure.IsTransient(httpStatus, failureKind));
             Assert.False(ScrobbleStartFailure.ShouldCapture(3, false, httpStatus, null, failureKind));
@@ -71,6 +73,18 @@ namespace GsPlugin.Tests {
         [InlineData(403, "http")]
         public void IsTransient_FalseForFailuresRetryingCannotFix(int httpStatus, string failureKind) {
             Assert.False(ScrobbleStartFailure.IsTransient(httpStatus, failureKind));
+        }
+
+        // The POST helper records the status before reading the body, so a body read that
+        // throws after a 4xx arrives as "transport" with the status intact. The server
+        // answered; that answer is a permanent rejection and must still be reported.
+        [Theory]
+        [InlineData(403, "transport")]
+        [InlineData(404, "transport")]
+        [InlineData(401, "timeout")]
+        public void ShouldCapture_ReportsPermanentStatusEvenWhenBodyReadFailed(int httpStatus, string failureKind) {
+            Assert.False(ScrobbleStartFailure.IsTransient(httpStatus, failureKind));
+            Assert.True(ScrobbleStartFailure.ShouldCapture(1, false, httpStatus, null, failureKind));
         }
 
         public static TheoryData<Exception, string> ClassifiedExceptions => new TheoryData<Exception, string> {

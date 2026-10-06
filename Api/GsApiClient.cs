@@ -1454,10 +1454,17 @@ namespace GsPlugin.Api {
         /// timeout) or a status that invites a retry (408, 429, 5xx). The start was persisted
         /// before the request, so the pending-queue flush replays it. Capturing each blip
         /// filed recovered sessions under GS-PLAYNITE-PT and regressed the issue for nothing.
+        /// An error status wins over the failure kind: the POST helper records the status
+        /// before reading the body, so a 403 whose body read then throws arrives as
+        /// "transport", and the server's answer is still a permanent rejection.
         /// </summary>
-        public static bool IsTransient(int httpStatus, string failureKind) =>
-            failureKind == "transport" || failureKind == "timeout"
-            || httpStatus == (int)HttpStatusCode.RequestTimeout || httpStatus == 429 || httpStatus >= 500;
+        public static bool IsTransient(int httpStatus, string failureKind) {
+            if (httpStatus >= 400) {
+                return httpStatus == (int)HttpStatusCode.RequestTimeout || httpStatus == 429 || httpStatus >= 500;
+            }
+
+            return failureKind == "transport" || failureKind == "timeout";
+        }
 
         /// <summary>
         /// Report once on the live start path after the HTTP helper actually ran, and only for
