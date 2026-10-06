@@ -1,4 +1,9 @@
 using System;
+using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Threading.Tasks;
 using GsPlugin.Api;
 using Xunit;
 
@@ -24,18 +29,94 @@ namespace GsPlugin.Tests {
         }
 
         [Theory]
-        [InlineData(0, false, 0, null, false)]
-        [InlineData(0, true, 0, null, false)]
-        [InlineData(1, true, 0, null, false)]
-        [InlineData(3, true, 0, null, false)]
-        [InlineData(1, false, 0, null, true)]
-        [InlineData(3, false, 0, null, true)]
-        [InlineData(1, false, 429, null, false)]
-        [InlineData(1, false, 403, "OPTED_OUT", false)]
-        [InlineData(1, false, 403, null, true)]
+        [InlineData(0, false, 0, null, null, false)]
+        [InlineData(0, true, 0, null, null, false)]
+        [InlineData(1, true, 0, null, null, false)]
+        [InlineData(3, true, 0, null, null, false)]
+        [InlineData(1, false, 0, null, null, true)]
+        [InlineData(3, false, 0, null, null, true)]
+        [InlineData(1, false, 429, null, "http", false)]
+        [InlineData(1, false, 403, "OPTED_OUT", "http", false)]
+        [InlineData(1, false, 403, null, "http", true)]
+        [InlineData(1, false, 404, null, "http", true)]
+        [InlineData(1, false, 200, null, "json", true)]
+        [InlineData(1, false, 200, null, "html", true)]
+        [InlineData(1, false, 0, null, "exception", true)]
         public void ShouldCapture_OnlyLivePathAfterAnAttempt(
-            int attempts, bool isFlushRetry, int httpStatus, string code, bool expected) {
-            Assert.Equal(expected, ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry, httpStatus, code));
+            int attempts, bool isFlushRetry, int httpStatus, string code, string failureKind, bool expected) {
+            Assert.Equal(expected, ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry, httpStatus, code, failureKind));
+        }
+
+        // GS-PLAYNITE-PT regressed on two transport failures whose starts the pending queue
+        // replayed five minutes later. A blip the queue recovers from is not an issue.
+        [Theory]
+        [InlineData(0, "transport")]
+        [InlineData(0, "timeout")]
+        [InlineData(408, "http")]
+        [InlineData(429, "http")]
+        [InlineData(500, "http")]
+        [InlineData(502, "html")]
+        [InlineData(503, "http")]
+        [InlineData(504, "empty")]
+        [InlineData(503, "transport")]
+        [InlineData(200, "transport")]
+        public void ShouldCapture_SkipsTransientFailuresTheQueueReplays(int httpStatus, string failureKind) {
+            Assert.True(ScrobbleStartFailure.IsTransient(httpStatus, failureKind));
+            Assert.False(ScrobbleStartFailure.ShouldCapture(3, false, httpStatus, null, failureKind));
+        }
+
+        [Theory]
+        [InlineData(0, null)]
+        [InlineData(0, "exception")]
+        [InlineData(200, "json")]
+        [InlineData(400, "http")]
+        [InlineData(403, "http")]
+        public void IsTransient_FalseForFailuresRetryingCannotFix(int httpStatus, string failureKind) {
+            Assert.False(ScrobbleStartFailure.IsTransient(httpStatus, failureKind));
+        }
+
+        // The POST helper records the status before reading the body, so a body read that
+        // throws after a 4xx arrives as "transport" with the status intact. The server
+        // answered; that answer is a permanent rejection and must still be reported.
+        [Theory]
+        [InlineData(403, "transport")]
+        [InlineData(404, "transport")]
+        [InlineData(401, "timeout")]
+        public void ShouldCapture_ReportsPermanentStatusEvenWhenBodyReadFailed(int httpStatus, string failureKind) {
+            Assert.False(ScrobbleStartFailure.IsTransient(httpStatus, failureKind));
+            Assert.True(ScrobbleStartFailure.ShouldCapture(1, false, httpStatus, null, failureKind));
+        }
+
+        // The POST helper catches every exception, so "transport" has to mean the network.
+        // Anything else is a plugin fault and must stay reportable. Rows pass the Type, not
+        // an instance, so Test Explorer can enumerate them (exceptions are not serializable).
+        [Theory]
+        [InlineData(typeof(TaskCanceledException), "timeout")]
+        [InlineData(typeof(TimeoutException), "timeout")]
+        [InlineData(typeof(HttpRequestException), "transport")]
+        [InlineData(typeof(WebException), "transport")]
+        [InlineData(typeof(IOException), "transport")]
+        [InlineData(typeof(SocketException), "transport")]
+        [InlineData(typeof(InvalidOperationException), "exception")]
+        [InlineData(typeof(ObjectDisposedException), "exception")]
+        [InlineData(typeof(NotSupportedException), "exception")]
+        [InlineData(typeof(NullReferenceException), "exception")]
+        public void ClassifyException_OnlyNetworkFaultsAreTransport(Type exceptionType, string expected) {
+            // ObjectDisposedException has no parameterless constructor; it takes the object name.
+            var ex = exceptionType.GetConstructor(Type.EmptyTypes) != null
+                ? (Exception)Activator.CreateInstance(exceptionType)
+                : (Exception)Activator.CreateInstance(exceptionType, "HttpClient");
+
+            Assert.Equal(expected, HttpCallDiagnostics.ClassifyException(ex));
+        }
+
+        // .NET Framework's HttpClient reports DNS, connect and TLS failures as an
+        // HttpRequestException wrapping a WebException; the outer type decides.
+        [Fact]
+        public void ClassifyException_WrappedWebExceptionIsTransport() {
+            var ex = new HttpRequestException("send failed", new WebException("name not resolved"));
+
+            Assert.Equal("transport", HttpCallDiagnostics.ClassifyException(ex));
         }
 
         [Theory]
