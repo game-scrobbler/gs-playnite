@@ -4,7 +4,7 @@ using GsPlugin.Api;
 
 namespace GsPlugin.View {
     public class GsDashboardView : AppViewItem {
-        public GsDashboardView(IGsApiClient apiClient, string? userDataFolder = null) {
+        public GsDashboardView(IGsApiClient apiClient, string userDataFolder) {
             View = new MySidebarView(apiClient, userDataFolder);
         }
 

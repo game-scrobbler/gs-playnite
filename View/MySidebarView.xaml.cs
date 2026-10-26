@@ -14,7 +14,7 @@ using Microsoft.Web.WebView2.Wpf;
 namespace GsPlugin.View {
     public partial class MySidebarView : UserControl, IDisposable {
         private readonly IGsApiClient _apiClient;
-        private readonly string? _userDataFolder;
+        private readonly string _userDataFolder;
         private bool _webView2Ready;
         private DateTime _lastNavigatedAtUtc = DateTime.MinValue;
         private bool _disposed;
@@ -26,9 +26,10 @@ namespace GsPlugin.View {
         /// from the host process, which every Playnite extension hosting a WebView2 shares — so the
         /// cookie jar, localStorage and browsing history of the signed-in gamescrobbler.com dashboard
         /// (including the access_token carried in the URL) would be readable by any other extension.
-        /// Passing null keeps the shared default, for callers that cannot supply a path.
+        /// Required rather than optional: an optional null default is how the dashboard shipped on
+        /// the shared profile once already, with the private-profile path defined but never passed.
         /// </param>
-        public MySidebarView(IGsApiClient apiClient, string? userDataFolder = null) {
+        public MySidebarView(IGsApiClient apiClient, string userDataFolder) {
             InitializeComponent();
             _apiClient = apiClient;
             _userDataFolder = userDataFolder;
@@ -130,25 +131,25 @@ namespace GsPlugin.View {
                 return true;
             }
 
-            CoreWebView2Environment? environment = null;
-            if (!string.IsNullOrEmpty(_userDataFolder)) {
-                try {
-                    Directory.CreateDirectory(_userDataFolder);
-                    environment = await CoreWebView2Environment.CreateAsync(
-                        browserExecutableFolder: null, userDataFolder: _userDataFolder);
+            // Fail closed. Falling back to the shared default used to look harmless because the
+            // dashboard still rendered, but the default profile is derived from the host process
+            // and shared with every other extension hosting a WebView2, so the fallback quietly
+            // handed them this dashboard's authenticated cookies and the access_token in its URL
+            // history, which is the exact exposure the private profile exists to prevent. The view
+            // gets isolation or an error, never a silent downgrade.
+            CoreWebView2Environment environment;
+            try {
+                if (string.IsNullOrEmpty(_userDataFolder)) {
+                    throw new InvalidOperationException("no private profile folder was supplied");
                 }
-                catch (Exception envEx) {
-                    // Fail closed. Falling back to the shared default used to look harmless
-                    // because the dashboard still rendered, but the default profile is derived
-                    // from the host process and shared with every other extension hosting a
-                    // WebView2, so the fallback quietly handed them this dashboard's
-                    // authenticated cookies and the access_token in its URL history, which is
-                    // the exact exposure the private profile exists to prevent. A caller that
-                    // asked for isolation gets isolation or an error, never a silent downgrade.
-                    GsLogger.Error($"Could not create a private WebView2 profile: {envEx.Message}");
-                    ShowErrorMessage(Loc.dashboard_profile_failed());
-                    return false;
-                }
+                Directory.CreateDirectory(_userDataFolder);
+                environment = await CoreWebView2Environment.CreateAsync(
+                    browserExecutableFolder: null, userDataFolder: _userDataFolder);
+            }
+            catch (Exception envEx) {
+                GsLogger.Error($"Could not create a private WebView2 profile: {envEx.Message}");
+                ShowErrorMessage(Loc.dashboard_profile_failed());
+                return false;
             }
 
             await _browser.EnsureCoreWebView2Async(environment);

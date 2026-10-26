@@ -369,7 +369,7 @@ namespace GsPlugin {
 
         public override AppViewItem? GetAppViewItem(GetAppViewItemsArgs args) {
             if (args.ViewId == "gs-dashboard") {
-                return new GsDashboardView(_apiClient);
+                return new GsDashboardView(_apiClient, WebViewUserDataFolder);
             }
             return null;
         }
