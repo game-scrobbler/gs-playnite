@@ -278,11 +278,6 @@ namespace GsPlugin {
         }
 
         /// <summary>
-        /// Called when the game collection changes. Used to detect game sessions starting/stopping
-        /// (P11 replaced OnGameStarting/OnGameStopped with session-based collection change events)
-        /// and to trigger library sync when games are added.
-        /// </summary>
-        /// <summary>
         /// Fired before a game launches. Playnite 11 alpha exposes the real game lifecycle
         /// callbacks, so the SessionIds-diffing workaround this branch used while the API was
         /// missing is gone, and stops are reported again rather than being inferred at exit.
@@ -336,11 +331,15 @@ namespace GsPlugin {
             });
         }
 
+        /// <summary>
+        /// Called when the game collection changes; starts a library sync when games are added.
+        /// </summary>
         public override async Task OnGameCollectionChange(DataCollectionChangeArgs<Game> args) {
             if (_dataUnavailable) return;
             await GuardedAsync("OnGameCollectionChange", async () => {
-                // Trigger library sync when games are added (e.g. after a library import)
-                if (args.AddedItems.Count > 0) {
+                // AddedItems is declared non-nullable, but alpha 11.0.11.0 passes null for some
+                // changes: a Steam import threw here five times in a minute before this guard.
+                if (args.AddedItems?.Count > 0) {
                     _ = SyncLibraryWithDiffAsync().LogFaults("Library sync after game add failed");
                 }
                 await Task.CompletedTask;
