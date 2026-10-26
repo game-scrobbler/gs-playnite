@@ -24,6 +24,7 @@ namespace GsPlugin.Infrastructure {
                         return true;
                     }
                 }
+
                 return false;
             }
             catch {

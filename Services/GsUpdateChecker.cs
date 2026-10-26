@@ -4,9 +4,9 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Playnite;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
+using Playnite;
 
 namespace GsPlugin.Services {
     internal class GsUpdateChecker {

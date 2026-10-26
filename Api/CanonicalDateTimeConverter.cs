@@ -33,10 +33,12 @@ namespace GsPlugin.Api {
             if (reader.TokenType == JsonTokenType.Null) {
                 return null;
             }
+
             var raw = reader.GetString();
             if (string.IsNullOrEmpty(raw)) {
                 return null;
             }
+
             return DateTime.Parse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
         }
 
@@ -46,6 +48,7 @@ namespace GsPlugin.Api {
                 writer.WriteNullValue();
                 return;
             }
+
             writer.WriteStringValue(GsHashUtils.FormatDateForHash(value));
         }
     }

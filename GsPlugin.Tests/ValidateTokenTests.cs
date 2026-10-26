@@ -1,5 +1,5 @@
-using Xunit;
 using GsPlugin.Services;
+using Xunit;
 
 namespace GsPlugin.Tests {
     public class ValidateTokenTests {

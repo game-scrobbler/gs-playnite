@@ -101,12 +101,14 @@ namespace GsPlugin.View {
 
         public override void LoadedInDetailsView(LoadedInDetailsViewArgs args) {
             base.LoadedInDetailsView(args);
+
             // Guard: Playnite can load the same presenter more than once (view
             // switches, theme reloads). The data is per-game and effectively static
             // between syncs, so fetching once is enough.
             if (_loadStarted) {
                 return;
             }
+
             _loadStarted = true;
             _ = LoadAsync();
         }
@@ -162,6 +164,7 @@ namespace GsPlugin.View {
             catch (Exception ex) {
                 GsLogger.Warn($"GsGameDataPresenter dispose failed: {ex.Message}");
             }
+
             return base.DisposeAsync();
         }
     }

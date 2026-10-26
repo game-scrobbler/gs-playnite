@@ -24,11 +24,14 @@ namespace GsPlugin.Models {
         };
 
         private readonly string _fileName;
+
         /// <summary>Capitalized half name used in log messages, e.g. "Library" / "Achievement".</summary>
         private readonly string _label;
+
         /// <summary>Lower-case half name as used in the legacy migration messages.</summary>
         private readonly string _legacyHalfLabel;
         private readonly string _sentryOperation;
+
         /// <summary>
         /// Derives this half's index from a legacy combined snapshot, or returns null when the
         /// snapshot carries no data for this half. Encapsulates both the half selection and the
@@ -109,6 +112,7 @@ namespace GsPlugin.Models {
             if (_index.IdentityGeneration == currentGeneration) {
                 return false;
             }
+
             GsLogger.Warn($"[GsSyncHashIndex] {_label} index generation {_index.IdentityGeneration} != data generation {currentGeneration}; discarding");
             ResetToGeneration(currentGeneration);
             return true;
@@ -123,6 +127,7 @@ namespace GsPlugin.Models {
             if (_index == null) {
                 return false;
             }
+
             _index.IdentityGeneration = GsDataManager.DataOrNull?.IdentityGeneration ?? 0;
             try {
                 GsAtomicFile.WriteJson(_filePath, _index, jsonOptions);
@@ -167,16 +172,19 @@ namespace GsPlugin.Models {
             if (_index.Entries == null) {
                 _index.Entries = new Dictionary<string, string>();
             }
+
             if (upserted != null) {
                 foreach (var kvp in upserted) {
                     _index.Entries[kvp.Key] = kvp.Value;
                 }
             }
+
             if (removed != null) {
                 foreach (var id in removed) {
                     _index.Entries.Remove(id);
                 }
             }
+
             return Save();
         }
 
@@ -202,8 +210,10 @@ namespace GsPlugin.Models {
                 if (string.IsNullOrEmpty(kvp.Key) || kvp.Value == null) {
                     continue;
                 }
+
                 entries[kvp.Key] = fingerprint(kvp.Value);
             }
+
             return new GsSyncHashIndexFile {
                 IdentityGeneration = generation,
                 FullSyncAt = fullSyncAt,

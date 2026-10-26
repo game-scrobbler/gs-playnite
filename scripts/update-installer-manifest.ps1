@@ -19,7 +19,9 @@ Import-Module "$PSScriptRoot\..\powershell-yaml\powershell-yaml.psd1" -Force
 
 $manifestPath = "$PSScriptRoot\..\installer_manifest.yaml"
 $releaseDate = Get-Date -Format "yyyy-MM-dd"
-$packageUrl = "https://github.com/game-scrobbler/gs-playnite/releases/download/$TagName/$TagName.pext"
+# Playnite 11 extensions ship as .pext2; build.yml uploads $TagName.pext2 and only runs this
+# script once that asset is published.
+$packageUrl = "https://github.com/game-scrobbler/gs-playnite/releases/download/$TagName/$TagName.pext2"
 
 Write-Host "Updating installer_manifest.yaml with version $Version"
 Write-Host "Tag: $TagName"
@@ -50,9 +52,9 @@ if ($changelogMatch.Success) {
 
     # Extract bullet points
     $bulletPattern = "^\s*\*\s+(.+?)$"
-    $matches = [regex]::Matches($bulletSource, $bulletPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
+    $bulletMatches = [regex]::Matches($bulletSource, $bulletPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
 
-    foreach ($match in $matches) {
+    foreach ($match in $bulletMatches) {
         $line = $match.Groups[1].Value.Trim()
         # Clean up the line - remove commit links and extra formatting
         $line = $line -replace '\[([a-f0-9]+)\]\([^\)]+\)', ''

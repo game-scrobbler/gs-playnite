@@ -1,11 +1,15 @@
 using System.Threading.Tasks;
+using System.Windows;
 using Playnite;
-using GsPlugin.Api;
 
 namespace GsPlugin.View {
+    /// <summary>
+    /// Hosts the dashboard surface (WebView2 hub or the native opted-out panel, chosen by
+    /// <see cref="GsDashboardSurface"/>) as a Playnite 11 app view.
+    /// </summary>
     public class GsDashboardView : AppViewItem {
-        public GsDashboardView(IGsApiClient apiClient, string userDataFolder) {
-            View = new MySidebarView(apiClient, userDataFolder);
+        public GsDashboardView(FrameworkElement surface) {
+            View = surface;
         }
 
         public override async Task ActivateViewAsync(ActivateViewAsyncArgs args) {

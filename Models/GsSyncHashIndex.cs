@@ -13,6 +13,7 @@ namespace GsPlugin.Models {
     public class GsSyncHashIndexFile {
         public int IdentityGeneration { get; set; }
         public DateTime? FullSyncAt { get; set; }
+
         /// <summary>playnite_id → item fingerprint</summary>
         public Dictionary<string, string> Entries { get; set; }
             = new Dictionary<string, string>();
@@ -61,6 +62,7 @@ namespace GsPlugin.Models {
             if (legacy.Library == null) {
                 return null;
             }
+
             return GsHashIndexStore.FromLegacyDict(
                 legacy.Library,
                 legacy.IdentityGeneration,
@@ -73,6 +75,7 @@ namespace GsPlugin.Models {
             if (legacy.Achievements == null) {
                 return null;
             }
+
             return GsHashIndexStore.FromLegacyDict(
                 legacy.Achievements,
                 legacy.IdentityGeneration,
@@ -106,6 +109,7 @@ namespace GsPlugin.Models {
                 if (_library.DiscardIfGenerationMismatch(currentGeneration)) {
                     libNeedsSave = true;
                 }
+
                 var achNeedsSave = achMigrated;
                 if (_achievements.DiscardIfGenerationMismatch(currentGeneration)) {
                     achNeedsSave = true;
@@ -114,6 +118,7 @@ namespace GsPlugin.Models {
                 if (libNeedsSave) {
                     _library.Save();
                 }
+
                 if (achNeedsSave) {
                     _achievements.Save();
                 }
@@ -214,6 +219,7 @@ namespace GsPlugin.Models {
                     // Not initialized (rotation before startup Initialize, or in tests).
                     return true;
                 }
+
                 return _library.Save() && _achievements.Save();
             }
         }

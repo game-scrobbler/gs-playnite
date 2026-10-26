@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
-using Xunit;
 using GsPlugin.Api;
 using GsPlugin.Models;
+using Xunit;
 
 namespace GsPlugin.Tests {
     public class GsDataTests {

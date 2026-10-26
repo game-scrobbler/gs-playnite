@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using GsPlugin.Infrastructure;
@@ -50,6 +51,39 @@ namespace GsPlugin.Tests {
             }
         }
 
+        [Fact]
+        public void Initialize_OutsidePlaynite_NeverStartsTheProductionSdk() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                try {
+                    Assert.True(GsTelemetryConsent.HasConsent("no-sentry"));
+                    GsSentry.Initialize();
+                    Assert.False(GsSentry.IsInitialized);
+                    GsSentry.ApplyPreferences();
+                    Assert.False(GsSentry.IsInitialized);
+                }
+                finally {
+                    GsSentry.Shutdown();
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("Playnite11.Desktop", true)]
+        [InlineData("playnite11.desktop", true)]
+        [InlineData("Playnite11.BrowserProcess", false)]
+        [InlineData("Playnite.DesktopApp", false)]
+        [InlineData("Playnite.FullscreenApp", false)]
+        [InlineData("testhost", false)]
+        [InlineData("testhost.x86", false)]
+        [InlineData("PlayniteToolbox", false)]
+        [InlineData("Playnite.TestHost", false)]
+        [InlineData("Playnite.DesktopApp.Tests", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void IsPlayniteProcessName_AcceptsOnlyPlayniteExecutables(string? name, bool expected) {
+            Assert.Equal(expected, GsSentry.IsPlayniteProcessName(name));
+        }
+
         [Theory]
         [InlineData(@"Could not read C:\Users\Alice\AppData\state.json", @"Could not read C:\Users\%USER%\AppData\state.json")]
         [InlineData(@"Could not read 'D:\Users\Alice Jones\state.json'", @"Could not read 'C:\Users\%USER%\state.json'")]
@@ -57,6 +91,20 @@ namespace GsPlugin.Tests {
         [InlineData("No user path here", "No user path here")]
         public void ScrubText_RemovesProfileNameWithoutBreakingThePath(string input, string expected) {
             Assert.Equal(expected, GsSentry.ScrubText(input));
+        }
+
+        [Fact]
+        public void ScrubText_FailsClosedWhenTheMatchTimesOut() {
+            // Nested quantifiers backtrack exponentially on a near miss, so this cannot finish
+            // within the timeout. Scrub() sends an event unscrubbed if ScrubText throws, so the
+            // timeout has to come back as a redaction, never as the original value.
+            var slow = new Regex(@"(a+)+\\Users", RegexOptions.None, TimeSpan.FromMilliseconds(1));
+            var input = @"C:\Users\Alice\" + new string('a', 40) + "!";
+
+            var scrubbed = GsSentry.ScrubText(input, slow);
+
+            Assert.Equal(GsSentry.ScrubTimedOutPlaceholder, scrubbed);
+            Assert.DoesNotContain("Alice", scrubbed);
         }
 
         [Theory]
@@ -108,6 +156,22 @@ namespace GsPlugin.Tests {
                     GsDataManager.PerformOptOut();
                     using (await client.PostAsync("https://telemetry.invalid/session", new StringContent("automatic-session-end"))) { }
                     Assert.Equal(0, transport.Calls);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("no-sentry")]
+        [InlineData("no-posthog")]
+        public async Task Transport_StaysBlockedWhileRestartIsPending(string flag) {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var transport = new CountingHandler();
+                using (var client = new HttpClient(new GsTelemetryConsentHandler(new GsTelemetryConsent(flag), transport))) {
+                    GsDataManager.PerformOptOut();
+                    Assert.True(GsDataManager.PerformOptIn());
+                    using (await client.PostAsync("https://telemetry.invalid/session", new StringContent("pending-restart"))) { }
+                    Assert.Equal(0, transport.Calls);
+                    Assert.False(GsTelemetryConsent.HasConsent(flag));
                 }
             }
         }

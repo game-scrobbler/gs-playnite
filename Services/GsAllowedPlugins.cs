@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Playnite;
 using GsPlugin.Api;
 using GsPlugin.Models;
+using Playnite;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -23,6 +23,7 @@ namespace GsPlugin.Services {
         private static readonly HashSet<string> HardcodedPluginIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
             "Crow.Steam",
             "Crow.GOG",
+
             // Other P11 library plugin IDs will be provided by the server endpoint.
         };
 
@@ -81,6 +82,7 @@ namespace GsPlugin.Services {
                     else {
                         _allowedPluginIds = new HashSet<string>(HardcodedPluginIds, StringComparer.OrdinalIgnoreCase);
                     }
+
                     return _allowedPluginIds;
                 }
             }
@@ -155,6 +157,7 @@ namespace GsPlugin.Services {
                         if (plugin.status == "active" && !string.IsNullOrEmpty(plugin.pluginId)) {
                             newIds.Add(plugin.pluginId);
                         }
+
                         if (plugin.status == "active" && plugin.sourceAliases != null) {
                             foreach (var alias in plugin.sourceAliases) {
                                 var normalizedAlias = NormalizeSourceName(alias);

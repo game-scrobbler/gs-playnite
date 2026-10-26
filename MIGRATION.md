@@ -148,6 +148,57 @@ Three merge decisions worth knowing:
 3. **Achievements stay removed** (see CLAUDE.md), but every piece needed to switch them back on
    — API methods, hash-index half, hash recipes, DTO fields — was kept.
 
+### Second merge from `main` (2.8.3 to 2.9.2, October 2026)
+
+58 commits of Playnite 10 work came across: scrobble start/finish failure classification (transient
+failures the queue replays are no longer Sentry issues, 4xx rejections still are), expected linking
+rejections as breadcrumbs, the wider `GsAtomicFile` retry budget, v4 failure rendering through
+`DescribeV4Failure`, the opt-in fixes (tracking stays paused until restart, `IsTrackingPaused`,
+fail closed on a failed save), link and delete running as observed tasks instead of `async void`,
+the native opted-out dashboard panel, the Sentry production-DSN host guard, StyleCop, and the
+release tooling (highlights assertion, changelog dedupe, retryable manifest update).
+
+Adapted rather than taken as-is:
+
+1. **Dashboard surfaces.** main routes its sidebar item, theme control and Extensions window
+   through `GsDashboardSurface`. Playnite 11 has one app view, so `GetAppViewItem` wraps the
+   surface in `GsDashboardView`, the view entry stays visible when opted out (showing
+   `OptedOutView`), and "Open Dashboard" switches to the view instead of opening a dialog.
+   `MySidebarView` keeps this branch's activation-driven loading, with main's pause checks after
+   every await and its swap to `OptedOutView` on opt-out.
+2. **Sentry host guard.** main only initializes Sentry inside `Playnite.DesktopApp` or
+   `Playnite.FullscreenApp`. Taken as-is, that would have disabled Sentry on Playnite 11, whose
+   only host is `Playnite11.Desktop`. The check now accepts that name alone.
+3. **Strings.** main's new XAML strings (opted-out panel, opt-back-in progress and error, "Open
+   Dashboard") were added to `en_US.ftl` and `Localization.g.cs` regenerated. Two tests that
+   asserted English text now assert the `LocId` they map to, since `Loc` returns ids in tests.
+4. **StyleCop.** Same `.editorconfig` and `stylecop.json` as main, but `StyleCop.Analyzers`
+   `1.2.0-beta.556` instead of main's `1.1.118`, which predates C# 12 and flags collection
+   expressions. The newer analyzer adds SA1316 (tuple name casing); `stylecop.json` declares the
+   codebase's camelCase convention instead of disabling the rule.
+5. **Dropped:** the `AssemblyResolve` cross-major policy (`GsAssemblyIdentity`,
+   `AssemblyResolveDriftTests`), the achievement-provider StyleCop touch-ups, and every edit to the
+   deleted XAML locales, `AssemblyInfo.cs`, `extension.yaml` and `packages.config`.
+
+### Before `playnite11` becomes `main`
+
+- **CodeQL and SonarCloud.** `codeql.yml` and `sonarcloud.yml` came from main unchanged. They
+  trigger only on `main` and build with `nuget restore` + MSBuild for net462, so they would fail
+  on the first push. Switch them to `dotnet build` for `net10.0-windows`.
+- **Installer manifest.** The manifest steps in `build.yml` and `update-installer-manifest.ps1`
+  now look for and link `.pext2`, but they have never run against a Playnite 11 release, and it is
+  not yet known whether Playnite 11 reads `installer_manifest.yaml` at all.
+- **release-please.** `release-please-config.json` still bumps `extension.yaml` and
+  `Properties/AssemblyInfo.cs`, which this branch deleted, while the real version lives in
+  `GsPlugin.csproj` (`<Version>`, between the `x-release-please` markers) and `extension.toml`.
+  `.release-please-manifest.json` tracks main's version (2.9.2) while the branch says 3.0.0.
+  Point `extra-files` at the two P11 files and settle the version before the first P11 release.
+- **Locales.** Only `en_US.ftl` exists. main's other six locales (`ru_RU`, `pt_BR`, `de_DE`,
+  `fr_FR`, `zh_CN`, `hi_IN`) need converting from XAML to `.ftl`.
+- **Settings card headers** still bind `{DynamicResource LOCGsPlugin…SectionTitle}`, which
+  resolves to nothing on Playnite 11. The visible titles come from the inner `LocalizedString`
+  text blocks, so this is dead markup rather than a visible bug, but it should go.
+
 ---
 
 ## SDK & tooling reference

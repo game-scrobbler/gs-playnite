@@ -5,11 +5,11 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Playnite;
-using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Services;
+using Playnite;
+using Sentry;
 
 namespace GsPlugin.Models {
     /// <summary>
@@ -78,6 +78,7 @@ namespace GsPlugin.Models {
         private readonly GsPlugin? _plugin;
 
         #region Constructor
+
         /// <summary>
         /// Initializes a new instance of the GsPluginSettingsViewModel.
         /// </summary>
@@ -119,12 +120,14 @@ namespace GsPlugin.Models {
                     GsLogger.Warn($"[GsPluginSettingsViewModel] Failed to load settings: {ex.Message}");
                 }
             }
+
             if (savedSettings != null) {
                 LoadExistingSettings(savedSettings);
             }
             else {
                 CreateDefaultSettings();
             }
+
             // Subscribe to property changes for UI updates
             if (Settings != null) {
                 Settings.PropertyChanged += (s, e) => OnPropertyChanged("Settings");
@@ -261,7 +264,7 @@ namespace GsPlugin.Models {
         /// <summary>
         /// Performs account linking with the provided token.
         /// </summary>
-        public async void LinkAccount() {
+        public async Task LinkAccount() {
             try {
                 if (!ValidateLinkToken()) return;
                 StartCountdown();
@@ -282,6 +285,7 @@ namespace GsPlugin.Models {
                 Settings.LinkStatusMessage = "Please enter a token";
                 return false;
             }
+
             return true;
         }
 
@@ -298,6 +302,7 @@ namespace GsPlugin.Models {
 
                 if (result.Success) {
                     Settings.LinkStatusMessage = "Successfully linked account!";
+
                     // Note: OnLinkingStatusChanged() is already called inside LinkAccountAsync
                 }
                 else if (result.IsTokenExpiry) {
@@ -318,6 +323,7 @@ namespace GsPlugin.Models {
             finally {
                 Settings.IsLinking = false;
                 StopCountdown();
+
                 // Preserve the token on network errors so the user can retry without re-entering it
                 if (!preserveToken) {
                     Settings.LinkToken = "";
@@ -338,6 +344,7 @@ namespace GsPlugin.Models {
                 _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
                 _countdownTimer.Tick += (s, e) => UpdateCountdownText();
             }
+
             _countdownTimer.Start();
         }
 
@@ -361,6 +368,7 @@ namespace GsPlugin.Models {
                 Settings.TokenCountdown = "";
                 return;
             }
+
             Settings.TokenCountdown = $"Token expires in ~{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
         }
 
@@ -371,7 +379,7 @@ namespace GsPlugin.Models {
         /// <summary>
         /// Requests data deletion from the server and transitions the plugin to opted-out state.
         /// </summary>
-        public async void DeleteMyData() {
+        public async Task DeleteMyData() {
             try {
                 Settings.IsDeleting = true;
                 Settings.DeleteStatusMessage = "Requesting data deletion...";
@@ -399,6 +407,7 @@ namespace GsPlugin.Models {
                     GsPostHog.ApplyPreferences();
                     GsSyncHashIndex.ClearAll();
                     Settings.DeleteStatusMessage = Loc.delete_success();
+
                     // Notify UI to refresh connection status and button visibility
                     OnLinkingStatusChanged();
                 }
@@ -438,32 +447,12 @@ namespace GsPlugin.Models {
         /// Calls the server to clear the opted-out flag and reset the token,
         /// then clears local opt-out state so /v2/register runs on next startup.
         /// </summary>
-        public async void OptBackIn() {
-            try {
-                Settings.DeleteStatusMessage = "Re-enabling...";
-
-                var result = await _apiClient.RequestOptIn(new OptInReq());
-
-                if (result == null || !result.success) {
-                    if (result?.rateLimited == true) {
-                        Settings.DeleteStatusMessage = Loc.opt_back_in_rate_limited();
-                    }
-                    else {
-                        Settings.DeleteStatusMessage = Loc.opt_back_in_failed();
-                    }
-                    return;
-                }
-
-                GsDataManager.PerformOptIn();
-                GsSentry.ApplyPreferences();
-                GsPostHog.ApplyPreferences();
-                Settings.DeleteStatusMessage = Loc.opt_back_in_success();
+        public async Task OptBackIn() {
+            Settings.DeleteStatusMessage = Loc.opt_back_in_requesting();
+            var outcome = await GsOptBackIn.TryAsync(_apiClient);
+            Settings.DeleteStatusMessage = GsOptBackIn.MessageFor(outcome);
+            if (outcome == GsOptBackIn.Outcome.Success) {
                 OnLinkingStatusChanged();
-            }
-            catch (Exception ex) {
-                Settings.DeleteStatusMessage = "An error occurred. Please restart Playnite to try again.";
-                GsLogger.Error("Error during opt-back-in", ex);
-                GsSentry.CaptureException(ex, "Error during opt-back-in");
             }
         }
 

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using GsPlugin.Models;
 using Microsoft.Extensions.Options;
 using Playnite;
 using PostHog;
-using GsPlugin.Models;
 
 namespace GsPlugin.Infrastructure {
     /// <summary>
@@ -23,6 +23,9 @@ namespace GsPlugin.Infrastructure {
             else Shutdown();
         }
 
+        // Not a secret. A PostHog project key is a public, write-only ingestion key that PostHog
+        // documents as safe to embed in client apps; it cannot read any data, and every shipped
+        // .pext necessarily carries it.
         private const string ApiKey = "phc_la6sOuOYr4cEb9Rpq27MMi6Mv8EhCLsVi6ovp6azdSi";
         private const string HostUrl = "https://eu.i.posthog.com";
 
@@ -44,7 +47,7 @@ namespace GsPlugin.Infrastructure {
                     return;
                 }
 
-                if (GsDataManager.Data.Flags.Contains("no-posthog") || GsDataManager.IsOptedOut) {
+                if (GsDataManager.Data.Flags.Contains("no-posthog") || GsDataManager.IsTrackingPaused) {
                     _logger.Info("PostHog disabled by user preference or opt-out");
                     return;
                 }
@@ -76,7 +79,7 @@ namespace GsPlugin.Infrastructure {
         public static void Capture(string eventName, Dictionary<string, object>? properties = null) {
             var data = GsDataManager.DataOrNull;
             if (data == null) return;
-            if (data.Flags.Contains("no-posthog") || data.OptedOut) return;
+            if (data.Flags.Contains("no-posthog") || GsDataManager.IsTrackingPaused) return;
             if (_client == null) return;
 
             try {
@@ -142,6 +145,7 @@ namespace GsPlugin.Infrastructure {
                 });
                 if (!disposeTask.Wait(TimeSpan.FromSeconds(2))) {
                     _logger.Warn("PostHog dispose timed out during shutdown; abandoning");
+
                     // Dispose keeps running in the background after we give up waiting on it —
                     // observe any fault it eventually throws so it doesn't surface later as an
                     // unobserved task exception.
