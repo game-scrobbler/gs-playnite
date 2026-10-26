@@ -166,7 +166,7 @@ GsPlugin (entry point, IDisposable)
 
 ### Theme Integration
 - Playnite 11 has no `AddCustomElementSupport`/`GetGameViewControl`, so main's embeddable `GameScrobbler_Dashboard` control has no equivalent here. Themes get per-game data instead: `GetPluginGameDataPresenter` returns a `GsGameDataPresenter`, bound as `{Binding GameData.GsGameDataPresenter.Impl.PlaytimeHours}` (see the class summary for the shape). It returns null while tracking is paused.
-- `MySidebarView` self-disposes on `Unloaded`, so Playnite creating/destroying the view on reloads or view changes is safe.
+- `MySidebarView` self-disposes on `Unloaded`, so Playnite creating/destroying the view on reloads or view changes is safe. Closing Playnite never raises `Unloaded`, though: there `GsDashboardView.DisposeAsync` (which Playnite does call on shutdown) disposes the view on its dispatcher. Without it the private profile's `msedgewebview2` processes outlived Playnite, and the Playnite process sat half-terminated with the extension DLLs still mapped for about ten minutes.
 
 ### Achievements (removed on this branch)
 SuccessStory and Playnite Achievements have not shipped P11-compatible versions, so there is no
