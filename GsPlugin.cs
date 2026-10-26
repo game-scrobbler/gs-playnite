@@ -403,7 +403,7 @@ namespace GsPlugin {
         /// This is the Playnite 11 replacement for the Playnite 10 custom-element and
         /// PluginSettings-binding surfaces, which no longer exist in the v11 SDK.
         ///
-        /// Returns null when opted out, or for games we would never have synced, so
+        /// Returns null while tracking is paused, or for games we would never have synced, so
         /// themes get no presenter at all rather than one that is permanently empty.
         /// </summary>
         public override PluginGameDataPresenter? GetPluginGameDataPresenter(GetPluginGameDataPresenterArgs args) {
@@ -411,8 +411,11 @@ namespace GsPlugin {
 
             var game = args.Game;
             if (game == null || string.IsNullOrEmpty(game.Id)) return null;
-            if (string.IsNullOrEmpty(game.LibraryId)
-                || !GsAllowedPlugins.AllowedPluginIds.Contains(game.LibraryId)) {
+
+            // The same predicate sync uses. The server's allowlist holds Playnite 10 plugin GUIDs
+            // and replaces the hardcoded Crow.* ids once fetched, so a direct AllowedPluginIds
+            // lookup matched no Playnite 11 library and every game got no presenter.
+            if (!GsAllowedPlugins.IsAllowed(game)) {
                 return null;
             }
 

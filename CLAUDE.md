@@ -150,11 +150,10 @@ GsPlugin (entry point, IDisposable)
 - Achievement sync (`SyncAchievementsWithDiffAsync`) has been removed from the startup flow; it will be re-added once SuccessStory and Playnite Achievements release P11-compatible versions.
 
 ### Allowed Library Sources
-- `GsAllowedPlugins.IsAllowed(Game)` is the single predicate for deciding whether a Playnite game can sync, scrobble, or contribute achievement counts.
-- Official Playnite library plugin GUIDs are accepted directly after `RefreshAllowedPluginsAsync` loads the backend allowlist.
-- OSS/forked library plugins can still sync when `Game.Source.Name` contains a recognized supported source fragment such as `GOG OSS`, `Legendary`, `Epic Games`, or `Amazon Games`.
-- `Guid.Empty` plugin IDs are always rejected. They represent manual/custom games and should not be sent.
-- Keep DTOs source-aware: send the raw `plugin_id` plus `source_name = g.Source?.Name`; the backend canonicalizes recognized fork GUIDs to official plugin IDs before writing rows.
+- `GsAllowedPlugins.IsAllowed(Game)` is the single predicate for deciding whether a Playnite game can sync, scrobble, contribute achievement counts, or get a theme presenter. Never test `AllowedPluginIds` directly.
+- Playnite 11 library ids are strings (`Crow.Steam`, `Crow.GOG`), and the backend allowlist from `RefreshAsync` holds only Playnite 10 GUIDs. Once fetched it replaces the hardcoded `Crow.Steam`/`Crow.GOG` fallback, so on a connected install **every P11 game is admitted through the source-name alias** (`steam`, `gog`, ...), not its library id. The server accepts these the same way: `isPluginAllowedV2` and the row canonicalization fall back to `source_name` when `plugin_id` is unknown. Verified on alpha 11.0.11.0 with three Steam games.
+- An empty `LibraryId` is always rejected; it is P11's equivalent of P10's `Guid.Empty`, a manual or custom game that must not be sent.
+- Keep DTOs source-aware: send the raw `plugin_id` (`g.LibraryId`) plus the resolved `source_name`; the backend canonicalizes recognized sources to official plugin ids before writing rows. Until the backend allowlist learns P11 ids, a library whose source name is not a recognized alias cannot sync.
 
 ### Sidebar Dashboard
 - The dashboard is one Playnite 11 app view (`DashboardViewId = "gs-dashboard"`). It replaces main's three surfaces: P11 has no extension sidebar item, no theme custom element and no Extensions-window dialog, so the "Open Dashboard" menu item switches to the view (`MainView.SwitchToViewAsync`) instead of opening a window.
