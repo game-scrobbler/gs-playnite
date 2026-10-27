@@ -105,21 +105,21 @@ Steam friends, Discord servers, and linked accounts, all in one place.
 
 ## Screenshots
 
-### Universe (Mind Map)
+### Universe
 
-![Gamer Mind Map](screenshots/gamer-mind-map.png)
+![Universe](screenshots/universe.png)
 
-### Play Timeline
+### Dossier
 
-![Play Timeline](screenshots/timeline-screenshot.jpg)
+![Dossier](screenshots/dossier.png)
 
-### Chat With Library
+### Stats
 
-![Chat With Library](screenshots/chats-screenshot.jpg)
+![Stats](screenshots/stats.png)
 
-### AI Roast
+### Library
 
-![AI Roast](screenshots/roast-screenshot.jpg)
+![Library](screenshots/library.png)
 
 ---
 
