@@ -117,7 +117,7 @@ ID пользователя: {0}</sys:String>
 
     <!-- ── Privacy Tooltips ── -->
     <sys:String x:Key="LOCGsPluginDisableSentryTooltip">Запрещает отправку отчётов о сбоях и диагностических данных для улучшения плагина</sys:String>
-    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">Запрещает отправку анонимной аналитики использования для улучшения плагина</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">Запрещает отправку аналитики использования для улучшения плагина</sys:String>
     <sys:String x:Key="LOCGsPluginDisableScrobblingTooltip">Запрещает отслеживание вашей игровой активности</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInTooltip">Повторно включить плагин и возобновить синхронизацию</sys:String>
 

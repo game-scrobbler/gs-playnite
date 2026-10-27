@@ -117,7 +117,7 @@
 
     <!-- ── Privacy Tooltips ── -->
     <sys:String x:Key="LOCGsPluginDisableSentryTooltip">क्रैश रिपोर्ट और डायग्नोस्टिक डेटा भेजने से रोकता है</sys:String>
-    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">अज्ञात उपयोग एनालिटिक्स भेजने से रोकता है</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">उपयोग एनालिटिक्स भेजने से रोकता है</sys:String>
     <sys:String x:Key="LOCGsPluginDisableScrobblingTooltip">आपकी गेम एक्टिविटी की ट्रैकिंग रोकता है</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInTooltip">प्लगइन फिर से सक्षम करें और सिंक फिर से शुरू करें</sys:String>
 
