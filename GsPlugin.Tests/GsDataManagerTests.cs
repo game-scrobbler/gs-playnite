@@ -196,6 +196,36 @@ namespace GsPlugin.Tests {
                     Assert.True(GsDataManager.IsTrackingPaused);
                     Assert.Equal(originalBytes, File.ReadAllBytes(path));
                 }
+
+                // The failed attempt closed its pause transition: once opted back in and
+                // restarted, tracking resumes instead of reading as paused for good.
+                Assert.True(GsDataManager.PerformOptIn());
+                GsDataManager.Initialize(temp.Path, null);
+                Assert.False(GsDataManager.IsTrackingPaused);
+            }
+        }
+
+        /// <summary>
+        /// IsTrackingPaused reads OptedOut and PendingRestartAfterOptIn without the lock, so a
+        /// read that overlaps PerformOptIn's rollback can see neither set. Neither is set here,
+        /// as in that torn read, and the open transition alone must keep tracking paused.
+        /// </summary>
+        [Fact]
+        public void IsTrackingPaused_StaysTrueWhileAPauseTransitionIsOpen() {
+            using (TempPluginDir.CreateWithDataManager()) {
+                Assert.False(GsDataManager.IsTrackingPaused);
+
+                GsDataManager.BeginPauseTransition();
+                try {
+                    Assert.False(GsDataManager.IsOptedOut);
+                    Assert.False(GsDataManager.PendingRestartAfterOptIn);
+                    Assert.True(GsDataManager.IsTrackingPaused);
+                }
+                finally {
+                    GsDataManager.EndPauseTransition();
+                }
+
+                Assert.False(GsDataManager.IsTrackingPaused);
             }
         }
 
