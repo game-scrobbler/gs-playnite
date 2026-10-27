@@ -117,7 +117,7 @@ Voulez-vous réessayer ?</sys:String>
 
     <!-- ── Privacy Tooltips ── -->
     <sys:String x:Key="LOCGsPluginDisableSentryTooltip">Empêche l'envoi de rapports de plantage et de données de diagnostic</sys:String>
-    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">Empêche l'envoi d'analyses d'utilisation anonymes</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">Empêche l'envoi d'analyses d'utilisation</sys:String>
     <sys:String x:Key="LOCGsPluginDisableScrobblingTooltip">Empêche le suivi de votre activité de jeu</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInTooltip">Réactiver le plugin et reprendre la synchronisation</sys:String>
 

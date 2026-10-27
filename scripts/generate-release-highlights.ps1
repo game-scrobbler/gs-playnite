@@ -99,6 +99,7 @@ Rules:
   - Bad: "Improved handling of transient save errors during library sync."
   - Good: "Your play stats no longer get lost when your PC or connection hiccups."
 - Address the reader as "you"/"your" where it reads naturally.
+- Do not use em-dashes or en-dashes. Use a comma, a colon, or a second sentence instead.
 - Every word must make sense to a non-programmer. Never use words like: sync hash, snapshot, session, token, API, server, endpoint, DTO, retry, error handling, thread, timer, JSON, plugin ID.
 - Omit purely internal changes (refactors, CI, tests, logging, telemetry) entirely. Do NOT write a filler bullet like "various behind-the-scenes improvements".
 - If nothing in this release changes what a player notices, output exactly this one line and nothing else: $($script:NoPlayerFacingChangesSentinel)

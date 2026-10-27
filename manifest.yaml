@@ -1,10 +1,40 @@
 AddonId: 32975fed-6915-4dd3-a230-030cdc5265ae
 Name: Game Scrobbler
-ShortDescription: Track and visualize your gaming stats
+ShortDescription: Turn your Playnite library into a living gaming profile
 Author: GameScrobbler
 Type: Generic
-Tags: ['Report', 'Statistics']
+Tags: ["Analytics", "Statistics", "Visualization", "Tracking"]
 SourceUrl: https://github.com/game-scrobbler/gs-playnite
 InstallerManifestUrl: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/installer_manifest.yaml
 IconUrl: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/icon.png
-Description: Game Scrobbler — a Playnite plugin that tracks your game sessions and visualizes your stats with interactive insights.
+Description: |-
+    Game Scrobbler brings your playtime, statistics and achievements from Playnite and your gaming accounts together in one profile, so you see all of your gaming and not only the sessions on this PC.
+
+    The plugin records your play sessions and syncs your Playnite library in the background. It supports games from the Steam, Epic Games, GOG, Xbox, PlayStation, Battle.net, Ubisoft Connect, Amazon Games, itch.io and Humble libraries, plus community libraries such as Legendary and GOG OSS.
+
+    Link the plugin to your gamescrobbler.com account to also connect Steam, Xbox, PlayStation, Nintendo and Epic Games directly. Playtime and achievements from your consoles and other PCs then join the same profile, depending on what each platform shares.
+
+    Features:
+    * Sync your gaming activity: automatically capture play sessions from your Playnite library
+    * Unified player profile: aggregate your gaming behavior across genres, games, and platforms
+    * Interactive gaming graph: explore your gaming identity through a visual graph connecting genres, games, and play patterns
+    * Timeline of play sessions: view your gaming history as a chronological timeline
+    * AI-powered gaming insights: GameScrobbler analyzes your library and generates commentary about your habits
+    * Cross-platform foundation: designed as a player data layer that can power dashboards, overlays, and analytics tools
+Links:
+    Website: https://gamescrobbler.com
+    GitHub: https://github.com/game-scrobbler/gs-playnite
+    Discord: https://discord.gg/ynEGCAEBun
+    Support: https://gamescrobbler.com/support
+    FAQ: https://gamescrobbler.com/faqs
+    "Privacy Policy": https://gamescrobbler.com/privacy
+    "Terms of Service": https://gamescrobbler.com/terms-and-conditions
+Screenshots:
+    - Thumbnail: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/screenshots/universe.png
+      Image: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/screenshots/universe.png
+    - Thumbnail: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/screenshots/dossier.png
+      Image: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/screenshots/dossier.png
+    - Thumbnail: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/screenshots/stats.png
+      Image: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/screenshots/stats.png
+    - Thumbnail: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/screenshots/library.png
+      Image: https://raw.githubusercontent.com/game-scrobbler/gs-playnite/main/screenshots/library.png

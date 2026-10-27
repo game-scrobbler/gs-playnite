@@ -117,7 +117,7 @@
 
     <!-- ── Privacy Tooltips ── -->
     <sys:String x:Key="LOCGsPluginDisableSentryTooltip">阻止发送崩溃报告和诊断数据</sys:String>
-    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">阻止发送匿名使用分析</sys:String>
+    <sys:String x:Key="LOCGsPluginDisablePostHogTooltip">阻止发送使用分析</sys:String>
     <sys:String x:Key="LOCGsPluginDisableScrobblingTooltip">阻止追踪您的游戏活动</sys:String>
     <sys:String x:Key="LOCGsPluginOptBackInTooltip">重新启用插件并恢复同步</sys:String>
 

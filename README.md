@@ -1,4 +1,4 @@
-# GameScrobbler — Playnite Plugin
+# GameScrobbler for Playnite
 
 [![GitHub license](https://img.shields.io/github/license/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/blob/main/LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/game-scrobbler/gs-playnite.svg)](https://github.com/game-scrobbler/gs-playnite/releases/latest)
@@ -10,11 +10,11 @@
 [![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.6.2-blue.svg)](https://dotnet.microsoft.com/download/dotnet-framework)
 [![Discord](https://img.shields.io/badge/Discord-community-5865F2?logo=discord&logoColor=white)](https://discord.gg/ynEGCAEBun)
 
-Track, analyze, and visualize your gaming life — like Last.fm, but for games.
+Track, analyze, and visualize your gaming life. Like Last.fm, but for games.
 
 [GameScrobbler](https://gamescrobbler.com) is the official Playnite plugin for the GameScrobbler platform. It automatically tracks your play sessions, syncs your library, and turns your gaming data into interactive analytics, visual maps, and AI-powered insights.
 
-Instead of a static list of games, your library becomes a living profile of how you actually play — across every platform Playnite manages.
+Instead of a static list of games, your library becomes a living profile of how you actually play, across every platform Playnite manages.
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=aIkQVpO8NoA">
@@ -41,13 +41,13 @@ Download the latest `.pext` from the [releases page](https://github.com/game-scr
 
 ## Supported Platforms
 
-Playnite aggregates games from many launchers. GameScrobbler tracks everything Playnite sees, including games from:
+Playnite aggregates games from many launchers. GameScrobbler tracks games imported by Playnite's library plugins, including:
 
 Steam, GOG, Epic Games, Xbox, PlayStation, Battle.net, Ubisoft Connect, itch.io, Humble, Amazon Games, and more.
 
 Official Playnite library plugins are supported by plugin ID. Recognized OSS/forked library plugins are also supported when Playnite exposes a known source name such as GOG OSS, Legendary, Epic Games, or Amazon Games. Manual/custom games without a library plugin are not synced.
 
-You can also link your GameScrobbler account to Steam and Discord at [gamescrobbler.com](https://gamescrobbler.com), with more platforms coming soon.
+You can also link Steam, Xbox, PlayStation, Discord, and other accounts to your GameScrobbler profile at [gamescrobbler.com](https://gamescrobbler.com).
 
 ---
 
@@ -99,45 +99,45 @@ Full game collection view with achievement rarity tracking, sortable by playtime
 
 ### Social
 
-Steam friends, Discord servers, and linked accounts — all visible in one place.
+Steam friends, Discord servers, and linked accounts, all in one place.
 
 ---
 
 ## Screenshots
 
-### Universe (Mind Map)
+### Universe
 
-![Gamer Mind Map](screenshots/gamer-mind-map.png)
+![Universe](screenshots/universe.png)
 
-### Play Timeline
+### Dossier
 
-![Play Timeline](screenshots/timeline-screenshot.jpg)
+![Dossier](screenshots/dossier.png)
 
-### Chat With Library
+### Stats
 
-![Chat With Library](screenshots/chats-screenshot.jpg)
+![Stats](screenshots/stats.png)
 
-### AI Roast
+### Library
 
-![AI Roast](screenshots/roast-screenshot.jpg)
+![Library](screenshots/library.png)
 
 ---
 
 ## How It Works
 
-1. You play a game — the plugin records the session automatically
+1. You play a game, and the plugin records the session automatically
 2. Your library, playtime, and achievements sync to GameScrobbler in bounded batches
 3. AI and analytics generate insights, visualizations, and recommendations
 4. View everything in Playnite's sidebar or at [gamescrobbler.com](https://gamescrobbler.com)
 
-Link your GameScrobbler account to connect data from other platforms (Steam, Xbox, PlayStation, etc.) into one unified profile.
+Link your GameScrobbler account to connect data from other platforms (Steam, Xbox, PlayStation, Discord, and more) into one unified profile.
 
 ### Reliable synchronization
 
 - Full library and achievement uploads are divided into chunks, preventing large Playnite libraries from producing oversized requests.
 - Later syncs compare compact local fingerprints and send only added, changed, or removed entries.
 - Failed chunked uploads are aborted without replacing the last known-good local baseline, so the next sync can retry safely.
-- A queued upload is confirmed before its local baseline is accepted. Failed or unconfirmed jobs retain the previous baseline for the next sync attempt.
+- After a queued upload, the plugin checks the server job's status before accepting its local baseline. A job the server reports as failed keeps the previous baseline for the next sync attempt. A job still processing after a short wait is accepted, so a slow server does not force a full re-upload on every launch.
 - Session starts and stops are saved before network requests, and shutdown saves all active sessions before waiting on the server.
 - Achievement read failures postpone the upload instead of clearing previously synced achievements.
 - Existing installations migrate their legacy local sync snapshot automatically. This migration affects only plugin state on your computer and does not delete library or achievement data.
@@ -209,7 +209,7 @@ Supported providers:
 
 The plugin checks providers in priority order and uses the first one that returns data. If neither addon is installed, achievement fields are sent as unknown, not zero.
 
-You can disable achievement sync in `Settings -> Experimental Features -> Sync achievement data`.
+You can disable achievement sync in the plugin settings, under `Sync Settings -> Sync achievement data`.
 
 ---
 
@@ -221,24 +221,25 @@ The plugin UI is fully localized. Playnite automatically selects the matching la
 | --- | --- | --- |
 | English | `en_US` | Default |
 | Russian | `ru_RU` | [@godOFslaves](https://github.com/godOFslaves) |
-| Portuguese (Brazil) | `pt_BR` | — |
-| German | `de_DE` | — |
-| French | `fr_FR` | — |
-| Chinese (Simplified) | `zh_CN` | — |
-| Hindi | `hi_IN` | — |
+| Portuguese (Brazil) | `pt_BR` | |
+| German | `de_DE` | |
+| French | `fr_FR` | |
+| Chinese (Simplified) | `zh_CN` | |
+| Hindi | `hi_IN` | |
 
-Want to add a language or fix a translation? See [`Localization/`](Localization/) — each file is a standalone XAML resource dictionary with 117 string keys.
+Want to add a language or fix a translation? See [`Localization/`](Localization/). Each file is a standalone XAML resource dictionary, and every locale must define the same keys as `en_US.xaml` (a test enforces this).
 
 ---
 
 ## Privacy
 
-GameScrobbler is [open source](https://github.com/game-scrobbler/gs-playnite) — you can audit exactly what data is collected and sent.
+GameScrobbler is [open source](https://github.com/game-scrobbler/gs-playnite), so you can audit exactly what data is collected and sent.
 
 Settings allow you to:
 
 - disable scrobbling entirely
-- disable error reporting
+- disable error reporting (crash reports and diagnostics sent to [Sentry](https://sentry.io))
+- disable usage analytics (plugin usage events sent to [PostHog](https://posthog.com))
 - disable achievement syncing
 - **delete all your data** from GameScrobbler servers (permanently removes server-side data and disables the plugin)
 - opt back in at any time after deletion
@@ -253,33 +254,51 @@ Library synchronization is authenticated with a per-install token stored in Play
 
 ### Requirements
 
-- .NET Framework 4.6.2
-- Playnite SDK
-- Visual Studio / MSBuild
+- Visual Studio or Visual Studio Build Tools, for the full `MSBuild.exe`. `dotnet build` cannot compile the WPF views.
+- .NET Framework 4.6.2 Developer Pack
+- .NET 8 SDK for the tests, and a .NET 10 SDK for code formatting
+- [`nuget.exe`](https://www.nuget.org/downloads), to restore the plugin's packages, including the Playnite SDK
+
+Keep the checkout path short (under about 100 characters). The WPF build cannot open files past 260 characters and fails with a misleading "Could not load file or assembly" error.
 
 ### Build
 
+The plugin project uses `packages.config`, which MSBuild's `-restore` does not cover, so restore with `nuget` first:
+
 ```bash
+nuget restore GsPlugin.sln
 MSBuild.exe GsPlugin.sln -p:Configuration=Release -restore
 ```
 
 ### Tests
 
+Build first; the test command uses the build output.
+
 ```bash
 dotnet test GsPlugin.Tests/GsPlugin.Tests.csproj --configuration Release --no-build
 ```
+
+### Formatting
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/format-code.ps1
+```
+
+Use this script instead of calling `dotnet format` directly: it picks an SDK that can load the solution's .NET Framework project.
 
 ### Repository Structure
 
 ```text
 gs-playnite/
-├── Api/                — HTTP client, request/response DTOs, circuit breaker
-├── Services/           — scrobbling, chunked sync, hashes, achievements
-├── Models/             — settings, persistent data, compact sync indexes
-├── Infrastructure/     — logging, telemetry, localization, atomic files
-├── View/
-├── Localization/       — en_US, ru_RU, pt_BR, de_DE, fr_FR, zh_CN, hi_IN
-└── GsPlugin.Tests/
+├── Api/                # HTTP client, request/response DTOs, circuit breaker
+├── Services/           # scrobbling, chunked sync, hashes, achievements
+├── Models/             # settings, persistent data, compact sync indexes
+├── Infrastructure/     # logging, telemetry, localization, atomic files
+├── View/               # settings screen, sidebar dashboard, opted-out panel
+├── Localization/       # en_US, ru_RU, pt_BR, de_DE, fr_FR, zh_CN, hi_IN
+├── scripts/            # formatting, hook setup, release automation
+├── hooks/              # pre-commit and commit-msg hooks
+└── GsPlugin.Tests/     # xUnit tests
 ```
 
 ---
@@ -308,7 +327,14 @@ Release Please automatically updates version files, generates changelogs, and pu
 powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1
 ```
 
-4. All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by the `commit-msg` hook).
+4. All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by the `commit-msg` hook). The `pre-commit` hook checks that staged C# files are formatted.
+5. Give your pull request a plain-English title, without a `fix:`-style prefix. Pull requests land as merge commits, and a prefixed title would add a duplicate entry to the changelog.
+
+---
+
+## Acknowledgements
+
+Thanks to [Sentry](https://sentry.io/for/open-source/) for sponsoring GameScrobbler's error monitoring through its open-source program.
 
 ---
 
