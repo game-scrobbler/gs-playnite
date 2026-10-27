@@ -337,8 +337,14 @@ namespace GsPlugin.Models {
         /// off until restart, so the dashboard keeps showing the restart panel instead
         /// of trying to load a hub with no install token. Process-local: not persisted,
         /// and cleared when <see cref="Initialize"/> runs in a new session.
+        /// Volatile because <see cref="IsTrackingPaused"/> reads it without the lock.
         /// </summary>
-        public static bool PendingRestartAfterOptIn { get; private set; }
+        public static bool PendingRestartAfterOptIn {
+            get => _pendingRestartAfterOptIn;
+            private set => _pendingRestartAfterOptIn = value;
+        }
+
+        private static volatile bool _pendingRestartAfterOptIn;
 
         /// <summary>
         /// True when tracking, sync, and telemetry must stay off: the user is opted out,
@@ -824,14 +830,18 @@ namespace GsPlugin.Models {
         /// </returns>
         public static bool PerformOptIn() {
             lock (_lock) {
+                // Raise the pause before clearing OptedOut, and on failure restore OptedOut
+                // before dropping it. IsTrackingPaused reads both flags without the lock, and
+                // setting the pause only after the save left a window in which it saw neither.
+                PendingRestartAfterOptIn = true;
                 _data.OptedOut = false;
                 if (!SaveInternal(durable: true)) {
                     _data.OptedOut = true;
+                    PendingRestartAfterOptIn = false;
                     return false;
                 }
             }
 
-            PendingRestartAfterOptIn = true;
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
             return true;
         }

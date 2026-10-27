@@ -671,6 +671,47 @@ namespace GsPlugin.Tests {
             }
         }
 
+        /// <summary>
+        /// After an opt-back-in, tracking stays paused until Playnite restarts. The circuit
+        /// breaker's recovery callback calls the flush directly, with no plugin-level gate in
+        /// front of it, so the flush has to check the paused state itself; checking only
+        /// IsOptedOut let a queued item go out in that window.
+        /// </summary>
+        [Fact]
+        public async Task FlushPendingScrobblesAsync_RestartPendingAfterOptIn_SendsNothing() {
+            using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {
+                GsDataManager.PerformOptOut();
+                Assert.True(GsDataManager.PerformOptIn());
+                Assert.False(GsDataManager.IsOptedOut);
+                Assert.True(GsDataManager.IsTrackingPaused);
+
+                GsDataManager.EnqueuePendingScrobble(new PendingScrobble {
+                    Type = "start",
+                    StartData = new ScrobbleStartReq {
+                        user_id = "u1",
+                        game_name = "Game",
+                        game_id = "g1",
+                        plugin_id = "p1"
+                    },
+                    QueuedAt = DateTime.UtcNow
+                });
+
+                var handler = new MockHttpHandler {
+                    ResponseBody = JsonSerializer.Serialize(new {
+                        success = true,
+                        status = "queued",
+                        queueId = "q-1"
+                    })
+                };
+                var client = new GsApiClient(new HttpClient(handler));
+
+                await client.FlushPendingScrobblesAsync();
+
+                Assert.Equal(0, handler.CallCount);
+                Assert.Single(GsDataManager.PeekPendingScrobbles());
+            }
+        }
+
         [Fact]
         public async Task FlushPendingScrobblesAsync_FailedItem_IncrementsAttempts() {
             using (var temp = TempPluginDir.CreateWithDataManager("valid-token")) {

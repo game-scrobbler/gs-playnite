@@ -133,6 +133,7 @@ GsPlugin (entry point, IDisposable)
 - Successful starts atomically attach their session ID to the matching queued finish, stopping at the next start for that game. Accepted starts without a session ID retain the pending marker when no finish exists. Finish completion clears only a matching active session. Failed queue writes roll back local transitions.
 - Shutdown persists all active and pending-start finishes in one identity-checked write before the first network await.
 - `_flushInFlight` Interlocked guard prevents concurrent flush invocations (circuit recovery + periodic timer + startup can overlap).
+- The flush, scrobble and sync service methods check `GsDataManager.IsTrackingPaused`, not just `IsOptedOut`, even though `GsPlugin`'s handlers, startup and timer already do. The circuit breaker's recovery callback calls `FlushPendingScrobblesAsync` directly, with no plugin-level gate, so the paused-until-restart state after an opt-back-in has to hold at the service layer too.
 - Failed items stay queued with an incremented `FlushAttempts` counter. A blocked circuit consumes no attempt; an expired open circuit permits a recovery probe. A failed send stops the pass, and dropping a start after five attempts also drops its paired finish before the next same-game start.
 - A periodic 5-minute timer (`_pendingFlushTimer`) retries queued scrobbles independently of circuit breaker recovery. Disposed in `Dispose()`.
 
