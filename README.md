@@ -238,7 +238,8 @@ GameScrobbler is [open source](https://github.com/game-scrobbler/gs-playnite) â€
 Settings allow you to:
 
 - disable scrobbling entirely
-- disable error reporting
+- disable error reporting (crash reports and diagnostics sent to [Sentry](https://sentry.io))
+- disable usage analytics (plugin usage events sent to [PostHog](https://posthog.com))
 - disable achievement syncing
 - **delete all your data** from GameScrobbler servers (permanently removes server-side data and disables the plugin)
 - opt back in at any time after deletion
@@ -309,6 +310,12 @@ powershell -ExecutionPolicy Bypass -File scripts/setup-hooks.ps1
 ```
 
 4. All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by the `commit-msg` hook).
+
+---
+
+## Acknowledgements
+
+Thanks to [Sentry](https://sentry.io/for/open-source/) for sponsoring GameScrobbler's error monitoring through its open-source program.
 
 ---
 
