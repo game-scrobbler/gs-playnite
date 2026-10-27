@@ -176,29 +176,24 @@ Auth via `x-profile-token` header or `profile_token` parameter.
 
 ## Theme Integration
 
-The dashboard is exposed as a custom element, so theme developers can place it anywhere in a **Desktop or Fullscreen** theme. This is how GameScrobbler becomes usable in Fullscreen mode, which has no sidebar.
+Playnite 11 has no custom theme elements, so the embeddable `GameScrobbler_Dashboard` control from the Playnite 10 plugin does not exist in this build. The dashboard is a Playnite 11 app view instead: it appears in the sidebar and opens from **Game Scrobbler → Open Dashboard**. If the user has opted out of data collection, it shows a native "tracking is off" panel with an Opt Back In action instead of the live dashboard.
 
-Add this to your theme XAML:
+Themes get per-game data rather than the dashboard. For each game Game Scrobbler would sync, the plugin provides a `GsGameDataPresenter` that Playnite exposes on the game presenter, so a theme can render it in its own visual language:
 
 ```xml
-<ContentControl x:Name="GameScrobbler_Dashboard" />
+<TextBlock Visibility="{Binding GameDataExists.GsGameDataPresenter}"
+           Text="{Binding GameData.GsGameDataPresenter.Impl.PlaytimeHours}" />
 ```
 
-Playnite renders the dashboard wherever you place the control, and your layout controls its position and size. Nothing else is required: no configuration, and no reference to the plugin assembly.
+Bindable properties on `Impl`: `HasData`, `IsLoading`, `PlaytimeSeconds`, `PlaytimeHours`, `PlayCount`, `CompletionStatus`, `AchievementsUnlocked`, `AchievementsTotal` and `HasAchievements`. Data loads when the game is shown in the details view, not when the presenter is created, so scrolling a large library does not fetch every game. No presenter is provided while tracking is off, or for games Game Scrobbler does not sync.
 
-Notes:
-
-- The element resolves only when the Game Scrobbler plugin is installed and enabled. If the user has opted out of data collection, the control shows a native “tracking is off” panel with an Opt Back In action instead of the live dashboard.
-- The same dashboard is used on every surface (sidebar, Extensions menu, and your theme), so users see consistent content wherever it appears.
-- The control disposes itself when unloaded, so theme reloads and view changes are safe.
-
-**Current limitation:** this embeds the *whole* dashboard as a single web view. You can position and size it, but you cannot restyle its internals or place individual pieces (the Dossier board, the AI Roast text, specific stats) separately in your theme's own visual language.
-
-Finer-grained integration is being scoped in [#74](https://github.com/game-scrobbler/gs-playnite/issues/74), either as native WPF widgets that inherit your theme's styles or as bindable data you render yourself. If you build themes, that issue is the place to say which pieces you want and which of the two approaches suits you.
+Finer-grained integration is being scoped in [#74](https://github.com/game-scrobbler/gs-playnite/issues/74). If you build themes, that issue is the place to say which pieces you want.
 
 ---
 
 ## Achievement Sync
+
+> **Playnite 11:** not available yet. Achievement sync returns once SuccessStory and Playnite Achievements support Playnite 11. The rest of this section describes the Playnite 10 plugin.
 
 GameScrobbler can aggregate achievement progress from multiple Playnite addons.
 
