@@ -228,7 +228,7 @@ namespace GsPlugin.Services {
             string gameKey = null;
             var enteredGate = false;
             try {
-                if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")
+                if (GsDataManager.IsTrackingPaused || GsDataManager.Data.Flags.Contains("no-scrobble")
                     || game == null || !GsAllowedPlugins.IsAllowed(game)) return;
 
                 var gameId = game.Id.ToString();
@@ -290,7 +290,7 @@ namespace GsPlugin.Services {
             string gameKey = null;
             var enteredGate = false;
             try {
-                if (GsDataManager.IsOptedOut || game == null) return;
+                if (GsDataManager.IsTrackingPaused || game == null) return;
 
                 var gameId = game.Id.ToString();
 
@@ -388,7 +388,7 @@ namespace GsPlugin.Services {
         public async Task OnApplicationStoppedAsync() {
             var pendingFinishes = new List<PendingScrobble>();
             try {
-                if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")) return;
+                if (GsDataManager.IsTrackingPaused || GsDataManager.Data.Flags.Contains("no-scrobble")) return;
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
                 var at = DateTime.Now;
@@ -925,7 +925,7 @@ namespace GsPlugin.Services {
         public async Task<SyncLibraryResult> SyncLibraryFullAsync(
             IEnumerable<Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                if (GsDataManager.IsTrackingPaused) return SyncLibraryResult.Skipped;
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
 
@@ -953,7 +953,7 @@ namespace GsPlugin.Services {
                         () => GsSyncHashIndex.ReplaceLibraryIndex(BuildLibraryFingerprints(library)));
                 }
 
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                if (GsDataManager.IsTrackingPaused) return SyncLibraryResult.Skipped;
 
                 var response = await UploadLibraryFullChunkedAsync(library, libraryHash, integrationAccounts);
 
@@ -1063,7 +1063,7 @@ namespace GsPlugin.Services {
         public async Task<SyncLibraryResult> SyncLibraryDiffAsync(
             IEnumerable<Game> playniteDatabaseGames) {
             try {
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                if (GsDataManager.IsTrackingPaused) return SyncLibraryResult.Skipped;
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
 
@@ -1107,7 +1107,7 @@ namespace GsPlugin.Services {
                     (accountsChanged ? " (integration accounts also changed)" : ""));
 
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                if (GsDataManager.IsTrackingPaused) return SyncLibraryResult.Skipped;
 
                 var response = await _apiClient.SyncLibraryDiff(new LibraryDiffSyncReq {
                     user_id = GsDataManager.InstallIdForBody,

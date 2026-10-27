@@ -318,7 +318,7 @@ namespace GsPlugin.Api {
         /// Called on circuit breaker recovery, on application startup, and by the periodic timer.
         /// </summary>
         public async Task FlushPendingScrobblesAsync() {
-            if (GsDataManager.IsOptedOut) return;
+            if (GsDataManager.IsTrackingPaused) return;
 
             // Prevent concurrent flushes from sending duplicates when two callers overlap
             // (e.g. circuit-recovery fires while the startup flush or periodic timer is running).
@@ -349,7 +349,7 @@ namespace GsPlugin.Api {
 
                 foreach (var item in pending) {
                     // Re-check opt-out before each send (user may have opted out mid-flush)
-                    if (GsDataManager.IsOptedOut) break;
+                    if (GsDataManager.IsTrackingPaused) break;
 
                     // The breaker can trip partway through a pass: the first real send fails and
                     // opens it, then every remaining item fast-fails with no network call. Stop
