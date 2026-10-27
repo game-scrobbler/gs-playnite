@@ -257,14 +257,16 @@ Library synchronization is authenticated with a per-install token stored in Play
 - Visual Studio or Visual Studio Build Tools, for the full `MSBuild.exe`. `dotnet build` cannot compile the WPF views.
 - .NET Framework 4.6.2 Developer Pack
 - .NET 8 SDK for the tests, and a .NET 10 SDK for code formatting
-
-The Playnite SDK is a NuGet package and is restored by the build.
+- [`nuget.exe`](https://www.nuget.org/downloads), to restore the plugin's packages, including the Playnite SDK
 
 Keep the checkout path short (under about 100 characters). The WPF build cannot open files past 260 characters and fails with a misleading "Could not load file or assembly" error.
 
 ### Build
 
+The plugin project uses `packages.config`, which MSBuild's `-restore` does not cover, so restore with `nuget` first:
+
 ```bash
+nuget restore GsPlugin.sln
 MSBuild.exe GsPlugin.sln -p:Configuration=Release -restore
 ```
 
