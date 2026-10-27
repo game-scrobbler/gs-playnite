@@ -3,6 +3,13 @@
 ## [2.9.3](https://github.com/game-scrobbler/gs-playnite/compare/GsPlugin-v2.9.2...GsPlugin-v2.9.3) (2026-10-27)
 
 
+### Highlights
+
+* Fixed a bug where opting back in could leave tracking active too soon, so your data now stays paused until you actually restart Playnite.
+* Updated the privacy settings text to describe usage analytics accurately, since they're tied to your install rather than fully anonymous.
+* Refreshed the screenshots on the Playnite add-on page so they match the current look of Game Scrobbler.
+
+
 ### Bug Fixes
 
 * **i18n:** stop describing usage analytics as anonymous ([167b5c2](https://github.com/game-scrobbler/gs-playnite/commit/167b5c2648e666c394661a90bcd2ea965fb797bb))
