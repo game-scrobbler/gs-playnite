@@ -11,8 +11,10 @@ namespace GsPlugin.Api {
     public class GsCircuitBreaker {
         private static readonly ILogger _logger = LogManager.GetLogger<GsCircuitBreaker>();
 
-        // Reuse a single Random instance for jitter calculation to improve performance
-        // and ensure better randomness distribution
+        // One shared Random for retry jitter. Jitter only keeps installs from retrying in
+        // lockstep and is not a security boundary, so a predictable generator is fine.
+        // System.Random is not thread-safe and this instance is shared by every breaker,
+        // so callers lock on it rather than on a breaker's own _lock.
         private static readonly Random _random = new Random();
 
         public enum CircuitState {
@@ -105,6 +107,7 @@ namespace GsPlugin.Api {
                         if (isPermanent != null && isPermanent()) {
                             _logger.Warn(
                                 $"API call attempt {attempt + 1} was rejected permanently; not retrying");
+
                             // The service answered, so the circuit is healthy even though
                             // this request was refused. Resolve a HalfOpen probe rather
                             // than returning with the state machine still mid-probe.
@@ -147,13 +150,14 @@ namespace GsPlugin.Api {
         /// <summary>
         /// Exponential backoff with jitter: delay = baseDelay * 2^attempt + random(0-1000ms).
         /// </summary>
-        private async Task WaitWithBackoffAsync(TimeSpan baseDelay, int attempt) {
+        private static async Task WaitWithBackoffAsync(TimeSpan baseDelay, int attempt) {
             int jitter;
-            lock (_lock) {
+            lock (_random) {
                 jitter = _random.Next(0, 1000);
             }
+
             var waitTime = TimeSpan.FromMilliseconds(
-                baseDelay.TotalMilliseconds * Math.Pow(2, attempt) + jitter);
+                (baseDelay.TotalMilliseconds * Math.Pow(2, attempt)) + jitter);
             _logger.Info($"Waiting {waitTime.TotalSeconds:F1} seconds before retry attempt {attempt + 2}");
             await Task.Delay(waitTime);
         }
@@ -179,6 +183,7 @@ namespace GsPlugin.Api {
                             _logger.Info("Circuit breaker moving from Open to HalfOpen state");
                             return true;
                         }
+
                         return false;
                     case CircuitState.HalfOpen:
                         return true;
@@ -213,6 +218,7 @@ namespace GsPlugin.Api {
                     recovered = true;
                 }
             }
+
             if (recovered) {
                 OnCircuitClosed?.Invoke();
             }

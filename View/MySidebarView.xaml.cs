@@ -4,40 +4,48 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using Playnite;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
+using Playnite;
 
 namespace GsPlugin.View {
     public partial class MySidebarView : UserControl, IDisposable {
         private readonly IGsApiClient _apiClient;
-        private readonly string? _userDataFolder;
+        private readonly string _userDataFolder;
+        private readonly Action? _openSettings;
         private bool _webView2Ready;
         private DateTime _lastNavigatedAtUtc = DateTime.MinValue;
         private bool _disposed;
+        private bool _optedOutUiShown;
+
         // Created programmatically to avoid a XAML compile-time reference to Microsoft.Web.WebView2.Wpf.
         private WebView2 _browser;
 
+        /// <param name="apiClient">Client used to fetch the short-lived dashboard token.</param>
         /// <param name="userDataFolder">
         /// Private WebView2 profile directory. Without one, WebView2 falls back to a folder derived
         /// from the host process, which every Playnite extension hosting a WebView2 shares — so the
         /// cookie jar, localStorage and browsing history of the signed-in gamescrobbler.com dashboard
         /// (including the access_token carried in the URL) would be readable by any other extension.
-        /// Passing null keeps the shared default, for callers that cannot supply a path.
+        /// Required rather than optional: an optional null default is how the dashboard shipped on
+        /// the shared profile once already, with the private-profile path defined but never passed.
         /// </param>
-        public MySidebarView(IGsApiClient apiClient, string? userDataFolder = null) {
+        /// <param name="openSettings">Opens plugin settings from the opted-out panel; null hides that button.</param>
+        public MySidebarView(IGsApiClient apiClient, string userDataFolder, Action? openSettings = null) {
             InitializeComponent();
             _apiClient = apiClient;
             _userDataFolder = userDataFolder;
+            _openSettings = openSettings;
 
             _browser = new WebView2();
             BrowserHost.Children.Add(_browser);
 
             this.IsVisibleChanged += MySidebarView_IsVisibleChanged;
             this.Unloaded += MySidebarView_Unloaded;
+            GsDataManager.DiagnosticsStateChanged += OnDiagnosticsStateChanged;
         }
 
         /// <summary>
@@ -45,6 +53,11 @@ namespace GsPlugin.View {
         /// Navigates to the dashboard on first load or if the token has likely expired.
         /// </summary>
         public async Task OnActivatedAsync() {
+            if (CannotLoadHub()) {
+                ShowOptedOutState();
+                return;
+            }
+
             if (_lastNavigatedAtUtc == DateTime.MinValue
                 || (DateTime.UtcNow - _lastNavigatedAtUtc).TotalMinutes > 8) {
                 GsLogger.Info("Dashboard activation - navigating to dashboard");
@@ -53,11 +66,17 @@ namespace GsPlugin.View {
         }
 
         private async void MySidebarView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e) {
-            if ((bool)e.NewValue && _lastNavigatedAtUtc != DateTime.MinValue) {
-                if ((DateTime.UtcNow - _lastNavigatedAtUtc).TotalMinutes > 8) {
-                    GsLogger.Info("Sidebar became visible after token likely expired — refreshing dashboard");
-                    await NavigateToDashboard();
+            if (!(bool)e.NewValue || _lastNavigatedAtUtc == DateTime.MinValue || CannotLoadHub()) {
+                if ((bool)e.NewValue && GsDataManager.IsTrackingPaused) {
+                    ShowOptedOutState();
                 }
+
+                return;
+            }
+
+            if ((DateTime.UtcNow - _lastNavigatedAtUtc).TotalMinutes > 8) {
+                GsLogger.Info("Sidebar became visible after token likely expired — refreshing dashboard");
+                await NavigateToDashboard();
             }
         }
 
@@ -69,8 +88,20 @@ namespace GsPlugin.View {
             await NavigateToDashboard();
         }
 
+        /// <summary>
+        /// Fetches a fresh dashboard token and navigates the WebView2 to the hub.
+        /// Only theme is passed as a URL param (cosmetic, needed for instant rendering).
+        /// All other context is sent server-side via the POST /v2/dashboard-token body.
+        /// Every await is followed by a pause check: an opt-out that lands mid-load must end
+        /// on the native panel, never on a hub page that was already on its way.
+        /// </summary>
         private async Task NavigateToDashboard() {
             try {
+                if (CannotLoadHub()) {
+                    ShowOptedOutState();
+                    return;
+                }
+
                 string theme = Uri.EscapeDataString((GsDataManager.Data.Theme ?? "Dark").ToLower());
                 bool hasInstallToken = !string.IsNullOrEmpty(GsDataManager.DataOrNull?.InstallToken);
 
@@ -79,6 +110,11 @@ namespace GsPlugin.View {
                     var dashboardToken = _apiClient != null
                         ? await _apiClient.GetDashboardToken()
                         : null;
+
+                    if (CannotLoadHub()) {
+                        ShowOptedOutState();
+                        return;
+                    }
 
                     if (!string.IsNullOrEmpty(dashboardToken)) {
                         url = $"https://gamescrobbler.com/dashboard/hub?access_token={Uri.EscapeDataString(dashboardToken)}&theme={theme}";
@@ -99,7 +135,12 @@ namespace GsPlugin.View {
                 if (!await EnsureWebViewReadyAsync()) {
                     return;
                 }
-                var core = _browser.CoreWebView2!;
+
+                var core = _browser.CoreWebView2;
+                if (core == null) {
+                    ShowErrorMessage("Failed to load Game Scrobbler dashboard. Please try again later.");
+                    return;
+                }
 
                 core.NavigationStarting -= OnNavigationStarting;
                 core.NavigationStarting += OnNavigationStarting;
@@ -114,6 +155,11 @@ namespace GsPlugin.View {
                 core.Navigate(url);
             }
             catch (Exception ex) {
+                if (CannotLoadHub()) {
+                    ShowOptedOutState();
+                    return;
+                }
+
                 GsLogger.Error("Failed to navigate to dashboard", ex);
                 GsSentry.CaptureException(ex, "Failed to navigate to dashboard");
                 ShowErrorMessage("Failed to load Game Scrobbler dashboard. Please try again later.");
@@ -123,35 +169,51 @@ namespace GsPlugin.View {
         /// <summary>
         /// Brings CoreWebView2 up against the private user-data profile and applies the
         /// Release hardening settings. Returns false when the view could not be brought up
-        /// safely, in which case an error message is already on screen.
+        /// safely, in which case an error message or the opted-out panel is already on screen.
         /// </summary>
         private async Task<bool> EnsureWebViewReadyAsync() {
             if (_webView2Ready) {
                 return true;
             }
 
-            CoreWebView2Environment? environment = null;
-            if (!string.IsNullOrEmpty(_userDataFolder)) {
-                try {
-                    Directory.CreateDirectory(_userDataFolder);
-                    environment = await CoreWebView2Environment.CreateAsync(
-                        browserExecutableFolder: null, userDataFolder: _userDataFolder);
+            // Fail closed. Falling back to the shared default used to look harmless because the
+            // dashboard still rendered, but the default profile is derived from the host process
+            // and shared with every other extension hosting a WebView2, so the fallback quietly
+            // handed them this dashboard's authenticated cookies and the access_token in its URL
+            // history, which is the exact exposure the private profile exists to prevent. The view
+            // gets isolation or an error, never a silent downgrade.
+            CoreWebView2Environment environment;
+            try {
+                if (string.IsNullOrEmpty(_userDataFolder)) {
+                    throw new InvalidOperationException("no private profile folder was supplied");
                 }
-                catch (Exception envEx) {
-                    // Fail closed. Falling back to the shared default used to look harmless
-                    // because the dashboard still rendered, but the default profile is derived
-                    // from the host process and shared with every other extension hosting a
-                    // WebView2, so the fallback quietly handed them this dashboard's
-                    // authenticated cookies and the access_token in its URL history, which is
-                    // the exact exposure the private profile exists to prevent. A caller that
-                    // asked for isolation gets isolation or an error, never a silent downgrade.
-                    GsLogger.Error($"Could not create a private WebView2 profile: {envEx.Message}");
-                    ShowErrorMessage(Loc.dashboard_profile_failed());
+
+                Directory.CreateDirectory(_userDataFolder);
+                environment = await CoreWebView2Environment.CreateAsync(
+                    browserExecutableFolder: null, userDataFolder: _userDataFolder);
+            }
+            catch (Exception envEx) {
+                if (CannotLoadHub()) {
+                    ShowOptedOutState();
                     return false;
                 }
+
+                GsLogger.Error($"Could not create a private WebView2 profile: {envEx.Message}");
+                ShowErrorMessage(Loc.dashboard_profile_failed());
+                return false;
+            }
+
+            if (CannotLoadHub()) {
+                ShowOptedOutState();
+                return false;
             }
 
             await _browser.EnsureCoreWebView2Async(environment);
+
+            if (CannotLoadHub()) {
+                ShowOptedOutState();
+                return false;
+            }
 
             if (_browser.CoreWebView2 == null) {
                 GsLogger.Error("WebView2 initialization failed: CoreWebView2 is null after initialization");
@@ -177,12 +239,14 @@ namespace GsPlugin.View {
             try {
                 var uri = new Uri(e.Uri);
                 bool isTrustedHost = uri.Host == "gamescrobbler.com" || uri.Host.EndsWith(".gamescrobbler.com");
+
                 // Require https even for the trusted host: an on-path attacker (e.g. open
                 // Wi-Fi) could otherwise serve arbitrary content over plain http inside this
                 // trusted, chrome-less sidebar frame.
                 if (isTrustedHost && uri.Scheme == "https") {
                     return; // Allow navigation
                 }
+
                 e.Cancel = true;
                 if (uri.Scheme == "https" && GsPlayniteHelper.IsTrustedUrl(e.Uri)) {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -236,7 +300,40 @@ namespace GsPlugin.View {
                     };
                 })();
             ";
-            _ = _browser.CoreWebView2!.ExecuteScriptAsync(script);
+            _ = _browser.CoreWebView2?.ExecuteScriptAsync(script);
+        }
+
+        private void OnDiagnosticsStateChanged(object? sender, EventArgs e) {
+            if (!GsDataManager.IsOptedOut) {
+                return;
+            }
+
+            Dispatcher.BeginInvoke(new Action(ShowOptedOutState));
+        }
+
+        private bool CannotLoadHub() {
+            return _optedOutUiShown || _disposed || GsDataManager.IsTrackingPaused;
+        }
+
+        /// <summary>
+        /// Replaces the hub with the native opted-out panel and tears the WebView2 down, so an
+        /// install that opted out while the dashboard was open stops talking to the server.
+        /// </summary>
+        private void ShowOptedOutState() {
+            if (_optedOutUiShown || _disposed) {
+                return;
+            }
+
+            _optedOutUiShown = true;
+            _webView2Ready = false;
+            TearDownWebView();
+            try {
+                BrowserHost.Children.Clear();
+                BrowserHost.Children.Add(new OptedOutView(_apiClient, _openSettings));
+            }
+            catch (Exception ex) {
+                GsLogger.Warn($"Failed to show opted-out dashboard: {ex.Message}");
+            }
         }
 
         private void MySidebarView_Unloaded(object sender, RoutedEventArgs e) {
@@ -247,8 +344,18 @@ namespace GsPlugin.View {
             if (_disposed) return;
             _disposed = true;
             try {
+                GsDataManager.DiagnosticsStateChanged -= OnDiagnosticsStateChanged;
                 this.IsVisibleChanged -= MySidebarView_IsVisibleChanged;
                 this.Unloaded -= MySidebarView_Unloaded;
+                TearDownWebView();
+            }
+            catch (Exception ex) {
+                GsLogger.Warn($"Error disposing MySidebarView: {ex.Message}");
+            }
+        }
+
+        private void TearDownWebView() {
+            try {
                 var core = _browser.CoreWebView2;
                 if (core != null) {
                     core.NavigationStarting -= OnNavigationStarting;
@@ -256,19 +363,19 @@ namespace GsPlugin.View {
                     core.NewWindowRequested -= OnNewWindowRequested;
                     core.WebMessageReceived -= OnWebMessageReceived;
                 }
+
                 _browser.Dispose();
             }
             catch (Exception ex) {
-                GsLogger.Warn($"Error disposing MySidebarView: {ex.Message}");
+                GsLogger.Warn($"Error tearing down sidebar WebView2: {ex.Message}");
             }
         }
 
         private void ShowErrorMessage(string message) {
             try {
                 Application.Current.Dispatcher.Invoke(() => {
-                    var grid = (Grid)Content;
-                    grid.Children.Clear();
-                    grid.Children.Add(new TextBlock {
+                    BrowserHost.Children.Clear();
+                    BrowserHost.Children.Add(new TextBlock {
                         Text = message,
                         Foreground = System.Windows.Media.Brushes.Gray,
                         TextWrapping = TextWrapping.Wrap,

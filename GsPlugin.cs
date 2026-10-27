@@ -7,16 +7,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
-using Playnite;
-using Sentry;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 using GsPlugin.Services;
 using GsPlugin.View;
+using Playnite;
+using Sentry;
 
 namespace GsPlugin {
-
     /// <summary>
     /// Static plugin identity referenced by the generated Localization.cs.
     /// The plugin ID must match extension.toml.
@@ -39,6 +38,7 @@ namespace GsPlugin {
         public static IPlayniteApi PlayniteApi { get; private set; } = null!;
 
         private GsPluginSettingsViewModel _settings;
+
         /// <summary>
         /// Private WebView2 profile directory, kept inside the plugin's own data folder. The default
         /// profile is derived from the host process and is therefore shared by every Playnite
@@ -46,6 +46,9 @@ namespace GsPlugin {
         /// URL history holding its access_token.
         /// </summary>
         private static string WebViewUserDataFolder => Path.Combine(PlayniteApi.UserDataDir, "WebView2");
+
+        /// <summary>App view ID of the dashboard; also the target of "Open Dashboard".</summary>
+        private const string DashboardViewId = "gs-dashboard";
         private GsApiClient _apiClient;
         private GsAccountLinkingService _linkingService;
         private GsUriHandler _uriHandler;
@@ -53,6 +56,7 @@ namespace GsPlugin {
         private GsUpdateChecker _updateChecker;
         private GsNotificationService _notificationService;
         private bool _disposed;
+
         /// <summary>
         /// Set when <see cref="GsDataManager.Initialize"/> could not read the data file. Every
         /// entry point below returns early on it, because the services it would use were never
@@ -62,18 +66,21 @@ namespace GsPlugin {
         private bool _dataUnavailable;
         private int _librarySyncInFlight;
         private Timer _pendingFlushTimer;
+
         /// <summary>
         /// Synchronizes _pendingFlushTimer creation (OnApplicationStarted, after several
         /// awaits) with its disposal (Dispose()) so a shutdown racing startup can't leave
         /// an orphaned timer created after _disposed was already set.
         /// </summary>
         private readonly object _timerLock = new object();
+
         /// <summary>
         /// Serializes the install-token registration flow so startup (EnsureInstallTokenAsync)
         /// and on-demand callers (EnsureInstallTokenReadyAsync, e.g. the "Delete My Data"
         /// button) cannot register concurrently and double-register the install.
         /// </summary>
         private readonly SemaphoreSlim _installTokenGate = new SemaphoreSlim(1, 1);
+
         // No-arg constructor required by P11.
         public GsPlugin() { }
 
@@ -107,6 +114,7 @@ namespace GsPlugin {
                 catch (Exception notifyEx) {
                     _logger.Error(notifyEx, "Could not surface the unreadable-data notification");
                 }
+
                 return;
             }
 
@@ -129,6 +137,7 @@ namespace GsPlugin {
             // Create settings with the linking service dependency.
             _settings = new GsPluginSettingsViewModel(
                 args.Api.UserDataDir, _linkingService, _apiClient, this);
+
             // Load saved privacy preferences before starting either telemetry SDK.
             GsSentry.ApplyPreferences();
             GsPostHog.ApplyPreferences();
@@ -153,15 +162,16 @@ namespace GsPlugin {
 
         /// <summary>
         /// Shared wrapper for the Playnite event-handler overrides. Skips <paramref name="body"/>
-        /// when the user has opted out, and turns any unhandled exception into a log entry plus a
+        /// when tracking is paused, and turns any unhandled exception into a log entry plus a
         /// Sentry report so a fault in one handler cannot take Playnite down with it.
         /// </summary>
         /// <param name="name">Handler name used in the log and Sentry messages.</param>
-        /// <param name="body">Handler work, run only when the user has not opted out.</param>
+        /// <param name="body">Handler work, run only when tracking is not paused.</param>
         private static async Task GuardedAsync(string name, Func<Task> body) {
-            if (GsDataManager.IsOptedOut) {
+            if (GsDataManager.IsTrackingPaused) {
                 return;
             }
+
             try {
                 await body();
             }
@@ -172,8 +182,10 @@ namespace GsPlugin {
         }
 
         private async Task RunStartupAsync() {
-            if (GsDataManager.IsOptedOut) return;
+            if (GsDataManager.IsTrackingPaused) return;
             var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            // Detect first run before any async work: no prior sync and no token yet.
             bool isFirstRun = GsDataManager.Data.LastSyncAt == null
                 && string.IsNullOrEmpty(GsDataManager.Data.InstallToken);
             try {
@@ -196,7 +208,8 @@ namespace GsPlugin {
                 var tokenTask = EnsureInstallTokenAsync();
                 _ = FetchNotificationsAfterTokenAsync(tokenTask);
 
-                if (GsDataManager.IsOptedOut) return;
+                // Re-check after token registration (opt-out or opt-back-in can land during startup)
+                if (GsDataManager.IsTrackingPaused) return;
 
                 var refreshTask = GsAllowedPlugins.RefreshAsync(_apiClient)
                     .LogFaults("Plugin refresh failed, continuing with cached/hardcoded list");
@@ -211,7 +224,8 @@ namespace GsPlugin {
                     // startup work below.
                 }
 
-                if (GsDataManager.IsOptedOut) return;
+                // Re-check after async steps (opt-out or opt-back-in can land during startup)
+                if (GsDataManager.IsTrackingPaused) return;
 
                 // Flush pending scrobbles fire-and-forget so library sync starts immediately.
                 // The periodic timer below catches any items not flushed by the time it fires.
@@ -227,7 +241,7 @@ namespace GsPlugin {
                         _pendingFlushTimer = new Timer(_ => {
                             if (_disposed) return;
                             var api = _apiClient;
-                            if (api == null || GsDataManager.IsOptedOut) return;
+                            if (api == null || GsDataManager.IsTrackingPaused) return;
                             try {
                                 _ = api.FlushPendingScrobblesAsync().LogFaults("Periodic pending flush failed");
                             }
@@ -239,6 +253,11 @@ namespace GsPlugin {
                 }
 
                 await tokenTask;
+                if (GsDataManager.IsTrackingPaused) {
+                    _logger.Info("Startup tracking work skipped: waiting for Playnite restart.");
+                    return;
+                }
+
                 var startupSyncResult = await SyncLibraryWithDiffAsync();
                 if (startupSyncResult == SyncLibraryResult.Cooldown) {
                     _logger.Info("Startup library sync skipped: sync cooldown is still active.");
@@ -277,11 +296,6 @@ namespace GsPlugin {
             }
         }
 
-        /// <summary>
-        /// Called when the game collection changes. Used to detect game sessions starting/stopping
-        /// (P11 replaced OnGameStarting/OnGameStopped with session-based collection change events)
-        /// and to trigger library sync when games are added.
-        /// </summary>
         /// <summary>
         /// Fired before a game launches. Playnite 11 alpha exposes the real game lifecycle
         /// callbacks, so the SessionIds-diffing workaround this branch used while the API was
@@ -336,19 +350,25 @@ namespace GsPlugin {
             });
         }
 
+        /// <summary>
+        /// Called when the game collection changes; starts a library sync when games are added.
+        /// </summary>
         public override async Task OnGameCollectionChange(DataCollectionChangeArgs<Game> args) {
             if (_dataUnavailable) return;
             await GuardedAsync("OnGameCollectionChange", async () => {
-                // Trigger library sync when games are added (e.g. after a library import)
-                if (args.AddedItems.Count > 0) {
+                // AddedItems is declared non-nullable, but alpha 11.0.11.0 passes null for some
+                // changes: a Steam import threw here five times in a minute before this guard.
+                if (args.AddedItems?.Count > 0) {
                     _ = SyncLibraryWithDiffAsync().LogFaults("Library sync after game add failed");
                 }
+
                 await Task.CompletedTask;
             });
         }
 
         public override ICollection<AppViewItemDescriptor>? GetAppViewItemDescriptors(GetAppViewItemDescriptorsArgs args) {
-            if (GsDataManager.IsOptedOut) return null;
+            // Opted-out installs keep the entry; it opens the native opted-out panel.
+            if (_dataUnavailable) return null;
 
             string? iconPath = null;
             try {
@@ -361,7 +381,7 @@ namespace GsPlugin {
 
             return new[] {
                 new AppViewItemDescriptor(
-                    "gs-dashboard",
+                    DashboardViewId,
                     "Game Scrobbler",
                     iconPath != null ? (_) => UIIcon.FromBitmapFile(iconPath) : (_) => UIIcon.FromFontIcon("f11b", Fonts.NerdFont),
                     iconPath != null ? (_) => UIIcon.FromBitmapFile(iconPath) : (_) => UIIcon.FromFontIcon("f11b", Fonts.NerdFont))
@@ -369,9 +389,11 @@ namespace GsPlugin {
         }
 
         public override AppViewItem? GetAppViewItem(GetAppViewItemsArgs args) {
-            if (args.ViewId == "gs-dashboard") {
-                return new GsDashboardView(_apiClient);
+            if (_dataUnavailable) return null;
+            if (args.ViewId == DashboardViewId) {
+                return new GsDashboardView(CreateDashboardSurface());
             }
+
             return null;
         }
 
@@ -381,16 +403,19 @@ namespace GsPlugin {
         /// This is the Playnite 11 replacement for the Playnite 10 custom-element and
         /// PluginSettings-binding surfaces, which no longer exist in the v11 SDK.
         ///
-        /// Returns null when opted out, or for games we would never have synced, so
+        /// Returns null while tracking is paused, or for games we would never have synced, so
         /// themes get no presenter at all rather than one that is permanently empty.
         /// </summary>
         public override PluginGameDataPresenter? GetPluginGameDataPresenter(GetPluginGameDataPresenterArgs args) {
-            if (GsDataManager.IsOptedOut) return null;
+            if (_dataUnavailable || GsDataManager.IsTrackingPaused) return null;
 
             var game = args.Game;
             if (game == null || string.IsNullOrEmpty(game.Id)) return null;
-            if (string.IsNullOrEmpty(game.LibraryId)
-                || !GsAllowedPlugins.AllowedPluginIds.Contains(game.LibraryId)) {
+
+            // The same predicate sync uses. The server's allowlist holds Playnite 10 plugin GUIDs
+            // and replaces the hardcoded Crow.* ids once fetched, so a direct AllowedPluginIds
+            // lookup matched no Playnite 11 library and every game got no presenter.
+            if (!GsAllowedPlugins.IsAllowed(game)) {
                 return null;
             }
 
@@ -402,18 +427,28 @@ namespace GsPlugin {
         }
 
         public override ICollection<MenuItemDescriptor>? GetAppMenuItemDescriptors(GetAppMenuItemDescriptorsArgs args) {
-            var items = new List<MenuItemDescriptor>();
-            if (GsDataManager.IsOptedOut) {
-                items.Add(new MenuItemDescriptor("gs-settings", "Open Settings", "Game Scrobbler"));
-            }
-            else {
-                items.Add(new MenuItemDescriptor("gs-sync", Loc.menu_sync_library(), "Game Scrobbler"));
+            // Nothing here works without readable plugin data.
+            if (_dataUnavailable) return null;
+            var items = new List<MenuItemDescriptor> {
+                new MenuItemDescriptor("gs-dashboard", Loc.menu_open_dashboard(), "Game Scrobbler")
+            };
+            if (GsDataManager.IsTrackingPaused) {
                 items.Add(new MenuItemDescriptor("gs-settings", Loc.menu_open_settings(), "Game Scrobbler"));
+                return items;
             }
+
+            items.Add(new MenuItemDescriptor("gs-sync", Loc.menu_sync_library(), "Game Scrobbler"));
+            items.Add(new MenuItemDescriptor("gs-settings", Loc.menu_open_settings(), "Game Scrobbler"));
             return items;
         }
 
         public override ICollection<MenuItemImpl>? GetAppMenuItems(GetAppMenuItemsArgs args) {
+            if (args.ItemId == "gs-dashboard") {
+                return [new MenuItemImpl(
+                    Loc.menu_open_dashboard(),
+                    async (_) => await PlayniteApi.MainView.SwitchToViewAsync(DashboardViewId))];
+            }
+
             if (args.ItemId == "gs-sync") {
                 return [new MenuItemImpl(
                     Loc.menu_sync_library(),
@@ -442,7 +477,8 @@ namespace GsPlugin {
                                 message = Loc.sync_failed();
                             }
 
-                            await PlayniteApi.Dialogs.ShowMessageAsync(message, "Game Scrobbler");                        }
+                            await PlayniteApi.Dialogs.ShowMessageAsync(message, "Game Scrobbler");
+                        }
                         catch (Exception ex) {
                             _logger.Error(ex, "Error in Sync Library Now menu action");
                             GsSentry.CaptureException(ex, "Error in Sync Library Now menu action");
@@ -459,6 +495,19 @@ namespace GsPlugin {
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// The dashboard as an app view. Playnite 11 has no extension sidebar or custom theme
+        /// element, so this one view replaces main's sidebar item, theme control and Extensions
+        /// window, and "Open Dashboard" switches to it instead of opening a dialog.
+        /// </summary>
+        private System.Windows.Controls.Control CreateDashboardSurface() {
+            return GsDashboardSurface.Create(
+                _apiClient,
+                WebViewUserDataFolder,
+                () => _ = PlayniteApi.MainView.OpenPluginSettingsAsync(GsPluginPlugin.Id)
+                    .LogFaults("Opening settings from the dashboard failed"));
         }
 
         /// <summary>
@@ -498,6 +547,7 @@ namespace GsPlugin {
                 if (!string.IsNullOrEmpty(GsDataManager.Data.InstallToken)) {
                     return;
                 }
+
                 await EnsureInstallTokenCoreAsync();
             }
             finally {
@@ -525,6 +575,7 @@ namespace GsPlugin {
                     if (attempt > 0) {
                         await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
                     }
+
                     result = await _apiClient.RegisterInstallToken(installId);
                     if (result != null) break;
                     _logger.Warn($"EnsureInstallTokenAsync: attempt {attempt + 1}/3 returned null");
@@ -542,6 +593,7 @@ namespace GsPlugin {
                     else {
                         _logger.Warn("EnsureInstallTokenAsync: opt-out occurred during registration; token discarded");
                     }
+
                     return;
                 }
 
@@ -560,6 +612,7 @@ namespace GsPlugin {
                     else {
                         _logger.Warn("EnsureInstallTokenAsync: re-registration after rotation failed; will retry on next startup");
                     }
+
                     return;
                 }
 
@@ -576,7 +629,7 @@ namespace GsPlugin {
         private async Task FetchNotificationsAfterTokenAsync(Task tokenTask) {
             try {
                 await tokenTask.ConfigureAwait(false);
-                if (GsDataManager.IsOptedOut) return;
+                if (GsDataManager.IsTrackingPaused) return;
                 await _notificationService.FetchAndShowNotificationsAsync().ConfigureAwait(false);
             }
             catch (Exception ex) {
@@ -585,14 +638,20 @@ namespace GsPlugin {
         }
 
         private async Task<SyncLibraryResult> SyncLibraryWithDiffAsync() {
+            if (GsDataManager.IsTrackingPaused) {
+                return SyncLibraryResult.Skipped;
+            }
+
             if (Interlocked.CompareExchange(ref _librarySyncInFlight, 1, 0) != 0) {
                 _logger.Info("Library sync already in flight — skipping.");
                 return SyncLibraryResult.Skipped;
             }
+
             try {
                 if (GsSyncHashIndex.HasLibraryBaseline) {
                     return await _scrobblingService.SyncLibraryDiffAsync(PlayniteApi.Library.Games);
                 }
+
                 return await _scrobblingService.SyncLibraryFullAsync(PlayniteApi.Library.Games);
             }
             finally {
@@ -612,7 +671,7 @@ namespace GsPlugin {
 
             if (!alreadyDisposed) {
                 // Clean up active game session on shutdown
-                if (!GsDataManager.IsOptedOut) {
+                if (!_dataUnavailable && !GsDataManager.IsTrackingPaused) {
                     try {
                         GsPostHog.Capture("plugin_stopped");
                         await _scrobblingService.OnApplicationStoppedAsync();
@@ -641,6 +700,7 @@ namespace GsPlugin {
 
                 try {
                     GsSentry.Shutdown();
+
                     // Only here. Consent changes call Shutdown() too, and detaching the global
                     // handlers there would let a privacy preference disable the plugin's own
                     // fault observation; process teardown is the one moment it is right to.
@@ -664,5 +724,4 @@ namespace GsPlugin {
             }
         }
     }
-
 }

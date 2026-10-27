@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using GsPlugin.Api;
 using GsPlugin.Models;
 using GsPlugin.Services;
+using Playnite;
 using Xunit;
 
 namespace GsPlugin.Tests {
@@ -147,6 +148,37 @@ namespace GsPlugin.Tests {
                 Assert.Equal(1, sentBeforeUnlinkCompleted);
                 Assert.All(results, result => Assert.True(result.Success));
                 Assert.Equal("new-account", GsDataManager.Data.LinkedUserId);
+            }
+        }
+
+        [Fact]
+        public async Task LinkAccountAsync_WhenRestartPending_ReturnsErrorWithoutSending() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                GsDataManager.PerformOptOut();
+                Assert.True(GsDataManager.PerformOptIn());
+                var handler = new DelayedHttpHandler();
+
+                var result = await CreateService(handler).LinkAccountAsync("valid-token", LinkingContext.ManualSettings);
+
+                Assert.False(result.Success);
+
+                // Loc returns the message id without a live Loc.Api.
+                Assert.Equal(LocId.opted_out_restart_title, result.ErrorMessage);
+                Assert.Equal(0, handler.CallCount);
+            }
+        }
+
+        [Fact]
+        public async Task LinkAccountAsync_WhenOptedOut_ReturnsDisabledErrorWithoutSending() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                GsDataManager.PerformOptOut();
+                var handler = new DelayedHttpHandler();
+
+                var result = await CreateService(handler).LinkAccountAsync("valid-token", LinkingContext.ManualSettings);
+
+                Assert.False(result.Success);
+                Assert.Contains("disabled", result.ErrorMessage);
+                Assert.Equal(0, handler.CallCount);
             }
         }
 

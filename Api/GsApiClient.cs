@@ -9,10 +9,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Playnite;
-using Sentry;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
+using Playnite;
+using Sentry;
 
 namespace GsPlugin.Api {
     public class GsApiClient : IGsApiClient {
@@ -27,7 +27,6 @@ namespace GsPlugin.Api {
 
         static GsApiClient() {
             // TLS 1.2+ is the default on .NET 10; ServicePointManager is not used.
-
             try {
                 _defaultHttpClient = new HttpClient(new SentryHttpMessageHandler()) {
                     Timeout = TimeSpan.FromSeconds(30)
@@ -102,6 +101,7 @@ namespace GsPlugin.Api {
             if (HasIdentity(userId)) {
                 return true;
             }
+
             _logger.Error($"{caller} called with no user_id and no install token");
             return false;
         }
@@ -115,6 +115,7 @@ namespace GsPlugin.Api {
             if (req != null) {
                 return true;
             }
+
             _logger.Error($"{caller} called with null {argName}");
             return false;
         }
@@ -164,13 +165,21 @@ namespace GsPlugin.Api {
                     _logger.Info("Scrobble start accepted without a session ID");
                     return new ScrobbleStartRes();
 
-                case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
-                    _logger.Info($"Scrobble start skipped: {envelope.message}");
+                case ApiOutcome.Fail when ScrobbleStartFailure.IsExpectedRejection(envelope.code):
+                    // Consent, auth, allow-list and throttle answers are the user's own
+                    // state (or an explicit retry invitation), not a plugin defect.
+                    // Reporting them as GS-PLAYNITE-PT hid the real start-failure rate.
+                    _logger.Info($"Scrobble start skipped: [{envelope.code}] {envelope.message}");
+                    if (onAttempt == null) {
+                        AddExpectedRejectionBreadcrumb("start", envelope.code, diagnostics.StatusCode);
+                    }
+
                     return null;
 
                 case ApiOutcome.Fail:
                 case ApiOutcome.Error:
                     _logger.Warn($"Scrobble start rejected by server: [{envelope.code}] {envelope.message}");
+
                     // Flush retries already reported the live failure; do not open a new
                     // issue every 5 minutes for the same queued start.
                     if (onAttempt == null) {
@@ -183,6 +192,7 @@ namespace GsPlugin.Api {
                                 attempts, diagnostics, envelope.Outcome.ToString(), startData.game_name),
                             fingerprint: new[] { "gs-playnite", "scrobble-start-fail", envelope.code ?? "unknown" });
                     }
+
                     return null;
 
                 default:
@@ -230,6 +240,7 @@ namespace GsPlugin.Api {
                 else {
                     _logger.Info($"Finishing session without session_id (game: {sendData.game_name ?? "unknown"}), {fallback}");
                 }
+
                 sendData.session_id = null;
             }
 
@@ -248,19 +259,33 @@ namespace GsPlugin.Api {
             }
 
             string url = $"{_apiBaseUrl}/api/playnite/v3/scrobble/finish";
+            var diagnostics = new HttpCallDiagnostics();
+            var attempts = 0;
 
             var envelope = await _circuitBreaker.ExecuteAsync(async () => {
+                attempts++;
+                diagnostics.Reset();
                 onAttempt?.Invoke();
-                return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(url, sendData, true);
-            }, maxRetries: 2, isFailure: r => r == null);
+                return await PostJsonAsync<ApiResponse<ScrobbleFinishData>>(
+                    url, sendData,
+                    onStatus: status => diagnostics.StatusCode = status,
+                    parseErrorBody: true,
+                    diagnostics: diagnostics,
+                    captureExceptions: false);
+            }, maxRetries: 2, isFailure: r => r == null,
+                isPermanent: () => IsPermanentRejection(diagnostics.StatusCode));
 
             switch (envelope?.Outcome) {
                 case ApiOutcome.Success:
                     _logger.Info($"Scrobble finish complete ({envelope.data?.duration_seconds}s)");
                     return new ScrobbleFinishRes();
 
-                case ApiOutcome.Fail when envelope.code == "UNSUPPORTED_PLUGIN":
-                    _logger.Info($"Scrobble finish skipped: {envelope.message}");
+                case ApiOutcome.Fail when ScrobbleStartFailure.IsExpectedRejection(envelope.code):
+                    _logger.Info($"Scrobble finish skipped: [{envelope.code}] {envelope.message}");
+                    if (onAttempt == null) {
+                        AddExpectedRejectionBreadcrumb("finish", envelope.code, diagnostics.StatusCode);
+                    }
+
                     return new ScrobbleFinishRes();
 
                 case ApiOutcome.Fail:
@@ -268,7 +293,8 @@ namespace GsPlugin.Api {
                     return null;
 
                 default:
-                    GsLogger.Error("Failed to finish scrobble session");
+                    ReportNullEnvelopeFinishFailure(
+                        sendData, onAttempt != null, attempts, diagnostics);
                     return null;
             }
         }
@@ -292,7 +318,7 @@ namespace GsPlugin.Api {
         /// Called on circuit breaker recovery, on application startup, and by the periodic timer.
         /// </summary>
         public async Task FlushPendingScrobblesAsync() {
-            if (GsDataManager.IsOptedOut) return;
+            if (GsDataManager.IsTrackingPaused) return;
 
             // Prevent concurrent flushes from sending duplicates when two callers overlap
             // (e.g. circuit-recovery fires while the startup flush or periodic timer is running).
@@ -323,7 +349,7 @@ namespace GsPlugin.Api {
 
                 foreach (var item in pending) {
                     // Re-check opt-out before each send (user may have opted out mid-flush)
-                    if (GsDataManager.IsOptedOut) break;
+                    if (GsDataManager.IsTrackingPaused) break;
 
                     // The breaker can trip partway through a pass: the first real send fails and
                     // opens it, then every remaining item fast-fails with no network call. Stop
@@ -373,6 +399,7 @@ namespace GsPlugin.Api {
                         if (!attempted && _circuitBreaker.IsBlocking) {
                             break;
                         }
+
                         // Mutate-then-save under GsDataManager's lock, rather than incrementing
                         // the field directly and calling Save() separately — keeps this in line
                         // with every other queue mutation (see RemovePendingScrobble) instead of
@@ -389,6 +416,7 @@ namespace GsPlugin.Api {
                                     { "queued_at", item.QueuedAt.ToString("O") }
                                 });
                         }
+
                         // else: item stays in the queue with its incremented FlushAttempts counter,
                         // already persisted by IncrementPendingScrobbleFlushAttempts above.
                         // Keep FIFO order: a finish must never overtake its failed start, even if
@@ -436,6 +464,7 @@ namespace GsPlugin.Api {
                 _logger.Error("SyncLibraryFullBegin called with no install token");
                 return null;
             }
+
             return await PostV4Async<V4SyncBeginRes>(
                 $"{_apiBaseUrl}/api/playnite/v4/library/sync-full/begin", req, nameof(SyncLibraryFullBegin));
         }
@@ -484,6 +513,7 @@ namespace GsPlugin.Api {
                 _logger.Error("SyncAchievementsFullBegin called with no install token");
                 return null;
             }
+
             return await PostV4Async<V4SyncBeginRes>(
                 $"{_apiBaseUrl}/api/playnite/v4/achievements/sync-full/begin", req, nameof(SyncAchievementsFullBegin));
         }
@@ -520,6 +550,7 @@ namespace GsPlugin.Api {
             if (!RequireRequest(req, logName)) {
                 return null;
             }
+
             // 0 until a response arrives, so a transport failure stays retryable.
             var lastStatus = 0;
             return await _circuitBreaker.ExecuteAsync(
@@ -548,6 +579,7 @@ namespace GsPlugin.Api {
             if (string.IsNullOrEmpty(syncId)) {
                 return;
             }
+
             try {
                 await PostJsonAsync<object>(url, new V4SyncAbortReq { sync_id = syncId }, true);
             }
@@ -584,6 +616,7 @@ namespace GsPlugin.Api {
                 new RegisterInstallTokenReq { playnite_user_id = installId },
                 attachToken: false,
                 logName: nameof(RegisterInstallToken),
+
                 // An unreadable body still means the server answered: returning an empty failure
                 // rather than null tells EnsureInstallTokenAsync to stop retrying. Only a
                 // transport exception (null from the helper) keeps the retry loop going.
@@ -614,6 +647,7 @@ namespace GsPlugin.Api {
                 sentry_disabled = data?.Flags?.Contains("no-sentry") ?? false,
                 posthog_disabled = data?.Flags?.Contains("no-posthog") ?? false,
                 new_dashboard = data?.NewDashboardExperience ?? false,
+
                 // Achievement sync is not wired up on Playnite 11 (no P11-compatible
                 // SuccessStory / Playnite Achievements addon yet), so this is always false.
                 // The field stays in the payload to keep the dashboard context shape stable.
@@ -718,6 +752,7 @@ namespace GsPlugin.Api {
             if (string.IsNullOrEmpty(queueId)) {
                 return null;
             }
+
             return await GetJsonAsync<QueueStatusRes>($"{_apiBaseUrl}/api/playnite/queue/status/{queueId}");
         }
 
@@ -767,6 +802,8 @@ namespace GsPlugin.Api {
                     if (res == null) {
                         return null;
                     }
+
+                    res.statusCode = (int)response.StatusCode;
 
                     // On non-2xx, mark as failed and surface the server error message
                     if (!response.IsSuccessStatusCode) {
@@ -905,20 +942,43 @@ namespace GsPlugin.Api {
             GsSentry.CaptureException(exception, contextMessage);
         }
 
+        private static void AddExpectedRejectionBreadcrumb(string action, string code, int httpStatus) {
+            GsSentry.AddBreadcrumb(
+                message: $"Scrobble {action} rejected",
+                category: "scrobble",
+                data: new Dictionary<string, string> {
+                    { "code", code ?? "" },
+                    { "http_status", httpStatus.ToString() }
+                });
+        }
+
         /// <summary>
         /// Logs a null-envelope scrobble start and, on the live path only, reports one
-        /// Sentry event with a stable fingerprint. Game/user identity stays in extras
-        /// and breadcrumbs so Sentry cannot split GS-PLAYNITE-M5-style issues per title.
+        /// Sentry event with a stable fingerprint unless the failure is transient (the
+        /// queue replays those). Game/user identity stays in extras and breadcrumbs so
+        /// Sentry cannot split GS-PLAYNITE-M5-style issues per title.
         /// </summary>
         private static void ReportNullEnvelopeStartFailure(
             ScrobbleStartReq startData, bool isFlushRetry, int attempts, HttpCallDiagnostics diagnostics) {
             var extras = ScrobbleStartFailure.BuildExtras(
                 attempts, diagnostics, outcome: null, startData?.game_name);
             extras.TryGetValue("failure_kind", out var reason);
+            var status = diagnostics?.StatusCode ?? 0;
             GsLogger.Error(
-                $"Failed to start scrobble session (reason={reason ?? "unknown"}, http={diagnostics?.StatusCode ?? 0}, attempts={attempts})");
+                $"Failed to start scrobble session (reason={reason ?? "unknown"}, http={status}, attempts={attempts})");
 
-            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry)) {
+            if (!ScrobbleStartFailure.ShouldCapture(attempts, isFlushRetry, status, failureKind: diagnostics?.FailureKind)) {
+                if (!isFlushRetry && ScrobbleStartFailure.IsTransient(status, diagnostics?.FailureKind)) {
+                    // Context for any later event: the start is queued, not lost.
+                    GsSentry.AddBreadcrumb(
+                        message: "Scrobble start deferred to the pending queue",
+                        category: "scrobble",
+                        data: new Dictionary<string, string> {
+                            { "failure_kind", reason ?? "" },
+                            { "http_status", status.ToString() }
+                        });
+                }
+
                 return;
             }
 
@@ -929,6 +989,29 @@ namespace GsPlugin.Api {
                 startData?.user_id,
                 extras: extras,
                 fingerprint: ScrobbleStartFailure.Fingerprint);
+        }
+
+        /// <summary>
+        /// Logs a null-envelope scrobble finish. On the live path only, an unparsed
+        /// permanent 4xx (HTML WAF, empty body, missing status) is reported with a
+        /// stable fingerprint. Flush retries and 429/5xx stay local.
+        /// </summary>
+        private static void ReportNullEnvelopeFinishFailure(
+            ScrobbleFinishReq endData, bool isFlushRetry, int attempts, HttpCallDiagnostics diagnostics) {
+            GsLogger.Error("Failed to finish scrobble session");
+            if (isFlushRetry || !IsPermanentRejection(diagnostics?.StatusCode ?? 0)) {
+                return;
+            }
+
+            CaptureSentryMessage(
+                ScrobbleFinishFailure.Message,
+                SentryLevel.Warning,
+                endData?.game_name,
+                endData?.user_id,
+                endData?.session_id,
+                extras: ScrobbleStartFailure.BuildExtras(
+                    attempts, diagnostics, outcome: null, endData?.game_name),
+                fingerprint: ScrobbleFinishFailure.Fingerprint);
         }
 
         /// <summary>
@@ -950,15 +1033,19 @@ namespace GsPlugin.Api {
             if (!string.IsNullOrEmpty(gameName)) {
                 data["game"] = gameName;
             }
+
             if (!string.IsNullOrEmpty(userId)) {
                 data["user_id"] = userId;
             }
+
             if (!string.IsNullOrEmpty(sessionId)) {
                 data["session_id"] = sessionId;
             }
+
             if (data.Count > 0) {
                 GsSentry.AddBreadcrumb(message: "scrobble failure context", category: "scrobble", data: data);
             }
+
             GsSentry.CaptureMessage(message, level, fingerprint, extras);
         }
 
@@ -1026,6 +1113,7 @@ namespace GsPlugin.Api {
             using (var gzip = new GZipStream(compressedStream, CompressionLevel.Fastest, leaveOpen: true)) {
                 gzip.Write(jsonBytes, 0, jsonBytes.Length);
             }
+
             compressedStream.Position = 0;
             var content = new StreamContent(compressedStream);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
@@ -1078,6 +1166,7 @@ namespace GsPlugin.Api {
                     else {
                         response = await _httpClient.PostAsync(url, content).ConfigureAwait(false);
                     }
+
                     // Report the status before reading the body: if the body read
                     // throws, the server still answered, and a 4xx must stay
                     // classified as a permanent rejection rather than falling back
@@ -1104,6 +1193,11 @@ namespace GsPlugin.Api {
                         _logger.Warn(
                             $"POST {url} returned {(int)response.StatusCode} ({response.StatusCode}): {body}");
                         diagnostics?.SetFailure("http");
+                        if (diagnostics != null) {
+                            diagnostics.ResponseContentType = string.IsNullOrWhiteSpace(responseBody)
+                                ? "none"
+                                : response.Content?.Headers?.ContentType?.MediaType ?? "unknown";
+                        }
 
                         if (ensureSuccess) {
                             var httpEx = new HttpRequestException(
@@ -1121,6 +1215,7 @@ namespace GsPlugin.Api {
                                 try {
                                     var errorResponse =
                                         JsonSerializer.Deserialize<TResponse>(responseBody, _jsonOptions);
+
                                     // Deserializing without throwing proves nothing: System.Text.Json
                                     // fills a body it does not recognize with defaults, so a generic
                                     // 401 {"error":"invalid_token"} would come back as a non-null
@@ -1139,6 +1234,7 @@ namespace GsPlugin.Api {
                                 }
                             }
                         }
+
                         return null;
                     }
 
@@ -1164,6 +1260,7 @@ namespace GsPlugin.Api {
                             _logger.Warn($"Deserialization returned null for {url}. Response: {responseBody}");
                             diagnostics?.SetFailure("json");
                         }
+
                         return deserializedResponse;
                     }
                     catch (JsonException jsonEx) {
@@ -1178,14 +1275,13 @@ namespace GsPlugin.Api {
                         responseData: $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}",
                         isError: true);
 
-                    var kind = ex is TaskCanceledException || ex is TimeoutException
-                        ? "timeout"
-                        : "transport";
+                    var kind = HttpCallDiagnostics.ClassifyException(ex);
                     diagnostics?.SetFailure(kind, ex);
                     _logger.Warn(ex, $"POST {url} {kind} error: {ex.GetType().Name}");
                     if (captureExceptions) {
                         CaptureHttpException(ex, url, jsonData, response, responseBody);
                     }
+
                     return null;
                 }
             }
@@ -1239,6 +1335,7 @@ namespace GsPlugin.Api {
                     if (jsonData != null) {
                         request.Content = CreateJsonContent(jsonData);
                     }
+
                     if (attachToken) {
                         var installToken = GsDataManager.DataOrNull?.InstallToken;
                         if (!string.IsNullOrEmpty(installToken)) {
@@ -1298,6 +1395,7 @@ namespace GsPlugin.Api {
                 else {
                     _logger.Warn(ex, $"{logName} HTTP error");
                 }
+
                 return null;
             }
         }
@@ -1314,10 +1412,36 @@ namespace GsPlugin.Api {
         public string FailureKind { get; set; }
         public string ExceptionType { get; set; }
 
+        /// <summary>
+        /// Media type of an error response, or "none" when it had no body. A proxy's HTML error
+        /// page and an application rejection can share a status code; this is what tells them
+        /// apart on the Sentry event.
+        /// </summary>
+        public string ResponseContentType { get; set; }
+
+        /// <summary>
+        /// Names what a thrown request failed on. Only the network's own exceptions count as
+        /// "transport": the POST helper's catch also sees serializer and disposal faults, and
+        /// those are plugin defects that must not be filed as a retryable network blip.
+        /// </summary>
+        public static string ClassifyException(Exception ex) {
+            if (ex is TaskCanceledException || ex is TimeoutException) {
+                return "timeout";
+            }
+
+            if (ex is HttpRequestException || ex is WebException || ex is IOException
+                || ex is System.Net.Sockets.SocketException) {
+                return "transport";
+            }
+
+            return "exception";
+        }
+
         public void Reset() {
             StatusCode = 0;
             FailureKind = null;
             ExceptionType = null;
+            ResponseContentType = null;
         }
 
         public void SetFailure(string kind, Exception ex = null) {
@@ -1338,11 +1462,48 @@ namespace GsPlugin.Api {
         public static readonly string[] Fingerprint = { "gs-playnite", "scrobble-start-failed" };
 
         /// <summary>
-        /// Report once on the live start path after the HTTP helper actually ran.
-        /// Circuit-open skips and pending-queue flush retries only log locally.
+        /// Consent, auth, allow-list and throttle answers the server will not change
+        /// on retry. They belong in a breadcrumb, not a Sentry issue (same rule as
+        /// <c>GsAccountLinkingService.IsExpectedLinkingRejection</c>).
         /// </summary>
-        public static bool ShouldCapture(int attempts, bool isFlushRetry) =>
-            attempts > 0 && !isFlushRetry;
+        public static bool IsExpectedRejection(string code) {
+            switch (code) {
+                case "UNSUPPORTED_PLUGIN":
+                case "OPTED_OUT":
+                case "TOKEN_REQUIRED":
+                case "TOKEN_INVALID":
+                case "RATE_LIMITED":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// A failure the next try can answer differently: no response at all (transport,
+        /// timeout) or a status that invites a retry (408, 429, 5xx). The start was persisted
+        /// before the request, so the pending-queue flush replays it. Capturing each blip
+        /// filed recovered sessions under GS-PLAYNITE-PT and regressed the issue for nothing.
+        /// An error status wins over the failure kind: the POST helper records the status
+        /// before reading the body, so a 403 whose body read then throws arrives as
+        /// "transport", and the server's answer is still a permanent rejection.
+        /// </summary>
+        public static bool IsTransient(int httpStatus, string failureKind) {
+            if (httpStatus >= 400) {
+                return httpStatus == (int)HttpStatusCode.RequestTimeout || httpStatus == 429 || httpStatus >= 500;
+            }
+
+            return failureKind == "transport" || failureKind == "timeout";
+        }
+
+        /// <summary>
+        /// Report once on the live start path after the HTTP helper actually ran, and only for
+        /// a failure retrying cannot fix. Circuit-open skips, pending-queue flush retries,
+        /// expected rejections and transient failures only log locally.
+        /// </summary>
+        public static bool ShouldCapture(
+            int attempts, bool isFlushRetry, int httpStatus = 0, string code = null, string failureKind = null) =>
+            attempts > 0 && !isFlushRetry && !IsTransient(httpStatus, failureKind) && !IsExpectedRejection(code);
 
         public static Dictionary<string, string> BuildExtras(
             int attempts, HttpCallDiagnostics diagnostics, string outcome, string gameName = null) {
@@ -1368,16 +1529,34 @@ namespace GsPlugin.Api {
             if (diagnostics != null && diagnostics.StatusCode > 0) {
                 extras["http_status"] = diagnostics.StatusCode.ToString();
             }
+
             if (!string.IsNullOrEmpty(diagnostics?.ExceptionType)) {
                 extras["exception_type"] = diagnostics.ExceptionType;
             }
+
+            if (!string.IsNullOrEmpty(diagnostics?.ResponseContentType)) {
+                extras["response_content_type"] = diagnostics.ResponseContentType;
+            }
+
             if (!string.IsNullOrEmpty(outcome)) {
                 extras["outcome"] = outcome;
             }
+
             if (!string.IsNullOrEmpty(gameName)) {
                 extras["game"] = gameName;
             }
+
             return extras;
         }
+    }
+
+    /// <summary>
+    /// Stable identity for the null-envelope scrobble-finish path. Game titles
+    /// never enter the message or fingerprint.
+    /// </summary>
+    internal static class ScrobbleFinishFailure {
+        public const string Message = "Failed to finish scrobble session";
+
+        public static readonly string[] Fingerprint = { "gs-playnite", "scrobble-finish-failed" };
     }
 }

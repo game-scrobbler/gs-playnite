@@ -166,6 +166,15 @@ delete_error = An error occurred. Please try again later.
 opt_back_in_success = Plugin re-enabled. Please restart Playnite to resume syncing.
 opt_back_in_rate_limited = Too many attempts. Please wait and try again.
 opt_back_in_failed = Failed to re-enable. Please restart Playnite to try again.
+opt_back_in_requesting = Re-enabling...
+opt_back_in_error = An error occurred. Please restart Playnite to try again.
+
+# ── Opted-out dashboard ──
+opted_out_title = Tracking is off
+opted_out_body = You opted out of Game Scrobbler. Your Playnite library, sessions, and achievements were deleted from our servers, and this dashboard no longer loads any stats.
+opted_out_hint = Nothing is being synced. You can opt back in whenever you want.
+opted_out_restart_title = Restart Playnite to continue
+opted_out_restart_body = Game Scrobbler is on again. Close and reopen Playnite to restore the dashboard and start syncing.
 
 # ── URI Handler ──
 invalid_linking_token = Invalid linking token received.
@@ -181,6 +190,7 @@ sync_error = Library sync encountered an error.
 
 # ── Menu Items ──
 menu_sync_library = Sync Library Now
+menu_open_dashboard = Open Dashboard
 menu_open_settings = Open Settings
 
 # -- Section: ported from main (Playnite 10) --

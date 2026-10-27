@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Playnite;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
+using Playnite;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -137,6 +137,7 @@ namespace GsPlugin.Services {
                     GsLogger.Warn($"Notification action_url rejected (untrusted host): {actionUrl}");
                     return null;
                 }
+
                 return async () => {
                     await Task.CompletedTask;
                     try {

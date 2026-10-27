@@ -6,9 +6,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Navigation;
-using Playnite;
+using GsPlugin.Infrastructure;
 using GsPlugin.Models;
 using GsPlugin.Services;
+using Playnite;
 
 namespace GsPlugin.View {
     /// <summary>
@@ -35,6 +36,7 @@ namespace GsPlugin.View {
 
             // Subscribe to static linking status changes (single source of truth)
             GsAccountLinkingService.LinkingStatusChanged += OnLinkingStatusChanged;
+
             // Subscribe to token/queue state changes for diagnostics indicators
             GsDataManager.DiagnosticsStateChanged += OnDiagnosticsStateChanged;
         }
@@ -45,6 +47,7 @@ namespace GsPlugin.View {
         }
 
         #region View Lifecycle Events
+
         /// <summary>
         /// Handles cleanup when the view is unloaded.
         /// </summary>
@@ -77,10 +80,13 @@ namespace GsPlugin.View {
         private void InitializeViewData() {
             // Display the installation ID
             IDTextBlock.Text = GsDataManager.Data.InstallID;
+
             // Display last sync status (static property — cannot use XAML {Binding})
             LastSyncStatusTextBlock.Text = GsPluginSettingsViewModel.LastSyncStatus;
+
             // Display install token status
             UpdateInstallTokenStatus();
+
             // Display pending scrobble count if any
             UpdatePendingScrobblesStatus();
         }
@@ -156,6 +162,8 @@ namespace GsPlugin.View {
             Dispatcher.Invoke(() => {
                 UpdateInstallTokenStatus();
                 UpdatePendingScrobblesStatus();
+                UpdateOptOutState();
+                UpdateConnectionStatus();
                 LastSyncStatusTextBlock.Text = GsPluginSettingsViewModel.LastSyncStatus;
             });
         }
@@ -175,6 +183,7 @@ namespace GsPlugin.View {
                 if (settings != null) {
                     settings.PropertyChanged += Settings_PropertyChanged;
                 }
+
                 _subscribedSettings = settings;
             }
         }
@@ -188,10 +197,12 @@ namespace GsPlugin.View {
             switch (e.PropertyName) {
                 case nameof(GsPluginSettings.IsLinking):
                     UpdateLinkingState();
+
                     // Also check connection status when linking completes
                     if (!_viewModel.Settings.IsLinking) {
                         UpdateConnectionStatus();
                     }
+
                     break;
 
                 case nameof(GsPluginSettings.IsDeleting):
@@ -201,14 +212,19 @@ namespace GsPlugin.View {
         }
 
         #region UI Update Methods
+
         /// <summary>
         /// Updates the connection status display and related UI elements.
         /// </summary>
         private void UpdateConnectionStatus() {
-            bool isOptedOut = GsDataManager.IsOptedOut;
+            bool trackingPaused = GsDataManager.IsTrackingPaused;
 
-            if (isOptedOut) {
+            if (GsDataManager.IsOptedOut) {
                 ConnectionStatusTextBlock.Text = Loc.connection_status_opted_out();
+                ConnectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
+            }
+            else if (GsDataManager.PendingRestartAfterOptIn) {
+                ConnectionStatusTextBlock.Text = Loc.opted_out_restart_title();
                 ConnectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
             }
             else {
@@ -218,16 +234,16 @@ namespace GsPlugin.View {
                     : new SolidColorBrush(Colors.Red);
             }
 
-            // Hide linking controls when opted out or already linked
-            var linkingVisibility = (!isOptedOut && GsPluginSettingsViewModel.ShowLinkingControls)
+            // Hide linking controls while tracking is paused or already linked
+            var linkingVisibility = (!trackingPaused && GsPluginSettingsViewModel.ShowLinkingControls)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             OpenWebsiteToLinkButton.Visibility = linkingVisibility;
             ManualTokenSeparator.Visibility = linkingVisibility;
             LinkingControlsGrid.Visibility = linkingVisibility;
 
-            // Show disconnect button only when linked and not opted out
-            DisconnectAccountButton.Visibility = (!isOptedOut && GsPluginSettingsViewModel.IsLinked)
+            // Show disconnect button only when linked and tracking is not paused
+            DisconnectAccountButton.Visibility = (!trackingPaused && GsPluginSettingsViewModel.IsLinked)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
@@ -239,9 +255,11 @@ namespace GsPlugin.View {
             if (_viewModel?.Settings == null) return;
 
             bool isLinking = _viewModel.Settings.IsLinking;
+
             // Disable controls during linking
             TokenTextBox.IsEnabled = !isLinking;
             LinkAccountButton.IsEnabled = !isLinking;
+
             // Update button text
             LinkAccountButton.Content = isLinking
                 ? Loc.linking_in_progress()
@@ -251,6 +269,7 @@ namespace GsPlugin.View {
         #endregion
 
         #region User Interaction Handlers
+
         /// <summary>
         /// Shows the standard localized error dialog for a failed user action.
         /// </summary>
@@ -266,7 +285,7 @@ namespace GsPlugin.View {
         /// Handles the link account button click event.
         /// </summary>
         private void LinkAccount_Click(object sender, RoutedEventArgs e) {
-            _viewModel?.LinkAccount();
+            _ = _viewModel?.LinkAccount().LogFaults("Unhandled exception in LinkAccount", asError: true);
         }
 
         /// <summary>
@@ -347,7 +366,7 @@ namespace GsPlugin.View {
 
             if (confirmResult != System.Windows.MessageBoxResult.Yes) return;
 
-            _viewModel?.DeleteMyData();
+            _ = _viewModel?.DeleteMyData().LogFaults("Unhandled exception in DeleteMyData", asError: true);
         }
 
         /// <summary>
@@ -368,25 +387,49 @@ namespace GsPlugin.View {
         /// </summary>
         private void UpdateOptOutState() {
             bool isOptedOut = GsDataManager.IsOptedOut;
-            DeleteMyDataButton.Visibility = isOptedOut ? Visibility.Collapsed : Visibility.Visible;
+            bool pendingRestart = GsDataManager.PendingRestartAfterOptIn;
+            DeleteMyDataButton.Visibility = isOptedOut || pendingRestart
+                ? Visibility.Collapsed
+                : Visibility.Visible;
             OptBackInButton.Visibility = isOptedOut ? Visibility.Visible : Visibility.Collapsed;
+            OptedOutBanner.Visibility = isOptedOut || pendingRestart
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (pendingRestart) {
+                OptedOutBannerTitle.Text = Loc.opted_out_restart_title();
+                OptedOutBannerBody.Text = Loc.opted_out_restart_body();
+                OptedOutBannerHint.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            OptedOutBannerTitle.Text = Loc.opted_out_title();
+            OptedOutBannerBody.Text = Loc.opted_out_body();
+            OptedOutBannerHint.Text = Loc.opted_out_hint();
+            OptedOutBannerHint.Visibility = Visibility.Visible;
         }
 
         /// <summary>
         /// Handles the Opt Back In button click.
         /// </summary>
-        private void OptBackIn_Click(object sender, RoutedEventArgs e) {
+        private async void OptBackIn_Click(object sender, RoutedEventArgs e) {
             var result = MessageBox.Show(
                 Loc.opt_back_in_confirm_body(),
                 Loc.opt_back_in_confirm_title(),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (result != System.Windows.MessageBoxResult.Yes) return;
+            if (result != System.Windows.MessageBoxResult.Yes || _viewModel == null) return;
 
-            _viewModel?.OptBackIn();
-            UpdateOptOutState();
-            UpdateConnectionStatus();
+            OptBackInButton.IsEnabled = false;
+            try {
+                await _viewModel.OptBackIn();
+            }
+            finally {
+                UpdateOptOutState();
+                UpdateConnectionStatus();
+                OptBackInButton.IsEnabled = true;
+            }
         }
 
         /// <summary>

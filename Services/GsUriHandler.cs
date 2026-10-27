@@ -2,9 +2,9 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
-using Playnite;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
+using Playnite;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -48,8 +48,8 @@ namespace GsPlugin.Services {
         /// <param name="args">URI arguments containing the token</param>
         private async Task HandleUriRequest(PlayniteUriEventArgs args) {
             try {
-                if (GsDataManager.IsOptedOut) {
-                    GsLogger.Info("URI request ignored: plugin is opted out");
+                if (GsDataManager.IsTrackingPaused) {
+                    GsLogger.Info("URI request ignored: tracking is paused");
                     return;
                 }
 
@@ -58,10 +58,12 @@ namespace GsPlugin.Services {
                 // Log the arguments for debugging (mask sensitive token values)
                 for (int i = 0; i < args.Arguments.Length; i++) {
                     string logValue = args.Arguments[i];
+
                     // Mask token values (argument after "link" command)
                     if (i == 1 && args.Arguments.Length >= 2 && args.Arguments[0].Equals("link", StringComparison.OrdinalIgnoreCase)) {
                         logValue = logValue.Length > 4 ? logValue.Substring(0, 4) + "****" : "****";
                     }
+
                     GsLogger.Info($"Argument {i}: {logValue}");
                 }
 
@@ -140,6 +142,7 @@ namespace GsPlugin.Services {
             catch (Exception ex) {
                 GsLogger.Warn($"Failed to parse expires_at from deep link: {ex.Message}");
             }
+
             return null;
         }
 
@@ -155,10 +158,12 @@ namespace GsPlugin.Services {
                     var result = await _linkingService.LinkAccountAsync(token, LinkingContext.AutomaticUri);
 
                     if (result.Success) {
-                        if (_playniteApi?.Dialogs != null)
+                        if (_playniteApi?.Dialogs != null) {
                             await _playniteApi.Dialogs.ShowMessageAsync(
                                 Loc.link_success_dialog_body(result.UserId),
                                 Loc.link_success_dialog_title());
+                        }
+
                         return;
                     }
 
@@ -170,10 +175,12 @@ namespace GsPlugin.Services {
                     if (result.IsNetworkError) {
                         bool isLastAttempt = attempt == MaxLinkRetries - 1;
                         if (isLastAttempt) {
-                            if (_playniteApi?.Dialogs != null)
+                            if (_playniteApi?.Dialogs != null) {
                                 await _playniteApi.Dialogs.ShowMessageAsync(
                                     Loc.link_failed_retries_body(result.ErrorMessage),
                                     Loc.link_failed_dialog_title());
+                            }
+
                             return;
                         }
 
@@ -185,13 +192,16 @@ namespace GsPlugin.Services {
                         if (retry != System.Windows.MessageBoxResult.Yes) {
                             return;
                         }
+
                         // Loop continues to next attempt
                     }
                     else {
-                        if (_playniteApi?.Dialogs != null)
+                        if (_playniteApi?.Dialogs != null) {
                             await _playniteApi.Dialogs.ShowMessageAsync(
                                 Loc.link_failed_body(result.ErrorMessage),
                                 Loc.link_failed_dialog_title());
+                        }
+
                         return;
                     }
                 }
@@ -242,7 +252,6 @@ namespace GsPlugin.Services {
                 }
             }
         }
-
 
         /// <summary>
         /// Handles empty token scenario.

@@ -174,7 +174,26 @@ Auth via `x-profile-token` header or `profile_token` parameter.
 
 ---
 
+## Theme Integration
+
+Playnite 11 has no custom theme elements, so the embeddable `GameScrobbler_Dashboard` control from the Playnite 10 plugin does not exist in this build. The dashboard is a Playnite 11 app view instead: it appears in the sidebar and opens from **Game Scrobbler → Open Dashboard**. If the user has opted out of data collection, it shows a native "tracking is off" panel with an Opt Back In action instead of the live dashboard.
+
+Themes get per-game data rather than the dashboard. For each game Game Scrobbler would sync, the plugin provides a `GsGameDataPresenter` that Playnite exposes on the game presenter, so a theme can render it in its own visual language:
+
+```xml
+<TextBlock Visibility="{Binding GameDataExists.GsGameDataPresenter}"
+           Text="{Binding GameData.GsGameDataPresenter.Impl.PlaytimeHours}" />
+```
+
+Bindable properties on `Impl`: `HasData`, `IsLoading`, `PlaytimeSeconds`, `PlaytimeHours`, `PlayCount`, `CompletionStatus`, `AchievementsUnlocked`, `AchievementsTotal` and `HasAchievements`. Data loads when the game is shown in the details view, not when the presenter is created, so scrolling a large library does not fetch every game. No presenter is provided while tracking is off, or for games Game Scrobbler does not sync.
+
+Finer-grained integration is being scoped in [#74](https://github.com/game-scrobbler/gs-playnite/issues/74). If you build themes, that issue is the place to say which pieces you want.
+
+---
+
 ## Achievement Sync
+
+> **Playnite 11:** not available yet. Achievement sync returns once SuccessStory and Playnite Achievements support Playnite 11. The rest of this section describes the Playnite 10 plugin.
 
 GameScrobbler can aggregate achievement progress from multiple Playnite addons.
 

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using GsPlugin.Models;
 using Playnite;
 using Sentry;
-using GsPlugin.Models;
 
 namespace GsPlugin.Infrastructure {
     /// <summary>
@@ -65,6 +65,7 @@ namespace GsPlugin.Infrastructure {
                     _unhandledExceptionHandler = OnAppDomainUnhandledException;
                     AppDomain.CurrentDomain.UnhandledException += _unhandledExceptionHandler;
                 }
+
                 if (_unobservedTaskExceptionHandler == null) {
                     _unobservedTaskExceptionHandler = OnUnobservedTaskException;
                     System.Threading.Tasks.TaskScheduler.UnobservedTaskException += _unobservedTaskExceptionHandler;
@@ -82,6 +83,7 @@ namespace GsPlugin.Infrastructure {
                     AppDomain.CurrentDomain.UnhandledException -= _unhandledExceptionHandler;
                     _unhandledExceptionHandler = null;
                 }
+
                 if (_unobservedTaskExceptionHandler != null) {
                     System.Threading.Tasks.TaskScheduler.UnobservedTaskException -= _unobservedTaskExceptionHandler;
                     _unobservedTaskExceptionHandler = null;
@@ -122,6 +124,7 @@ namespace GsPlugin.Infrastructure {
                 if (fromUs) {
                     _logger.Error(e.Exception, "UnobservedTaskException captured (from GsPlugin)");
                     CaptureException(e.Exception, "TaskScheduler.UnobservedTaskException");
+
                     // Only ours. SetObserved() suppresses the fault process-wide, and this handler
                     // now runs regardless of telemetry consent, so calling it on another
                     // extension's task would silently override whatever escalation the host or
@@ -138,6 +141,27 @@ namespace GsPlugin.Infrastructure {
             }
         }
 
+        /// <summary>
+        /// Playnite 11 runs both Desktop and Fullscreen mode in one process, Playnite11.Desktop.exe
+        /// (main's Playnite 10 names, Playnite.DesktopApp and Playnite.FullscreenApp, cannot host
+        /// this net10 build, and leaving only those here silently disabled Sentry on Playnite 11).
+        /// Playnite11.BrowserProcess.exe is a helper, not a host. If the process name cannot be
+        /// read, assume Playnite rather than silently losing reports.
+        /// </summary>
+        internal static bool IsPlayniteHost() {
+            try {
+                using (var process = System.Diagnostics.Process.GetCurrentProcess()) {
+                    return IsPlayniteProcessName(process.ProcessName);
+                }
+            }
+            catch (Exception) {
+                return true;
+            }
+        }
+
+        internal static bool IsPlayniteProcessName(string processName) =>
+            string.Equals(processName, "Playnite11.Desktop", StringComparison.OrdinalIgnoreCase);
+
         private static void InitializeCore(Func<System.Net.Http.HttpMessageHandler> createHandler, Action<Exception> onError) {
             try {
                 _logger.Info("Initializing Sentry error tracking");
@@ -152,6 +176,16 @@ namespace GsPlugin.Infrastructure {
                     // for none. Not initializing is the only way to be silent; the Capture* wrappers
                     // below already no-op, so nothing else needs to change.
                     _logger.Info("Sentry disabled by user preference or opt-out — not initializing");
+                    return;
+                }
+
+                // The DSN below is the production project. A test run or a reflection harness
+                // driving bin/Release reaches this with consent granted (fresh data defaults to
+                // it), and every CaptureMessage it makes lands in the production issue stream:
+                // GS-PLAYNITE-Q0 was five CI runs doing exactly that. Callers that want the SDK
+                // outside Playnite must supply their own transport.
+                if (createHandler == null && !IsPlayniteHost()) {
+                    _logger.Info("Not running inside Playnite — Sentry not initialized");
                     return;
                 }
 
@@ -187,10 +221,12 @@ namespace GsPlugin.Infrastructure {
                     options.SendDefaultPii = false;
                     options.SampleRate = disableSentryFlag ? 0.0f : 1.0f;
                     options.TracesSampleRate = disableSentryFlag ? 0.0f : 0.1f;
+
                     // Never enable continuous profiling in-process — it keeps background
                     // workers alive and has been implicated in Playnite refusing to quit.
                     options.ProfilesSampleRate = 0.0f;
                     options.AutoSessionTracking = !disableSentryFlag;
+
                     // CaptureFailedRequests + FailedRequestStatusCodes.Add((400,499)) constructs
                     // Sentry.HttpStatusCodeRange. Playnite loads all plugins into one AppDomain;
                     // if another extension already loaded an older Sentry.dll, that Add() throws
@@ -202,6 +238,7 @@ namespace GsPlugin.Infrastructure {
                     options.IsGlobalModeEnabled = false;
                     options.DiagnosticLevel = SentryLevel.Warning;
                     options.AttachStacktrace = true;
+
                     // Cap breadcrumb buffer to reduce per-session memory overhead.
                     options.MaxBreadcrumbs = 50;
 
@@ -216,6 +253,7 @@ namespace GsPlugin.Infrastructure {
 
                     options.SetBeforeSend((sentryEvent, hint) => {
                         if (!consent.IsAllowed) return null;
+
                         // Always allow explicitly captured messages (our own CaptureMessage calls)
                         if (sentryEvent.Exception == null) {
                             return Scrub(sentryEvent);
@@ -233,6 +271,7 @@ namespace GsPlugin.Infrastructure {
                                 if (se.Module != null && se.Module.StartsWith(ourNamespace)) {
                                     return Scrub(sentryEvent);
                                 }
+
                                 if (se.Stacktrace?.Frames != null) {
                                     foreach (var frame in se.Stacktrace.Frames) {
                                         if (frame.Module != null && frame.Module.StartsWith(ourNamespace)) {
@@ -264,7 +303,6 @@ namespace GsPlugin.Infrastructure {
                 catch (Exception ex) {
                     _logger.Debug(ex, "Failed to configure Sentry scope (non-critical)");
                 }
-
 
                 _initialized = true;
                 _logger.Info($"Sentry initialized. Tracking enabled: {!disableSentryFlag}");
@@ -332,13 +370,43 @@ namespace GsPlugin.Infrastructure {
             var pattern = string.IsNullOrEmpty(root)
                 ? standardProfile
                 : Regex.Escape(root) + @"(?=$|[\\/""'\s])|" + standardProfile;
-            return new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            return new Regex(
+                pattern,
+                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                TimeSpan.FromMilliseconds(ScrubMatchTimeoutMilliseconds));
         }
 
-        internal static string ScrubText(string value) =>
-            string.IsNullOrEmpty(value)
-                ? value
-                : UserProfilePathRegex.Replace(value, @"C:\Users\%USER%");
+        /// <summary>
+        /// Bounds each profile-path match. The pattern is linear, so this is a guard against a
+        /// pathological input rather than a limit expected to fire. A const, not a static
+        /// TimeSpan field, because <see cref="UserProfilePathRegex"/> is built during static
+        /// initialization and would otherwise read the field before it is assigned.
+        /// </summary>
+        private const int ScrubMatchTimeoutMilliseconds = 1000;
+
+        /// <summary>Replaces a whole value whose scrub could not finish.</summary>
+        internal const string ScrubTimedOutPlaceholder = "[redacted: profile path scrub timed out]";
+
+        internal static string ScrubText(string value) => ScrubText(value, UserProfilePathRegex);
+
+        /// <summary>
+        /// A match timeout has to fail closed here. <see cref="Scrub"/> sends the event unscrubbed
+        /// on any exception, so letting <see cref="RegexMatchTimeoutException"/> escape would turn a
+        /// slow match into a leaked account name. The value may still contain the profile path, so
+        /// none of it is kept.
+        /// </summary>
+        internal static string ScrubText(string value, Regex profilePathRegex) {
+            if (string.IsNullOrEmpty(value)) {
+                return value;
+            }
+
+            try {
+                return profilePathRegex.Replace(value, @"C:\Users\%USER%");
+            }
+            catch (RegexMatchTimeoutException) {
+                return ScrubTimedOutPlaceholder;
+            }
+        }
 
         /// <summary>
         /// Removes personal data from an event immediately before it leaves the device.
@@ -368,6 +436,7 @@ namespace GsPlugin.Infrastructure {
                         if (se.Stacktrace?.Frames == null) {
                             continue;
                         }
+
                         foreach (var frame in se.Stacktrace.Frames) {
                             frame.AbsolutePath = ScrubText(frame.AbsolutePath);
                             frame.FileName = ScrubText(frame.FileName);
@@ -378,6 +447,7 @@ namespace GsPlugin.Infrastructure {
             catch (Exception ex) {
                 _logger.Debug(ex, "Sentry PII scrub failed; sending event unscrubbed");
             }
+
             return sentryEvent;
         }
 
@@ -394,6 +464,7 @@ namespace GsPlugin.Infrastructure {
                             return true;
                         }
                     }
+
                     return false;
                 }
 
@@ -462,6 +533,7 @@ namespace GsPlugin.Infrastructure {
             IReadOnlyCollection<string> fingerprint = null,
             IReadOnlyDictionary<string, string> extras = null) {
             if (!_initialized || _consent?.IsAllowed != true) return;
+
             // Skip if Sentry is disabled, data not yet initialized, or user opted out
             var data = GsDataManager.DataOrNull;
             if (data == null) return;
@@ -475,6 +547,7 @@ namespace GsPlugin.Infrastructure {
                     if (fingerprint != null && fingerprint.Count > 0) {
                         scope.SetFingerprint(fingerprint);
                     }
+
                     if (extras != null) {
                         foreach (var kv in extras) {
                             if (!string.IsNullOrEmpty(kv.Key) && kv.Value != null) {
@@ -494,6 +567,7 @@ namespace GsPlugin.Infrastructure {
         /// <param name="message">An optional message describing the context of the exception.</param>
         public static void CaptureException(Exception exception, string message = null) {
             if (!_initialized || _consent?.IsAllowed != true) return;
+
             // Skip if Sentry is disabled or data not yet initialized
             var data = GsDataManager.DataOrNull;
             if (data == null) return;
@@ -522,6 +596,7 @@ namespace GsPlugin.Infrastructure {
         /// <param name="level">The severity level of the breadcrumb.</param>
         public static void AddBreadcrumb(string message, string category = null, Dictionary<string, string> data = null, BreadcrumbLevel level = BreadcrumbLevel.Info) {
             if (!_initialized || _consent?.IsAllowed != true) return;
+
             // Skip if Sentry is disabled or data not yet initialized
             var gsData = GsDataManager.DataOrNull;
             if (gsData == null) return;

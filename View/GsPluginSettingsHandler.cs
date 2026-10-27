@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
-using Playnite;
 using GsPlugin.Models;
+using Playnite;
 
 namespace GsPlugin.View {
     public class GsPluginSettingsHandler : PluginSettingsHandler {

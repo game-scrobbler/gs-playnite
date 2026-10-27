@@ -49,6 +49,14 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
     <!-- WebView2 replaces CefSharp for the embedded dashboard browser -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" />
+    <!-- Same rule set as main (.editorconfig + stylecop.json), build-time only. main pins 1.1.118,
+         which predates C# 12 and reports collection expressions (`return [x];`) as SA1010
+         violations; 1.2.0-beta.556 is the release line that parses modern C#. -->
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="stylecop.json" />
   </ItemGroup>
 
   <ItemGroup>

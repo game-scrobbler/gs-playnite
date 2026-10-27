@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Xunit;
 using GsPlugin.Api;
+using Xunit;
 using static GsPlugin.Api.GsApiClient;
 
 namespace GsPlugin.Tests {
@@ -175,8 +175,8 @@ namespace GsPlugin.Tests {
         [Fact]
         public static async Task MockClient_FlushPendingScrobblesAsync_DoesNotThrow() {
             IGsApiClient client = new MockGsApiClient();
-            // Should complete without throwing
-            await client.FlushPendingScrobblesAsync();
+            var ex = await Record.ExceptionAsync(() => client.FlushPendingScrobblesAsync());
+            Assert.Null(ex);
         }
 
         // --- GameSyncDto DTO tests (slim v3 shape — see ADR-011 in gs-mono) ---
@@ -445,8 +445,15 @@ namespace GsPlugin.Tests {
         public Task<DeleteDataRes> RequestDeleteMyData(DeleteDataReq req) =>
             Task.FromResult(new DeleteDataRes { success = true, message = "mock" });
 
-        public Task<OptInRes> RequestOptIn(OptInReq req) =>
-            Task.FromResult(new OptInRes { success = true, message = "mock" });
+        public OptInRes OptInResponse { get; set; } = new OptInRes { success = true, message = "mock" };
+        public Exception OptInException { get; set; }
+
+        public Task<OptInRes> RequestOptIn(OptInReq req) {
+            if (OptInException != null) {
+                throw OptInException;
+            }
+            return Task.FromResult(OptInResponse);
+        }
 
         public Task<RegisterInstallTokenRes> RegisterInstallToken(string installId) =>
             Task.FromResult(new RegisterInstallTokenRes { success = true, token = "mock-token" });

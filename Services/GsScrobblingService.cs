@@ -7,10 +7,10 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Playnite;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using GsPlugin.Models;
+using Playnite;
 
 namespace GsPlugin.Services {
     /// <summary>
@@ -223,11 +223,12 @@ namespace GsPlugin.Services {
             var at = DateTime.Now;
             PendingScrobble pending = null;
             SessionGate gate = null;
+
             // Declared out here so the finally can hand the gate back for disposal.
             string gameKey = null;
             var enteredGate = false;
             try {
-                if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")
+                if (GsDataManager.IsTrackingPaused || GsDataManager.Data.Flags.Contains("no-scrobble")
                     || game == null || !GsAllowedPlugins.IsAllowed(game)) return;
 
                 var gameId = game.Id.ToString();
@@ -239,6 +240,7 @@ namespace GsPlugin.Services {
                     QueuedAt = at
                 };
                 GsDataManager.ClaimPendingScrobble(pending);
+
                 // Persist the event before any await. Claims prevent the background flusher
                 // from sending this same item while the live handler owns it.
                 if (!GsDataManager.TryMutateIfActiveIdentity(installId, generation, d => {
@@ -283,13 +285,15 @@ namespace GsPlugin.Services {
             var at = DateTime.Now;
             PendingScrobble pending = null;
             SessionGate gate = null;
+
             // Declared out here so the finally can hand the gate back for disposal.
             string gameKey = null;
             var enteredGate = false;
             try {
-                if (GsDataManager.IsOptedOut || game == null) return;
+                if (GsDataManager.IsTrackingPaused || game == null) return;
 
                 var gameId = game.Id.ToString();
+
                 // Split out from the opt-out check: these two say "do not report this stop",
                 // not "leave the session open". Returning without clearing what the start
                 // recorded is what let a stopped game be finished again at Playnite's exit.
@@ -322,13 +326,16 @@ namespace GsPlugin.Services {
                         && d.ActiveSessionsByGameId.TryGetValue(gameId, out var completedSession)) {
                         pending.FinishData.session_id = completedSession;
                     }
+
                     // Same resolution the shutdown path uses: the start that recorded this
                     // instant may only be visible from inside the transaction.
                     if (string.IsNullOrEmpty(pending.FinishData.started_at)) {
                         pending.FinishData.started_at = d.ResolveSessionStart(gameId);
                     }
+
                     d.PendingScrobbles.Add(pending);
                     d.PendingStartGameIds.Remove(gameId);
+
                     // The durable finish owns completion from now on. Never erase a newer
                     // session merely because it uses the same Playnite game ID.
                     if (!string.IsNullOrEmpty(pending.FinishData.session_id)
@@ -344,6 +351,7 @@ namespace GsPlugin.Services {
                 enteredGate = true;
                 if (!IsCurrentIdentity(installId, generation)) return;
                 if (GsDataManager.HasEarlierPendingScrobble(pending)) return;
+
                 // Nothing here identifies which session to close: no server session id, and no
                 // start instant to match one on. Only the queued replay can resolve it, once
                 // the start ahead of it in the queue succeeds. A finish that knows when its
@@ -363,6 +371,7 @@ namespace GsPlugin.Services {
                 ReleaseSessionGate(gameKey, gate);
             }
         }
+
         /// <summary>
         /// Handles the application stopped event and cleans up any active scrobbling session(s).
         /// This ensures that if Playnite is closed while one or more games are running, each
@@ -379,7 +388,7 @@ namespace GsPlugin.Services {
         public async Task OnApplicationStoppedAsync() {
             var pendingFinishes = new List<PendingScrobble>();
             try {
-                if (GsDataManager.IsOptedOut || GsDataManager.Data.Flags.Contains("no-scrobble")) return;
+                if (GsDataManager.IsTrackingPaused || GsDataManager.Data.Flags.Contains("no-scrobble")) return;
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
                 var at = DateTime.Now;
@@ -392,6 +401,7 @@ namespace GsPlugin.Services {
                             user_id = GsDataManager.InstallIdForBody,
                             game_id = entry.Key,
                             session_id = entry.Value,
+
                             // This payload names no game, so without the start instant a
                             // session_id the server has since closed leaves it nothing exact
                             // to match on. Null only for sessions started before the plugin
@@ -402,6 +412,7 @@ namespace GsPlugin.Services {
                         }
                     });
                 }
+
                 // Starts can still be awaiting the server during shutdown. Their durable
                 // finishes pair with those queued starts on response or on the next launch.
                 foreach (var entry in _runningGames.ToArray()) {
@@ -413,9 +424,11 @@ namespace GsPlugin.Services {
                             FormatScrobbleTimestamp(entry.Value.StartedAt), at)
                     });
                 }
+
                 if (pendingFinishes.Count == 0) return;
 
                 foreach (var pending in pendingFinishes) GsDataManager.ClaimPendingScrobble(pending);
+
                 // This single durable write covers every session before the first await.
                 if (!GsDataManager.QueueSessionFinishesAndClearActive(activeSessions, pendingFinishes, installId, generation)) return;
                 _runningGames.Clear();
@@ -442,7 +455,6 @@ namespace GsPlugin.Services {
         }
         #region v3 Sync Methods
 
-
         /// <summary>
         /// Maps a Playnite Game to the API DTO. Shared by all sync paths.
         /// </summary>
@@ -460,6 +472,7 @@ namespace GsPlugin.Services {
                 completion_status_name = g.CompletionStatusId != null
                     ? _libraryApi.CompletionStatuses.Get(g.CompletionStatusId)?.Name
                     : null,
+
                 // Achievement counts stay null on P11: no P11-compatible achievement addon
                 // exists yet, so nothing reads them. They remain part of the hashed payload
                 // (as empty) so the digest still matches the server's createLibraryHashV3.
@@ -475,7 +488,6 @@ namespace GsPlugin.Services {
                 modified = g.ModifiedDate?.UtcDateTime
             };
         }
-
 
         /// <summary>
         /// Builds a full { playnite_id, fingerprint } map for the library, the shape the local
@@ -505,6 +517,7 @@ namespace GsPlugin.Services {
             ComputeLibraryDiff(List<GameSyncDto> current, Dictionary<string, string> fingerprints) {
             var added = new List<GameSyncDto>();
             var updated = new List<GameSyncDto>();
+
             // Computed once here and returned so the caller can reuse it for the index upsert
             // instead of hashing every changed game a second time.
             var currentFingerprints = new Dictionary<string, string>(current.Count);
@@ -547,6 +560,7 @@ namespace GsPlugin.Services {
                 : V4FullSyncChunkSize;
             var chunks = new List<List<TItem>>();
             var current = new List<TItem>(Math.Min(maxChunkItems, items.Count));
+
             // Opening and closing brackets for the JSON array.
             var currentBytes = 2;
 
@@ -573,7 +587,44 @@ namespace GsPlugin.Services {
             if (current.Count > 0) {
                 chunks.Add(current);
             }
+
             return chunks;
+        }
+
+        /// <summary>
+        /// Renders a v4 begin/chunk/commit failure for the local log.
+        ///
+        /// A null response and a server rejection are different outages with different fixes, and
+        /// interpolating <c>response?.status</c> collapsed both into the same empty <c>status=</c>.
+        /// That is what a user reporting a days-long sync outage was able to send us in
+        /// gs-playnite#89: three identical "commit failed: status=" lines that could not say whether
+        /// the server had answered at all. A null response means the API client already logged the
+        /// HTTP status and body it saw, so point the reader at that line instead of printing nothing;
+        /// a response that arrived carries the server's own status/error/reason/message, so print
+        /// whichever of them the server actually set.
+        /// </summary>
+        internal static string DescribeV4Failure(
+            bool responded, string status, string error, string message, string reason) {
+            if (!responded) {
+                return "no usable response (see the preceding POST log line for the HTTP status and body)";
+            }
+
+            var parts = new List<string> {
+                $"status={(string.IsNullOrEmpty(status) ? "(none)" : status)}"
+            };
+            if (!string.IsNullOrEmpty(error)) {
+                parts.Add($"error={error}");
+            }
+
+            if (!string.IsNullOrEmpty(reason)) {
+                parts.Add($"reason={reason}");
+            }
+
+            if (!string.IsNullOrEmpty(message)) {
+                parts.Add($"message={message}");
+            }
+
+            return string.Join(", ", parts);
         }
 
         /// <summary>
@@ -595,9 +646,11 @@ namespace GsPlugin.Services {
                 var begin = await beginAsync(items.Count);
                 if (begin == null || !begin.success || begin.status != "started"
                     || string.IsNullOrEmpty(begin.sync_id)) {
-                    _logger.Error($"{label} v4 begin failed: status={begin?.status}, error={begin?.error}");
+                    _logger.Error($"{label} v4 begin failed: "
+                        + DescribeV4Failure(begin != null, begin?.status, begin?.error, begin?.message, begin?.reason));
                     return null;
                 }
+
                 syncId = begin.sync_id;
                 List<List<TItem>> chunks;
                 try {
@@ -608,12 +661,14 @@ namespace GsPlugin.Services {
                     await abortAsync(syncId);
                     return null;
                 }
+
                 var chunkCount = chunks.Count;
 
                 for (var i = 0; i < chunkCount; i++) {
                     var chunkRes = await chunkAsync(syncId, i, chunks[i]);
                     if (chunkRes == null || !chunkRes.success || chunkRes.status != "accepted") {
-                        _logger.Error($"{label} v4 chunk {i} failed: status={chunkRes?.status}");
+                        _logger.Error($"{label} v4 chunk {i + 1}/{chunkCount} failed: "
+                            + DescribeV4Failure(chunkRes != null, chunkRes?.status, chunkRes?.error, chunkRes?.message, null));
                         await abortAsync(syncId);
                         return null;
                     }
@@ -634,11 +689,14 @@ namespace GsPlugin.Services {
                         _logger.Warn($"{label} v4 commit rejected: force-full-sync (reason: {commit.reason})");
                     }
                     else {
-                        _logger.Error($"{label} v4 commit failed: status={commit?.status}");
+                        _logger.Error($"{label} v4 commit failed: "
+                            + DescribeV4Failure(commit != null, commit?.status, null, commit?.message, commit?.reason));
                     }
+
                     await abortAsync(syncId);
                     return isForceFullSync ? commit : null;
                 }
+
                 return commit;
             }
             catch (Exception ex) {
@@ -646,6 +704,7 @@ namespace GsPlugin.Services {
                 if (!string.IsNullOrEmpty(syncId)) {
                     await abortAsync(syncId);
                 }
+
                 throw;
             }
         }
@@ -801,6 +860,7 @@ namespace GsPlugin.Services {
                 _logger.Error($"{label}: failed to repair local hash index.");
                 return SyncLibraryResult.Error;
             }
+
             return SyncLibraryResult.Success;
         }
 
@@ -841,6 +901,7 @@ namespace GsPlugin.Services {
                 : $"{label} queued successfully ({queuedDetail}).");
 
             var indexSaved = false;
+
             // The data lock also fences the index write. Index stores read DataOrNull
             // without taking this lock, so this does not invert their lock order.
             var saved = GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration, d => {
@@ -852,6 +913,7 @@ namespace GsPlugin.Services {
                     "or the installation changed; will retry next run.");
                 return SyncLibraryResult.Error;
             }
+
             return SyncLibraryResult.Success;
         }
 
@@ -863,7 +925,7 @@ namespace GsPlugin.Services {
         public async Task<SyncLibraryResult> SyncLibraryFullAsync(
             IEnumerable<Game> playniteDatabaseGames, bool bypassCooldown = false) {
             try {
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                if (GsDataManager.IsTrackingPaused) return SyncLibraryResult.Skipped;
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
 
@@ -891,7 +953,7 @@ namespace GsPlugin.Services {
                         () => GsSyncHashIndex.ReplaceLibraryIndex(BuildLibraryFingerprints(library)));
                 }
 
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                if (GsDataManager.IsTrackingPaused) return SyncLibraryResult.Skipped;
 
                 var response = await UploadLibraryFullChunkedAsync(library, libraryHash, integrationAccounts);
 
@@ -953,6 +1015,7 @@ namespace GsPlugin.Services {
                 _logger.Warn(ex, "Database collection modified during snapshot — retrying once");
                 allGames = playniteDatabaseGames.ToList();
             }
+
             var (library, libraryHash, filteredCount) = await Task.Run(() => {
                 var filtered = allGames
                     .Where(GsAllowedPlugins.IsAllowed)
@@ -978,11 +1041,13 @@ namespace GsPlugin.Services {
             if (_integrationAccountReader == null) {
                 return new List<IntegrationAccountDto>();
             }
+
             try {
                 var accounts = _integrationAccountReader.ReadAll();
                 if (accounts.Count > 0) {
                     _logger.Info($"Discovered {accounts.Count} integration account(s): {string.Join(", ", accounts.Select(a => a.provider_id))}");
                 }
+
                 return accounts;
             }
             catch (Exception ex) {
@@ -991,7 +1056,6 @@ namespace GsPlugin.Services {
             }
         }
 
-
         /// <summary>
         /// Computes library diff against snapshot and sends to v2/library/sync-diff.
         /// Falls back to full sync if the server requests it.
@@ -999,7 +1063,7 @@ namespace GsPlugin.Services {
         public async Task<SyncLibraryResult> SyncLibraryDiffAsync(
             IEnumerable<Game> playniteDatabaseGames) {
             try {
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                if (GsDataManager.IsTrackingPaused) return SyncLibraryResult.Skipped;
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
 
@@ -1030,6 +1094,7 @@ namespace GsPlugin.Services {
                     ComputeLibraryDiff(library, fingerprints));
 
                 if (!IsCurrentIdentity(installId, generation)) return SyncLibraryResult.Error;
+
                 // If only integration accounts changed (no library diff), still send the request
                 // with empty diff so the backend can process the new accounts.
                 if (added.Count == 0 && updated.Count == 0 && removed.Count == 0 && !accountsChanged) {
@@ -1042,7 +1107,7 @@ namespace GsPlugin.Services {
                     (accountsChanged ? " (integration accounts also changed)" : ""));
 
                 // Re-check opt-out before sending data (user may have opted out mid-flight)
-                if (GsDataManager.IsOptedOut) return SyncLibraryResult.Skipped;
+                if (GsDataManager.IsTrackingPaused) return SyncLibraryResult.Skipped;
 
                 var response = await _apiClient.SyncLibraryDiff(new LibraryDiffSyncReq {
                     user_id = GsDataManager.InstallIdForBody,
@@ -1050,6 +1115,7 @@ namespace GsPlugin.Services {
                     updated = updated,
                     removed = removed.ToList(),
                     base_snapshot_hash = GsDataManager.Data.LastLibraryHash ?? "",
+
                     // libraryHash is computed over the current (post-diff) library, so it is
                     // the exact baseline for the server to store — no DB reconstruction needed.
                     result_snapshot_hash = libraryHash,
@@ -1122,6 +1188,7 @@ namespace GsPlugin.Services {
                     System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)) {
                 expiresAt = parsed.ToUniversalTime();
             }
+
             _logger.Info($"Sync skipped by server cooldown. Expires: {expiresAt?.ToString("O") ?? "unknown"}");
             if (expiresAt.HasValue) {
                 GsDataManager.MutateAndSave(d => {

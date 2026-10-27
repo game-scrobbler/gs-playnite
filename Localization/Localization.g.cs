@@ -753,6 +753,55 @@ public static partial class Loc
         return GetString("opt_back_in_failed");
     }
     /// <summary>
+    /// Re-enabling...
+    /// </summary>
+    public static string opt_back_in_requesting()
+    {
+        return GetString("opt_back_in_requesting");
+    }
+    /// <summary>
+    /// An error occurred. Please restart Playnite to try again.
+    /// </summary>
+    public static string opt_back_in_error()
+    {
+        return GetString("opt_back_in_error");
+    }
+    /// <summary>
+    /// Tracking is off
+    /// </summary>
+    public static string opted_out_title()
+    {
+        return GetString("opted_out_title");
+    }
+    /// <summary>
+    /// You opted out of Game Scrobbler. Your Playnite library, sessions, and achievements were deleted from our servers, and this dashboard no longer loads any stats.
+    /// </summary>
+    public static string opted_out_body()
+    {
+        return GetString("opted_out_body");
+    }
+    /// <summary>
+    /// Nothing is being synced. You can opt back in whenever you want.
+    /// </summary>
+    public static string opted_out_hint()
+    {
+        return GetString("opted_out_hint");
+    }
+    /// <summary>
+    /// Restart Playnite to continue
+    /// </summary>
+    public static string opted_out_restart_title()
+    {
+        return GetString("opted_out_restart_title");
+    }
+    /// <summary>
+    /// Game Scrobbler is on again. Close and reopen Playnite to restore the dashboard and start syncing.
+    /// </summary>
+    public static string opted_out_restart_body()
+    {
+        return GetString("opted_out_restart_body");
+    }
+    /// <summary>
     /// Invalid linking token received.
     /// </summary>
     public static string invalid_linking_token()
@@ -814,6 +863,13 @@ public static partial class Loc
     public static string menu_sync_library()
     {
         return GetString("menu_sync_library");
+    }
+    /// <summary>
+    /// Open Dashboard
+    /// </summary>
+    public static string menu_open_dashboard()
+    {
+        return GetString("menu_open_dashboard");
     }
     /// <summary>
     /// Open Settings
@@ -1330,6 +1386,34 @@ public static partial class LocId
     /// </summary>
     public const string opt_back_in_failed = "opt_back_in_failed";
     /// <summary>
+    /// Re-enabling...
+    /// </summary>
+    public const string opt_back_in_requesting = "opt_back_in_requesting";
+    /// <summary>
+    /// An error occurred. Please restart Playnite to try again.
+    /// </summary>
+    public const string opt_back_in_error = "opt_back_in_error";
+    /// <summary>
+    /// Tracking is off
+    /// </summary>
+    public const string opted_out_title = "opted_out_title";
+    /// <summary>
+    /// You opted out of Game Scrobbler. Your Playnite library, sessions, and achievements were deleted from our servers, and this dashboard no longer loads any stats.
+    /// </summary>
+    public const string opted_out_body = "opted_out_body";
+    /// <summary>
+    /// Nothing is being synced. You can opt back in whenever you want.
+    /// </summary>
+    public const string opted_out_hint = "opted_out_hint";
+    /// <summary>
+    /// Restart Playnite to continue
+    /// </summary>
+    public const string opted_out_restart_title = "opted_out_restart_title";
+    /// <summary>
+    /// Game Scrobbler is on again. Close and reopen Playnite to restore the dashboard and start syncing.
+    /// </summary>
+    public const string opted_out_restart_body = "opted_out_restart_body";
+    /// <summary>
     /// Invalid linking token received.
     /// </summary>
     public const string invalid_linking_token = "invalid_linking_token";
@@ -1365,6 +1449,10 @@ public static partial class LocId
     /// Sync Library Now
     /// </summary>
     public const string menu_sync_library = "menu_sync_library";
+    /// <summary>
+    /// Open Dashboard
+    /// </summary>
+    public const string menu_open_dashboard = "menu_open_dashboard";
     /// <summary>
     /// Open Settings
     /// </summary>

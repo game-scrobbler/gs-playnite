@@ -3,18 +3,19 @@ name: Release Highlights
 # Adds an AI-drafted "### Highlights" section to CHANGELOG.md on release-please
 # PRs. The bullets are reviewed (and editable) in the release PR like any other
 # change; update-installer-manifest.ps1 prefers them for the Playnite changelog.
+#
+# Triggered by pushes to the release branch rather than by the pull request, so
+# the job never checks out a pull request head: only accounts with write access
+# can push these branches, and a fork cannot reach the job at all.
 on:
-  pull_request:
-    branches: ["main"]
+  push:
+    branches: ["release-please--**"]
 
 jobs:
   highlights:
-    # Same-repo release-please branches only. Fork PRs never receive secrets on
-    # the pull_request trigger, but this guard stops spoofed-branch-name runs
-    # from even starting.
-    if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.head_ref, 'release-please--')
+    # Deleting a branch also fires push, and delete_branch_on_merge removes the
+    # release branch once its PR merges. There is nothing to check out then.
+    if: ${{ !github.event.deleted }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,9 +23,16 @@ jobs:
       - name: Checkout release PR branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ github.head_ref }}
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      # release-please lists a change twice when a PR whose title reads like one of
+      # its commits lands as a merge commit. PR titles are kept in plain English to
+      # avoid that; this catches any that slip through. It uses the full history
+      # fetched above to keep the PR's own commit rather than the merge commit.
+      - name: Remove duplicate changelog entries
+        shell: pwsh
+        run: ./scripts/remove-duplicate-changelog-entries.ps1
 
       - name: Generate release highlights
         shell: pwsh
@@ -32,12 +40,22 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: ./scripts/generate-release-highlights.ps1
 
-      # The generation script is idempotent (no-op when Highlights already
-      # exist), so the synchronize event triggered by this push does not loop.
-      - name: Commit highlights to release PR
+      # Both scripts are idempotent (no-ops once Highlights exist and nothing is
+      # repeated), so the push this step makes does not start a loop.
+      - name: Commit release notes to release PR
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
-          git diff --cached --quiet || { git commit -m "docs: add release highlights"; git push; }
+          git diff --cached --quiet || { git commit -m "docs: update release notes"; git push; }
+
+      # Generation never fails the job, so this is the alert: a failed API call,
+      # exhausted credit or unusable answer leaves the release without Highlights,
+      # and this step turns that into a failed check on the release PR. It lives
+      # here rather than in a pull_request workflow because that one would also run
+      # on release-please's own push, before this job adds the section, and fail
+      # on every release PR update.
+      - name: Require Highlights
+        shell: pwsh
+        run: ./scripts/assert-release-highlights.ps1
