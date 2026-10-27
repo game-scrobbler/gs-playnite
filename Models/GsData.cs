@@ -344,8 +344,6 @@ namespace GsPlugin.Models {
             private set => _pendingRestartAfterOptIn = value;
         }
 
-        private static volatile bool _pendingRestartAfterOptIn;
-
         /// <summary>
         /// True when tracking, sync, and telemetry must stay off: the user is opted out,
         /// or they opted back in this process and Playnite has not restarted yet.
@@ -378,6 +376,10 @@ namespace GsPlugin.Models {
         // Live event handlers own these durable queue items until their HTTP attempt ends.
         // Claims are process-local: after a crash all persisted items become replayable.
         private static readonly HashSet<PendingScrobble> _claimedScrobbles = new HashSet<PendingScrobble>();
+
+        // Backing field of PendingRestartAfterOptIn; volatile because IsTrackingPaused reads it
+        // without the lock.
+        private static volatile bool _pendingRestartAfterOptIn;
 
         private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
             WriteIndented = true

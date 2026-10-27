@@ -1159,6 +1159,32 @@ namespace GsPlugin.Services {
         }
 
         /// <summary>
+        /// True, after logging <paramref name="skippedMessage"/>, when achievement sync is
+        /// turned off or no achievement provider is installed.
+        /// </summary>
+        private bool AchievementSyncDisabled(string skippedMessage) {
+            if (GsDataManager.Data.SyncAchievements && _achievementHelper.IsInstalled) {
+                return false;
+            }
+
+            _logger.Info(skippedMessage);
+            return true;
+        }
+
+        /// <summary>
+        /// Snapshots Playnite's live game collection, retrying once if Playnite modified it
+        /// mid-enumeration (a metadata download or library import running at the same time).
+        /// </summary>
+        private static List<Playnite.SDK.Models.Game> SnapshotGames(IEnumerable<Playnite.SDK.Models.Game> games) {
+            try {
+                return games.ToList();
+            }
+            catch (InvalidOperationException) {
+                return games.ToList();
+            }
+        }
+
+        /// <summary>
         /// Sends all per-achievement data to v2/achievements/sync-full and writes the achievement snapshot.
         /// </summary>
         /// <param name="playniteDatabaseGames">List of games from Playnite's database</param>
@@ -1170,19 +1196,12 @@ namespace GsPlugin.Services {
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
 
-                if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
-                    _logger.Info("Achievement sync skipped: disabled or no achievement provider installed.");
+                if (AchievementSyncDisabled("Achievement sync skipped: disabled or no achievement provider installed.")) {
                     return SyncLibraryResult.Skipped;
                 }
 
                 _logger.Info("Starting full achievements sync (v4 chunked)");
-                List<Playnite.SDK.Models.Game> allGames;
-                try {
-                    allGames = playniteDatabaseGames.ToList();
-                }
-                catch (InvalidOperationException) {
-                    allGames = playniteDatabaseGames.ToList();
-                }
+                var allGames = SnapshotGames(playniteDatabaseGames);
 
                 var games = await Task.Run(() => {
                     return allGames
@@ -1311,19 +1330,12 @@ namespace GsPlugin.Services {
                 var installId = GsDataManager.Data.InstallID;
                 var generation = GsDataManager.Data.IdentityGeneration;
 
-                if (!GsDataManager.Data.SyncAchievements || !_achievementHelper.IsInstalled) {
-                    _logger.Info("Achievement diff sync skipped: disabled or no achievement provider installed.");
+                if (AchievementSyncDisabled("Achievement diff sync skipped: disabled or no achievement provider installed.")) {
                     return SyncLibraryResult.Skipped;
                 }
 
                 _logger.Info("Starting diff achievements sync (v2)");
-                List<Playnite.SDK.Models.Game> allGames;
-                try {
-                    allGames = playniteDatabaseGames.ToList();
-                }
-                catch (InvalidOperationException) {
-                    allGames = playniteDatabaseGames.ToList();
-                }
+                var allGames = SnapshotGames(playniteDatabaseGames);
 
                 var achievementFingerprints = GsSyncHashIndex.GetAchievementFingerprints();
 
