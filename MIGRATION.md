@@ -180,6 +180,30 @@ Adapted rather than taken as-is:
    `AssemblyResolveDriftTests`), the achievement-provider StyleCop touch-ups, and every edit to the
    deleted XAML locales, `AssemblyInfo.cs`, `extension.yaml` and `packages.config`.
 
+### Next merge from `main`: expected conflicts
+
+The opt-in pause fixes landed on both lines separately (#125 on main; #123 and #126 here), so
+the next merge overlaps them. A trial `git merge-tree --write-tree origin/playnite11 origin/main`
+after both merged (October 27, 2026) conflicts in three files. Run it again first, since main may
+have moved since.
+
+1. **`Models/GsData.cs`: take main's side of the conflict, which is empty.** The conflict block
+   holds this branch's `_pendingRestartAfterOptIn` and `_pauseTransitions` declarations. main
+   declares the same two fields about 60 lines lower (after `jsonOptions`, where `de9a2a2` moved
+   them for SA1201), and those lines merge in without a conflict. Keeping this branch's block
+   therefore declares both fields twice, which fails with CS0102. Before committing, check that
+   each is declared exactly once.
+2. **`Services/GsScrobblingService.cs`: keep this branch's side.** Two scrobble guards use this
+   branch's local `game` where main has `args?.Game`. The third hunk is main's
+   `SyncAchievementsFullAsync`/`SyncAchievementsDiffAsync` and the two helpers `de9a2a2` added
+   for them (`AchievementSyncDisabled`, `SnapshotGames`). Achievement sync stays removed here, so
+   drop all of it. Take main's versions when achievements are switched back on.
+3. **`GsPlugin.Tests/GsScrobblingServiceReliabilityTests.cs`: drop main's achievement-sync
+   tests**, including the two `de9a2a2` added. They exercise methods this branch does not have.
+
+`IsTrackingPaused`, the two transition methods, their test and the CLAUDE.md bullet are already
+identical on both lines, so they merge without changes.
+
 ### Before `playnite11` becomes `main`
 
 - **CodeQL and SonarCloud.** `codeql.yml` and `sonarcloud.yml` came from main unchanged. They
