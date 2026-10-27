@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -189,6 +190,63 @@ namespace GsPlugin.Tests {
                 Assert.Empty(Assert.Single(api.AchievementDiff.changed).achievements);
                 Assert.Equal(0, GsSyncHashIndex.AchievementEntryCount);
             }
+        }
+
+        [Fact]
+        public async Task DisabledAchievementSync_SkipsFullAndDiffWithoutUploading() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                GsDataManager.MutateAndSave(d => d.SyncAchievements = false);
+                var api = new FakeApi();
+                var service = Service(api);
+
+                Assert.Equal(SyncLibraryResult.Skipped, await service.SyncAchievementsFullAsync(new[] { Game() }));
+                Assert.Equal(SyncLibraryResult.Skipped, await service.SyncAchievementsDiffAsync(new[] { Game() }));
+                Assert.Equal(0, api.AchievementUploads);
+            }
+        }
+
+        /// <summary>
+        /// Playnite can modify its game collection while a sync enumerates it (a metadata
+        /// download or library import running at the same time). The snapshot retries once
+        /// instead of failing the sync.
+        /// </summary>
+        [Fact]
+        public async Task AchievementDiff_RetriesTheSnapshotWhenTheCollectionChangesMidEnumeration() {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                var game = Game();
+                GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { [game.Id.ToString()] = "old-item" });
+                GsDataManager.MutateAndSave(d => d.LastAchievementHash = "old-global");
+                var api = new FakeApi();
+                var games = new ModifiedOnFirstEnumeration(game);
+
+                var result = await Service(api).SyncAchievementsDiffAsync(games);
+
+                Assert.Equal(SyncLibraryResult.Success, result);
+                Assert.Equal(2, games.Enumerations);
+                Assert.Single(api.AchievementDiff.changed);
+            }
+        }
+
+        /// <summary>Throws "collection was modified" on the first enumeration only.</summary>
+        private sealed class ModifiedOnFirstEnumeration : IEnumerable<Game> {
+            private readonly Game[] _games;
+
+            public ModifiedOnFirstEnumeration(params Game[] games) {
+                _games = games;
+            }
+
+            public int Enumerations { get; private set; }
+
+            public IEnumerator<Game> GetEnumerator() {
+                Enumerations++;
+                if (Enumerations == 1) {
+                    throw new InvalidOperationException("Collection was modified; enumeration operation may not execute.");
+                }
+
+                return ((IEnumerable<Game>)_games).GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
         /// <summary>

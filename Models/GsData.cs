@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using GsPlugin.Api;
 using GsPlugin.Infrastructure;
 using Sentry;
@@ -337,14 +338,30 @@ namespace GsPlugin.Models {
         /// off until restart, so the dashboard keeps showing the restart panel instead
         /// of trying to load a hub with no install token. Process-local: not persisted,
         /// and cleared when <see cref="Initialize"/> runs in a new session.
+        /// Volatile because <see cref="IsTrackingPaused"/> reads it without the lock.
         /// </summary>
-        public static bool PendingRestartAfterOptIn { get; private set; }
+        public static bool PendingRestartAfterOptIn {
+            get => _pendingRestartAfterOptIn;
+            private set => _pendingRestartAfterOptIn = value;
+        }
 
         /// <summary>
         /// True when tracking, sync, and telemetry must stay off: the user is opted out,
         /// or they opted back in this process and Playnite has not restarted yet.
         /// </summary>
-        public static bool IsTrackingPaused => IsOptedOut || PendingRestartAfterOptIn;
+        public static bool IsTrackingPaused {
+            get {
+                // The two flags are read without the lock, so a read that overlaps an opt-in
+                // rollback or an opt-out can take OptedOut from before the change and
+                // PendingRestartAfterOptIn from after it, and see neither set although one always
+                // was. Both changes end paused, so report paused while one is in progress or if
+                // one completed during this read.
+                int before = Volatile.Read(ref _pauseTransitions);
+                bool paused = IsOptedOut || PendingRestartAfterOptIn;
+                Thread.MemoryBarrier();
+                return paused || (before & 1) != 0 || before != Volatile.Read(ref _pauseTransitions);
+            }
+        }
 
         /// <summary>
         /// Manually fires DiagnosticsStateChanged for callers that modify
@@ -376,6 +393,15 @@ namespace GsPlugin.Models {
         private static readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions {
             WriteIndented = true
         };
+
+        // Backing field of PendingRestartAfterOptIn; volatile because IsTrackingPaused reads it
+        // without the lock.
+        private static volatile bool _pendingRestartAfterOptIn;
+
+        // Odd while PerformOptIn or PerformOptOut is changing OptedOut and
+        // PendingRestartAfterOptIn. Written only with Interlocked and read only with
+        // Volatile.Read, because IsTrackingPaused reads it without the lock.
+        private static int _pauseTransitions;
 
         /// <summary>
         /// Initializes the custom data manager.
@@ -796,20 +822,38 @@ namespace GsPlugin.Models {
         public static bool IsOptedOut => _data?.OptedOut == true;
 
         /// <summary>
+        /// Brackets a change to OptedOut and PendingRestartAfterOptIn so that
+        /// <see cref="IsTrackingPaused"/> reports paused until the change completes. Call both
+        /// under the lock, with <see cref="EndPauseTransition"/> in a finally: a missed end
+        /// leaves tracking paused for the rest of the process. Internal for tests.
+        /// </summary>
+        internal static void BeginPauseTransition() => Interlocked.Increment(ref _pauseTransitions);
+
+        internal static void EndPauseTransition() => Interlocked.Increment(ref _pauseTransitions);
+
+        /// <summary>
         /// Transitions the plugin to the opted-out state: sets OptedOut flag,
         /// clears all session/sync/linking state, and persists to disk. Thread-safe.
         /// </summary>
         public static void PerformOptOut() {
             lock (_lock) {
-                _data.OptedOut = true;
-                _data.IdentityGeneration++;
+                // Bracketed like PerformOptIn: after an opt-in in this session, opting out
+                // changes both flags.
+                BeginPauseTransition();
+                try {
+                    _data.OptedOut = true;
+                    _data.IdentityGeneration++;
 
-                // Token is invalidated server-side on opt-out, so clear it too.
-                _data.ClearIdentityBoundState(IdentityClearScope.InstallToken);
-                SaveInternal(durable: true);
+                    // Token is invalidated server-side on opt-out, so clear it too.
+                    _data.ClearIdentityBoundState(IdentityClearScope.InstallToken);
+                    SaveInternal(durable: true);
+                    PendingRestartAfterOptIn = false;
+                }
+                finally {
+                    EndPauseTransition();
+                }
             }
 
-            PendingRestartAfterOptIn = false;
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
         }
 
@@ -824,14 +868,24 @@ namespace GsPlugin.Models {
         /// </returns>
         public static bool PerformOptIn() {
             lock (_lock) {
-                _data.OptedOut = false;
-                if (!SaveInternal(durable: true)) {
-                    _data.OptedOut = true;
-                    return false;
+                // IsTrackingPaused reads both flags without the lock. Raising the pause before
+                // clearing OptedOut covers the change itself, but the rollback has to write them
+                // in the opposite order, so no write order covers both. The bracket does.
+                BeginPauseTransition();
+                try {
+                    PendingRestartAfterOptIn = true;
+                    _data.OptedOut = false;
+                    if (!SaveInternal(durable: true)) {
+                        _data.OptedOut = true;
+                        PendingRestartAfterOptIn = false;
+                        return false;
+                    }
+                }
+                finally {
+                    EndPauseTransition();
                 }
             }
 
-            PendingRestartAfterOptIn = true;
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
             return true;
         }
