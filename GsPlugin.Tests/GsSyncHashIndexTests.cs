@@ -121,8 +121,11 @@ namespace GsPlugin.Tests {
             }
         }
 
-        [Fact]
-        public void Persistence_MigratesLegacyCombinedSnapshot() {
+        [Theory]
+        [InlineData(null)]
+        [InlineData("gs_library_hashes.json")]
+        [InlineData("gs_achievement_hashes.json")]
+        public void Persistence_MigratesLegacyCombinedSnapshot(string blockedCompactFile) {
             using (var temp = TempPluginDir.Create()) {
                 // The snapshot's generation must match the current install identity or the
                 // migration is (correctly) discarded. Read the current generation rather than
@@ -159,8 +162,23 @@ namespace GsPlugin.Tests {
                 };
                 var legacyPath = Path.Combine(temp.Path, "gs_snapshot.json");
                 File.WriteAllText(legacyPath, System.Text.Json.JsonSerializer.Serialize(legacy));
+                var blockedTempPath = blockedCompactFile == null
+                    ? null
+                    : Path.Combine(temp.Path, blockedCompactFile) + ".tmp";
+                if (blockedTempPath != null) {
+                    // A directory at the atomic writer's temp path fails the write without
+                    // depending on the timing of a real file lock or antivirus scan.
+                    Directory.CreateDirectory(blockedTempPath);
+                }
 
                 GsSyncHashIndex.Initialize(temp.Path);
+
+                if (blockedTempPath != null) {
+                    Assert.True(File.Exists(legacyPath),
+                        "A failed compact write must retain the durable migration source.");
+                    Directory.Delete(blockedTempPath);
+                    GsSyncHashIndex.Initialize(temp.Path);
+                }
 
                 Assert.True(GsSyncHashIndex.HasLibraryBaseline);
                 Assert.True(GsSyncHashIndex.HasAchievementsBaseline);
@@ -170,6 +188,7 @@ namespace GsPlugin.Tests {
                 Assert.Equal(expectedAch, GsSyncHashIndex.GetAchievementFingerprints()["legacy-game"]);
                 Assert.True(File.Exists(Path.Combine(temp.Path, "gs_library_hashes.json")));
                 Assert.True(File.Exists(Path.Combine(temp.Path, "gs_achievement_hashes.json")));
+                Assert.False(File.Exists(legacyPath));
             }
         }
 

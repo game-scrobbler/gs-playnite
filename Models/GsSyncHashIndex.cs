@@ -115,18 +115,13 @@ namespace GsPlugin.Models {
                     achNeedsSave = true;
                 }
 
-                if (libNeedsSave) {
-                    _library.Save();
-                }
-
-                if (achNeedsSave) {
-                    _achievements.Save();
-                }
+                var librarySaved = !libNeedsSave || _library.Save();
+                var achievementsSaved = !achNeedsSave || _achievements.Save();
 
                 // Delete the legacy fat snapshot only after BOTH halves have been read and the
-                // compact indexes persisted — otherwise migrating the library half could destroy
+                // compact indexes successfully persisted, otherwise migrating the library half could destroy
                 // the combined file the achievements half still needs to read.
-                if (libMigrated || achMigrated) {
+                if ((libMigrated || achMigrated) && librarySaved && achievementsSaved) {
                     GsAtomicFile.TryDelete(_legacyCombinedPath);
                 }
             }
