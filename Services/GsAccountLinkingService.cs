@@ -423,7 +423,10 @@ namespace GsPlugin.Services {
                         return IdentityChangedResult(LinkingContext.ManualSettings);
                     }
 
-                    GsSyncHashIndex.Reset();
+                    if (!GsSyncHashIndex.Reset()) {
+                        GsLogger.Warn("Hash index reset was incomplete after unlink; a stale baseline may remain on disk until a later retry.");
+                    }
+
                     OnLinkingStatusChanged();
 
                     // Refresh diagnostics widgets (pending scrobble count, last-sync text)

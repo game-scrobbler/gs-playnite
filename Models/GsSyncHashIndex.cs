@@ -93,6 +93,35 @@ namespace GsPlugin.Models {
         }
 
         public static void Initialize(string folderPath) {
+            var data = GsDataManager.DataOrNull;
+            var libPending = data?.LibraryBaselineInvalidationPending == true;
+            var achPending = data?.AchievementBaselineInvalidationPending == true;
+            var libInvalidationDone = false;
+            var achInvalidationDone = false;
+
+            InitializeLocked(folderPath, libPending, achPending, ref libInvalidationDone, ref achInvalidationDone);
+
+            // Outside the index lock: GsDataManager takes its own lock, and sync commits take the
+            // data lock before this one, so taking it from inside would invert the order.
+            if (libInvalidationDone || achInvalidationDone) {
+                GsDataManager.MutateAndSave(d => {
+                    if (libInvalidationDone) {
+                        d.LibraryBaselineInvalidationPending = false;
+                    }
+
+                    if (achInvalidationDone) {
+                        d.AchievementBaselineInvalidationPending = false;
+                    }
+                });
+            }
+        }
+
+        private static void InitializeLocked(
+            string folderPath,
+            bool libPending,
+            bool achPending,
+            ref bool libInvalidationDone,
+            ref bool achInvalidationDone) {
             lock (_lock) {
                 _legacyCombinedPath = Path.Combine(folderPath, LegacyCombinedFileName);
                 _library.SetLocation(folderPath);
@@ -107,12 +136,24 @@ namespace GsPlugin.Models {
 
                 var currentGeneration = GsDataManager.DataOrNull?.IdentityGeneration ?? 0;
 
+                // Finish an invalidation a previous session could not complete (see InvalidateHalf).
+                // The half starts empty whether or not the delete succeeds now, so a baseline the
+                // server has moved past is never served; the flag is cleared below once the files
+                // are gone.
+                if (libPending) {
+                    libInvalidationDone = FinishPendingInvalidation(_library);
+                }
+
+                if (achPending) {
+                    achInvalidationDone = FinishPendingInvalidation(_achievements);
+                }
+
                 // Read/derive both halves first (no writes, no deletes) so the generation check
                 // below runs against the *loaded* generation: the compact file save re-stamps
                 // it to the current generation, so discarding a stale-identity baseline has to
                 // happen before that save, not after.
-                var libLoaded = _library.TryLoadCompact();
-                var achLoaded = _achievements.TryLoadCompact();
+                var libLoaded = !libPending && _library.TryLoadCompact();
+                var achLoaded = !achPending && _achievements.TryLoadCompact();
 
                 // Parse the legacy snapshot at most once, and only when a half still needs it. The
                 // fat file is the multi-megabyte OOM class the compact index exists to avoid, so
@@ -120,7 +161,7 @@ namespace GsPlugin.Models {
                 // the file is unreadable (corrupt or transiently locked).
                 var legacyExists = File.Exists(_legacyCombinedPath);
                 GsSnapshot legacy = null;
-                if (legacyExists && (!libLoaded || !achLoaded)) {
+                if (legacyExists && ((!libLoaded && !libPending) || (!achLoaded && !achPending))) {
                     legacy = GsAtomicFile.LoadJson<GsSnapshot>(_legacyCombinedPath, _legacyJsonOptions);
                 }
 
@@ -129,8 +170,14 @@ namespace GsPlugin.Models {
                 // its index ends up non-null. A compact file that exists but is unreadable is
                 // replaced by the legacy-derived baseline: it could be a transient lock rather than
                 // corruption, and the worst case is the same older-baseline redundancy noted below.
-                var libLegacy = libLoaded ? (GsLegacyHalfResult?)null : _library.MigrateFromLegacy(legacy);
-                var achLegacy = achLoaded ? (GsLegacyHalfResult?)null : _achievements.MigrateFromLegacy(legacy);
+                // A half with a pending invalidation counts as having nothing in the legacy file:
+                // that data is the outdated baseline being dropped.
+                var libLegacy = libPending
+                    ? GsLegacyHalfResult.Absent
+                    : libLoaded ? (GsLegacyHalfResult?)null : _library.MigrateFromLegacy(legacy);
+                var achLegacy = achPending
+                    ? GsLegacyHalfResult.Absent
+                    : achLoaded ? (GsLegacyHalfResult?)null : _achievements.MigrateFromLegacy(legacy);
 
                 var libNeedsSave = PrepareHalfForSave(_library, libLoaded, libLegacy, currentGeneration);
                 var achNeedsSave = PrepareHalfForSave(_achievements, achLoaded, achLegacy, currentGeneration);
@@ -332,7 +379,7 @@ namespace GsPlugin.Models {
         /// record it. See <see cref="InvalidateHalf"/>.
         /// </summary>
         public static bool InvalidateLibraryBaseline() {
-            return InvalidateHalf(_library);
+            return InvalidateHalf(_library, d => d.LibraryBaselineInvalidationPending = true);
         }
 
         /// <summary>
@@ -340,7 +387,7 @@ namespace GsPlugin.Models {
         /// not record it. See <see cref="InvalidateHalf"/>.
         /// </summary>
         public static bool InvalidateAchievementBaseline() {
-            return InvalidateHalf(_achievements);
+            return InvalidateHalf(_achievements, d => d.AchievementBaselineInvalidationPending = true);
         }
 
         /// <summary>
@@ -352,18 +399,50 @@ namespace GsPlugin.Models {
         /// The legacy snapshot goes too, because it would re-derive the same outdated baseline on
         /// the next launch. That also drops the other half's legacy fallback, which costs at most
         /// one extra full upload for that half and only after two failed index writes.
-        /// Returns true when nothing that could restore an outdated baseline is left on disk.
+        /// Returns true when nothing that could restore an outdated baseline is left on disk. When
+        /// something is, the half is marked pending in <see cref="GsData"/> so the next
+        /// <see cref="Initialize"/> drops it instead of loading it.
         /// </summary>
-        private static bool InvalidateHalf(GsHashIndexStore store) {
+        private static bool InvalidateHalf(GsHashIndexStore store, Action<GsData> markPending) {
+            bool gone;
             lock (_lock) {
-                var halfGone = store.Invalidate();
-                var legacyGone = GsAtomicFile.TryDeleteWithTemp(_legacyCombinedPath);
-                if (!halfGone || !legacyGone) {
-                    GsLogger.Warn("[GsSyncHashIndex] Could not remove an outdated baseline from disk; the next launch may diff against it.");
-                }
-
-                return halfGone && legacyGone;
+                gone = DeleteOutdatedBaseline(store, inMemoryToo: true);
             }
+
+            if (!gone && GsDataManager.DataOrNull != null) {
+                // A lock that blocked the index save can block these deletes too. Record that the
+                // half still has to be dropped, in gs_data.json (a different file), so the next
+                // Initialize finishes the job instead of loading the outdated baseline. Done
+                // outside the index lock; callers must not hold the data lock (CommitSyncBaselineAsync
+                // calls this after TryMutateIfActiveIdentity returns).
+                GsLogger.Warn("[GsSyncHashIndex] Could not remove an outdated baseline from disk; the next Initialize will drop it.");
+                GsDataManager.MutateAndSave(markPending);
+            }
+
+            return gone;
+        }
+
+        /// <summary>
+        /// Retries a pending invalidation at startup. Returns true once nothing outdated is left
+        /// on disk, which lets the caller clear the pending flag.
+        /// </summary>
+        private static bool FinishPendingInvalidation(GsHashIndexStore store) {
+            var gone = DeleteOutdatedBaseline(store, inMemoryToo: false);
+            if (!gone) {
+                GsLogger.Warn("[GsSyncHashIndex] Pending baseline invalidation still blocked; the half starts empty and the delete is retried next launch.");
+            }
+
+            return gone;
+        }
+
+        /// <summary>
+        /// Deletes one half's file and the legacy snapshot, each with its <c>.tmp</c>. Both deletes
+        /// always run. Caller holds <see cref="_lock"/>.
+        /// </summary>
+        private static bool DeleteOutdatedBaseline(GsHashIndexStore store, bool inMemoryToo) {
+            var halfGone = inMemoryToo ? store.Invalidate() : store.DeleteFile();
+            var legacyGone = GsAtomicFile.TryDeleteWithTemp(_legacyCombinedPath);
+            return halfGone && legacyGone;
         }
     }
 }

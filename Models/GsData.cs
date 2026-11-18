@@ -110,6 +110,15 @@ namespace GsPlugin.Models {
         // UTC time until which the server has asked us not to send library diffs.
         public DateTime? LibraryDiffSyncCooldownExpiresAt { get; set; } = null;
 
+        // Set when the server accepted a sync whose index write failed and the outdated baseline
+        // could not be deleted either (GsSyncHashIndex.InvalidateLibraryBaseline). The next
+        // GsSyncHashIndex.Initialize treats the half as empty, retries the delete, and clears the
+        // flag once nothing outdated is left; a successful baseline commit also clears it.
+        public bool LibraryBaselineInvalidationPending { get; set; } = false;
+
+        // Achievements twin of LibraryBaselineInvalidationPending.
+        public bool AchievementBaselineInvalidationPending { get; set; } = false;
+
         // Hash of last-synced integration accounts (e.g. Steam UserId).
         // Forces a sync when a user links/switches accounts even if the library is unchanged.
         public string LastIntegrationAccountsHash { get; set; } = null;
@@ -965,7 +974,10 @@ namespace GsPlugin.Models {
             }
 
             // Reset hash index outside the data lock (each manager has its own lock).
-            GsSyncHashIndex.Reset();
+            if (!GsSyncHashIndex.Reset()) {
+                GsLogger.Warn("Hash index reset was incomplete after InstallID rotation; a stale baseline may remain on disk until a later retry.");
+            }
+
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
             return newId;
         }

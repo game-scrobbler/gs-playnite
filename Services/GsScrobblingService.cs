@@ -979,6 +979,7 @@ namespace GsPlugin.Services {
                             d.LastLibraryHash = libraryHash;
                             d.LastIntegrationAccountsHash = accountsHash;
                             d.SyncCooldownExpiresAt = null;
+                            d.LibraryBaselineInvalidationPending = false;
                         },
                         queuedDetail: $"{libCount} games");
                 }
@@ -1158,6 +1159,7 @@ namespace GsPlugin.Services {
                             d.LastLibraryHash = libraryHash;
                             d.LastIntegrationAccountsHash = accountsHash;
                             d.LibraryDiffSyncCooldownExpiresAt = null;
+                            d.LibraryBaselineInvalidationPending = false;
                         });
                 }
 
@@ -1316,7 +1318,10 @@ namespace GsPlugin.Services {
                         response.queueId, installId, generation,
                         () => GsSyncHashIndex.ReplaceAchievementIndex(BuildAchievementFingerprints(games)),
                         GsSyncHashIndex.InvalidateAchievementBaseline,
-                        d => d.LastAchievementHash = achHash);
+                        d => {
+                            d.LastAchievementHash = achHash;
+                            d.AchievementBaselineInvalidationPending = false;
+                        });
                 }
 
                 _logger.Error($"Unexpected response from full achievements sync: status={response.status}");
@@ -1552,7 +1557,10 @@ namespace GsPlugin.Services {
                         response.queueId, installId, generation,
                         () => GsSyncHashIndex.ApplyAchievementDiff(upsertedFingerprints, allCleared),
                         GsSyncHashIndex.InvalidateAchievementBaseline,
-                        d => d.LastAchievementHash = resultAchievementHash);
+                        d => {
+                            d.LastAchievementHash = resultAchievementHash;
+                            d.AchievementBaselineInvalidationPending = false;
+                        });
                 }
 
                 _logger.Error($"Unexpected response from achievements diff sync: status={response.status}");

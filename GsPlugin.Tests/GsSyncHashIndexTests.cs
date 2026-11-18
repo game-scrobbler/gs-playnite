@@ -424,6 +424,58 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void InvalidateLibraryBaseline_WhenTheFileIsLocked_DefersTheDropToTheNextLaunch() {
+            // Pins: a lock that blocks the delete is recorded in gs_data.json, so the next
+            // Initialize starts the half empty instead of loading the outdated baseline, retries
+            // the delete, and clears the flag only once the file is gone.
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                Assert.True(GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> { { "game1", "lib-fp" } }));
+                Assert.True(GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { { "game1", "ach-fp" } }));
+                var libraryPath = Path.Combine(temp.Path, LibraryFile);
+
+                using (new FileStream(libraryPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                    Assert.False(GsSyncHashIndex.InvalidateLibraryBaseline());
+                    Assert.True(GsDataManager.Data.LibraryBaselineInvalidationPending);
+                    Assert.False(GsSyncHashIndex.HasLibraryBaseline);
+
+                    // Still locked at the next launch: the half starts empty and the flag stays.
+                    GsSyncHashIndex.Initialize(temp.Path);
+                    Assert.False(GsSyncHashIndex.HasLibraryBaseline);
+                    Assert.True(File.Exists(libraryPath));
+                    Assert.True(GsDataManager.Data.LibraryBaselineInvalidationPending);
+                }
+
+                GsSyncHashIndex.Initialize(temp.Path);
+
+                Assert.False(GsSyncHashIndex.HasLibraryBaseline);
+                Assert.False(File.Exists(libraryPath));
+                Assert.False(GsDataManager.Data.LibraryBaselineInvalidationPending);
+                Assert.Equal("ach-fp", GsSyncHashIndex.GetAchievementFingerprints()["game1"]);
+            }
+        }
+
+        [Fact]
+        public void Initialize_PendingInvalidation_DropsTheCompactFileAndLegacyAndClearsTheFlag() {
+            // Pins: a pending flag from an earlier session drops that half's compact file and the
+            // legacy snapshot (which would re-derive it) and leaves the other half alone.
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                Assert.True(GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> { { "game1", "lib-fp" } }));
+                Assert.True(GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { { "game1", "ach-fp" } }));
+                var legacyPath = WriteLegacySnapshot(temp.Path, BuildLegacySnapshot(CurrentGeneration()));
+                GsDataManager.MutateAndSave(d => d.LibraryBaselineInvalidationPending = true);
+
+                GsSyncHashIndex.Initialize(temp.Path);
+
+                Assert.False(GsSyncHashIndex.HasLibraryBaseline);
+                Assert.False(File.Exists(Path.Combine(temp.Path, LibraryFile)));
+                Assert.False(File.Exists(legacyPath));
+                Assert.False(GsDataManager.Data.LibraryBaselineInvalidationPending);
+                Assert.True(GsSyncHashIndex.HasAchievementsBaseline);
+                Assert.Equal("ach-fp", GsSyncHashIndex.GetAchievementFingerprints()["game1"]);
+            }
+        }
+
+        [Fact]
         public void Initialize_UnreadableCompactFile_FallsBackToLegacyForThatHalf() {
             // Pins: a compact file that exists but does not parse counts as missing, so that half
             // migrates from the legacy snapshot and the unreadable file is overwritten, while the

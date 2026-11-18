@@ -424,7 +424,10 @@ namespace GsPlugin.Models {
                     GsDataManager.PerformOptOut();
                     GsSentry.ApplyPreferences();
                     GsPostHog.ApplyPreferences();
-                    GsSyncHashIndex.ClearAll();
+                    if (!GsSyncHashIndex.ClearAll()) {
+                        GsLogger.Warn("Data deletion: hash index wipe was incomplete; a legacy snapshot or compact index file may remain on disk until a later retry.");
+                    }
+
                     Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteSuccess", "Your data has been deleted. The plugin is now disabled.");
 
                     // Notify UI to refresh connection status and button visibility
@@ -437,7 +440,10 @@ namespace GsPlugin.Models {
                     GsDataManager.PerformOptOut();
                     GsSentry.ApplyPreferences();
                     GsPostHog.ApplyPreferences();
-                    GsSyncHashIndex.ClearAll();
+                    if (!GsSyncHashIndex.ClearAll()) {
+                        GsLogger.Warn("Data deletion: hash index wipe was incomplete; a legacy snapshot or compact index file may remain on disk until a later retry.");
+                    }
+
                     Settings.DeleteStatusMessage = GsLocalization.Get("LOCGsPluginDeleteAlreadyDone",
                         "Your data has already been deleted. The plugin is now disabled.");
                     OnLinkingStatusChanged();
