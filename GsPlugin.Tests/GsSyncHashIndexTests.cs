@@ -175,8 +175,7 @@ namespace GsPlugin.Tests {
                 var heldTempPath = Path.Combine(temp.Path, heldCompactFile) + ".tmp";
                 var otherCompactFile = heldCompactFile == LibraryFile ? AchievementFile : LibraryFile;
 
-                var held = new FileStream(heldTempPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
-                try {
+                using (new FileStream(heldTempPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None)) {
                     GsSyncHashIndex.Initialize(temp.Path);
 
                     Assert.True(File.Exists(legacyPath),
@@ -184,9 +183,6 @@ namespace GsPlugin.Tests {
                     Assert.True(File.Exists(Path.Combine(temp.Path, otherCompactFile)));
                     Assert.False(File.Exists(Path.Combine(temp.Path, heldCompactFile)));
                     AssertLegacyBaselinesServed(legacy);
-                }
-                finally {
-                    held.Dispose();
                 }
 
                 // Drop the empty temp file the held handle created so the second Initialize
