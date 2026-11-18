@@ -64,7 +64,7 @@ namespace GsPlugin.Models {
 
         /// <summary>
         /// Recovers a crash-interrupted write of this half's file. Must run before
-        /// <see cref="LoadOrMigrate"/> so an upgrade after a crash between temp-write and rename
+        /// <see cref="TryLoadCompact"/> so an upgrade after a crash between temp-write and rename
         /// does not silently lose a baseline and force a full re-upload.
         /// </summary>
         public void RecoverTemp() {
@@ -72,22 +72,43 @@ namespace GsPlugin.Models {
         }
 
         /// <summary>
-        /// Loads this half from its compact file, or derives it once from the legacy fat combined
-        /// snapshot (<c>gs_snapshot.json</c>, the only format any shipped build wrote). Never
-        /// writes or deletes: the caller persists and clears the legacy file after the generation
-        /// check. Returns whether the index came from a migration.
+        /// Loads this half from its compact file. Returns true only when the file exists and
+        /// parsed. Otherwise <c>_index</c> is left null and the caller must follow up with
+        /// <see cref="MigrateFromLegacy"/>, which is what makes the index non-null again. Never
+        /// writes or deletes.
         /// </summary>
-        public bool LoadOrMigrate(string legacyCombinedPath) {
-            if (File.Exists(_filePath)) {
-                _index = GsAtomicFile.LoadJson<GsSyncHashIndexFile>(_filePath, jsonOptions)
-                    ?? new GsSyncHashIndexFile();
-                return false;
+        public bool TryLoadCompact() {
+            var exists = File.Exists(_filePath);
+            var loaded = exists
+                ? GsAtomicFile.LoadJson<GsSyncHashIndexFile>(_filePath, jsonOptions)
+                : null;
+            if (loaded != null) {
+                _index = loaded;
+                return true;
             }
 
-            if (File.Exists(legacyCombinedPath)) {
+            _index = null;
+            if (exists) {
+                // LoadJson already logged the parse error itself.
+                GsLogger.Warn($"[GsSyncHashIndex] {_label} index file is unreadable; this half will fall back to the legacy snapshot if one exists");
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Derives this half once from an already parsed legacy fat combined snapshot
+        /// (<c>gs_snapshot.json</c>, the only format any shipped build wrote), or starts empty when
+        /// the snapshot is missing or carries nothing for this half. Always leaves a non-null
+        /// index. Never writes or deletes: the caller persists and clears the legacy file after
+        /// the generation check. Takes the parsed snapshot rather than a path because the facade
+        /// parses the multi-megabyte file at most once for both halves. Returns whether the index
+        /// came from a migration.
+        /// </summary>
+        public bool MigrateFromLegacy(GsSnapshot legacy) {
+            if (legacy != null) {
                 try {
-                    var legacy = GsAtomicFile.LoadJson<GsSnapshot>(legacyCombinedPath, jsonOptions);
-                    var derived = legacy == null ? null : _fromLegacySnapshot(legacy);
+                    var derived = _fromLegacySnapshot(legacy);
                     if (derived != null) {
                         GsLogger.Info($"[GsSyncHashIndex] Migrating {_legacyHalfLabel} half of gs_snapshot.json");
                         _index = derived;
