@@ -321,6 +321,24 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void ClearAll_DeletesLeftoverLegacyTempFile() {
+            // Pins: a stale gs_snapshot.json.tmp left by an interrupted promotion must not
+            // survive ClearAll, or the next launch's RecoverTemp would resurrect the wiped data.
+            using (var temp = TempPluginDir.Create()) {
+                var legacy = BuildLegacySnapshot(CurrentGeneration());
+                var legacyPath = WriteLegacySnapshot(temp.Path, legacy);
+                var legacyTempPath = legacyPath + ".tmp";
+                File.WriteAllText(legacyTempPath, System.Text.Json.JsonSerializer.Serialize(legacy));
+
+                GsSyncHashIndex.Initialize(temp.Path);
+                Assert.True(GsSyncHashIndex.ClearAll());
+
+                Assert.False(File.Exists(legacyPath));
+                Assert.False(File.Exists(legacyTempPath));
+            }
+        }
+
+        [Fact]
         public void Initialize_UnreadableCompactFile_FallsBackToLegacyForThatHalf() {
             // Pins: a compact file that exists but does not parse counts as missing, so that half
             // migrates from the legacy snapshot and the unreadable file is overwritten, while the

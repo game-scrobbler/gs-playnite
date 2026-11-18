@@ -299,6 +299,11 @@ namespace GsPlugin.Models {
 
                 if (!string.IsNullOrEmpty(_legacyCombinedPath)) {
                     GsAtomicFile.TryDelete(_legacyCombinedPath);
+
+                    // A stale .tmp left by an interrupted promotion (or a crash before this
+                    // final file existed) would otherwise survive a wipe and get promoted back
+                    // on the next launch, resurrecting the data the user asked to clear.
+                    GsAtomicFile.TryDelete(_legacyCombinedPath + ".tmp");
                 }
 
                 return libSaved && achSaved;
