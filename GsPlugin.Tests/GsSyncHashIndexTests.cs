@@ -339,6 +339,91 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void ClearAll_DeletesStaleCompactTempWhenResetSaveFails() {
+            // Pins: when the reset save fails, the stale compact .tmp (holding the old baseline)
+            // is deleted with the final file, so the next launch cannot promote it back.
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
+                Assert.True(GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> {
+                    { "game1", "old-fp" }
+                }));
+                var libraryPath = Path.Combine(temp.Path, LibraryFile);
+                var libraryTempPath = libraryPath + ".tmp";
+                File.Copy(libraryPath, libraryTempPath);
+
+                // Allows deletion but not the writer's exclusive open, so the reset save fails
+                // with a sharing violation while the delete still goes through.
+                using (new FileStream(libraryTempPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete)) {
+                    Assert.False(GsSyncHashIndex.ClearAll());
+                }
+
+                Assert.False(File.Exists(libraryTempPath));
+                Assert.False(File.Exists(libraryPath));
+                GsSyncHashIndex.Initialize(temp.Path);
+                Assert.False(GsSyncHashIndex.HasLibraryBaseline);
+            }
+        }
+
+        [Fact]
+        public void ClearAll_ReportsFailureWhenLegacyFileCannotBeDeleted() {
+            // Pins: a wipe that leaves the legacy snapshot on disk reports false even though both
+            // compact saves succeeded.
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
+                var legacyPath = WriteLegacySnapshot(temp.Path, BuildLegacySnapshot(CurrentGeneration()));
+                using (new FileStream(legacyPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                    Assert.False(GsSyncHashIndex.ClearAll());
+                    Assert.True(File.Exists(legacyPath));
+                }
+
+                Assert.True(GsSyncHashIndex.ClearAll());
+                Assert.False(File.Exists(legacyPath));
+            }
+        }
+
+        [Fact]
+        public void Initialize_DeletesStaleLegacyTempWithTheLegacyFile() {
+            // Pins: RecoverTemp leaves a .tmp alone when the final file exists, so cleanup removes
+            // it together with the legacy file instead of letting the next launch promote it.
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
+                Assert.True(GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> { { "game1", "lib-fp" } }));
+                Assert.True(GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { { "game1", "ach-fp" } }));
+                var legacy = BuildLegacySnapshot(CurrentGeneration());
+                var legacyPath = WriteLegacySnapshot(temp.Path, legacy);
+                File.WriteAllText(legacyPath + ".tmp", System.Text.Json.JsonSerializer.Serialize(legacy));
+
+                GsSyncHashIndex.Initialize(temp.Path);
+
+                Assert.False(File.Exists(legacyPath));
+                Assert.False(File.Exists(legacyPath + ".tmp"));
+                Assert.Equal("lib-fp", GsSyncHashIndex.GetLibraryFingerprints()["game1"]);
+            }
+        }
+
+        [Fact]
+        public void InvalidateLibraryBaseline_DropsTheBaselineItsFileAndTheLegacySnapshot() {
+            // Pins: invalidation leaves nothing that could restore an outdated library baseline,
+            // in memory or after a restart, and does not touch the achievements half.
+            using (var temp = TempPluginDir.CreateWithHashIndex()) {
+                Assert.True(GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> { { "game1", "lib-fp" } }));
+                Assert.True(GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { { "game1", "ach-fp" } }));
+                var legacyPath = WriteLegacySnapshot(temp.Path, BuildLegacySnapshot(CurrentGeneration()));
+
+                Assert.True(GsSyncHashIndex.InvalidateLibraryBaseline());
+
+                Assert.False(GsSyncHashIndex.HasLibraryBaseline);
+                Assert.Equal(0, GsSyncHashIndex.LibraryEntryCount);
+                Assert.False(File.Exists(Path.Combine(temp.Path, LibraryFile)));
+                Assert.False(File.Exists(legacyPath));
+                Assert.True(GsSyncHashIndex.HasAchievementsBaseline);
+
+                GsSyncHashIndex.Initialize(temp.Path);
+
+                Assert.False(GsSyncHashIndex.HasLibraryBaseline);
+                Assert.True(GsSyncHashIndex.HasAchievementsBaseline);
+                Assert.Equal("ach-fp", GsSyncHashIndex.GetAchievementFingerprints()["game1"]);
+            }
+        }
+
+        [Fact]
         public void Initialize_UnreadableCompactFile_FallsBackToLegacyForThatHalf() {
             // Pins: a compact file that exists but does not parse counts as missing, so that half
             // migrates from the legacy snapshot and the unreadable file is overwritten, while the

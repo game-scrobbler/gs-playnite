@@ -160,7 +160,10 @@ namespace GsPlugin.Models {
                 // write, instead of lingering forever because nothing is left to migrate.
                 if (legacyExists) {
                     if (librarySafe && achievementsSafe) {
-                        GsAtomicFile.TryDelete(_legacyCombinedPath);
+                        // RecoverTemp only promoted a .tmp when the final file was missing, so a
+                        // stale one can sit beside it. Removing the final file alone would let the
+                        // next launch promote that .tmp back.
+                        GsAtomicFile.TryDeleteWithTemp(_legacyCombinedPath);
                     }
                     else {
                         var pending = new List<string>();
@@ -281,7 +284,9 @@ namespace GsPlugin.Models {
         ///
         /// When initialized, a retained legacy <c>gs_snapshot.json</c> is always deleted, even if a
         /// compact save fails: the user asked for the data to be wiped, and that file holds the
-        /// full old library and achievement rows. The return value reflects the compact saves only.
+        /// full old library and achievement rows. Returns false when either compact save failed or
+        /// the legacy file (or its <c>.tmp</c>) could not be removed, so a caller can tell the wipe
+        /// is incomplete.
         /// </summary>
         public static bool ClearAll() {
             lock (_lock) {
@@ -309,21 +314,56 @@ namespace GsPlugin.Models {
                     _achievements.DeleteFile();
                 }
 
-                if (!string.IsNullOrEmpty(_legacyCombinedPath)) {
-                    GsAtomicFile.TryDelete(_legacyCombinedPath);
+                // A stale .tmp left by an interrupted promotion (or a crash before this final file
+                // existed) would otherwise survive a wipe and get promoted back on the next launch,
+                // resurrecting the data the user asked to clear.
+                var legacyGone = GsAtomicFile.TryDeleteWithTemp(_legacyCombinedPath);
 
-                    // A stale .tmp left by an interrupted promotion (or a crash before this
-                    // final file existed) would otherwise survive a wipe and get promoted back
-                    // on the next launch, resurrecting the data the user asked to clear.
-                    GsAtomicFile.TryDelete(_legacyCombinedPath + ".tmp");
-                }
-
-                return libSaved && achSaved;
+                return libSaved && achSaved && legacyGone;
             }
         }
 
         public static bool Reset() {
             return ClearAll();
+        }
+
+        /// <summary>
+        /// Called when the server accepted a library change but the library index could not
+        /// record it. See <see cref="InvalidateHalf"/>.
+        /// </summary>
+        public static bool InvalidateLibraryBaseline() {
+            return InvalidateHalf(_library);
+        }
+
+        /// <summary>
+        /// Called when the server accepted an achievements change but the achievement index could
+        /// not record it. See <see cref="InvalidateHalf"/>.
+        /// </summary>
+        public static bool InvalidateAchievementBaseline() {
+            return InvalidateHalf(_achievements);
+        }
+
+        /// <summary>
+        /// Drops one half's baseline in memory and on disk so its next sync is a full upload.
+        /// Leaving any baseline loadable here lets the server sit ahead of it: an item added and
+        /// synced, then removed locally before a restart, would match the recovered baseline and
+        /// the unchanged global hash, so no sync would ever remove it from the server.
+        ///
+        /// The legacy snapshot goes too, because it would re-derive the same outdated baseline on
+        /// the next launch. That also drops the other half's legacy fallback, which costs at most
+        /// one extra full upload for that half and only after two failed index writes.
+        /// Returns true when nothing that could restore an outdated baseline is left on disk.
+        /// </summary>
+        private static bool InvalidateHalf(GsHashIndexStore store) {
+            lock (_lock) {
+                var halfGone = store.Invalidate();
+                var legacyGone = GsAtomicFile.TryDeleteWithTemp(_legacyCombinedPath);
+                if (!halfGone || !legacyGone) {
+                    GsLogger.Warn("[GsSyncHashIndex] Could not remove an outdated baseline from disk; the next launch may diff against it.");
+                }
+
+                return halfGone && legacyGone;
+            }
         }
     }
 }

@@ -861,6 +861,7 @@ namespace GsPlugin.Services {
         /// <param name="label">Sync path name used to prefix log lines.</param>
         /// <param name="queueId">Server queue job id from the "queued" response.</param>
         /// <param name="persistIndex">Writes the per-item hash index; returns false if the save failed.</param>
+        /// <param name="invalidateIndex">Drops this half's baseline when the server accepted the change but <paramref name="persistIndex"/> failed, forcing a full upload next run.</param>
         /// <param name="persistHashes">Writes the global hash and sync bookkeeping into <see cref="GsData"/>.</param>
         /// <param name="queuedDetail">Optional detail appended to the "queued successfully" log line.</param>
         private async Task<SyncLibraryResult> CommitSyncBaselineAsync(
@@ -869,6 +870,7 @@ namespace GsPlugin.Services {
             string expectedInstallId,
             int expectedGeneration,
             Func<bool> persistIndex,
+            Func<bool> invalidateIndex,
             Action<GsData> persistHashes,
             string queuedDetail = null) {
             // == false, not != true. Only a status the server actually disowned (failed/partial)
@@ -890,6 +892,15 @@ namespace GsPlugin.Services {
                 indexSaved = persistIndex();
                 if (indexSaved) persistHashes(d);
             });
+            if (saved && !indexSaved) {
+                // The server applied the change but the index could not record it, so whatever
+                // baseline is still in memory or on disk is now behind the server. Diffing against
+                // it can hide that change for good (an item synced, then removed locally before a
+                // restart, matches the old baseline and the unchanged global hash). Drop the
+                // baseline so the next run of this half is a full upload.
+                invalidateIndex();
+            }
+
             if (!saved || !indexSaved) {
                 _logger.Error($"{label} queued but local hash index save failed — " +
                     "or the installation changed; will retry next run.");
@@ -961,6 +972,7 @@ namespace GsPlugin.Services {
                         "Full library sync",
                         response.queueId, installId, generation,
                         () => GsSyncHashIndex.ReplaceLibraryIndex(BuildLibraryFingerprints(library)),
+                        GsSyncHashIndex.InvalidateLibraryBaseline,
                         d => {
                             d.LastSyncAt = DateTime.UtcNow;
                             d.LastSyncGameCount = libCount;
@@ -1139,6 +1151,7 @@ namespace GsPlugin.Services {
                                 g => g.playnite_id,
                                 g => currentFingerprints[g.playnite_id]),
                             removed),
+                        GsSyncHashIndex.InvalidateLibraryBaseline,
                         d => {
                             d.LastSyncAt = DateTime.UtcNow;
                             d.LastSyncGameCount = libCount;
@@ -1302,6 +1315,7 @@ namespace GsPlugin.Services {
                         "Full achievements sync",
                         response.queueId, installId, generation,
                         () => GsSyncHashIndex.ReplaceAchievementIndex(BuildAchievementFingerprints(games)),
+                        GsSyncHashIndex.InvalidateAchievementBaseline,
                         d => d.LastAchievementHash = achHash);
                 }
 
@@ -1537,6 +1551,7 @@ namespace GsPlugin.Services {
                         "Achievement diff sync",
                         response.queueId, installId, generation,
                         () => GsSyncHashIndex.ApplyAchievementDiff(upsertedFingerprints, allCleared),
+                        GsSyncHashIndex.InvalidateAchievementBaseline,
                         d => d.LastAchievementHash = resultAchievementHash);
                 }
 

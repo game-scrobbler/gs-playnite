@@ -243,9 +243,28 @@ namespace GsPlugin.Models {
         /// cannot rely on <see cref="DiscardIfGenerationMismatch"/> to invalidate the untouched old
         /// file on the next load. Deleting it is what actually prevents that stale baseline from
         /// loading.
+        ///
+        /// The <c>.tmp</c> goes first. A failed replacement can leave a complete old baseline in it,
+        /// and with the final file gone <see cref="RecoverTemp"/> would promote it on the next
+        /// launch. Returns true when neither file is left on disk.
         /// </summary>
-        public void DeleteFile() {
-            GsAtomicFile.TryDelete(_filePath);
+        public bool DeleteFile() {
+            return GsAtomicFile.TryDeleteWithTemp(_filePath);
+        }
+
+        /// <summary>
+        /// Drops this half's baseline in memory and on disk, so the next sync of this half is a
+        /// full upload. For a server that accepted a change this half's file could not record:
+        /// any baseline left loadable would be behind the server and could hide that change from
+        /// later diffs and unchanged-hash checks. Returns true when no file is left on disk.
+        /// </summary>
+        public bool Invalidate() {
+            if (_index != null) {
+                _index.Entries = new Dictionary<string, string>();
+                _index.FullSyncAt = null;
+            }
+
+            return !HasFilePath || DeleteFile();
         }
 
         /// <summary>

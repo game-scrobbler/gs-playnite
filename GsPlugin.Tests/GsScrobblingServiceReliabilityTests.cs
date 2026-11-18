@@ -320,6 +320,61 @@ namespace GsPlugin.Tests {
             }
         }
 
+        /// <summary>
+        /// The server accepted the change but the index could not record it, so every baseline
+        /// left behind is older than the server. Diffing against one can hide a change for good
+        /// (an item synced, then removed locally before a restart, matches the old baseline and
+        /// the unchanged global hash), so the half must fall back to a full upload, now and after
+        /// a restart.
+        /// </summary>
+        [Theory]
+        [InlineData("library-full")]
+        [InlineData("library-diff")]
+        [InlineData("achievement-full")]
+        [InlineData("achievement-diff")]
+        public async Task AcceptedJobWithFailedIndexSave_DropsTheBaselineSoTheNextRunIsFull(string path) {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                var game = Game();
+                var id = game.Id.ToString();
+                GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> { [id] = "old-library" });
+                GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { [id] = "old-achievement" });
+                GsDataManager.MutateAndSave(d => { d.LastLibraryHash = "old-library-global"; d.LastAchievementHash = "old-achievement-global"; });
+                var isLibrary = path.StartsWith("library");
+                var indexPath = Path.Combine(temp.Path, isLibrary ? "gs_library_hashes.json" : "gs_achievement_hashes.json");
+
+                // A directory at the writer's temp path fails the index save deterministically.
+                var blocker = indexPath + ".tmp";
+                Directory.CreateDirectory(blocker);
+                try {
+                    var api = new FakeApi { QueueStatus = "processing" };
+                    var provider = new Provider { Result = AchievementReadResult.Available(new List<AchievementItem> { new AchievementItem { Name = "new" } }) };
+                    var service = Service(api, provider);
+                    SyncLibraryResult result;
+                    switch (path) {
+                        case "library-full": result = await service.SyncLibraryFullAsync(new[] { game }); break;
+                        case "library-diff": result = await service.SyncLibraryDiffAsync(new[] { game }); break;
+                        case "achievement-full": result = await service.SyncAchievementsFullAsync(new[] { game }); break;
+                        default: result = await service.SyncAchievementsDiffAsync(new[] { game }); break;
+                    }
+
+                    Assert.Equal(SyncLibraryResult.Error, result);
+                    Assert.False(isLibrary ? GsSyncHashIndex.HasLibraryBaseline : GsSyncHashIndex.HasAchievementsBaseline);
+                    Assert.False(File.Exists(indexPath));
+                    Assert.Equal(isLibrary ? "old-library-global" : "old-achievement-global",
+                        isLibrary ? GsDataManager.Data.LastLibraryHash : GsDataManager.Data.LastAchievementHash);
+
+                    // The other half is untouched.
+                    Assert.True(isLibrary ? GsSyncHashIndex.HasAchievementsBaseline : GsSyncHashIndex.HasLibraryBaseline);
+                }
+                finally {
+                    Directory.Delete(blocker);
+                }
+
+                GsSyncHashIndex.Initialize(temp.Path);
+                Assert.False(isLibrary ? GsSyncHashIndex.HasLibraryBaseline : GsSyncHashIndex.HasAchievementsBaseline);
+            }
+        }
+
         [Fact]
         public async Task MissingQueueId_DoesNotCommitBaseline() {
             using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
