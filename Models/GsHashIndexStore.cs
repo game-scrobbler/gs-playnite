@@ -237,6 +237,18 @@ namespace GsPlugin.Models {
         }
 
         /// <summary>
+        /// Deletes this half's on-disk file outright. For use after a failed <see cref="Save"/>
+        /// during a reset: the generation stamp a successful save would have written only changes
+        /// across an identity rotation, so a same-identity reset (unlink, user-initiated clear)
+        /// cannot rely on <see cref="DiscardIfGenerationMismatch"/> to invalidate the untouched old
+        /// file on the next load. Deleting it is what actually prevents that stale baseline from
+        /// loading.
+        /// </summary>
+        public void DeleteFile() {
+            GsAtomicFile.TryDelete(_filePath);
+        }
+
+        /// <summary>
         /// Builds a compact index from one half of a legacy snapshot dictionary using the supplied
         /// fingerprint recipe. Shared by both halves: the element type and the recipe are the
         /// only things that differ.

@@ -297,6 +297,18 @@ namespace GsPlugin.Models {
                 var libSaved = _library.Save();
                 var achSaved = _achievements.Save();
 
+                // A failed save here leaves the old file in place, stamped with a generation
+                // that still matches (nothing rotated), so the generation check on the next
+                // Initialize would not catch it as stale and the pre-reset baseline would
+                // resurface. Delete it outright instead of relying on that check.
+                if (!libSaved) {
+                    _library.DeleteFile();
+                }
+
+                if (!achSaved) {
+                    _achievements.DeleteFile();
+                }
+
                 if (!string.IsNullOrEmpty(_legacyCombinedPath)) {
                     GsAtomicFile.TryDelete(_legacyCombinedPath);
 
