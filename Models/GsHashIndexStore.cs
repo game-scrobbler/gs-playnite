@@ -5,6 +5,18 @@ using System.Text.Json;
 using GsPlugin.Infrastructure;
 
 namespace GsPlugin.Models {
+    /// <summary>Outcome of deriving one half from the legacy fat snapshot.</summary>
+    internal enum GsLegacyHalfResult {
+        /// <summary>The half was derived from the snapshot.</summary>
+        Migrated,
+
+        /// <summary>The snapshot parsed but carries no data for this half.</summary>
+        Absent,
+
+        /// <summary>No snapshot could be read, or deriving this half threw.</summary>
+        Unavailable
+    }
+
     /// <summary>
     /// One compact fingerprint index file (the library half or the achievements half). Owns its
     /// path and its in-memory <see cref="GsSyncHashIndexFile"/>. The two halves are otherwise
@@ -102,26 +114,34 @@ namespace GsPlugin.Models {
         /// the snapshot is missing or carries nothing for this half. Always leaves a non-null
         /// index. Never writes or deletes: the caller persists and clears the legacy file after
         /// the generation check. Takes the parsed snapshot rather than a path because the facade
-        /// parses the multi-megabyte file at most once for both halves. Returns whether the index
-        /// came from a migration.
+        /// parses the multi-megabyte file at most once for both halves.
+        ///
+        /// The result separates "the snapshot has nothing for this half" (<see
+        /// cref="GsLegacyHalfResult.Absent"/>, so the legacy file is not needed for it) from "this
+        /// half could not be derived" (<see cref="GsLegacyHalfResult.Unavailable"/>: the snapshot
+        /// was unreadable, or the fingerprint recipe threw on a malformed entry). Only the latter
+        /// must keep the legacy file, because it may still hold the only copy of this baseline.
         /// </summary>
-        public bool MigrateFromLegacy(GsSnapshot legacy) {
-            if (legacy != null) {
-                try {
-                    var derived = _fromLegacySnapshot(legacy);
-                    if (derived != null) {
-                        GsLogger.Info($"[GsSyncHashIndex] Migrating {_legacyHalfLabel} half of gs_snapshot.json");
-                        _index = derived;
-                        return true;
-                    }
-                }
-                catch (Exception ex) {
-                    GsLogger.Warn($"[GsSyncHashIndex] Combined snapshot {_legacyHalfLabel} migrate failed: {ex.Message}");
-                }
+        public GsLegacyHalfResult MigrateFromLegacy(GsSnapshot legacy) {
+            _index = new GsSyncHashIndexFile();
+            if (legacy == null) {
+                return GsLegacyHalfResult.Unavailable;
             }
 
-            _index = new GsSyncHashIndexFile();
-            return false;
+            try {
+                var derived = _fromLegacySnapshot(legacy);
+                if (derived == null) {
+                    return GsLegacyHalfResult.Absent;
+                }
+
+                GsLogger.Info($"[GsSyncHashIndex] Migrating {_legacyHalfLabel} half of gs_snapshot.json");
+                _index = derived;
+                return GsLegacyHalfResult.Migrated;
+            }
+            catch (Exception ex) {
+                GsLogger.Warn($"[GsSyncHashIndex] Combined snapshot {_legacyHalfLabel} migrate failed: {ex.Message}");
+                return GsLegacyHalfResult.Unavailable;
+            }
         }
 
         /// <summary>

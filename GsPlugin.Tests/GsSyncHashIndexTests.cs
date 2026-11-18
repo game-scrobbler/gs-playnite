@@ -399,6 +399,56 @@ namespace GsPlugin.Tests {
         }
 
         [Fact]
+        public void Initialize_UnreadableLegacyUnderNonZeroGeneration_KeepsLegacyAcrossLaunches() {
+            // Pins: a half that started empty is not written just to re-stamp its generation.
+            // Writing empty compact files here made the second launch load them as valid halves
+            // and delete the legacy snapshot the first launch could not read.
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                GsDataManager.MutateAndSave(d => d.IdentityGeneration = d.IdentityGeneration + 1);
+                Assert.NotEqual(0, CurrentGeneration());
+                var legacyPath = Path.Combine(temp.Path, LegacyFile);
+                File.WriteAllText(legacyPath, "{ not json");
+
+                GsSyncHashIndex.Initialize(temp.Path);
+                GsSyncHashIndex.Initialize(temp.Path);
+
+                Assert.True(File.Exists(legacyPath));
+                Assert.False(File.Exists(Path.Combine(temp.Path, LibraryFile)));
+                Assert.False(File.Exists(Path.Combine(temp.Path, AchievementFile)));
+                Assert.False(GsSyncHashIndex.HasLibraryBaseline);
+                Assert.False(GsSyncHashIndex.HasAchievementsBaseline);
+            }
+        }
+
+        [Fact]
+        public void Initialize_LegacyHalfThatFailsToDerive_KeepsLegacy() {
+            // Pins: a half whose fingerprint recipe throws on a malformed legacy entry counts as
+            // not durable, so the other half migrating cannot delete its only copy.
+            using (var temp = TempPluginDir.Create()) {
+                var legacy = BuildLegacySnapshot(CurrentGeneration());
+                // A null achievement row makes the recipe dereference null.
+                legacy.Achievements["legacy-game"].achievements = new List<AchievementSnapshot> { null };
+                var legacyPath = WriteLegacySnapshot(temp.Path, legacy);
+
+                GsSyncHashIndex.Initialize(temp.Path);
+
+                Assert.True(GsSyncHashIndex.HasLibraryBaseline);
+                Assert.True(File.Exists(Path.Combine(temp.Path, LibraryFile)));
+                Assert.False(GsSyncHashIndex.HasAchievementsBaseline);
+                Assert.True(File.Exists(legacyPath));
+
+                // The next launch loads the library from its compact file and still keeps the
+                // legacy file for the half it cannot derive.
+                GsSyncHashIndex.Initialize(temp.Path);
+
+                Assert.True(File.Exists(legacyPath));
+                Assert.Equal(
+                    GsHashUtils.LibraryFingerprintFromSnapshot(legacy.Library["legacy-game"]),
+                    GsSyncHashIndex.GetLibraryFingerprints()["legacy-game"]);
+            }
+        }
+
+        [Fact]
         public void Initialize_UnreadableLegacyWithBothCompactFilesValid_DeletesLegacy() {
             // Pins: an unreadable legacy file that is no longer needed (both compact files are
             // valid) is deleted, and the compact baselines are left intact.

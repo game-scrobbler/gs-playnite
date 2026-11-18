@@ -53,6 +53,10 @@ namespace GsPlugin.Models {
             sentryOperation: "GsSyncHashIndex.SaveAchievements",
             fromLegacySnapshot: AchievementsFromLegacySnapshot);
 
+        /// <summary>
+        /// Same settings the store used when it read the legacy file itself. <see cref="GsSnapshot"/>
+        /// has no naming policy or converters, and WriteIndented has no effect on reads.
+        /// </summary>
         private static readonly JsonSerializerOptions _legacyJsonOptions = new JsonSerializerOptions {
             WriteIndented = false
         };
@@ -125,18 +129,11 @@ namespace GsPlugin.Models {
                 // its index ends up non-null. A compact file that exists but is unreadable is
                 // replaced by the legacy-derived baseline: it could be a transient lock rather than
                 // corruption, and the worst case is the same older-baseline redundancy noted below.
-                var libMigrated = !libLoaded && _library.MigrateFromLegacy(legacy);
-                var achMigrated = !achLoaded && _achievements.MigrateFromLegacy(legacy);
+                var libLegacy = libLoaded ? (GsLegacyHalfResult?)null : _library.MigrateFromLegacy(legacy);
+                var achLegacy = achLoaded ? (GsLegacyHalfResult?)null : _achievements.MigrateFromLegacy(legacy);
 
-                var libNeedsSave = libMigrated;
-                if (_library.DiscardIfGenerationMismatch(currentGeneration)) {
-                    libNeedsSave = true;
-                }
-
-                var achNeedsSave = achMigrated;
-                if (_achievements.DiscardIfGenerationMismatch(currentGeneration)) {
-                    achNeedsSave = true;
-                }
+                var libNeedsSave = PrepareHalfForSave(_library, libLoaded, libLegacy, currentGeneration);
+                var achNeedsSave = PrepareHalfForSave(_achievements, achLoaded, achLegacy, currentGeneration);
 
                 // Both saves are always attempted: the halves are independent, so one failing must
                 // not stop the other from becoming durable.
@@ -151,10 +148,11 @@ namespace GsPlugin.Models {
 
                 // A half no longer needs the legacy file once its write (if any) succeeded and it
                 // either loaded from a valid compact file, migrated, or the legacy snapshot parsed
-                // fine and simply carries nothing for it. When the legacy file could not be parsed
-                // and the half did not load, the legacy data may still be the only copy.
-                var librarySafe = librarySaved && (libLoaded || libMigrated || legacy != null);
-                var achievementsSafe = achievementsSaved && (achLoaded || achMigrated || legacy != null);
+                // fine and simply carries nothing for it. When the half did not load and could not
+                // be derived (snapshot unreadable, or the fingerprint recipe threw on a malformed
+                // entry), the legacy data may still be the only copy.
+                var librarySafe = librarySaved && (libLoaded || libLegacy != GsLegacyHalfResult.Unavailable);
+                var achievementsSafe = achievementsSaved && (achLoaded || achLegacy != GsLegacyHalfResult.Unavailable);
 
                 // Deletion depends on every half being durable or not needing the legacy data, not
                 // on whether this call migrated anything. That way a legacy file retained after a
@@ -167,17 +165,39 @@ namespace GsPlugin.Models {
                     else {
                         var pending = new List<string>();
                         if (!librarySafe) {
-                            pending.Add(librarySaved ? "library (legacy snapshot unreadable)" : "library (save failed)");
+                            pending.Add(librarySaved ? "library (legacy data unreadable)" : "library (save failed)");
                         }
 
                         if (!achievementsSafe) {
-                            pending.Add(achievementsSaved ? "achievements (legacy snapshot unreadable)" : "achievements (save failed)");
+                            pending.Add(achievementsSaved ? "achievements (legacy data unreadable)" : "achievements (save failed)");
                         }
 
                         GsLogger.Warn($"[GsSyncHashIndex] Legacy gs_snapshot.json retained; not yet durable: {string.Join(", ", pending)}. The next Initialize retries.");
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Applies the generation check to one half and reports whether it must be written.
+        /// A half with data (loaded or migrated) is discarded on a generation mismatch, and the
+        /// discard is persisted. A half that started empty is only re-stamped in memory: writing
+        /// an empty file for it would make the next launch load that file as a valid compact half
+        /// and delete a legacy snapshot this launch could not read, losing the baseline.
+        /// </summary>
+        private static bool PrepareHalfForSave(
+            GsHashIndexStore store,
+            bool loaded,
+            GsLegacyHalfResult? legacyHalf,
+            int currentGeneration) {
+            var migrated = legacyHalf == GsLegacyHalfResult.Migrated;
+            if (!loaded && !migrated) {
+                store.ResetToGeneration(currentGeneration);
+                return false;
+            }
+
+            var discarded = store.DiscardIfGenerationMismatch(currentGeneration);
+            return migrated || discarded;
         }
 
         public static bool HasLibraryBaseline {
