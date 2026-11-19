@@ -574,6 +574,23 @@ namespace GsPlugin.Models {
 
         /// <summary>Rejects responses that belong to a deleted or replaced installation.</summary>
         public static bool TryMutateIfActiveIdentity(string expectedInstallId, int expectedGeneration, Action<GsData> action) {
+            return TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration, action, null);
+        }
+
+        /// <summary>
+        /// Runs <paramref name="afterPersistence"/> synchronously after the mutation's save or
+        /// rollback, while the same identity lock is still held. Neither callback runs for a
+        /// rejected identity. Completion receives whether the data save succeeded. It is outside
+        /// the rollback transaction, so a failed save cannot undo recovery state it records.
+        /// Callbacks must not await other threads
+        /// that need this lock. Exceptions propagate without invoking completion for a thrown
+        /// mutation.
+        /// </summary>
+        public static bool TryMutateIfActiveIdentity(
+            string expectedInstallId,
+            int expectedGeneration,
+            Action<GsData> action,
+            Action<bool> afterPersistence) {
             bool saved;
             lock (_lock) {
                 if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
@@ -581,6 +598,7 @@ namespace GsPlugin.Models {
                 }
 
                 saved = PersistMutation(action);
+                afterPersistence?.Invoke(saved);
             }
 
             if (saved) NotifyDiagnosticsChanged();

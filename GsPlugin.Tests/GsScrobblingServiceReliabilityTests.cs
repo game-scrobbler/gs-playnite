@@ -321,18 +321,26 @@ namespace GsPlugin.Tests {
         }
 
         /// <summary>
-        /// The server accepted the change but the index could not record it, so every baseline
-        /// left behind is older than the server. Diffing against one can hide a change for good
+        /// The server accepted the change but one or both local baseline writes failed. A compact
+        /// index and global hash from different syncs must not be trusted. Diffing against one can hide a change for good
         /// (an item synced, then removed locally before a restart, matches the old baseline and
         /// the unchanged global hash), so the half must fall back to a full upload, now and after
         /// a restart.
         /// </summary>
         [Theory]
-        [InlineData("library-full")]
-        [InlineData("library-diff")]
-        [InlineData("achievement-full")]
-        [InlineData("achievement-diff")]
-        public async Task AcceptedJobWithFailedIndexSave_DropsTheBaselineSoTheNextRunIsFull(string path) {
+        [InlineData("library-full", true, false)]
+        [InlineData("library-full", false, true)]
+        [InlineData("library-full", true, true)]
+        [InlineData("library-diff", true, false)]
+        [InlineData("library-diff", false, true)]
+        [InlineData("library-diff", true, true)]
+        [InlineData("achievement-full", true, false)]
+        [InlineData("achievement-full", false, true)]
+        [InlineData("achievement-full", true, true)]
+        [InlineData("achievement-diff", true, false)]
+        [InlineData("achievement-diff", false, true)]
+        [InlineData("achievement-diff", true, true)]
+        public async Task AcceptedJobWithFailedLocalSave_DropsTheBaselineSoTheNextRunIsFull(string path, bool blockIndexSave, bool blockDataSave) {
             using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
                 var game = Game();
                 var id = game.Id.ToString();
@@ -344,7 +352,9 @@ namespace GsPlugin.Tests {
 
                 // A directory at the writer's temp path fails the index save deterministically.
                 var blocker = indexPath + ".tmp";
-                Directory.CreateDirectory(blocker);
+                if (blockIndexSave) Directory.CreateDirectory(blocker);
+                var dataBlocker = Path.Combine(temp.Path, "gs_data.json.tmp");
+                if (blockDataSave) Directory.CreateDirectory(dataBlocker);
                 try {
                     var api = new FakeApi { QueueStatus = "processing" };
                     var provider = new Provider { Result = AchievementReadResult.Available(new List<AchievementItem> { new AchievementItem { Name = "new" } }) };
@@ -367,9 +377,11 @@ namespace GsPlugin.Tests {
                     Assert.True(isLibrary ? GsSyncHashIndex.HasAchievementsBaseline : GsSyncHashIndex.HasLibraryBaseline);
                 }
                 finally {
-                    Directory.Delete(blocker);
+                    if (blockIndexSave) Directory.Delete(blocker);
+                    if (blockDataSave) Directory.Delete(dataBlocker);
                 }
 
+                GsDataManager.Initialize(temp.Path, null);
                 GsSyncHashIndex.Initialize(temp.Path);
                 Assert.False(isLibrary ? GsSyncHashIndex.HasLibraryBaseline : GsSyncHashIndex.HasAchievementsBaseline);
             }

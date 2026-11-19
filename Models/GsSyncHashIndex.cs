@@ -413,8 +413,9 @@ namespace GsPlugin.Models {
                 // A lock that blocked the index save can block these deletes too. Record that the
                 // half still has to be dropped, in gs_data.json (a different file), so the next
                 // Initialize finishes the job instead of loading the outdated baseline. Done
-                // outside the index lock; callers must not hold the data lock (CommitSyncBaselineAsync
-                // calls this after TryMutateIfActiveIdentity returns).
+                // outside the index lock. Sync commits retain the identity/data lock here, but
+                // only after PersistMutation has finished its save or rollback. MutateAndSave
+                // re-enters that lock, so its pending marker is not part of a rollback snapshot.
                 GsLogger.Warn("[GsSyncHashIndex] Could not remove an outdated baseline from disk; the next Initialize will drop it.");
                 GsDataManager.MutateAndSave(markPending);
             }

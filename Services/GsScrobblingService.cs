@@ -854,14 +854,15 @@ namespace GsPlugin.Services {
         /// <item>persist the per-item hash index for ALL items,</item>
         /// <item>only then write the global Last*Hash and the rest of the sync bookkeeping.</item>
         /// </list>
-        /// Any step failing returns <see cref="SyncLibraryResult.Error"/> without touching the
-        /// steps after it, so a mid-failure leaves the previous good baseline intact and the next
-        /// run re-syncs rather than trusting a baseline that was never durably written.
+        /// A rejected job leaves the prior baseline intact. Once the server accepts a job, a
+        /// failure of either local write invalidates that half,
+        /// so the next run does not trust an outdated baseline. Either write failing returns
+        /// <see cref="SyncLibraryResult.Error"/>.
         /// </summary>
         /// <param name="label">Sync path name used to prefix log lines.</param>
         /// <param name="queueId">Server queue job id from the "queued" response.</param>
         /// <param name="persistIndex">Writes the per-item hash index; returns false if the save failed.</param>
-        /// <param name="invalidateIndex">Drops this half's baseline when the server accepted the change but <paramref name="persistIndex"/> failed, forcing a full upload next run.</param>
+        /// <param name="invalidateIndex">Drops this half's baseline when the server accepted the change but either local write failed, forcing a full upload next run.</param>
         /// <param name="persistHashes">Writes the global hash and sync bookkeeping into <see cref="GsData"/>.</param>
         /// <param name="queuedDetail">Optional detail appended to the "queued successfully" log line.</param>
         private async Task<SyncLibraryResult> CommitSyncBaselineAsync(
@@ -891,18 +892,16 @@ namespace GsPlugin.Services {
             var saved = GsDataManager.TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration, d => {
                 indexSaved = persistIndex();
                 if (indexSaved) persistHashes(d);
+            }, dataSaved => {
+                // This runs only if the identity guard accepted the index attempt, after any
+                // data-save rollback but before releasing the identity lock. A failed data save
+                // must not suppress invalidation or roll back its pending marker, and a newer
+                // commit or identity must not slip in between the local save failure and cleanup.
+                if (!dataSaved || !indexSaved) invalidateIndex();
             });
-            if (saved && !indexSaved) {
-                // The server applied the change but the index could not record it, so whatever
-                // baseline is still in memory or on disk is now behind the server. Diffing against
-                // it can hide that change for good (an item synced, then removed locally before a
-                // restart, matches the old baseline and the unchanged global hash). Drop the
-                // baseline so the next run of this half is a full upload.
-                invalidateIndex();
-            }
 
             if (!saved || !indexSaved) {
-                _logger.Error($"{label} queued but local hash index save failed — " +
+                _logger.Error($"{label} queued but a local baseline write failed — " +
                     "or the installation changed; will retry next run.");
                 return SyncLibraryResult.Error;
             }

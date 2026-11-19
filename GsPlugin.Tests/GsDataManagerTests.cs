@@ -1,12 +1,150 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using System.Threading;
 using GsPlugin.Models;
 using Xunit;
 
 namespace GsPlugin.Tests {
     [Collection("StaticManagerTests")]
     public class GsDataManagerTests {
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void IdentityMutationCompletion_RunsAfterRollbackWhileStillHoldingIdentityLock(bool blockDataSave) {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                GsDataManager.MutateAndSave(d => d.LastLibraryHash = "before");
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
+                var syncLock = typeof(GsDataManager).GetField("_lock", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
+                var blocker = Path.Combine(temp.Path, "gs_data.json.tmp");
+                if (blockDataSave) Directory.CreateDirectory(blocker);
+                var completed = 0;
+                try {
+                    var saved = GsDataManager.TryMutateIfActiveIdentity(installId, generation,
+                        d => d.LastLibraryHash = "after",
+                        dataSaved => {
+                            Assert.Equal(!blockDataSave, dataSaved);
+                            completed++;
+                            Assert.Equal(blockDataSave ? "before" : "after", GsDataManager.Data.LastLibraryHash);
+                            Assert.True(Monitor.IsEntered(syncLock));
+                            var enteredOnOtherThread = false;
+                            var contender = new Thread(() => {
+                                enteredOnOtherThread = Monitor.TryEnter(syncLock);
+                                if (enteredOnOtherThread) Monitor.Exit(syncLock);
+                            });
+                            contender.Start();
+                            Assert.True(contender.Join(TimeSpan.FromSeconds(5)));
+                            Assert.False(enteredOnOtherThread);
+
+                            // Recovery state is written after rollback, not into its discarded copy.
+                            GsDataManager.MutateAndSave(d => d.LibraryBaselineInvalidationPending = true);
+                        });
+                    Assert.Equal(!blockDataSave, saved);
+                    Assert.Equal(1, completed);
+                    Assert.True(GsDataManager.Data.LibraryBaselineInvalidationPending);
+                }
+                finally {
+                    if (blockDataSave) Directory.Delete(blocker);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("install")]
+        [InlineData("generation")]
+        [InlineData("opt-out")]
+        public void IdentityMutationCompletion_RejectedIdentityRunsNeitherCallback(string rejection) {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                var installId = GsDataManager.Data.InstallID;
+                var generation = GsDataManager.Data.IdentityGeneration;
+                if (rejection == "install") installId = Guid.NewGuid().ToString();
+                if (rejection == "generation") generation++;
+                if (rejection == "opt-out") GsDataManager.PerformOptOut();
+                var dataPath = Path.Combine(temp.Path, "gs_data.json");
+                var before = File.ReadAllBytes(dataPath);
+                var mutated = false;
+                var completed = false;
+                Assert.False(GsDataManager.TryMutateIfActiveIdentity(installId, generation,
+                    d => mutated = true, _ => completed = true));
+                Assert.False(mutated);
+                Assert.False(completed);
+                Assert.Equal(before, File.ReadAllBytes(dataPath));
+            }
+        }
+
+        [Fact]
+        public void IdentityMutationCompletion_ThrownMutationRollsBackWithoutRunningCompletion() {
+            using (var temp = TempPluginDir.CreateWithDataManager()) {
+                GsDataManager.MutateAndSave(d => d.LastLibraryHash = "before");
+                var completed = false;
+                Assert.Throws<InvalidOperationException>(() => GsDataManager.TryMutateIfActiveIdentity(
+                    GsDataManager.Data.InstallID, GsDataManager.Data.IdentityGeneration,
+                    d => {
+                        d.LastLibraryHash = "after";
+                        throw new InvalidOperationException("synthetic mutation failure");
+                    }, _ => completed = true));
+                Assert.False(completed);
+                Assert.Equal("before", GsDataManager.Data.LastLibraryHash);
+            }
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void IdentityMutationCompletion_BlockedDeleteAndDataSaveRetainPendingInvalidation(bool library) {
+            using (var temp = TempPluginDir.CreateWithDataManagerAndHashIndex()) {
+                var entries = new Dictionary<string, string> { ["old"] = "fingerprint" };
+                Assert.True(library
+                    ? GsSyncHashIndex.ReplaceLibraryIndex(entries)
+                    : GsSyncHashIndex.ReplaceAchievementIndex(entries));
+                var indexPath = Path.Combine(temp.Path, library ? "gs_library_hashes.json" : "gs_achievement_hashes.json");
+                var blocker = Path.Combine(temp.Path, "gs_data.json.tmp");
+                Directory.CreateDirectory(blocker);
+                try {
+                    // On the supported Windows runtime this blocks replacement and deletion.
+                    using (new FileStream(indexPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                        var indexSaved = true;
+                        var saved = GsDataManager.TryMutateIfActiveIdentity(
+                            GsDataManager.Data.InstallID, GsDataManager.Data.IdentityGeneration,
+                            d => indexSaved = library
+                                ? GsSyncHashIndex.ReplaceLibraryIndex(new Dictionary<string, string> { ["new"] = "fingerprint" })
+                                : GsSyncHashIndex.ReplaceAchievementIndex(new Dictionary<string, string> { ["new"] = "fingerprint" }),
+                            dataSaved => {
+                                Assert.False(dataSaved);
+                                Assert.False(indexSaved);
+                                Assert.False(library
+                                    ? GsSyncHashIndex.InvalidateLibraryBaseline()
+                                    : GsSyncHashIndex.InvalidateAchievementBaseline());
+                            });
+                        Assert.False(saved);
+                        Assert.True(library
+                            ? GsDataManager.Data.LibraryBaselineInvalidationPending
+                            : GsDataManager.Data.AchievementBaselineInvalidationPending);
+                        Assert.False(library ? GsSyncHashIndex.HasLibraryBaseline : GsSyncHashIndex.HasAchievementsBaseline);
+                        Assert.True(File.Exists(indexPath));
+                    }
+                }
+                finally {
+                    Directory.Delete(blocker);
+                }
+
+                // Once storage recovers, a later save makes the marker durable for startup cleanup.
+                GsDataManager.Save();
+                GsDataManager.Initialize(temp.Path, null);
+                Assert.True(library
+                    ? GsDataManager.Data.LibraryBaselineInvalidationPending
+                    : GsDataManager.Data.AchievementBaselineInvalidationPending);
+                GsSyncHashIndex.Initialize(temp.Path);
+                Assert.False(File.Exists(indexPath));
+                Assert.False(library ? GsSyncHashIndex.HasLibraryBaseline : GsSyncHashIndex.HasAchievementsBaseline);
+                Assert.False(library
+                    ? GsDataManager.Data.LibraryBaselineInvalidationPending
+                    : GsDataManager.Data.AchievementBaselineInvalidationPending);
+            }
+        }
+
         [Fact]
         public void IsAccountLinked_WhenLinkedUserIdIsNull_ReturnsFalse() {
             using (var temp = TempPluginDir.CreateWithDataManager()) {
