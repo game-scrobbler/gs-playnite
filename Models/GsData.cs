@@ -110,6 +110,15 @@ namespace GsPlugin.Models {
         // UTC time until which the server has asked us not to send library diffs.
         public DateTime? LibraryDiffSyncCooldownExpiresAt { get; set; } = null;
 
+        // Set when the server accepted a sync whose index write failed and the outdated baseline
+        // could not be deleted either (GsSyncHashIndex.InvalidateLibraryBaseline). The next
+        // GsSyncHashIndex.Initialize treats the half as empty, retries the delete, and clears the
+        // flag once nothing outdated is left; a successful baseline commit also clears it.
+        public bool LibraryBaselineInvalidationPending { get; set; } = false;
+
+        // Achievements twin of LibraryBaselineInvalidationPending.
+        public bool AchievementBaselineInvalidationPending { get; set; } = false;
+
         // Hash of last-synced integration accounts (e.g. Steam UserId).
         // Forces a sync when a user links/switches accounts even if the library is unchanged.
         public string LastIntegrationAccountsHash { get; set; } = null;
@@ -565,6 +574,23 @@ namespace GsPlugin.Models {
 
         /// <summary>Rejects responses that belong to a deleted or replaced installation.</summary>
         public static bool TryMutateIfActiveIdentity(string expectedInstallId, int expectedGeneration, Action<GsData> action) {
+            return TryMutateIfActiveIdentity(expectedInstallId, expectedGeneration, action, null);
+        }
+
+        /// <summary>
+        /// Runs <paramref name="afterPersistence"/> synchronously after the mutation's save or
+        /// rollback, while the same identity lock is still held. Neither callback runs for a
+        /// rejected identity. Completion receives whether the data save succeeded. It is outside
+        /// the rollback transaction, so a failed save cannot undo recovery state it records.
+        /// Callbacks must not await other threads
+        /// that need this lock. Exceptions propagate without invoking completion for a thrown
+        /// mutation.
+        /// </summary>
+        public static bool TryMutateIfActiveIdentity(
+            string expectedInstallId,
+            int expectedGeneration,
+            Action<GsData> action,
+            Action<bool> afterPersistence) {
             bool saved;
             lock (_lock) {
                 if (!IsActiveIdentity(expectedInstallId, expectedGeneration)) {
@@ -572,6 +598,7 @@ namespace GsPlugin.Models {
                 }
 
                 saved = PersistMutation(action);
+                afterPersistence?.Invoke(saved);
             }
 
             if (saved) NotifyDiagnosticsChanged();
@@ -965,7 +992,10 @@ namespace GsPlugin.Models {
             }
 
             // Reset hash index outside the data lock (each manager has its own lock).
-            GsSyncHashIndex.Reset();
+            if (!GsSyncHashIndex.Reset()) {
+                GsLogger.Warn("Hash index reset was incomplete after InstallID rotation; a stale baseline may remain on disk until a later retry.");
+            }
+
             DiagnosticsStateChanged?.Invoke(null, EventArgs.Empty);
             return newId;
         }

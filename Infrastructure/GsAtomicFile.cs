@@ -141,6 +141,22 @@ namespace GsPlugin.Infrastructure {
             }
         }
 
+        /// <summary>
+        /// Best-effort delete of a file and its <c>.tmp</c>, temp first: deleting only the final
+        /// file would let <see cref="RecoverTemp"/> promote the temp back on the next launch.
+        /// Returns true when neither is left on disk.
+        /// </summary>
+        public static bool TryDeleteWithTemp(string path) {
+            if (string.IsNullOrEmpty(path)) {
+                return true;
+            }
+
+            var tempPath = path + ".tmp";
+            TryDelete(tempPath);
+            TryDelete(path);
+            return !File.Exists(tempPath) && !File.Exists(path);
+        }
+
         /// <summary>Best-effort delete; swallows and logs failures.</summary>
         public static void TryDelete(string path) {
             if (string.IsNullOrEmpty(path) || !File.Exists(path)) {
